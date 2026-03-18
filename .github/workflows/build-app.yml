@@ -1,0 +1,140 @@
+name: CI Quality Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  strict-host-agnostic:
+    name: Strict Host-Agnostic Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard strict lane against host package manager setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          workflow = pathlib.Path(".github/workflows/build-app.yml").read_text(encoding="utf-8")
+          match = re.search(r"# strict-lane:start(.*?)# strict-lane:end", workflow, re.S)
+          if not match:
+            print("Strict lane markers not found in build-app workflow.", file=sys.stderr)
+            sys.exit(1)
+
+          strict_block = match.group(1)
+          if re.search(r"\b(?:brew|apt(?:-get)?|choco)\b", strict_block):
+            print("Strict lane must not include brew/apt/choco setup.", file=sys.stderr)
+            sys.exit(1)
+          PY
+
+      # strict-lane:start
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Fetch upstream native artifacts (strict lane)
+        run: npm run fetch:native-artifacts:upstream
+
+      - name: Frontend typecheck (strict lane)
+        run: npm run typecheck
+
+      - name: Validate native artifact manifest (strict lane)
+        run: npm run validate:native-artifacts:strict
+
+      - name: Rust app compile check (strict lane)
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+      # strict-lane:end
+
+  quality-gates:
+    name: Quality Gates
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            lane: full
+          - os: macos-latest
+            lane: smoke
+          - os: windows-latest
+            lane: smoke
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Frontend checks (full lane)
+        if: matrix.lane == 'full'
+        run: npm run check:frontend
+
+      - name: Troubleshooting guardrail tests (full lane)
+        if: matrix.lane == 'full'
+        run: npm run test:troubleshooting
+
+      - name: Packet fidelity checks (full lane)
+        if: matrix.lane == 'full'
+        run: npm run test:packet-fidelity
+
+      - name: Rust format check (core lane)
+        if: matrix.lane == 'full'
+        run: npm run rust:fmt:check
+
+      - name: Rust clippy check (core lane)
+        if: matrix.lane == 'full'
+        run: npm run rust:clippy
+
+      - name: Rust tests (core lane)
+        if: matrix.lane == 'full'
+        run: npm run rust:test
+
+      - name: Rust format check (full app lane)
+        if: matrix.lane == 'full'
+        run: npm run rust:fmt:check:app
+
+      - name: Rust clippy check (full app lane)
+        if: matrix.lane == 'full'
+        run: npm run rust:clippy:app
+
+      - name: Rust tests (full app lane)
+        if: matrix.lane == 'full'
+        run: npm run rust:test:app
+
+      - name: Frontend typecheck (smoke lane)
+        if: matrix.lane == 'smoke'
+        run: npm run typecheck
+
+      - name: Rust app compile check (smoke lane)
+        if: matrix.lane == 'smoke'
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets

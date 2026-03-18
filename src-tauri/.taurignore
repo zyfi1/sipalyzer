@@ -1,0 +1,3 @@
+# Ignore bundled resources from the dev file watcher
+# These are static assets that don't change during development
+resources/

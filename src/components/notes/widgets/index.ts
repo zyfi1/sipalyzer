@@ -1,0 +1,1 @@
+export { InlineNoteWidget } from "./InlineNoteWidget";

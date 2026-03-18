@@ -1,0 +1,15 @@
+name = "sipalyzer-relay"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[durable_objects.bindings]]
+name = "RELAY_SESSION"
+class_name = "RelaySession"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RelaySession"]
+
+[[routes]]
+pattern = "relay.zyfi.io/*"
+zone_name = "zyfi.io"

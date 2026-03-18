@@ -1,0 +1,53 @@
+name: Core Crate Quality Checks
+
+on:
+  push:
+    paths:
+      - "src-tauri/crates/sipalyzer-core/**"
+    branches: [main]
+  pull_request:
+    paths:
+      - "src-tauri/crates/sipalyzer-core/**"
+      - ".github/workflows/build-agent.yml"
+      - "src-tauri/crates/sipalyzer-core/Cargo.toml"
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    name: Core Quality Gates
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            lane: full
+          - os: macos-latest
+            lane: smoke
+          - os: windows-latest
+            lane: smoke
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust format check (full lane)
+        if: matrix.lane == 'full'
+        run: cargo fmt --manifest-path src-tauri/crates/sipalyzer-core/Cargo.toml -- --check
+
+      - name: Rust clippy check (full lane)
+        if: matrix.lane == 'full'
+        run: cargo clippy --manifest-path src-tauri/crates/sipalyzer-core/Cargo.toml --all-targets -- -D warnings
+
+      - name: Rust tests (full lane)
+        if: matrix.lane == 'full'
+        run: cargo test --manifest-path src-tauri/crates/sipalyzer-core/Cargo.toml --locked
+
+      - name: Rust compile check (smoke lane)
+        if: matrix.lane == 'smoke'
+        run: cargo check --manifest-path src-tauri/crates/sipalyzer-core/Cargo.toml --all-targets

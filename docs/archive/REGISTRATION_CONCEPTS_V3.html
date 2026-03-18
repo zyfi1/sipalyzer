@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIPalyzer — Registration Concepts V3 — Outside The Box</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#06060a;--fg:#e8e6f0;--muted:#5a5672;
+    --green:#34d399;--red:#f87171;--amber:#fbbf24;--blue:#818cf8;
+    --purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;
+  }
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--fg);line-height:1.6;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:1200px;margin:0 auto;padding:60px 40px}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:48px;font-weight:700;margin-bottom:8px;color:#fff}
+  h1 span{background:linear-gradient(135deg,#f472b6,#818cf8,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{font-size:15px;color:var(--muted);margin-bottom:72px;max-width:660px;line-height:1.9}
+
+  .concept{margin-bottom:120px}
+  .clabel{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+  .concept h2{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;margin-bottom:6px}
+  .concept .desc{font-size:13px;color:var(--muted);margin-bottom:28px;max-width:600px;line-height:1.9}
+  .notes{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+  .note{flex:1;min-width:240px;padding:14px 18px;border-radius:12px;background:#0d0d14;border:1px solid #1a1824;font-size:12px;color:var(--muted);line-height:1.7}
+  .note strong{color:var(--fg);font-weight:600}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .frame{border-radius:18px;overflow:hidden;border:1px solid #1a1824;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+
+  /* ═══════ O — CONSTELLATION ═══════ */
+  .constellation{position:relative;height:520px;background:radial-gradient(ellipse at 50% 50%,#0c0c18 0%,#06060a 70%);overflow:hidden}
+  .constellation::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cdefs%3E%3Cpattern id='s' width='40' height='40' patternUnits='userSpaceOnUse'%3E%3Ccircle cx='1' cy='1' r='.4' fill='%23ffffff08'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='400' height='400' fill='url(%23s)'/%3E%3C/svg%3E")}
+  .con-line{position:absolute;height:1px;background:linear-gradient(90deg,transparent,#818cf820,transparent);transform-origin:left center}
+  .con-node{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+  .con-node:hover{transform:scale(1.15)!important;z-index:10}
+  .con-orb{width:var(--sz);height:var(--sz);border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:calc(var(--sz)*.35);letter-spacing:-0.5px}
+  .con-orb::before{content:'';position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--c);opacity:.3}
+  .con-orb::after{content:'';position:absolute;inset:-20px;border-radius:50%;background:radial-gradient(circle,var(--c),transparent 70%);opacity:.15;animation:con-pulse 3s ease infinite}
+  .con-orb.live::after{opacity:.25;animation:con-pulse 2s ease infinite}
+  @keyframes con-pulse{0%,100%{transform:scale(1);opacity:.15}50%{transform:scale(1.2);opacity:.25}}
+  .con-orb-inner{position:relative;z-index:1;width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 30% 30%,color-mix(in srgb,var(--c) 30%,#0c0c18),#0c0c18);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+  .con-label{margin-top:10px;text-align:center;max-width:120px}
+  .con-label .cn{font-size:11px;font-weight:600;white-space:nowrap}
+  .con-label .cu{font-size:9px;color:var(--muted);margin-top:1px}
+  .con-label .cs{font-size:9px;font-weight:600;margin-top:3px;padding:1px 6px;border-radius:10px;display:inline-block}
+  .con-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#1a1830,#0c0c18);border:2px solid #2a2844;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:5;box-shadow:0 0 60px #818cf810}
+  .con-center-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+  .con-center-val{font-size:22px;font-weight:800}
+  .con-legend{position:absolute;bottom:16px;right:20px;display:flex;gap:16px;font-size:10px;color:var(--muted);z-index:5}
+  .con-legend span{display:flex;align-items:center;gap:5px}
+  .con-legend span::before{content:'';width:8px;height:8px;border-radius:50%}
+  .con-legend .lg::before{background:var(--green);box-shadow:0 0 8px var(--green)}.con-legend .lr::before{background:var(--red);box-shadow:0 0 8px var(--red)}.con-legend .la::before{background:var(--amber)}
+
+  /* ═══════ P — TERMINAL ═══════ */
+  .terminal{background:#0a0a0a;position:relative;overflow:hidden;font-family:'JetBrains Mono',monospace}
+  .terminal::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,100,.015) 2px,rgba(0,255,100,.015) 4px);pointer-events:none;z-index:2}
+  .terminal::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,100,.04),transparent 60%);pointer-events:none;z-index:2}
+  .term-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#050505;border-bottom:1px solid #1a1a1a}
+  .term-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid}
+  .term-title{flex:1;text-align:center;font-size:11px;color:#3a3a3a}
+  .term-body{padding:20px;font-size:12px;line-height:2;color:#33ff77;min-height:420px}
+  .term-body .dim{color:#1a5c30}
+  .term-body .bright{color:#66ffaa;text-shadow:0 0 10px rgba(0,255,100,.3)}
+  .term-body .err{color:#ff4444;text-shadow:0 0 10px rgba(255,50,50,.2)}
+  .term-body .warn{color:#ffaa33}
+  .term-body .info{color:#4488ff}
+  .term-body .prompt{color:#666}
+  .term-body .cursor{display:inline-block;width:8px;height:14px;background:#33ff77;animation:blink 1s step-end infinite;vertical-align:middle;margin-left:2px}
+  @keyframes blink{50%{opacity:0}}
+  .term-table{border-collapse:collapse;width:100%;margin:8px 0}
+  .term-table td{padding:3px 12px 3px 0;white-space:nowrap}
+  .term-table .th{color:#666;border-bottom:1px solid #1a2a1a}
+  .term-body .separator{color:#1a3a1a;display:block;margin:4px 0}
+  .term-body .ascii-box{border:1px solid #1a4a2a;padding:8px 12px;display:inline-block;margin:4px 0;border-radius:2px}
+
+  /* ═══════ Q — HUD ═══════ */
+  .hud{position:relative;height:560px;background:#04080c;overflow:hidden}
+  .hud::before{content:'';position:absolute;inset:0;background:
+    radial-gradient(circle at 50% 50%,transparent 200px,#04080c 201px),
+    conic-gradient(from 0deg at 50% 50%,#22d3ee06 0deg,transparent 30deg,transparent 330deg,#22d3ee06 360deg);
+    animation:hud-sweep 8s linear infinite}
+  @keyframes hud-sweep{from{--angle:0deg}to{--angle:360deg}}
+  .hud-rings{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .hud-ring{position:absolute;border-radius:50%;border:1px solid #22d3ee10;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .hud-ring.r1{width:160px;height:160px;border-color:#22d3ee18}.hud-ring.r2{width:300px;height:300px}.hud-ring.r3{width:440px;height:440px;border-style:dashed}
+  .hud-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;z-index:5}
+  .hud-center-val{font-family:'Space Grotesk',sans-serif;font-size:42px;font-weight:700;color:var(--cyan);text-shadow:0 0 30px rgba(34,211,238,.3)}
+  .hud-center-sub{font-size:10px;color:#22d3ee80;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+  .hud-target{position:absolute;cursor:pointer;transition:all .3s}
+  .hud-target:hover{z-index:10}
+  .hud-target:hover .ht-box{border-color:var(--cyan);background:rgba(34,211,238,.05)}
+  .ht-reticle{width:30px;height:30px;position:relative}
+  .ht-reticle::before,.ht-reticle::after{content:'';position:absolute;border-color:var(--c,var(--cyan));border-style:solid;width:10px;height:10px}
+  .ht-reticle::before{top:0;left:0;border-width:1.5px 0 0 1.5px}
+  .ht-reticle::after{bottom:0;right:0;border-width:0 1.5px 1.5px 0}
+  .ht-dot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:var(--c,var(--cyan));box-shadow:0 0 10px var(--c,var(--cyan))}
+  .ht-line{position:absolute;width:40px;height:1px;background:linear-gradient(90deg,var(--c,#22d3ee40),transparent);top:50%}
+  .ht-box{position:absolute;white-space:nowrap;padding:6px 12px;border:1px solid #22d3ee20;background:rgba(4,8,12,.85);backdrop-filter:blur(8px);font-size:10px;line-height:1.6;border-radius:4px;transition:all .2s}
+  .ht-box .htn{font-weight:600;font-size:11px;color:var(--fg)}.ht-box .htu{color:#22d3ee60}.ht-box .hts{font-weight:600}
+  .hud-scanline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#22d3ee15,transparent);animation:scanline 4s linear infinite;z-index:3;pointer-events:none}
+  @keyframes scanline{from{top:-2px}to{top:100%}}
+  .hud-corners{position:absolute;inset:16px;pointer-events:none}
+  .hud-corners::before,.hud-corners::after{content:'';position:absolute;width:30px;height:30px;border-color:#22d3ee20;border-style:solid}
+  .hud-corners::before{top:0;left:0;border-width:1px 0 0 1px}.hud-corners::after{bottom:0;right:0;border-width:0 1px 1px 0}
+  .hud-data{position:absolute;font-size:9px;color:#22d3ee50;letter-spacing:1px;text-transform:uppercase;z-index:4}
+  .hud-data.tl{top:24px;left:24px}.hud-data.tr{top:24px;right:24px;text-align:right}.hud-data.bl{bottom:24px;left:24px}.hud-data.br{bottom:24px;right:24px;text-align:right}
+
+  /* ═══════ R — BRUTALIST ═══════ */
+  .brut{background:#f5f0e8;color:#111;font-family:'Space Grotesk',sans-serif;min-height:500px;position:relative;overflow:hidden}
+  .brut-head{padding:40px 40px 0;position:relative;z-index:1}
+  .brut-head h3{font-family:'Playfair Display',serif;font-size:72px;font-weight:900;line-height:.9;letter-spacing:-3px;color:#111}
+  .brut-head h3 span{color:#e53e3e}
+  .brut-head .brut-sub{font-size:14px;color:#666;margin-top:12px;font-weight:400}
+  .brut-grid{display:grid;grid-template-columns:repeat(5,1fr);padding:30px 40px 40px;gap:0;position:relative;z-index:1}
+  .brut-item{border:2px solid #111;padding:24px 20px;position:relative;margin:-1px;transition:all .1s}
+  .brut-item:hover{background:#111;color:#f5f0e8;z-index:2;transform:scale(1.02)}
+  .brut-item:hover .bi-status{border-color:#f5f0e8}
+  .brut-item .bi-num{font-size:72px;font-weight:900;line-height:1;letter-spacing:-3px;opacity:.08;position:absolute;top:8px;right:12px}
+  .brut-item .bi-status{width:14px;height:14px;border-radius:50%;border:2.5px solid #111;margin-bottom:12px}
+  .brut-item .bi-status.ok{background:#2d6a4f}.brut-item .bi-status.fail{background:#e53e3e}.brut-item .bi-status.idle{background:#ddd}
+  .brut-item .bi-name{font-size:16px;font-weight:700;line-height:1.2;margin-bottom:4px}
+  .brut-item .bi-uri{font-size:10px;color:#888;font-family:'JetBrains Mono',monospace;margin-bottom:12px;word-break:break-all}
+  .brut-item .bi-code{font-size:36px;font-weight:900;letter-spacing:-1px;line-height:1}
+  .brut-item .bi-code.ok{color:#2d6a4f}.brut-item .bi-code.fail{color:#e53e3e}.brut-item .bi-code.idle{color:#ccc}
+  .brut-item .bi-label{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#999;margin-top:4px}
+  .brut-stamp{position:absolute;top:60px;right:60px;font-size:120px;font-weight:900;color:rgba(229,62,62,.06);line-height:1;letter-spacing:-4px;transform:rotate(-12deg);z-index:0;font-family:'Playfair Display',serif}
+
+  /* ═══════ S — WAVEFORM ═══════ */
+  .wave{background:#08080e;position:relative;min-height:480px;overflow:hidden}
+  .wave::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,#ffffff03 0px,#ffffff03 1px,transparent 1px,transparent 40px),repeating-linear-gradient(0deg,#ffffff03 0px,#ffffff03 1px,transparent 1px,transparent 40px)}
+  .wave-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #151520;position:relative;z-index:1}
+  .wave-header .wh-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+  .wave-header .wh-live{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--green);font-weight:600}
+  .wave-header .wh-live::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s ease infinite}
+  .wave-channels{padding:16px 24px;display:flex;flex-direction:column;gap:12px;position:relative;z-index:1}
+  .wave-ch{display:grid;grid-template-columns:180px 1fr 140px;align-items:center;gap:16px;padding:12px 16px;border-radius:12px;background:#0c0c14;border:1px solid #18182a;transition:all .15s}
+  .wave-ch:hover{border-color:#2a2a44;background:#0e0e18}
+  .wave-info .wi-name{font-size:13px;font-weight:600}.wave-info .wi-uri{font-size:9px;color:var(--muted);margin-top:2px}
+  .wave-viz{height:48px;position:relative;overflow:hidden;border-radius:6px;background:#06060c}
+  .wave-svg{width:100%;height:100%}
+  .wave-right{text-align:right}.wave-right .wr-code{font-size:18px;font-weight:700}.wave-right .wr-time{font-size:10px;color:var(--muted);margin-top:2px}
+
+  /* ═══════ T — SPATIAL DEPTH ═══════ */
+  .spatial{perspective:1200px;padding:60px 40px;min-height:520px;background:radial-gradient(ellipse at 50% 30%,#12101e,#06060a);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .spatial::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,#06060a 100%);z-index:0}
+  .spatial-stack{transform-style:preserve-3d;position:relative;z-index:1;width:100%;max-width:560px;transform:rotateX(12deg) rotateY(-3deg)}
+  .sp-card{padding:20px 24px;border-radius:16px;margin-bottom:-20px;position:relative;transform-style:preserve-3d;transition:all .4s cubic-bezier(.34,1.56,.64,1);cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .sp-card:hover{transform:translateZ(40px) translateY(-8px)!important;z-index:10!important}
+  .sp-card:nth-child(1){background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);z-index:5;transform:translateZ(0px)}
+  .sp-card:nth-child(2){background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);z-index:4;transform:translateZ(-30px) scale(.97)}
+  .sp-card:nth-child(3){background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.15);z-index:3;transform:translateZ(-60px) scale(.94)}
+  .sp-card:nth-child(4){background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.12);z-index:2;transform:translateZ(-90px) scale(.91)}
+  .sp-card:nth-child(5){background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.1);z-index:1;transform:translateZ(-120px) scale(.88)}
+  .sp-top{display:flex;align-items:center;gap:14px}
+  .sp-avatar{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+  .sp-info{flex:1;min-width:0}.sp-info .si-name{font-size:14px;font-weight:600}.sp-info .si-uri{font-size:10px;color:var(--muted)}
+  .sp-right{text-align:right}.sp-right .sr-code{font-size:16px;font-weight:700}.sp-right .sr-ms{font-size:10px;color:var(--muted);margin-top:1px}
+  .sp-ghost{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:10px;color:#ffffff15;letter-spacing:1px;z-index:0}
+
+  /* ═══════ U — EDITORIAL ═══════ */
+  .editorial{background:#fafaf7;color:#1a1a1a;min-height:520px;font-family:'Playfair Display',serif;position:relative;overflow:hidden}
+  .ed-masthead{padding:40px 48px 0;border-bottom:3px double #1a1a1a;margin-bottom:0}
+  .ed-masthead h3{font-size:11px;font-weight:400;letter-spacing:6px;text-transform:uppercase;font-family:'Inter',sans-serif;color:#888;text-align:center;margin-bottom:8px}
+  .ed-title{font-size:56px;font-weight:900;line-height:1;letter-spacing:-2px;text-align:center;padding-bottom:16px}
+  .ed-date{text-align:center;font-size:11px;font-family:'Inter',sans-serif;color:#888;padding:10px 0;border-bottom:1px solid #ddd;margin:0 48px}
+  .ed-grid{display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;padding:0 48px;gap:0}
+  .ed-divider{background:#ddd;margin:24px 0}
+  .ed-col{padding:24px 24px}
+  .ed-headline{font-size:22px;font-weight:800;line-height:1.2;margin-bottom:8px;letter-spacing:-.5px}
+  .ed-byline{font-size:10px;font-family:'Inter',sans-serif;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+  .ed-body{font-size:13px;font-family:'Inter',sans-serif;color:#555;line-height:1.8}
+  .ed-code{font-family:'JetBrains Mono',monospace;font-size:11px;padding:12px;background:#f0ece4;border-left:3px solid #1a1a1a;margin:12px 0;color:#333}
+  .ed-stat{font-size:64px;font-weight:900;line-height:1;letter-spacing:-2px;margin:16px 0}
+  .ed-stat-label{font-size:10px;font-family:'Inter',sans-serif;color:#888;text-transform:uppercase;letter-spacing:1px}
+  .ed-stat.ok{color:#2d6a4f}.ed-stat.fail{color:#c53030}
+  .ed-pull{font-size:20px;font-style:italic;line-height:1.5;padding:20px 0;border-top:2px solid #1a1a1a;border-bottom:2px solid #1a1a1a;margin:16px 0;color:#333}
+
+  /* ═══════ V — CIRCUIT BOARD ═══════ */
+  .circuit{background:#0a0c08;position:relative;min-height:520px;overflow:hidden}
+  .circuit::before{content:'';position:absolute;inset:0;background:
+    repeating-linear-gradient(90deg,#ffffff02 0,#ffffff02 1px,transparent 1px,transparent 20px),
+    repeating-linear-gradient(0deg,#ffffff02 0,#ffffff02 1px,transparent 1px,transparent 20px)}
+  .cir-traces{position:absolute;inset:0;z-index:0}
+  .cir-trace{position:absolute;background:var(--c,#33ff7708);transition:background .3s}
+  .cir-trace.h{height:2px}.cir-trace.v{width:2px}
+  .cir-trace.active{background:var(--c,#33ff7725);box-shadow:0 0 8px var(--c,#33ff7710)}
+  .cir-node{position:absolute;z-index:2;cursor:pointer;transition:all .2s}
+  .cir-node:hover{z-index:10;transform:scale(1.05)}
+  .cir-chip{padding:14px 18px;border:1.5px solid;border-radius:4px;background:#0a0c08;min-width:140px;position:relative}
+  .cir-chip::before{content:'';position:absolute;top:50%;left:-8px;width:8px;height:2px;background:var(--c)}
+  .cir-chip::after{content:'';position:absolute;top:50%;right:-8px;width:8px;height:2px;background:var(--c)}
+  .cir-chip .cc-name{font-size:11px;font-weight:700;letter-spacing:.5px}
+  .cir-chip .cc-uri{font-size:8px;color:var(--muted);margin-top:2px}
+  .cir-chip .cc-pins{display:flex;gap:4px;margin-top:8px}
+  .cir-pin{width:14px;height:6px;border-radius:1px;font-size:5px;display:flex;align-items:center;justify-content:center;font-weight:700;letter-spacing:.5px}
+  .cir-chip .cc-status{position:absolute;top:6px;right:8px;width:6px;height:6px;border-radius:50%}
+  .cir-chip .cc-val{font-size:16px;font-weight:800;margin-top:6px;letter-spacing:-0.5px}
+  .cir-bus{position:absolute;z-index:1;display:flex;align-items:center;gap:0}
+  .cir-bus-seg{height:2px;background:var(--c,#33ff7712)}
+  .cir-bus-seg.active{background:var(--c,#33ff7730);box-shadow:0 0 6px var(--c,#33ff7715);animation:trace-flow 2s linear infinite}
+  @keyframes trace-flow{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
+  .cir-legend{position:absolute;bottom:16px;left:20px;z-index:3;font-size:9px;color:#33ff7740;display:flex;gap:16px;font-family:'JetBrains Mono',monospace}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Concepts V3 — <span>Unhinged</span></h1>
+<p class="subtitle">
+  No more safe choices. These are experimental, dramatic, and intentionally weird.
+  Some break every dashboard convention on purpose. Mix what excites you.
+</p>
+
+<!-- ═══════ O — CONSTELLATION ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:var(--purple)">CONCEPT O</div>
+  <h2>Constellation Map</h2>
+  <p class="desc">Registrars as stars in a network constellation. Distance from the central hub = latency. Size = priority. Color = status. You're looking at your SIP infrastructure as a living star chart.</p>
+  <div class="frame">
+    <div class="constellation">
+      <!-- Connection lines -->
+      <svg style="position:absolute;inset:0;width:100%;height:100%;z-index:1" xmlns="http://www.w3.org/2000/svg">
+        <line x1="50%" y1="50%" x2="18%" y2="25%" stroke="#818cf815" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="50%" y1="50%" x2="78%" y2="30%" stroke="#818cf815" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="50%" y1="50%" x2="15%" y2="72%" stroke="#818cf815" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="50%" y1="50%" x2="82%" y2="68%" stroke="#818cf815" stroke-width="1" stroke-dasharray="4 4"/>
+        <line x1="50%" y1="50%" x2="45%" y2="82%" stroke="#818cf815" stroke-width="1" stroke-dasharray="4 4"/>
+        <!-- Cross connections -->
+        <line x1="18%" y1="25%" x2="78%" y2="30%" stroke="#818cf808" stroke-width="1"/>
+        <line x1="15%" y1="72%" x2="45%" y2="82%" stroke="#818cf808" stroke-width="1"/>
+      </svg>
+      <!-- Center hub -->
+      <div class="con-center">
+        <div class="con-center-val" style="color:var(--green)">3/5</div>
+        <div class="con-center-label">Online</div>
+      </div>
+      <!-- Nodes -->
+      <div class="con-node" style="left:14%;top:16%;--sz:54px;--c:var(--green)">
+        <div class="con-orb live"><div class="con-orb-inner">P</div></div>
+        <div class="con-label"><div class="cn">Production PBX</div><div class="cu mono">sip.acme.com</div><div class="cs mono" style="background:rgba(52,211,153,.12);color:var(--green)">200 &middot; 42ms</div></div>
+      </div>
+      <div class="con-node" style="left:74%;top:20%;--sz:46px;--c:var(--green)">
+        <div class="con-orb live"><div class="con-orb-inner">R</div></div>
+        <div class="con-label"><div class="cn">Remote Office</div><div class="cu mono">pbx.branch.co</div><div class="cs mono" style="background:rgba(52,211,153,.12);color:var(--green)">200 &middot; 18ms</div></div>
+      </div>
+      <div class="con-node" style="left:11%;top:62%;--sz:42px;--c:var(--red)">
+        <div class="con-orb"><div class="con-orb-inner" style="color:var(--red)">F</div></div>
+        <div class="con-label"><div class="cn">Fax Gateway</div><div class="cu mono">fax.telco.net</div><div class="cs mono" style="background:rgba(248,113,113,.12);color:var(--red)">403 &middot; 189ms</div></div>
+      </div>
+      <div class="con-node" style="left:78%;top:58%;--sz:36px;--c:var(--green)">
+        <div class="con-orb live"><div class="con-orb-inner">D</div></div>
+        <div class="con-label"><div class="cn">Dev Asterisk</div><div class="cu mono">192.168.1.50</div><div class="cs mono" style="background:rgba(52,211,153,.12);color:var(--green)">200 &middot; 3ms</div></div>
+      </div>
+      <div class="con-node" style="left:41%;top:74%;--sz:34px;--c:var(--amber)">
+        <div class="con-orb"><div class="con-orb-inner" style="color:var(--amber)">S</div></div>
+        <div class="con-label"><div class="cn">Staging Server</div><div class="cu mono">staging.provider.io</div><div class="cs" style="background:rgba(251,191,36,.1);color:var(--amber)">idle</div></div>
+      </div>
+      <div class="con-legend"><span class="lg">Registered</span><span class="lr">Failed</span><span class="la">Idle</span></div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Instantly see relationships and distance (latency). Failures are literally disconnected outliers. Beautiful and unique. Makes you feel like mission control.</div>
+    <div class="note"><strong>Cons:</strong> Doesn't scale past ~15 nodes. Hard to interact with precisely. More art than utility. Position needs to encode something meaningful or it's just decoration.</div>
+  </div>
+</div>
+
+<!-- ═══════ P — TERMINAL ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:var(--green)">CONCEPT P</div>
+  <h2>Terminal / CRT</h2>
+  <p class="desc">Full retro CRT terminal with phosphor glow and scanlines. Everything is monospaced text. Status is a table. Actions are typed commands. For the person who thinks GUIs are a regression.</p>
+  <div class="frame">
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="term-dot" style="border-color:#ff5f56;background:#ff5f56"></div>
+        <div class="term-dot" style="border-color:#ffbd2e;background:#ffbd2e"></div>
+        <div class="term-dot" style="border-color:#27c93f;background:#27c93f"></div>
+        <div class="term-title">sipalyzer — registrars</div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="term-body">
+        <span class="dim">SIPalyzer Registration Monitor v2.4.1</span><br>
+        <span class="dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span><br>
+        <br>
+        <span class="prompt">$</span> <span class="bright">sipalyzer registrars --status</span><br>
+        <br>
+        <table class="term-table">
+          <tr class="th"><td>STATUS</td><td>NAME</td><td>URI</td><td>RESPONSE</td><td>LATENCY</td></tr>
+          <tr><td><span class="bright">● ONLINE</span></td><td>Production PBX</td><td>admin@sip.acme.com</td><td><span class="bright">200 OK</span></td><td>42ms</td></tr>
+          <tr><td><span class="bright">● ONLINE</span></td><td>Remote Office</td><td>ext200@pbx.branch.co</td><td><span class="bright">200 OK</span></td><td>18ms</td></tr>
+          <tr><td><span class="bright">● ONLINE</span></td><td>Dev Asterisk</td><td>dev@192.168.1.50</td><td><span class="bright">200 OK</span></td><td>3ms</td></tr>
+          <tr><td><span class="err">✖ FAILED</span></td><td>Fax Gateway</td><td>fax@fax.telco.net</td><td><span class="err">403 FORBIDDEN</span></td><td>189ms</td></tr>
+          <tr><td><span class="warn">○ IDLE</span></td><td>Staging Server</td><td>test@staging.provider.io</td><td><span class="dim">—</span></td><td><span class="dim">—</span></td></tr>
+        </table>
+        <br>
+        <span class="dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span><br>
+        <span class="dim"> SUMMARY: </span><span class="bright">3 registered</span><span class="dim"> | </span><span class="err">1 failed</span><span class="dim"> | </span><span class="warn">1 idle</span><span class="dim"> | avg latency: 21ms</span><br>
+        <span class="dim separator">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+        <br>
+        <span class="prompt">$</span> <span class="bright">sipalyzer register fax-gateway --force</span><br>
+        <span class="info">→ Sending REGISTER to fax.telco.net:5060 (UDP)</span><br>
+        <span class="info">→ Contact: &lt;sip:fax@192.168.1.10:5060&gt;</span><br>
+        <span class="info">→ Expires: 3600</span><br>
+        <span class="err">✖ 403 Forbidden — authentication failed</span><br>
+        <br>
+        <span class="prompt">$</span> <span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Pure information density. Zero wasted pixels. CRT aesthetic is genuinely cool. SIP is a text protocol — showing it as text is honest. Scanlines and glow make it feel alive.</div>
+    <div class="note"><strong>Cons:</strong> Inaccessible to non-technical users. Hard to add interactive controls. Novelty might wear off. Readability depends on font rendering quality.</div>
+  </div>
+</div>
+
+<!-- ═══════ Q — HUD ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:var(--cyan)">CONCEPT Q</div>
+  <h2>Sci-Fi HUD</h2>
+  <p class="desc">Heads-up display like a fighter pilot's cockpit. Registrars are targets on a radar sweep. Reticle brackets lock onto each endpoint. Scanning animation pulses across the display.</p>
+  <div class="frame">
+    <div class="hud">
+      <div class="hud-scanline"></div>
+      <div class="hud-corners"></div>
+      <!-- Rings -->
+      <div class="hud-rings">
+        <div class="hud-ring r1"></div>
+        <div class="hud-ring r2"></div>
+        <div class="hud-ring r3"></div>
+      </div>
+      <!-- Center -->
+      <div class="hud-center">
+        <div class="hud-center-val">3/5</div>
+        <div class="hud-center-sub">Targets Locked</div>
+      </div>
+      <!-- Targets -->
+      <div class="hud-target" style="left:14%;top:22%">
+        <div class="ht-reticle" style="--c:var(--green)"><div class="ht-dot" style="--c:var(--green)"></div></div>
+        <div class="ht-line" style="left:30px;--c:var(--green)"></div>
+        <div class="ht-box" style="left:75px;top:-10px"><div class="htn">Production PBX</div><div class="htu mono">admin@sip.acme.com</div><div class="hts" style="color:var(--green)">200 OK &middot; 42ms</div></div>
+      </div>
+      <div class="hud-target" style="right:12%;top:18%">
+        <div class="ht-box" style="right:75px;top:-10px;text-align:right"><div class="htn">Remote Office</div><div class="htu mono">ext200@pbx.branch.co</div><div class="hts" style="color:var(--green)">200 OK &middot; 18ms</div></div>
+        <div class="ht-line" style="right:30px;transform:scaleX(-1);--c:var(--green)"></div>
+        <div class="ht-reticle" style="--c:var(--green)"><div class="ht-dot" style="--c:var(--green)"></div></div>
+      </div>
+      <div class="hud-target" style="left:8%;bottom:22%">
+        <div class="ht-reticle" style="--c:var(--red)"><div class="ht-dot" style="--c:var(--red)"></div></div>
+        <div class="ht-line" style="left:30px;background:linear-gradient(90deg,#f8717140,transparent)"></div>
+        <div class="ht-box" style="left:75px;top:-10px;border-color:#f8717120"><div class="htn">Fax Gateway</div><div class="htu mono">fax@fax.telco.net</div><div class="hts" style="color:var(--red)">403 FORBIDDEN &middot; 189ms</div></div>
+      </div>
+      <div class="hud-target" style="right:10%;bottom:28%">
+        <div class="ht-box" style="right:75px;top:-10px;text-align:right"><div class="htn">Dev Asterisk</div><div class="htu mono">dev@192.168.1.50</div><div class="hts" style="color:var(--green)">200 OK &middot; 3ms</div></div>
+        <div class="ht-line" style="right:30px;transform:scaleX(-1)"></div>
+        <div class="ht-reticle" style="--c:var(--green)"><div class="ht-dot" style="--c:var(--green)"></div></div>
+      </div>
+      <div class="hud-target" style="left:42%;bottom:10%">
+        <div class="ht-reticle" style="--c:var(--amber)"><div class="ht-dot" style="--c:var(--amber)"></div></div>
+        <div class="ht-line" style="left:30px;background:linear-gradient(90deg,#fbbf2440,transparent)"></div>
+        <div class="ht-box" style="left:75px;top:-10px;border-color:#fbbf2420"><div class="htn">Staging Server</div><div class="htu mono">staging.provider.io</div><div class="hts" style="color:var(--amber)">IDLE &middot; no signal</div></div>
+      </div>
+      <!-- Corner data -->
+      <div class="hud-data tl">SIPalyzer v2.4<br>Registration Monitor</div>
+      <div class="hud-data tr">UDP/TCP/TLS<br>5 Endpoints</div>
+      <div class="hud-data bl">Sweep: 30s interval<br>Last: 14:35:22 UTC</div>
+      <div class="hud-data br">Avg Latency: 54ms<br>Uptime: 99.2%</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Absolutely jaw-dropping. The scanning line, reticles, and radar rings create drama. Makes monitoring feel important. Great for presentations or NOC screens.</div>
+    <div class="note"><strong>Cons:</strong> Almost entirely decorative. Very hard to interact with. Doesn't scale. The coolness factor masks a lack of actual utility. Fun though.</div>
+  </div>
+</div>
+
+<!-- ═══════ R — BRUTALIST ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:var(--red)">CONCEPT R</div>
+  <h2>Brutalist Typography</h2>
+  <p class="desc">Anti-design. Giant serif numbers. Raw borders. No rounded corners, no gradients, no hand-holding. Information through typography alone. Light mode. Aggressively honest.</p>
+  <div class="frame" style="border-radius:0;border:3px solid #111">
+    <div class="brut">
+      <div class="brut-stamp">SIP</div>
+      <div class="brut-head">
+        <h3>Three of Five<br>Are <span>Alive</span></h3>
+        <div class="brut-sub">SIP Registration Status &middot; Last checked 14:35 UTC &middot; 5 endpoints monitored</div>
+      </div>
+      <div class="brut-grid">
+        <div class="brut-item">
+          <div class="bi-num">01</div>
+          <div class="bi-status ok"></div>
+          <div class="bi-name">Production PBX</div>
+          <div class="bi-uri">admin@sip.acme.com</div>
+          <div class="bi-code ok">200</div>
+          <div class="bi-label">42ms response</div>
+        </div>
+        <div class="brut-item">
+          <div class="bi-num">02</div>
+          <div class="bi-status ok"></div>
+          <div class="bi-name">Remote Office</div>
+          <div class="bi-uri">ext200@pbx.branch.co</div>
+          <div class="bi-code ok">200</div>
+          <div class="bi-label">18ms response</div>
+        </div>
+        <div class="brut-item">
+          <div class="bi-num">03</div>
+          <div class="bi-status ok"></div>
+          <div class="bi-name">Dev Asterisk</div>
+          <div class="bi-uri">dev@192.168.1.50</div>
+          <div class="bi-code ok">200</div>
+          <div class="bi-label">3ms response</div>
+        </div>
+        <div class="brut-item">
+          <div class="bi-num">04</div>
+          <div class="bi-status fail"></div>
+          <div class="bi-name">Fax Gateway</div>
+          <div class="bi-uri">fax@fax.telco.net</div>
+          <div class="bi-code fail">403</div>
+          <div class="bi-label">forbidden</div>
+        </div>
+        <div class="brut-item">
+          <div class="bi-num">05</div>
+          <div class="bi-status idle"></div>
+          <div class="bi-name">Staging Server</div>
+          <div class="bi-uri">test@staging.provider.io</div>
+          <div class="bi-code idle">&mdash;</div>
+          <div class="bi-label">idle</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Impossible to ignore. Typography IS the interface. The oversized status codes are immediately readable. Hover inversion is satisfying. Breaks every SaaS convention, and it works.</div>
+    <div class="note"><strong>Cons:</strong> Light mode in a dark-mode app is jarring. Borders feel aggressive. Limited space for metadata. The style is polarizing — people either love it or hate it.</div>
+  </div>
+</div>
+
+<!-- ═══════ S — WAVEFORM ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:var(--blue)">CONCEPT S</div>
+  <h2>Waveform Monitor</h2>
+  <p class="desc">Each registrar has a real-time signal waveform. Smooth sine = healthy. Flat line = idle. Distorted noise = failing. Like an oscilloscope for your SIP infrastructure. Audio-engineer aesthetic.</p>
+  <div class="frame">
+    <div class="wave">
+      <div class="wave-header">
+        <div class="wh-title">Signal Monitor &middot; 5 Channels</div>
+        <div class="wh-live">Live</div>
+      </div>
+      <div class="wave-channels">
+        <div class="wave-ch">
+          <div class="wave-info"><div class="wi-name" style="color:var(--green)">Production PBX</div><div class="wi-uri">admin@sip.acme.com</div></div>
+          <div class="wave-viz">
+            <svg class="wave-svg" viewBox="0 0 400 48" preserveAspectRatio="none">
+              <path d="M0,24 Q10,8 20,24 Q30,40 40,24 Q50,8 60,24 Q70,40 80,24 Q90,8 100,24 Q110,40 120,24 Q130,8 140,24 Q150,40 160,24 Q170,8 180,24 Q190,40 200,24 Q210,8 220,24 Q230,40 240,24 Q250,8 260,24 Q270,40 280,24 Q290,8 300,24 Q310,40 320,24 Q330,8 340,24 Q350,40 360,24 Q370,8 380,24 Q390,40 400,24" fill="none" stroke="#34d399" stroke-width="1.5" opacity=".8"/>
+              <path d="M0,24 Q10,8 20,24 Q30,40 40,24 Q50,8 60,24 Q70,40 80,24 Q90,8 100,24 Q110,40 120,24 Q130,8 140,24 Q150,40 160,24 Q170,8 180,24 Q190,40 200,24 Q210,8 220,24 Q230,40 240,24 Q250,8 260,24 Q270,40 280,24 Q290,8 300,24 Q310,40 320,24 Q330,8 340,24 Q350,40 360,24 Q370,8 380,24 Q390,40 400,24" fill="none" stroke="#34d399" stroke-width="4" opacity=".08"/>
+            </svg>
+          </div>
+          <div class="wave-right"><div class="wr-code mono" style="color:var(--green)">200</div><div class="wr-time">42ms</div></div>
+        </div>
+        <div class="wave-ch">
+          <div class="wave-info"><div class="wi-name" style="color:var(--green)">Remote Office</div><div class="wi-uri">ext200@pbx.branch.co</div></div>
+          <div class="wave-viz">
+            <svg class="wave-svg" viewBox="0 0 400 48" preserveAspectRatio="none">
+              <path d="M0,24 Q15,12 30,24 Q45,36 60,24 Q75,12 90,24 Q105,36 120,24 Q135,12 150,24 Q165,36 180,24 Q195,12 210,24 Q225,36 240,24 Q255,12 270,24 Q285,36 300,24 Q315,12 330,24 Q345,36 360,24 Q375,12 390,24 L400,24" fill="none" stroke="#34d399" stroke-width="1.5" opacity=".8"/>
+            </svg>
+          </div>
+          <div class="wave-right"><div class="wr-code mono" style="color:var(--green)">200</div><div class="wr-time">18ms</div></div>
+        </div>
+        <div class="wave-ch">
+          <div class="wave-info"><div class="wi-name" style="color:var(--red)">Fax Gateway</div><div class="wi-uri">fax@fax.telco.net</div></div>
+          <div class="wave-viz">
+            <svg class="wave-svg" viewBox="0 0 400 48" preserveAspectRatio="none">
+              <path d="M0,24 L5,8 L10,38 L15,4 L20,42 L25,12 L30,36 L35,6 L40,40 L45,10 L50,34 L55,8 L60,38 L65,4 L70,44 L75,14 L80,32 L85,2 L90,46 L95,16 L100,28 L105,6 L110,40 L115,12 L120,34 L125,4 L130,42 L135,10 L140,38 L145,6 L150,36 L155,8 L160,40 L165,14 L170,30 L175,4 L180,44 L185,10 L190,38 L195,6 L200,42 L205,12 L210,34 L215,2 L220,46 L225,8 L230,36 L235,6 L240,44 L245,14 L250,30 L255,4 L260,42 L265,10 L270,38 L275,8 L280,36 L285,6 L290,40 L295,12 L300,34 L305,4 L310,42 L315,10 L320,38 L325,6 L330,36 L335,8 L340,40 L345,14 L350,30 L355,4 L360,44 L365,10 L370,38 L375,6 L380,42 L385,12 L390,34 L395,8 L400,24" fill="none" stroke="#f87171" stroke-width="1.5" opacity=".7"/>
+              <path d="M0,24 L5,8 L10,38 L15,4 L20,42 L25,12 L30,36 L35,6 L40,40 L45,10 L50,34 L55,8 L60,38 L65,4 L70,44 L75,14 L80,32 L85,2 L90,46 L95,16 L100,28 L105,6 L110,40 L115,12 L120,34 L125,4 L130,42 L135,10 L140,38 L145,6 L150,36 L155,8 L160,40 L165,14 L170,30 L175,4 L180,44 L185,10 L190,38 L195,6 L200,42 L205,12 L210,34 L215,2 L220,46 L225,8 L230,36 L235,6 L240,44 L245,14 L250,30 L255,4 L260,42 L265,10 L270,38 L275,8 L280,36 L285,6 L290,40 L295,12 L300,34 L305,4 L310,42 L315,10 L320,38 L325,6 L330,36 L335,8 L340,40 L345,14 L350,30 L355,4 L360,44 L365,10 L370,38 L375,6 L380,42 L385,12 L390,34 L395,8 L400,24" fill="none" stroke="#f87171" stroke-width="5" opacity=".06"/>
+            </svg>
+          </div>
+          <div class="wave-right"><div class="wr-code mono" style="color:var(--red)">403</div><div class="wr-time">189ms</div></div>
+        </div>
+        <div class="wave-ch">
+          <div class="wave-info"><div class="wi-name" style="color:var(--amber)">Staging Server</div><div class="wi-uri">test@staging.provider.io</div></div>
+          <div class="wave-viz">
+            <svg class="wave-svg" viewBox="0 0 400 48" preserveAspectRatio="none">
+              <line x1="0" y1="24" x2="400" y2="24" stroke="#fbbf24" stroke-width="1" opacity=".3" stroke-dasharray="6 4"/>
+            </svg>
+          </div>
+          <div class="wave-right"><div class="wr-code" style="color:var(--amber)">&mdash;</div><div class="wr-time">idle</div></div>
+        </div>
+        <div class="wave-ch">
+          <div class="wave-info"><div class="wi-name" style="color:var(--green)">Dev Asterisk</div><div class="wi-uri">dev@192.168.1.50</div></div>
+          <div class="wave-viz">
+            <svg class="wave-svg" viewBox="0 0 400 48" preserveAspectRatio="none">
+              <path d="M0,24 Q20,14 40,24 Q60,34 80,24 Q100,14 120,24 Q140,34 160,24 Q180,14 200,24 Q220,34 240,24 Q260,14 280,24 Q300,34 320,24 Q340,14 360,24 Q380,34 400,24" fill="none" stroke="#34d399" stroke-width="1.5" opacity=".8"/>
+            </svg>
+          </div>
+          <div class="wave-right"><div class="wr-code mono" style="color:var(--green)">200</div><div class="wr-time">3ms</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> The waveform metaphor is immediately intuitive: smooth = good, chaotic = bad, flat = dead. Audio/signal processing aesthetic is unique in SIP tools. Grid background sells the oscilloscope look.</div>
+    <div class="note"><strong>Cons:</strong> Waveforms need real data to be meaningful (could be response-time history). Static waveforms are decoration. Horizontal space for the viz competes with useful info.</div>
+  </div>
+</div>
+
+<!-- ═══════ T — SPATIAL DEPTH ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:var(--pink)">CONCEPT T</div>
+  <h2>Spatial Depth Stack</h2>
+  <p class="desc">Cards in 3D perspective space. Most important/active registrars float to the front. Failed ones recede into the background. Hover pulls a card forward. Depth encodes priority.</p>
+  <div class="frame" style="background:transparent;border:none;box-shadow:none">
+    <div class="spatial">
+      <div class="spatial-stack">
+        <div class="sp-card">
+          <div class="sp-top">
+            <div class="sp-avatar" style="background:rgba(52,211,153,.15);color:var(--green)">P</div>
+            <div class="sp-info"><div class="si-name">Production PBX</div><div class="si-uri mono" style="color:var(--muted)">admin@sip.acme.com &middot; UDP :5060</div></div>
+            <div class="sp-right"><div class="sr-code" style="color:var(--green)">200 OK</div><div class="sr-ms mono">42ms</div></div>
+          </div>
+        </div>
+        <div class="sp-card">
+          <div class="sp-top">
+            <div class="sp-avatar" style="background:rgba(52,211,153,.15);color:var(--green)">R</div>
+            <div class="sp-info"><div class="si-name">Remote Office</div><div class="si-uri mono" style="color:var(--muted)">ext200@pbx.branch.co &middot; TLS :5061</div></div>
+            <div class="sp-right"><div class="sr-code" style="color:var(--green)">200 OK</div><div class="sr-ms mono">18ms</div></div>
+          </div>
+        </div>
+        <div class="sp-card">
+          <div class="sp-top">
+            <div class="sp-avatar" style="background:rgba(248,113,113,.15);color:var(--red)">F</div>
+            <div class="sp-info"><div class="si-name">Fax Gateway</div><div class="si-uri mono" style="color:var(--muted)">fax@fax.telco.net &middot; UDP :5060</div></div>
+            <div class="sp-right"><div class="sr-code" style="color:var(--red)">403</div><div class="sr-ms mono">189ms</div></div>
+          </div>
+        </div>
+        <div class="sp-card">
+          <div class="sp-top">
+            <div class="sp-avatar" style="background:rgba(251,191,36,.12);color:var(--amber)">S</div>
+            <div class="sp-info"><div class="si-name">Staging Server</div><div class="si-uri mono" style="color:var(--muted)">test@staging.provider.io &middot; TCP :5061</div></div>
+            <div class="sp-right"><div class="sr-code" style="color:var(--amber)">&mdash;</div><div class="sr-ms">idle</div></div>
+          </div>
+        </div>
+        <div class="sp-card">
+          <div class="sp-top">
+            <div class="sp-avatar" style="background:rgba(52,211,153,.12);color:var(--green)">D</div>
+            <div class="sp-info"><div class="si-name">Dev Asterisk</div><div class="si-uri mono" style="color:var(--muted)">dev@192.168.1.50 &middot; UDP :5060</div></div>
+            <div class="sp-right"><div class="sr-code" style="color:var(--green)">200 OK</div><div class="sr-ms mono">3ms</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="sp-ghost">SCROLL TO SURFACE &middot; HOVER TO INSPECT</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Physically feels like sifting through a stack. Depth is a novel hierarchy encoding. The perspective tilt adds cinema. Hover-to-surface is satisfying and intuitive.</div>
+    <div class="note"><strong>Cons:</strong> Occluded cards are literally hidden. Terrible accessibility. Perspective distortion hurts readability on back cards. Very limited data density. Form over function.</div>
+  </div>
+</div>
+
+<!-- ═══════ U — EDITORIAL ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:#c53030">CONCEPT U</div>
+  <h2>Broadsheet Editorial</h2>
+  <p class="desc">What if your registration status was the front page of a newspaper? Serif typography, editorial columns, pull quotes, and above-the-fold hierarchy. Data as narrative.</p>
+  <div class="frame" style="border-radius:0">
+    <div class="editorial">
+      <div class="ed-masthead"><h3>The SIPalyzer</h3>
+        <div class="ed-title">Three of Five Endpoints Report Active Registration</div>
+      </div>
+      <div class="ed-date">Monday, February 2, 2026 &middot; Volume 2, Issue 35 &middot; Registration Status Monitor</div>
+      <div class="ed-grid">
+        <div class="ed-col">
+          <div class="ed-headline">Production PBX Holds Steady at 42ms</div>
+          <div class="ed-byline">admin@sip.acme.com &middot; UDP :5060</div>
+          <div class="ed-stat ok">200</div>
+          <div class="ed-stat-label">Response Code</div>
+          <div class="ed-body">The primary production endpoint continues its unbroken streak of successful registrations. Response time remains well within acceptable thresholds at 42 milliseconds.</div>
+          <div class="ed-code">Via: SIP/2.0/UDP 10.0.1.5:5060<br>Expires: 3600<br>Contact: &lt;sip:admin@10.0.1.5&gt;</div>
+        </div>
+        <div class="ed-divider"></div>
+        <div class="ed-col">
+          <div class="ed-headline">Fax Gateway Refuses All Attempts</div>
+          <div class="ed-byline">fax@fax.telco.net &middot; UDP :5060</div>
+          <div class="ed-stat fail">403</div>
+          <div class="ed-stat-label">Forbidden</div>
+          <div class="ed-pull">&ldquo;Authentication credentials were rejected by the remote server for the third consecutive attempt.&rdquo;</div>
+          <div class="ed-body">The fax gateway endpoint has been returning 403 Forbidden responses since 13:50 UTC. Investigation suggests credential rotation may be required.</div>
+        </div>
+        <div class="ed-divider"></div>
+        <div class="ed-col">
+          <div class="ed-headline">Two More Hold; One Awaits Orders</div>
+          <div class="ed-byline">System Overview</div>
+          <div class="ed-body" style="margin-bottom:12px"><strong>Remote Office</strong> at pbx.branch.co maintains registration via TLS with an impressive 18ms response. <strong>Dev Asterisk</strong> on the local network responds in 3ms.</div>
+          <div class="ed-body"><strong>Staging Server</strong> at staging.provider.io remains idle, awaiting manual registration. No previous registration attempts recorded this session.</div>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid #ddd">
+            <div class="ed-stat-label" style="margin-bottom:8px">Quick Reference</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:'Inter',sans-serif;font-size:11px;color:#555">
+              <div><strong>Active:</strong> 3</div>
+              <div><strong>Failed:</strong> 1</div>
+              <div><strong>Idle:</strong> 1</div>
+              <div><strong>Avg ms:</strong> 21</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Nobody has ever done this. Transforms dry status data into a readable story. The editorial format forces clear writing about what's actually happening. Giant status codes are scannable.</div>
+    <div class="note"><strong>Cons:</strong> Terrible for quick scanning of many items. Requires generating narrative text. Column layout wastes vertical space. Light theme. Not serious? Or the most serious thing ever?</div>
+  </div>
+</div>
+
+<!-- ═══════ V — CIRCUIT BOARD ═══════ -->
+<div class="concept">
+  <div class="clabel" style="color:#33ff77">CONCEPT V</div>
+  <h2>Circuit Board</h2>
+  <p class="desc">Your registrars are chips on a PCB. Traces connect them. Active traces pulse with data flow. Each chip shows its status, response code, and pin connections. Hardware-engineer aesthetic meets network monitoring.</p>
+  <div class="frame">
+    <div class="circuit">
+      <!-- Traces -->
+      <svg style="position:absolute;inset:0;width:100%;height:100%;z-index:1" xmlns="http://www.w3.org/2000/svg">
+        <!-- Horizontal bus -->
+        <line x1="0" y1="260" x2="100%" y2="260" stroke="#33ff7708" stroke-width="2"/>
+        <!-- Vertical drops -->
+        <line x1="160" y1="100" x2="160" y2="260" stroke="#33ff7718" stroke-width="2"><animate attributeName="opacity" values=".3;.8;.3" dur="3s" repeatCount="indefinite"/></line>
+        <line x1="380" y1="100" x2="380" y2="260" stroke="#33ff7718" stroke-width="2"><animate attributeName="opacity" values=".3;.8;.3" dur="3.5s" repeatCount="indefinite"/></line>
+        <line x1="600" y1="100" x2="600" y2="260" stroke="#f8717118" stroke-width="2"/>
+        <line x1="820" y1="100" x2="820" y2="260" stroke="#fbbf2412" stroke-width="2"/>
+        <line x1="270" y1="340" x2="270" y2="260" stroke="#33ff7718" stroke-width="2"><animate attributeName="opacity" values=".3;.8;.3" dur="2.8s" repeatCount="indefinite"/></line>
+        <!-- Data flow dots -->
+        <circle r="3" fill="#33ff77" opacity=".6"><animateMotion dur="2s" repeatCount="indefinite" path="M160,260 L160,100"/></circle>
+        <circle r="3" fill="#33ff77" opacity=".6"><animateMotion dur="2.5s" repeatCount="indefinite" path="M380,260 L380,100"/></circle>
+        <circle r="3" fill="#33ff77" opacity=".4"><animateMotion dur="3s" repeatCount="indefinite" path="M270,260 L270,340"/></circle>
+      </svg>
+      <!-- Chips -->
+      <div class="cir-node" style="left:90px;top:50px">
+        <div class="cir-chip" style="border-color:#33ff7740;--c:#33ff77">
+          <div class="cc-status" style="background:#33ff77;box-shadow:0 0 8px #33ff77"></div>
+          <div class="cc-name" style="color:#33ff77">PROD-PBX</div>
+          <div class="cc-uri mono">sip.acme.com</div>
+          <div class="cc-val mono" style="color:#33ff77">200</div>
+          <div class="cc-pins"><div class="cir-pin" style="background:#33ff7730;color:#33ff77">UDP</div><div class="cir-pin" style="background:#33ff7720;color:#33ff7780">5060</div><div class="cir-pin" style="background:#33ff7720;color:#33ff7780">42ms</div></div>
+        </div>
+      </div>
+      <div class="cir-node" style="left:310px;top:50px">
+        <div class="cir-chip" style="border-color:#33ff7730;--c:#33ff77">
+          <div class="cc-status" style="background:#33ff77;box-shadow:0 0 8px #33ff77"></div>
+          <div class="cc-name" style="color:#33ff77">REMOTE-OFC</div>
+          <div class="cc-uri mono">pbx.branch.co</div>
+          <div class="cc-val mono" style="color:#33ff77">200</div>
+          <div class="cc-pins"><div class="cir-pin" style="background:#33ff7730;color:#33ff77">TLS</div><div class="cir-pin" style="background:#33ff7720;color:#33ff7780">5061</div><div class="cir-pin" style="background:#33ff7720;color:#33ff7780">18ms</div></div>
+        </div>
+      </div>
+      <div class="cir-node" style="left:530px;top:50px">
+        <div class="cir-chip" style="border-color:#f8717130;--c:#f87171">
+          <div class="cc-status" style="background:#f87171;box-shadow:0 0 8px #f87171"></div>
+          <div class="cc-name" style="color:#f87171">FAX-GW</div>
+          <div class="cc-uri mono">fax.telco.net</div>
+          <div class="cc-val mono" style="color:#f87171">403</div>
+          <div class="cc-pins"><div class="cir-pin" style="background:#f8717130;color:#f87171">UDP</div><div class="cir-pin" style="background:#f8717120;color:#f8717180">5060</div><div class="cir-pin" style="background:#f8717120;color:#f8717180">ERR</div></div>
+        </div>
+      </div>
+      <div class="cir-node" style="left:750px;top:50px">
+        <div class="cir-chip" style="border-color:#fbbf2420;--c:#fbbf24">
+          <div class="cc-status" style="background:#fbbf24;opacity:.4"></div>
+          <div class="cc-name" style="color:#fbbf24;opacity:.6">STAGING</div>
+          <div class="cc-uri mono">staging.provider.io</div>
+          <div class="cc-val mono" style="color:#fbbf24;opacity:.4">&mdash;</div>
+          <div class="cc-pins"><div class="cir-pin" style="background:#fbbf2420;color:#fbbf2480">TCP</div><div class="cir-pin" style="background:#fbbf2415;color:#fbbf2460">5061</div><div class="cir-pin" style="background:#fbbf2415;color:#fbbf2460">IDLE</div></div>
+        </div>
+      </div>
+      <div class="cir-node" style="left:200px;top:340px">
+        <div class="cir-chip" style="border-color:#33ff7730;--c:#33ff77">
+          <div class="cc-status" style="background:#33ff77;box-shadow:0 0 8px #33ff77"></div>
+          <div class="cc-name" style="color:#33ff77">DEV-AST</div>
+          <div class="cc-uri mono">192.168.1.50</div>
+          <div class="cc-val mono" style="color:#33ff77">200</div>
+          <div class="cc-pins"><div class="cir-pin" style="background:#33ff7730;color:#33ff77">UDP</div><div class="cir-pin" style="background:#33ff7720;color:#33ff7780">5060</div><div class="cir-pin" style="background:#33ff7720;color:#33ff7780">3ms</div></div>
+        </div>
+      </div>
+      <!-- Central bus label -->
+      <div style="position:absolute;left:50%;top:252px;transform:translateX(-50%);font-size:8px;font-weight:700;letter-spacing:2px;color:#33ff7720;z-index:3;font-family:'JetBrains Mono',monospace">━━━ SIP BUS ━━━</div>
+      <div class="cir-legend"><span>SIPALYZER PCB REV 2.4</span><span>5 CHIPS &middot; 1 FAULT</span></div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Completely unique metaphor. Animated trace pulses show data flow. The PCB aesthetic with chip labels and pin-outs is deeply satisfying for technical users. Faults are immediately visible as disconnected traces.</div>
+    <div class="note"><strong>Cons:</strong> Layout is manual and doesn't scale. Can't easily add 20 registrars. More art installation than functional tool. But you asked for outside the box.</div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div style="margin-top:40px;padding:48px;background:#0d0d14;border:1px solid #1a1824;border-radius:18px">
+  <h2 style="font-family:'Space Grotesk',sans-serif;font-size:24px;margin-bottom:20px">Total Concepts: 21</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:28px">
+    <div style="padding:16px;border-radius:12px;background:#111118;border:1px solid #1a1824">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">V1 — Clean</div>
+      <div style="font-size:12px;color:#888;line-height:1.8">A. Status Cards &middot; B. Dense Table &middot; C. Timeline &middot; D. Split Panel &middot; E. Zen &middot; F. Swimlanes &middot; G. Dashboard</div>
+    </div>
+    <div style="padding:16px;border-radius:12px;background:#111118;border:1px solid #1a1824">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">V2 — Modern</div>
+      <div style="font-size:12px;color:#888;line-height:1.8">H. Bento &middot; I. Glass &middot; J. Command &middot; K. Kanban &middot; L. Heatmap &middot; M. Progressive &middot; N. Side Panel</div>
+    </div>
+    <div style="padding:16px;border-radius:12px;background:#111118;border:1px solid #1a1824">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">V3 — Unhinged</div>
+      <div style="font-size:12px;color:#888;line-height:1.8">O. Constellation &middot; P. Terminal &middot; Q. HUD &middot; R. Brutalist &middot; S. Waveform &middot; T. Spatial &middot; U. Editorial &middot; V. Circuit</div>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--muted);line-height:1.8;max-width:600px">Pick individual concepts, name combinations, or just describe the energy you want. All 21 are on the table. The wildest option would be a mode-switcher that lets you flip between layouts like themes.</p>
+</div>
+
+</div>
+</body>
+</html>

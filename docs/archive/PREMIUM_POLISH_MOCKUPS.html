@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIPalyzer — Premium Polish Mockups (2025/2026)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  @property --border-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: hsl(240 22% 5%);
+    --bg-subtle: hsl(238 22% 8%);
+    --card: hsl(236 24% 15%);
+    --card-light: hsl(234 26% 18%);
+    --secondary: hsl(235 22% 21%);
+    --accent: hsl(232 28% 27%);
+    --border: hsl(0 0% 100% / 0.06);
+    --border-hover: hsl(0 0% 100% / 0.12);
+    --muted-fg: hsl(235 14% 55%);
+    --fg: hsl(230 15% 98%);
+    --primary: hsl(232 52% 62%);
+    --primary-glow: hsl(232 52% 62% / 0.15);
+    --success: hsl(152 58% 55%);
+    --warning: hsl(38 92% 56%);
+    --destructive: hsl(0 72% 62%);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    padding: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* Noise grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    opacity: 0.025;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, hsl(330 85% 72%), hsl(258 82% 68%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    font-size: 15px;
+    color: var(--muted-fg);
+    margin-bottom: 48px;
+    max-width: 700px;
+  }
+
+  /* Section styling */
+  .section {
+    margin-bottom: 72px;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .section-number {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    background: hsl(232 52% 62% / 0.12);
+    padding: 2px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+  .section-title {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .section-desc {
+    font-size: 14px;
+    color: var(--muted-fg);
+    margin-bottom: 24px;
+    max-width: 650px;
+  }
+
+  /* Comparison layout */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .comparison-panel {
+    padding: 24px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-subtle);
+    position: relative;
+    overflow: hidden;
+  }
+  .comparison-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .label-before { color: hsl(0 60% 65%); }
+  .label-after { color: var(--success); }
+  .label-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .label-dot-before { background: hsl(0 60% 65%); }
+  .label-dot-after { background: var(--success); }
+
+  /* Demo components */
+  .demo-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  /* ── 1. Card Hover ── */
+  .card-flat {
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    width: 100%;
+  }
+  .card-flat:hover {
+    background: hsl(236 24% 17%);
+  }
+
+  .card-premium {
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: hsl(236 24% 15% / 0.6);
+    backdrop-filter: blur(20px) saturate(1.3);
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.25s var(--ease-out-expo);
+    position: relative;
+    overflow: hidden;
+  }
+  .card-premium::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.1), transparent);
+    pointer-events: none;
+  }
+  .card-premium .spotlight {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .card-premium:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 12px hsl(0 0% 0% / 0.3),
+      0 1px 3px hsl(0 0% 0% / 0.2),
+      inset 0 1px 0 hsl(0 0% 100% / 0.06);
+  }
+  .card-premium:hover .spotlight {
+    opacity: 1;
+  }
+
+  .card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .card-meta { font-size: 11px; color: var(--muted-fg); }
+
+  /* ── 2. Animated Gradient Border ── */
+  .card-gradient-border {
+    position: relative;
+    border-radius: 12px;
+    padding: 20px;
+    background: var(--card);
+    cursor: pointer;
+    isolation: isolate;
+    width: 100%;
+  }
+  .card-gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--border-angle),
+      transparent 30%,
+      var(--primary) 50%,
+      transparent 70%
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .card-gradient-border:hover::before {
+    opacity: 1;
+    animation: border-rotate 4s linear infinite;
+  }
+  @keyframes border-rotate {
+    to { --border-angle: 360deg; }
+  }
+
+  /* ── 3. Status Indicators ── */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .status-static-green { background: var(--success); }
+  .status-static-gray { background: var(--muted-fg); opacity: 0.4; }
+
+  .status-animated-green {
+    background: var(--success);
+    animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .status-animated-amber {
+    background: var(--warning);
+    animation: pulse-dot 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .status-animated-gray {
+    background: var(--muted-fg);
+    opacity: 0.3;
+  }
+  @keyframes pulse-dot {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 currentColor;
+    }
+    50% {
+      opacity: 0.85;
+      box-shadow: 0 0 0 4px transparent;
+    }
+  }
+  @keyframes pulse-dot-green {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(152 58% 55% / 0.5);
+    }
+    50% {
+      box-shadow: 0 0 0 5px hsl(152 58% 55% / 0);
+    }
+  }
+  .status-pulse-green {
+    background: var(--success);
+    animation: pulse-dot-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes pulse-dot-amber {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(38 92% 56% / 0.5);
+    }
+    50% {
+      box-shadow: 0 0 0 5px hsl(38 92% 56% / 0);
+    }
+  }
+  .status-pulse-amber {
+    background: var(--warning);
+    animation: pulse-dot-amber 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: hsl(0 0% 100% / 0.8);
+  }
+  .status-label { color: var(--muted-fg); font-size: 11px; margin-left: auto; }
+
+  /* ── 4. Skeleton Loading ── */
+  .skeleton-static {
+    height: 14px;
+    border-radius: 6px;
+    background: hsl(236 24% 18%);
+  }
+
+  .skeleton-shimmer {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg,
+      hsl(236 24% 15% / 0.8) 0%,
+      hsl(236 24% 22% / 0.5) 40%,
+      hsl(236 24% 15% / 0.8) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .skeleton-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  /* ── 5. Button Glow ── */
+  .btn-flat {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-flat-primary {
+    background: var(--primary);
+    color: white;
+  }
+  .btn-flat-primary:hover {
+    opacity: 0.9;
+  }
+
+  .btn-glow {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--primary);
+    color: white;
+    transition: all 0.2s var(--ease-out-expo);
+    box-shadow: 0 0 0 transparent;
+  }
+  .btn-glow:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 16px -4px hsl(232 52% 62% / 0.5),
+      0 0 40px -8px hsl(232 52% 62% / 0.2);
+  }
+  .btn-glow:active {
+    transform: scale(0.97);
+    transition-duration: 80ms;
+  }
+
+  .btn-ghost {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: inherit;
+    background: transparent;
+    color: var(--fg);
+    transition: all 0.2s var(--ease-out-expo);
+  }
+  .btn-ghost:hover {
+    border-color: var(--border-hover);
+    background: hsl(0 0% 100% / 0.04);
+    transform: translateY(-1px);
+  }
+  .btn-ghost:active {
+    transform: scale(0.97);
+    transition-duration: 80ms;
+  }
+
+  /* ── 6. Focus Ring ── */
+  .focus-static:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
+  }
+
+  .focus-animated:focus {
+    outline: none;
+    animation: focus-expand 0.25s var(--ease-out-expo) forwards;
+  }
+  @keyframes focus-expand {
+    from {
+      box-shadow: 0 0 0 0px hsl(232 52% 62% / 0.6);
+    }
+    to {
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px hsl(232 52% 62% / 0.5);
+    }
+  }
+
+  /* ── 7. Nav Active Indicator ── */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--muted-fg);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+  }
+  .nav-item:hover { background: hsl(0 0% 100% / 0.04); color: var(--fg); }
+  .nav-item-active-flat {
+    background: hsl(0 0% 100% / 0.06);
+    color: var(--fg);
+  }
+  .nav-item-active-bar {
+    background: hsl(232 52% 62% / 0.08);
+    color: var(--fg);
+  }
+  .nav-item-active-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 60%;
+    border-radius: 1px;
+    background: var(--primary);
+  }
+
+  .nav-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: var(--muted-fg);
+    opacity: 0.3;
+  }
+  .nav-icon-active { background: var(--primary); opacity: 0.7; }
+
+  /* ── 8. Stat Cards ── */
+  .stat-card {
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+    flex: 1;
+  }
+  .stat-flat {
+    background: hsl(236 24% 13%);
+    border: 1px solid var(--border);
+  }
+  .stat-premium {
+    background: hsl(236 24% 15% / 0.4);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
+    transition: all 0.25s var(--ease-out-expo);
+    cursor: default;
+  }
+  .stat-premium:hover {
+    border-color: var(--border-hover);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.06),
+      0 4px 16px hsl(0 0% 0% / 0.2);
+    transform: translateY(-1px);
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .stat-value-success { color: var(--success); }
+  .stat-value-primary { color: var(--primary); }
+  .stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted-fg);
+    margin-top: 2px;
+  }
+
+  /* ── 9. Table Row Polish ── */
+  .table-demo {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .table-demo th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-fg);
+    border-bottom: 1px solid var(--border);
+  }
+  .table-demo td {
+    padding: 10px 12px;
+    border-bottom: 1px solid hsl(0 0% 100% / 0.03);
+  }
+  .table-flat tr:hover td {
+    background: hsl(0 0% 100% / 0.02);
+  }
+  .table-premium tr {
+    transition: all 0.15s var(--ease-out-expo);
+  }
+  .table-premium tr:hover td {
+    background: hsl(0 0% 100% / 0.03);
+  }
+  .table-premium tr:hover td:first-child {
+    box-shadow: inset 2px 0 0 var(--primary);
+  }
+
+  .mono { font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace; font-size: 11px; }
+  .text-muted { color: var(--muted-fg); }
+  .text-success { color: var(--success); }
+  .text-warning { color: var(--warning); }
+  .text-primary { color: var(--primary); }
+
+  /* ── 10. Popover Animation ── */
+  .popover-demo-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  .popover-static {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--card-light);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px hsl(0 0% 0% / 0.4);
+    display: none;
+  }
+  .popover-animated {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: hsl(234 26% 18% / 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-hover);
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 8px 32px hsl(0 0% 0% / 0.5);
+    display: none;
+    transform-origin: bottom center;
+  }
+  .popover-demo-wrap:hover .popover-static { display: block; }
+  .popover-demo-wrap:hover .popover-animated {
+    display: block;
+    animation: pop-in 0.2s var(--ease-out-expo) forwards;
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.92) translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) scale(1) translateY(0);
+    }
+  }
+
+  /* ── 11. Animated Counter ── */
+  .counter-wrap {
+    font-size: 36px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .counter-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── 12. Empty State ── */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .empty-icon-flat {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: hsl(0 0% 100% / 0.05);
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .empty-icon-premium {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: radial-gradient(ellipse at 50% 30%, hsl(232 52% 62% / 0.15), hsl(232 52% 62% / 0.04));
+    border: 1px solid hsl(232 52% 62% / 0.12);
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 24px -8px hsl(232 52% 62% / 0.1);
+  }
+  .empty-icon-svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--primary);
+    stroke-width: 1.5;
+    fill: none;
+    opacity: 0.6;
+  }
+  .empty-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: hsl(0 0% 100% / 0.8); }
+  .empty-desc { font-size: 12px; color: var(--muted-fg); margin-bottom: 16px; }
+
+  /* ── Impact badge ── */
+  .impact {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .impact-high { background: hsl(152 58% 55% / 0.12); color: var(--success); }
+  .impact-medium { background: hsl(38 92% 56% / 0.12); color: var(--warning); }
+
+  .css-hint {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: hsl(0 0% 0% / 0.3);
+    border: 1px solid hsl(0 0% 100% / 0.04);
+    font-size: 11px;
+    font-family: 'SF Mono', 'Cascadia Code', monospace;
+    color: hsl(232 52% 72%);
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .css-hint .comment { color: hsl(235 14% 45%); }
+</style>
+</head>
+<body>
+
+<h1>Premium Polish Mockups</h1>
+<p class="subtitle">Interactive before/after comparisons for each proposed enhancement. Hover, click, and tab through the examples to feel the difference. These are the highest-impact changes for elevating SIPalyzer to Linear/Vercel-caliber polish.</p>
+
+<!-- ═══════ 1. Card Hover ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">01</span>
+    <span class="section-title">Card Hover: Lift + Shadow Escalation + Spotlight</span>
+  </div>
+  <p class="section-desc">Cards should respond to hover with a coordinated lift, shadow deepening, border brightening, and optional cursor-following spotlight. The current flat hover feels lifeless.</p>
+  <span class="impact impact-high">HIGH IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current</div>
+      <div class="card-flat">
+        <div class="card-title">SIP Trunk: Twilio US East</div>
+        <div class="card-meta">sip.twilio.com:5060 · UDP · Registered</div>
+      </div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed</div>
+      <div class="card-premium" onmousemove="this.querySelector('.spotlight').style.background=`radial-gradient(350px at ${event.offsetX}px ${event.offsetY}px, hsl(232 52% 62% / 0.08), transparent 70%)`" onmouseleave="this.querySelector('.spotlight').style.background='none'">
+        <div class="spotlight"></div>
+        <div class="card-title">SIP Trunk: Twilio US East</div>
+        <div class="card-meta">sip.twilio.com:5060 · UDP · Registered</div>
+      </div>
+    </div>
+  </div>
+  <div class="css-hint"><span class="comment">/* Key CSS: coordinated transition + cursor spotlight */</span>
+transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+hover: { transform: translateY(-2px); border-color: white/12; shadow: layered 3-tier; }
+spotlight: radial-gradient(350px at var(--x) var(--y), primary/8, transparent 70%)</div>
+</div>
+
+<!-- ═══════ 2. Animated Gradient Border ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">02</span>
+    <span class="section-title">Animated Gradient Border</span>
+  </div>
+  <p class="section-desc">A rotating conic gradient border that reveals on hover — the signature Linear effect. Use sparingly on hero cards, CTAs, and primary interactive surfaces.</p>
+  <span class="impact impact-medium">MEDIUM IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Static Border</div>
+      <div class="card-flat" style="border-color: hsl(232 52% 62% / 0.3);">
+        <div class="card-title">Start PBX Server</div>
+        <div class="card-meta">Port 15060 · UDP · sipalyzer-pbx</div>
+      </div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Animated Gradient</div>
+      <div class="card-gradient-border">
+        <div class="card-title">Start PBX Server</div>
+        <div class="card-meta">Port 15060 · UDP · sipalyzer-pbx</div>
+      </div>
+    </div>
+  </div>
+  <div class="css-hint"><span class="comment">/* Uses @property for animatable CSS custom property */</span>
+@property --border-angle { syntax: "&lt;angle&gt;"; initial-value: 0deg; }
+background: conic-gradient(from var(--border-angle), transparent 30%, primary 50%, transparent 70%);
+mask-composite: exclude;  <span class="comment">/* Shows only the 1px border */</span></div>
+</div>
+
+<!-- ═══════ 3. Status Indicators ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">03</span>
+    <span class="section-title">Status Indicator Animations</span>
+  </div>
+  <p class="section-desc">Static colored dots communicate state but feel dead. A pulsing ring emanation on "online" indicators adds life and draws attention to active states. Offline stays static — no animation on inactive states.</p>
+  <span class="impact impact-high">HIGH IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current (static)</div>
+      <div class="status-row"><span class="status-dot status-static-green"></span> Extension 1001 <span class="status-label">Online</span></div>
+      <div class="status-row"><span class="status-dot" style="background: var(--warning);"></span> Trunk: Telnyx <span class="status-label">Registering</span></div>
+      <div class="status-row"><span class="status-dot status-static-gray"></span> Extension 1003 <span class="status-label">Offline</span></div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed (pulsing ring)</div>
+      <div class="status-row"><span class="status-dot status-pulse-green"></span> Extension 1001 <span class="status-label text-success">Online</span></div>
+      <div class="status-row"><span class="status-dot status-pulse-amber"></span> Trunk: Telnyx <span class="status-label text-warning">Registering</span></div>
+      <div class="status-row"><span class="status-dot status-animated-gray"></span> Extension 1003 <span class="status-label">Offline</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 4. Skeleton Loading ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">04</span>
+    <span class="section-title">Skeleton Shimmer Loading</span>
+  </div>
+  <p class="section-desc">Instead of showing a spinner or blank space while data loads, show shimmer placeholders that match the eventual content layout. This eliminates layout shift and makes loading feel instantaneous.</p>
+  <span class="impact impact-high">HIGH IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current (static pulse)</div>
+      <div class="skeleton-row"><div class="skeleton-static" style="width: 60px;"></div><div class="skeleton-static" style="width: 120px;"></div><div class="skeleton-static" style="width: 80px; margin-left: auto;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-static" style="width: 50px;"></div><div class="skeleton-static" style="width: 140px;"></div><div class="skeleton-static" style="width: 60px; margin-left: auto;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-static" style="width: 70px;"></div><div class="skeleton-static" style="width: 100px;"></div><div class="skeleton-static" style="width: 70px; margin-left: auto;"></div></div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed (shimmer sweep)</div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="width: 60px;"></div><div class="skeleton-shimmer" style="width: 120px; animation-delay: 0.1s;"></div><div class="skeleton-shimmer" style="width: 80px; margin-left: auto; animation-delay: 0.2s;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="width: 50px; animation-delay: 0.05s;"></div><div class="skeleton-shimmer" style="width: 140px; animation-delay: 0.15s;"></div><div class="skeleton-shimmer" style="width: 60px; margin-left: auto; animation-delay: 0.25s;"></div></div>
+      <div class="skeleton-row"><div class="skeleton-shimmer" style="width: 70px; animation-delay: 0.1s;"></div><div class="skeleton-shimmer" style="width: 100px; animation-delay: 0.2s;"></div><div class="skeleton-shimmer" style="width: 70px; margin-left: auto; animation-delay: 0.3s;"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 5. Button Glow ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">05</span>
+    <span class="section-title">Button Glow + Press Feedback</span>
+  </div>
+  <p class="section-desc">Primary action buttons emit a subtle color-matched glow on hover and scale down on press. The glow uses multi-layer box-shadows at different spreads for realistic light falloff. Ghost buttons lift and brighten borders.</p>
+  <span class="impact impact-high">HIGH IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current (opacity fade)</div>
+      <div class="demo-row" style="gap: 12px;">
+        <button class="btn-flat btn-flat-primary">Deploy</button>
+        <button class="btn-flat" style="background: transparent; border: 1px solid hsl(0 0% 100% / 0.1); color: var(--fg);">Cancel</button>
+      </div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed (glow + press)</div>
+      <div class="demo-row" style="gap: 12px;">
+        <button class="btn-glow">Deploy</button>
+        <button class="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div class="css-hint"><span class="comment">/* Multi-layer glow shadow */</span>
+hover: box-shadow: 0 0 16px -4px primary/50, 0 0 40px -8px primary/20;
+active: transform: scale(0.97); transition-duration: 80ms;
+<span class="comment">/* Exits faster than entrances — feels snappy */</span></div>
+</div>
+
+<!-- ═══════ 6. Focus Ring ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">06</span>
+    <span class="section-title">Animated Focus Ring</span>
+  </div>
+  <p class="section-desc">Instead of a static ring that pops in instantly, the focus ring expands outward with the premium ease-out-expo curve. Tab through both buttons below to compare.</p>
+  <span class="impact impact-medium">MEDIUM IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Static (tab to see)</div>
+      <button class="btn-flat btn-flat-primary focus-static" style="margin-top: 8px;">Tab to me</button>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Animated (tab to see)</div>
+      <button class="btn-glow focus-animated" style="margin-top: 8px;">Tab to me</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 7. Sidebar Active ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">07</span>
+    <span class="section-title">Sidebar Active Accent Bar</span>
+  </div>
+  <p class="section-desc">A thin primary-colored left edge on the active nav item provides a strong visual anchor. Used by Linear, VS Code, and Figma. The bar is 2px wide and 60% of the item height.</p>
+  <span class="impact impact-medium">MEDIUM IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current (bg only)</div>
+      <div style="width: 200px;">
+        <div class="nav-item"><div class="nav-icon"></div> Dashboard</div>
+        <div class="nav-item nav-item-active-flat"><div class="nav-icon nav-icon-active"></div> Extensions</div>
+        <div class="nav-item"><div class="nav-icon"></div> Trunks</div>
+        <div class="nav-item"><div class="nav-icon"></div> Settings</div>
+      </div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed (accent bar)</div>
+      <div style="width: 200px;">
+        <div class="nav-item"><div class="nav-icon"></div> Dashboard</div>
+        <div class="nav-item nav-item-active-bar"><div class="nav-icon nav-icon-active"></div> Extensions</div>
+        <div class="nav-item"><div class="nav-icon"></div> Trunks</div>
+        <div class="nav-item"><div class="nav-icon"></div> Settings</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 8. Stat Cards ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">08</span>
+    <span class="section-title">Stat Card Elevation</span>
+  </div>
+  <p class="section-desc">Dashboard metric cards should feel like separate glass surfaces — not painted rectangles. Adding inset highlights, subtle hover response, and a top-edge glow creates the layered-glass depth that visionOS and Linear use.</p>
+  <span class="impact impact-high">HIGH IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current (flat)</div>
+      <div class="demo-row">
+        <div class="stat-card stat-flat"><div class="stat-value stat-value-success">3/4</div><div class="stat-label">Online</div></div>
+        <div class="stat-card stat-flat"><div class="stat-value stat-value-primary">2</div><div class="stat-label">Active Calls</div></div>
+        <div class="stat-card stat-flat"><div class="stat-value">12</div><div class="stat-label">Extensions</div></div>
+      </div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed (glass elevation)</div>
+      <div class="demo-row">
+        <div class="stat-card stat-premium"><div class="stat-value stat-value-success">3/4</div><div class="stat-label">Online</div></div>
+        <div class="stat-card stat-premium"><div class="stat-value stat-value-primary">2</div><div class="stat-label">Active Calls</div></div>
+        <div class="stat-card stat-premium"><div class="stat-value">12</div><div class="stat-label">Extensions</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 9. Table Row Polish ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">09</span>
+    <span class="section-title">Table Row Accent Reveal</span>
+  </div>
+  <p class="section-desc">When hovering a data table row, reveal a thin primary-colored left accent bar. This signals interactivity and provides a visual breadcrumb for the user's focus position. Subtle but immediately noticeable.</p>
+  <span class="impact impact-medium">MEDIUM IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current (bg only)</div>
+      <table class="table-demo table-flat">
+        <thead><tr><th>Extension</th><th>Name</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1001</td><td>Alice Smith</td><td class="text-success">Online</td></tr>
+          <tr><td class="mono">1002</td><td>Bob Jones</td><td class="text-muted">Offline</td></tr>
+          <tr><td class="mono">1003</td><td>Carol Davis</td><td class="text-success">Online</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed (accent bar reveal)</div>
+      <table class="table-demo table-premium">
+        <thead><tr><th>Extension</th><th>Name</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1001</td><td>Alice Smith</td><td class="text-success">Online</td></tr>
+          <tr><td class="mono">1002</td><td>Bob Jones</td><td class="text-muted">Offline</td></tr>
+          <tr><td class="mono">1003</td><td>Carol Davis</td><td class="text-success">Online</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 10. Popover Animation ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">10</span>
+    <span class="section-title">Popover Entrance Animation</span>
+  </div>
+  <p class="section-desc">Popovers and tooltips should scale + fade + translate from their origin direction. The current Radix defaults are functional but adding a directional translate and glass backdrop makes them feel intentional. Hover both buttons below.</p>
+  <span class="impact impact-medium">MEDIUM IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel" style="min-height: 100px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 16px;">
+      <div class="comparison-label label-before" style="position: absolute; top: 24px; left: 24px;"><span class="label-dot label-dot-before"></span> Current</div>
+      <div class="popover-demo-wrap">
+        <button class="btn-flat btn-flat-primary" style="font-size: 12px; padding: 6px 12px;">Hover me</button>
+        <div class="popover-static">SIP trunk status: Registered</div>
+      </div>
+    </div>
+    <div class="comparison-panel" style="min-height: 100px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 16px;">
+      <div class="comparison-label label-after" style="position: absolute; top: 24px; left: 24px;"><span class="label-dot label-dot-after"></span> Proposed</div>
+      <div class="popover-demo-wrap">
+        <button class="btn-glow" style="font-size: 12px; padding: 6px 12px;">Hover me</button>
+        <div class="popover-animated">SIP trunk status: Registered</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 11. Empty State ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-number">11</span>
+    <span class="section-title">Empty State Icon Glow</span>
+  </div>
+  <p class="section-desc">The 25+ empty states across the app use a flat muted icon container. Adding a radial gradient glow and primary-tinted border makes them feel designed rather than placeholder.</p>
+  <span class="impact impact-medium">MEDIUM IMPACT</span>
+  <div class="comparison" style="margin-top: 16px;">
+    <div class="comparison-panel">
+      <div class="comparison-label label-before"><span class="label-dot label-dot-before"></span> Current</div>
+      <div class="empty-state">
+        <div class="empty-icon-flat">
+          <svg class="empty-icon-svg" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+        </div>
+        <div class="empty-title">No trunks configured</div>
+        <div class="empty-desc">Add a SIP trunk to enable external calling.</div>
+        <button class="btn-flat btn-flat-primary" style="font-size: 12px; padding: 6px 14px;">Add Trunk</button>
+      </div>
+    </div>
+    <div class="comparison-panel">
+      <div class="comparison-label label-after"><span class="label-dot label-dot-after"></span> Proposed</div>
+      <div class="empty-state">
+        <div class="empty-icon-premium">
+          <svg class="empty-icon-svg" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+        </div>
+        <div class="empty-title">No trunks configured</div>
+        <div class="empty-desc">Add a SIP trunk to enable external calling.</div>
+        <button class="btn-glow" style="font-size: 12px; padding: 6px 14px;">Add Trunk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Summary ═══════ -->
+<div class="section" style="margin-top: 80px; padding-top: 32px; border-top: 1px solid var(--border);">
+  <div class="section-header">
+    <span class="section-title">Implementation Priority</span>
+  </div>
+  <p class="section-desc" style="margin-bottom: 24px;">Ranked by visual impact per hour of effort. Start from the top.</p>
+  <table class="table-demo table-premium" style="max-width: 700px;">
+    <thead>
+      <tr>
+        <th style="width: 40px;">#</th>
+        <th>Enhancement</th>
+        <th style="width: 100px;">Impact</th>
+        <th style="width: 80px;">Effort</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="mono">1</td><td>transition-smooth unification</td><td><span class="impact impact-high">HIGH</span></td><td class="text-muted">~1h</td></tr>
+      <tr><td class="mono">2</td><td>Skeleton shimmer loading</td><td><span class="impact impact-high">HIGH</span></td><td class="text-muted">~2h</td></tr>
+      <tr><td class="mono">3</td><td>Card hover lift + shadow</td><td><span class="impact impact-high">HIGH</span></td><td class="text-muted">~1h</td></tr>
+      <tr><td class="mono">4</td><td>Button glow + press</td><td><span class="impact impact-high">HIGH</span></td><td class="text-muted">~1h</td></tr>
+      <tr><td class="mono">5</td><td>Status pulse animations</td><td><span class="impact impact-high">HIGH</span></td><td class="text-muted">~30m</td></tr>
+      <tr><td class="mono">6</td><td>Stat card glass elevation</td><td><span class="impact impact-high">HIGH</span></td><td class="text-muted">~1h</td></tr>
+      <tr><td class="mono">7</td><td>Animated gradient borders</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~2h</td></tr>
+      <tr><td class="mono">8</td><td>Cursor spotlight on cards</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~2h</td></tr>
+      <tr><td class="mono">9</td><td>Sidebar accent bar</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~30m</td></tr>
+      <tr><td class="mono">10</td><td>Table row accent reveal</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~1h</td></tr>
+      <tr><td class="mono">11</td><td>Popover entrance animation</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~1h</td></tr>
+      <tr><td class="mono">12</td><td>Focus ring animation</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~30m</td></tr>
+      <tr><td class="mono">13</td><td>Empty state icon glow</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~30m</td></tr>
+      <tr><td class="mono">14</td><td>Animated number counters</td><td><span class="impact impact-medium">MED</span></td><td class="text-muted">~2h</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="text-align: center; padding: 40px 0; color: var(--muted-fg); font-size: 12px;">
+  SIPalyzer Premium Polish Mockups — 2025/2026 Design Trends
+</div>
+
+</body>
+</html>

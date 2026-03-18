@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+  <!-- Hero contour lines: soft curved bands across the viewport -->
+  <path d="M 0 22 Q 25 12 50 22 T 100 24" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+  <path d="M 0 58 Q 30 48 50 58 T 100 55" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+  <path d="M 0 78 Q 50 68 100 78" fill="none" stroke="rgba(255,255,255,0.055)" stroke-width="0.45" vector-effect="non-scaling-stroke"/>
+</svg>

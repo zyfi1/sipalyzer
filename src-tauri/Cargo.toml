@@ -1,0 +1,118 @@
+[workspace]
+members = ["crates/*"]
+
+[package]
+name = "sipalyzer"
+version = "1.0.0"
+description = "SIPalyzer - Professional VoIP toolset for registration testing and diagnostics"
+authors = ["SIPalyzer"]
+license = ""
+repository = ""
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+bindgen = "0.70"
+cc = "1.0"
+
+[dependencies]
+sipalyzer-core = { path = "crates/sipalyzer-core" }
+tauri = { version = "2.9", features = ["devtools", "tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+base64 = "0.22"
+thiserror = "1.0"
+dirs = "5.0"
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher", "chrono", "serde_json"] }
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+getrandom = "0.3"
+uuid = { version = "1.6", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+md5 = "0.7"
+printpdf = "0.7"
+pcap = "1.1"
+pcap-file = "2.0"
+ipnetwork = "0.20"
+once_cell = "1.19"
+hickory-resolver = "0.25"
+hickory-client = "0.24"
+hickory-proto = "0.24"
+rsipstack = { version = "0.4", features = ["rustls", "websocket", "srv_lookup"] }
+rsip = "0.4"
+rfd = "0.14"
+cpal = "0.15"
+default-net = "0.22"
+rubato = "0.14"
+ezk-g711 = "0.2"
+ezk-g722 = "0.1"
+reqwest = { version = "0.12", features = ["rustls-tls", "native-tls", "blocking", "json", "cookies", "stream"], default-features = false }
+ldap3 = { version = "0.11", default-features = false, features = ["tls-rustls"] }
+image = { version = "0.25", features = ["tiff"] }
+tiff = "0.9"
+
+# Network test dependencies
+surge-ping = "0.8"
+socket2 = { version = "0.5", features = ["all"] }
+snmp2 = { version = "0.4.14", features = ["v3"] }
+
+# Enterprise packet monitor dependencies
+crossbeam-channel = "0.5"
+parking_lot = "0.12"
+rayon = "1.10"
+memmap2 = "0.9"
+zstd = "0.13"
+dashmap = "6.1"
+sysinfo = "0.32"
+num_cpus = "1.16"
+libc = "0.2"
+regex = "1.12.3"
+
+# Terminal emulator PTY support
+portable-pty = "0.8"
+
+# SSH remote capture support
+russh = "0.46"
+russh-keys = "0.46"
+async-trait = "0.1"
+hound = "3.5.1"
+urlencoding = "2.1.3"
+
+# Speech recognition (Vosk offline STT)
+vosk = "0.2"
+
+# Remote agent WebSocket server
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
+rustls = { version = "0.23", features = ["ring"] }
+rcgen = "0.13"
+futures-util = "0.3"
+tar = "0.4"
+bzip2 = "0.5"
+tempfile = "3.25.0"
+tauri-plugin-dialog = "2.6.0"
+lettre = { version = "0.11.19", default-features = false, features = ["tokio1-rustls-tls", "builder", "smtp-transport", "pool", "hostname"] }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "registry"] }
+
+[features]
+default = []
+# Explicit opt-in for host-native build/link steps in build.rs.
+# Default builds stay agnostic and skip SpanDSP/Vosk probing/tooling.
+native_extensions = []
+# Internal cfg gate used by Rust code paths when native bindings are available.
+# This is set by build.rs during native_extensions builds.
+spandsp-native = []
+
+[dev-dependencies]
+tempfile = "3.25.0"

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en" class="dark" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/geist-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background:
+          radial-gradient(ellipse at 50% 50%, hsl(215 45% 50% / 0.10), hsl(220 40% 35% / 0.06) 40%, transparent 70%),
+          conic-gradient(
+            from 0deg,
+            hsl(215 50% 45% / 0.12),
+            hsl(210 45% 50% / 0.15),
+            hsl(220 40% 40% / 0.10),
+            hsl(222 40% 12% / 0.05),
+            hsl(200 45% 45% / 0.08),
+            hsl(215 45% 55% / 0.14),
+            hsl(205 40% 38% / 0.08),
+            hsl(215 50% 45% / 0.12)
+          ),
+          hsl(240 15% 4%);
+        color: #e5e7eb;
+        background-attachment: fixed;
+        background-size: cover;
+        font-family: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      body {
+        overflow: hidden;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+      }
+      #boot-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        pointer-events: none;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse at 50% 50%, hsl(215 45% 50% / 0.10), hsl(220 40% 35% / 0.06) 40%, transparent 70%),
+          conic-gradient(
+            from 0deg,
+            hsl(215 50% 45% / 0.12),
+            hsl(210 45% 50% / 0.15),
+            hsl(220 40% 40% / 0.10),
+            hsl(222 40% 12% / 0.05),
+            hsl(200 45% 45% / 0.08),
+            hsl(215 45% 55% / 0.14),
+            hsl(205 40% 38% / 0.08),
+            hsl(215 50% 45% / 0.12)
+          ),
+          hsl(240 15% 4%);
+      }
+      #boot-screen::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 160vmax;
+        height: 160vmax;
+        transform: translate(-50%, -50%);
+        filter: blur(120px);
+        background: conic-gradient(
+          from 0deg,
+          hsl(215 50% 45% / 0.12),
+          hsl(210 45% 50% / 0.15),
+          hsl(220 40% 40% / 0.10),
+          hsl(200 45% 45% / 0.08),
+          hsl(215 45% 55% / 0.14),
+          hsl(205 40% 38% / 0.08),
+          hsl(215 50% 45% / 0.12)
+        );
+        animation: boot-mesh-rotate 25s linear infinite;
+      }
+      #boot-screen::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0.03;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-repeat: repeat;
+        background-size: 128px 128px;
+      }
+      .boot-wash {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 70vmax;
+        height: 70vmax;
+        border-radius: 50%;
+        background: radial-gradient(
+          ellipse at center,
+          hsl(215 45% 50% / 0.10),
+          hsl(220 40% 35% / 0.06) 40%,
+          transparent 70%
+        );
+        animation: boot-wash-drift 12s ease-in-out infinite;
+      }
+      .boot-pulse {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        border: 1px solid hsl(220 80% 60% / 0.15);
+        transform: translate(-50%, -50%) scale(0.6);
+        animation: boot-pulse-ring 2.8s cubic-bezier(0, 0.6, 0.3, 1) infinite;
+      }
+      .boot-center {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 32px;
+        transform: translateY(4px);
+      }
+      .boot-logo {
+        width: 180px;
+        height: 180px;
+        filter: drop-shadow(0 0 24px hsl(219 100% 65% / 0.22));
+        animation: boot-logo-in 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+      }
+      .boot-bar {
+        transform-box: fill-box;
+        transform-origin: left center;
+        opacity: 0;
+        animation: boot-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation-delay: var(--del);
+      }
+      .boot-text {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        transform: translateY(16px);
+        animation: boot-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+      }
+      .boot-title {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1;
+        background: linear-gradient(135deg, hsl(330 85% 72%), hsl(295 78% 64%), hsl(258 82% 68%));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .boot-sub {
+        margin: 0;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: hsl(215 16% 42%);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      #boot-screen.boot-exit {
+        opacity: 0;
+        transition: opacity 220ms ease;
+      }
+      @keyframes boot-mesh-rotate {
+        from { transform: translate(-50%, -50%) rotate(0deg); }
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+      @keyframes boot-wash-drift {
+        0% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+        50% { transform: translate(-45%, -55%) scale(1.15); opacity: 0.7; }
+        100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+      }
+      @keyframes boot-pulse-ring {
+        0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0.6; }
+        100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+      }
+      @keyframes boot-logo-in {
+        from { opacity: 0; transform: scale(0.6); filter: blur(20px); }
+        to { opacity: 1; transform: scale(1); filter: blur(0); }
+      }
+      @keyframes boot-pop {
+        0% { opacity: 0; transform: scaleX(0); }
+        60% { transform: scaleX(1.08); }
+        100% { opacity: 1; transform: scaleX(1); }
+      }
+      @keyframes boot-fade-up {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+    <title>SIPalyzer</title>
+  </head>
+  <body>
+    <div id="boot-screen" aria-hidden="true">
+      <div class="boot-wash"></div>
+      <div class="boot-pulse"></div>
+      <div class="boot-center">
+        <svg class="boot-logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <rect class="boot-bar" style="--del: .08s" x="42"  y="14"  width="120" height="17" rx="8" fill="hsl(330 85% 72%)" />
+          <rect class="boot-bar" style="--del: .18s" x="22"  y="40"  width="82"  height="17" rx="8" fill="hsl(320 82% 68%)" />
+          <rect class="boot-bar" style="--del: .28s" x="18"  y="66"  width="58"  height="17" rx="8" fill="hsl(308 80% 66%)" />
+          <rect class="boot-bar" style="--del: .38s" x="46"  y="92"  width="108" height="17" rx="8" fill="hsl(295 78% 64%)" />
+          <rect class="boot-bar" style="--del: .48s" x="124" y="118" width="58"  height="17" rx="8" fill="hsl(282 78% 64%)" />
+          <rect class="boot-bar" style="--del: .58s" x="96"  y="144" width="84"  height="17" rx="8" fill="hsl(270 80% 66%)" />
+          <rect class="boot-bar" style="--del: .68s" x="38"  y="170" width="122" height="17" rx="8" fill="hsl(258 82% 68%)" />
+        </svg>
+        <div class="boot-text">
+          <h1 class="boot-title">SIPalyzer</h1>
+          <p class="boot-sub">Packets don't lie</p>
+        </div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script>
+      (() => {
+        const FALLBACK_HIDE_MS = 12000;
+        const hideBootScreen = () => {
+          const boot = document.getElementById("boot-screen");
+          if (!boot) return;
+          boot.classList.add("boot-exit");
+          window.setTimeout(() => boot.remove(), 260);
+        };
+        window.setTimeout(hideBootScreen, FALLBACK_HIDE_MS);
+        window.addEventListener("error", () => window.setTimeout(hideBootScreen, 0), { once: true });
+        window.addEventListener("unhandledrejection", () => window.setTimeout(hideBootScreen, 0), { once: true });
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

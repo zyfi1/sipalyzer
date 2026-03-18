@@ -1,0 +1,231 @@
+name: Release Channels
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.2.3-rc.1)"
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  SIPALYZER_NATIVE_ARTIFACTS_DIR: ${{ vars.SIPALYZER_NATIVE_ARTIFACTS_DIR }}
+  SIPALYZER_NATIVE_ARTIFACTS_URL: ${{ vars.SIPALYZER_NATIVE_ARTIFACTS_URL }}
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare Channel Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      channel: ${{ steps.meta.outputs.channel }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      release_name: ${{ steps.meta.outputs.release_name }}
+    steps:
+      - name: Resolve tag and channel
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if [[ -z "${TAG}" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+|-rc\.[0-9]+)?$ ]]; then
+            echo "Invalid release tag format: ${TAG}" >&2
+            echo "Expected: vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-rc.N" >&2
+            exit 1
+          fi
+
+          CHANNEL="stable"
+          PRERELEASE="false"
+          if [[ "${TAG}" =~ -beta\.[0-9]+$ ]]; then
+            CHANNEL="beta"
+            PRERELEASE="true"
+          elif [[ "${TAG}" =~ -rc\.[0-9]+$ ]]; then
+            CHANNEL="rc"
+            PRERELEASE="true"
+          fi
+
+          echo "release_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "release_name=SIPalyzer ${TAG} (${CHANNEL})" >> "$GITHUB_OUTPUT"
+
+  strict-preflight:
+    name: Strict Host-Agnostic Preflight
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Guard strict lane against host package manager setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          workflow = pathlib.Path(".github/workflows/release-channels.yml").read_text(encoding="utf-8")
+          match = re.search(r"# strict-lane:start(.*?)# strict-lane:end", workflow, re.S)
+          if not match:
+            print("Strict lane markers not found in release workflow.", file=sys.stderr)
+            sys.exit(1)
+
+          strict_block = match.group(1)
+          if re.search(r"\b(?:brew|apt(?:-get)?|choco)\b", strict_block):
+            print("Strict lane must not include brew/apt/choco setup.", file=sys.stderr)
+            sys.exit(1)
+          PY
+
+      # strict-lane:start
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Fetch upstream native artifacts (strict lane)
+        run: npm run fetch:native-artifacts:upstream
+
+      - name: Frontend build check (strict lane)
+        run: npm run build
+
+      - name: Validate native artifact manifest (strict lane)
+        run: npm run validate:native-artifacts:strict
+
+      - name: Rust app compile check (strict lane)
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets --target x86_64-unknown-linux-gnu
+      # strict-lane:end
+
+  validate-secrets:
+    name: Validate Signing Secrets
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate updater signing inputs
+        shell: bash
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ -n "${TAURI_PRIVATE_KEY}" ]] || { echo "Missing TAURI_PRIVATE_KEY"; exit 1; }
+          [[ -n "${TAURI_KEY_PASSWORD}" ]] || { echo "Missing TAURI_KEY_PASSWORD"; exit 1; }
+          echo "Updater signing secrets detected."
+
+  release-extended:
+    name: Build and Publish ${{ matrix.label }}
+    needs: [prepare, strict-preflight, validate-secrets]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            label: linux-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            label: macOS-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            label: macOS-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Fetch native artifacts bundle (extended lane)
+        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL != ''
+        run: node ./scripts/fetch-native-artifacts.mjs --source "${{ env.SIPALYZER_NATIVE_ARTIFACTS_URL }}" --dest "${{ runner.temp }}/native-artifacts"
+
+      - name: Hydrate target native artifacts from fetched bundle (extended lane)
+        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL != ''
+        run: node ./scripts/hydrate-native-artifacts.mjs --source "${{ runner.temp }}/native-artifacts" --target ${{ matrix.target }}
+
+      - name: Hydrate target native artifacts from mounted directory (extended lane)
+        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR != ''
+        run: node ./scripts/hydrate-native-artifacts.mjs --source "${{ env.SIPALYZER_NATIVE_ARTIFACTS_DIR }}" --target ${{ matrix.target }}
+
+      - name: Fetch upstream native artifacts (extended lane fallback)
+        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR == ''
+        run: npm run fetch:native-artifacts:upstream
+
+      - name: Validate target native artifacts (extended lane)
+        run: node ./scripts/validate-native-artifacts.mjs --strict --target ${{ matrix.target }}
+
+      - name: Install macOS dependencies (extended lane)
+        if: runner.os == 'macOS'
+        run: brew install libpcap
+
+      - name: Install Windows dependencies (extended lane)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          try {
+            choco install npcap --version=1.79 -y --no-progress
+          } catch {
+            Write-Host "Npcap install failed; continuing release build without runtime capture driver."
+          }
+
+      - name: Install Linux dependencies (extended lane)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libpcap-dev
+
+      - name: Build and upload channel release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ needs.prepare.outputs.release_tag }}
+          releaseName: ${{ needs.prepare.outputs.release_name }}
+          releaseDraft: false
+          prerelease: ${{ needs.prepare.outputs.prerelease }}
+          args: --target ${{ matrix.target }}
+

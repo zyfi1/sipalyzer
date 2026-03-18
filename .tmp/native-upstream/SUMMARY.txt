@@ -1,0 +1,5 @@
+Installed upstream native artifacts:
+- x86_64-unknown-linux-gnu/{libspandsp.so, libtiff.so, libvosk.so}
+- x86_64-pc-windows-msvc/{spandsp.dll, tiff.dll, vosk.dll}
+
+Sources: Debian pool (spandsp/libtiff), MSYS2 mingw64 (spandsp/libtiff), vosk-api releases.

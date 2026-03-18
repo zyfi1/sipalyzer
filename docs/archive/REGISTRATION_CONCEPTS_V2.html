@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIPalyzer — Registration Concepts V2 (2025/2026 Design)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0b10;--card:hsl(238 25% 12%);--card2:hsl(238 22% 15%);
+    --glass:hsl(238 30% 18%/0.45);--glass-border:hsl(238 30% 40%/0.2);
+    --accent:hsl(238 18% 21%);--border:hsl(238 16% 25%);
+    --muted:hsl(235 14% 55%);--fg:hsl(230 15% 97%);
+    --primary:hsl(232 65% 62%);--primary-soft:hsl(232 65% 62%/0.12);
+    --success:hsl(152 62% 52%);--success-soft:hsl(152 62% 52%/0.12);
+    --warning:hsl(38 92% 56%);--warning-soft:hsl(38 92% 56%/0.10);
+    --destructive:hsl(0 72% 62%);--destructive-soft:hsl(0 72% 62%/0.10);
+    --aurora1:hsl(280 70% 60%);--aurora2:hsl(200 80% 55%);--aurora3:hsl(152 62% 52%);
+  }
+  body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6;padding:40px;-webkit-font-smoothing:antialiased}
+  h1{font-size:40px;font-weight:900;margin-bottom:8px;background:linear-gradient(135deg,hsl(280 70% 68%),hsl(200 80% 60%),hsl(152 62% 55%));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.5px}
+  .subtitle{font-size:15px;color:var(--muted);margin-bottom:56px;max-width:720px;line-height:1.8}
+  .concept{margin-bottom:90px;padding-bottom:90px;border-bottom:1px solid hsl(238 16% 16%)}
+  .concept:last-child{border-bottom:none}
+  .concept-label{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px}
+  .concept-label.h{color:hsl(280 70% 68%)} .concept-label.i{color:hsl(200 80% 60%)} .concept-label.j{color:hsl(152 62% 55%)}
+  .concept-label.k{color:hsl(38 92% 56%)} .concept-label.l{color:hsl(330 75% 65%)} .concept-label.m{color:hsl(260 60% 65%)}
+  .concept-label.n{color:hsl(180 60% 55%)}
+  .concept-label::before{content:'';display:block;width:20px;height:2px;background:currentColor;border-radius:2px}
+  .concept h2{font-size:28px;font-weight:800;margin-bottom:6px;letter-spacing:-0.3px}
+  .concept .desc{font-size:14px;color:var(--muted);margin-bottom:32px;max-width:620px;line-height:1.8}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .notes{display:flex;gap:14px;flex-wrap:wrap;margin-top:28px}
+  .note{flex:1;min-width:220px;padding:14px 18px;border-radius:12px;background:hsl(238 22% 10%);border:1px solid hsl(238 16% 18%);font-size:12px;color:var(--muted);line-height:1.7}
+  .note strong{color:var(--fg);font-weight:600}
+
+  /* Shared */
+  .frame{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:0 12px 48px hsl(0 0% 0%/0.4)}
+  .toolbar{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--border);background:hsl(238 22% 9%)}
+  .toolbar .sp{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;border:none;background:var(--accent);color:var(--fg);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s}
+  .btn:hover{background:hsl(238 18% 28%)}
+  .btn.p{background:var(--primary);color:#fff}.btn.p:hover{filter:brightness(1.1)}
+  .tag{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:600;text-transform:uppercase;background:var(--accent);color:var(--muted);border:1px solid var(--border)}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.3px}
+  .badge.ok{background:var(--success-soft);color:var(--success)}.badge.warn{background:var(--warning-soft);color:var(--warning)}.badge.fail{background:var(--destructive-soft);color:var(--destructive)}.badge.idle{background:var(--accent);color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .dot.g{background:var(--success);box-shadow:0 0 10px var(--success)}.dot.a{background:var(--warning);box-shadow:0 0 8px hsl(38 92% 56%/.4)}.dot.r{background:var(--destructive);box-shadow:0 0 8px hsl(0 72% 62%/.4)}.dot.x{background:var(--muted);opacity:.3}
+  .ib{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;transition:all .12s}
+  .ib:hover{background:var(--accent);color:var(--fg)}
+
+  /* ═══ H — Bento Mosaic ═══ */
+  .bento{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:minmax(60px,auto);gap:10px;padding:16px}
+  .bento-cell{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;transition:all .2s}
+  .bento-cell:hover{border-color:hsl(238 16% 35%);transform:translateY(-1px);box-shadow:0 4px 20px hsl(0 0% 0%/.2)}
+  .bento-cell.hero{grid-column:span 6;grid-row:span 2}
+  .bento-cell.stat{grid-column:span 3;grid-row:span 1}
+  .bento-cell.wide{grid-column:span 6;grid-row:span 1}
+  .bento-cell.reg{grid-column:span 4;grid-row:span 2}
+  .bento-cell .bc-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:8px}
+  .bento-cell .bc-val{font-size:32px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .bento-cell .bc-sub{font-size:11px;color:var(--muted);margin-top:6px}
+  .bento-bar{height:6px;border-radius:3px;background:var(--accent);margin-top:12px;overflow:hidden}
+  .bento-bar .fill{height:100%;border-radius:3px;transition:width .5s ease}
+  .bento-reg{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+  .bento-reg-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:hsl(238 20% 12%);border:1px solid hsl(238 16% 20%);transition:all .12s}
+  .bento-reg-row:hover{border-color:var(--border);background:hsl(238 20% 14%)}
+  .bento-reg-row .brr-name{font-size:12px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bento-reg-row .brr-uri{font-size:9px;color:var(--muted)}
+
+  /* ═══ I — Glass Panels ═══ */
+  .glass-bg{position:relative;min-height:500px;overflow:hidden}
+  .glass-bg::before{content:'';position:absolute;top:-100px;left:-100px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,hsl(232 65% 62%/.15),transparent 70%);filter:blur(60px)}
+  .glass-bg::after{content:'';position:absolute;bottom:-80px;right:-80px;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,hsl(152 62% 52%/.12),transparent 70%);filter:blur(50px)}
+  .glass-content{position:relative;z-index:1;padding:20px}
+  .glass-card{background:hsl(238 25% 16%/.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid hsl(238 30% 40%/.18);border-radius:16px;padding:20px;margin-bottom:10px;transition:all .2s}
+  .glass-card:hover{border-color:hsl(238 30% 50%/.25);background:hsl(238 25% 16%/.65)}
+  .glass-card .gc-row{display:flex;align-items:center;gap:14px}
+  .glass-card .gc-info{flex:1;min-width:0}
+  .glass-card .gc-name{font-size:15px;font-weight:600}
+  .glass-card .gc-uri{font-size:11px;color:var(--muted);margin-top:1px}
+  .glass-card .gc-meta{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .glass-card .gc-response{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid hsl(238 30% 40%/.12)}
+  .glass-pip{width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;font-weight:800}
+  .glass-pip.ok{background:hsl(152 62% 52%/.12);color:var(--success);box-shadow:inset 0 0 16px hsl(152 62% 52%/.08)}
+  .glass-pip.warn{background:hsl(38 92% 56%/.10);color:var(--warning)}
+  .glass-pip.fail{background:hsl(0 72% 62%/.10);color:var(--destructive)}
+  .glass-actions{display:flex;gap:6px;flex-shrink:0;opacity:0;transition:opacity .15s}
+  .glass-card:hover .glass-actions{opacity:1}
+  .glass-action{padding:6px 14px;border-radius:10px;border:1px solid var(--glass-border);background:hsl(238 25% 20%/.5);backdrop-filter:blur(12px);color:var(--fg);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s}
+  .glass-action:hover{background:hsl(238 25% 25%/.6);border-color:hsl(238 30% 50%/.3)}
+  .glass-action.accent{border-color:hsl(232 65% 62%/.3);color:var(--primary)}
+
+  /* ═══ J — Command Palette ═══ */
+  .cmd-frame{max-width:680px;margin:0 auto}
+  .cmd-search{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);background:hsl(238 22% 10%)}
+  .cmd-search input{flex:1;background:transparent;border:none;outline:none;color:var(--fg);font-size:14px;font-family:inherit}
+  .cmd-search input::placeholder{color:var(--muted)}
+  .cmd-search .cmd-kbd{display:inline-flex;align-items:center;padding:2px 6px;border-radius:5px;font-size:10px;font-weight:600;background:var(--accent);color:var(--muted);border:1px solid var(--border)}
+  .cmd-group{padding:6px 0}
+  .cmd-group-label{padding:6px 18px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+  .cmd-item{display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer;transition:background .08s;border-left:3px solid transparent}
+  .cmd-item:hover{background:hsl(238 18% 16%)}
+  .cmd-item.active{background:hsl(232 65% 62%/.08);border-left-color:var(--primary)}
+  .cmd-item .ci-status{flex-shrink:0}
+  .cmd-item .ci-info{flex:1;min-width:0}
+  .cmd-item .ci-name{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px}
+  .cmd-item .ci-uri{font-size:10px;color:var(--muted);margin-top:1px}
+  .cmd-item .ci-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .cmd-item .ci-shortcut{font-size:10px;color:hsl(235 14% 40%);display:flex;gap:3px}
+  .cmd-footer{display:flex;align-items:center;gap:12px;padding:10px 18px;border-top:1px solid var(--border);background:hsl(238 22% 9%);font-size:11px;color:var(--muted)}
+  .cmd-footer .cf-key{padding:2px 6px;border-radius:4px;background:var(--accent);border:1px solid var(--border);font-size:10px;font-weight:600}
+
+  /* ═══ K — Kanban Board ═══ */
+  .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px;min-height:400px}
+  .kanban-col{background:hsl(238 22% 10%);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+  .kanban-col-head{padding:14px 16px;border-bottom:1px solid hsl(238 16% 18%);display:flex;align-items:center;gap:8px}
+  .kanban-col-head .kch-dot{width:10px;height:10px;border-radius:50%}
+  .kanban-col-head .kch-name{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex:1}
+  .kanban-col-head .kch-count{font-size:11px;color:var(--muted);font-weight:600}
+  .kanban-col-body{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto}
+  .kanban-card{padding:14px;border-radius:12px;background:var(--card2);border:1px solid var(--border);cursor:pointer;transition:all .15s}
+  .kanban-card:hover{border-color:hsl(238 16% 35%);transform:translateY(-1px);box-shadow:0 4px 16px hsl(0 0% 0%/.15)}
+  .kanban-card .kc-name{font-size:13px;font-weight:600;margin-bottom:4px}
+  .kanban-card .kc-uri{font-size:10px;color:var(--muted);margin-bottom:10px}
+  .kanban-card .kc-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .kanban-card .kc-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid hsl(238 16% 18%)}
+  .kanban-card .kc-time{font-size:10px;color:var(--muted)}
+  .kanban-card .kc-latency{font-size:11px;color:var(--muted)}
+
+  /* ═══ L — Ambient Heatmap ═══ */
+  .heatmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;padding:16px}
+  .heat-cell{position:relative;aspect-ratio:1.6;border-radius:14px;overflow:hidden;cursor:pointer;transition:all .2s;border:1px solid transparent}
+  .heat-cell:hover{transform:scale(1.03);z-index:1;border-color:hsl(0 0% 100%/.1);box-shadow:0 8px 30px hsl(0 0% 0%/.3)}
+  .heat-cell .hc-glow{position:absolute;inset:0;opacity:.7}
+  .heat-cell.ok .hc-glow{background:radial-gradient(ellipse at 30% 40%,hsl(152 62% 45%/.3),hsl(152 62% 30%/.08) 60%,transparent)}
+  .heat-cell.warn .hc-glow{background:radial-gradient(ellipse at 30% 40%,hsl(38 92% 50%/.25),hsl(38 92% 40%/.06) 60%,transparent)}
+  .heat-cell.fail .hc-glow{background:radial-gradient(ellipse at 30% 40%,hsl(0 72% 55%/.3),hsl(0 72% 45%/.08) 60%,transparent)}
+  .heat-cell.idle .hc-glow{background:radial-gradient(ellipse at 30% 40%,hsl(238 20% 30%/.3),transparent 60%)}
+  .heat-cell .hc-content{position:relative;z-index:1;padding:16px;display:flex;flex-direction:column;height:100%;background:hsl(238 22% 12%/.75);backdrop-filter:blur(8px)}
+  .heat-cell .hc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:auto}
+  .heat-cell .hc-name{font-size:14px;font-weight:700}
+  .heat-cell .hc-uri{font-size:10px;color:var(--muted);margin-top:2px}
+  .heat-cell .hc-bottom{display:flex;align-items:flex-end;justify-content:space-between}
+  .heat-cell .hc-response{font-size:12px;font-weight:600}
+  .heat-cell .hc-latency{font-size:10px;color:var(--muted)}
+
+  /* ═══ M — Progressive Disclosure ═══ */
+  .prog-list{padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+  .prog-row{border-radius:14px;background:var(--card2);border:1px solid var(--border);overflow:hidden;transition:all .2s}
+  .prog-row:hover{border-color:hsl(238 16% 32%)}
+  .prog-row.expanded{border-color:var(--primary);box-shadow:0 0 0 1px hsl(232 65% 62%/.15),0 4px 20px hsl(0 0% 0%/.15)}
+  .prog-main{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:16px;padding:14px 18px;cursor:pointer;transition:background .1s}
+  .prog-main:hover{background:hsl(238 20% 17%)}
+  .prog-bar{width:4px;height:32px;border-radius:2px;flex-shrink:0}
+  .prog-info{min-width:0}
+  .prog-info .pi-top{display:flex;align-items:center;gap:10px}
+  .prog-info .pi-name{font-size:14px;font-weight:600}
+  .prog-info .pi-uri{font-size:11px;color:var(--muted);margin-top:2px}
+  .prog-right{display:flex;align-items:center;gap:12px}
+  .prog-expand{padding:16px 20px;border-top:1px solid hsl(238 16% 20%);background:hsl(238 22% 11%)}
+  .prog-expand-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .prog-stat{padding:12px;border-radius:10px;background:var(--card);border:1px solid hsl(238 16% 20%)}
+  .prog-stat .ps-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px}
+  .prog-stat .ps-value{font-size:18px;font-weight:700}
+  .prog-sip{padding:12px;border-radius:10px;background:hsl(238 22% 9%);border:1px solid hsl(238 16% 16%);font-size:11px;color:var(--muted);line-height:1.8;max-height:120px;overflow:auto}
+  .prog-actions{display:flex;gap:6px;margin-top:12px}
+  .prog-btn{padding:7px 16px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--fg);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .12s}
+  .prog-btn:hover{background:var(--accent)}
+  .prog-btn.accent{border-color:hsl(232 65% 62%/.3);color:var(--primary)}
+  .prog-btn.accent:hover{background:var(--primary-soft)}
+
+  /* ═══ N — Contextual Grid ═══ */
+  .ctx-layout{display:grid;grid-template-columns:1fr 320px;min-height:480px}
+  .ctx-main{overflow-y:auto}
+  .ctx-side{border-left:1px solid var(--border);background:hsl(238 22% 9%);padding:20px;overflow-y:auto}
+  .ctx-side h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:12px}
+  .ctx-chart{height:100px;background:var(--card2);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;display:flex;align-items:flex-end;justify-content:space-around;padding:8px 12px;gap:4px}
+  .ctx-chart-bar{width:100%;border-radius:3px 3px 0 0;min-width:6px;transition:height .3s ease}
+  .ctx-health{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+  .ctx-health-item{padding:12px;border-radius:10px;background:var(--card2);border:1px solid var(--border);text-align:center}
+  .ctx-health-item .chi-val{font-size:22px;font-weight:800;margin-top:4px}
+  .ctx-health-item .chi-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .ctx-list{display:flex;flex-direction:column;gap:4px;padding:16px}
+  .ctx-row{display:grid;grid-template-columns:10px 1fr auto auto;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:var(--card2);border:1px solid transparent;cursor:pointer;transition:all .12s}
+  .ctx-row:hover{border-color:var(--border);background:hsl(238 20% 17%)}
+  .ctx-row.selected{border-color:var(--primary);background:hsl(232 65% 62%/.06)}
+  .ctx-row .cr-bar{width:4px;height:28px;border-radius:2px}
+  .ctx-row .cr-info{min-width:0}
+  .ctx-row .cr-name{font-size:13px;font-weight:600}
+  .ctx-row .cr-uri{font-size:10px;color:var(--muted)}
+  .ctx-row .cr-resp{font-size:11px;min-width:70px;text-align:right}
+  .ctx-row .cr-actions{display:flex;gap:2px;opacity:0;transition:opacity .1s}
+  .ctx-row:hover .cr-actions{opacity:1}
+  .ctx-activity{display:flex;flex-direction:column;gap:6px}
+  .ctx-event{display:flex;gap:10px;font-size:11px;padding:8px 0;border-bottom:1px solid hsl(238 16% 16%)}
+  .ctx-event .ce-time{color:var(--muted);min-width:50px;font-variant-numeric:tabular-nums}
+  .ctx-event .ce-dot{width:8px;height:8px;border-radius:50%;margin-top:3px;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<h1>Registration Concepts V2</h1>
+<p class="subtitle">
+  Seven more layouts pushing into 2025/2026 design territory: bento grids, glassmorphism,
+  command palettes, kanban boards, ambient heatmaps, progressive disclosure, and contextual
+  side panels. All built for dark mode with modern spacing, type, and interaction patterns.
+</p>
+
+<!-- ═══════════════════ H — Bento Mosaic ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label h">Concept H</div>
+    <h2>Bento Mosaic</h2>
+    <p class="desc">
+      Modular bento grid with variable-size cells. Summary stats, health gauge, and
+      registrar groups coexist in a single scannable layout. Eye-tracking studies
+      show users fixate 2.6x longer on larger grid items.
+    </p>
+  </div>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Registrars</span>
+      <div class="sp"></div>
+      <button class="btn p">+ Add</button>
+    </div>
+    <div class="bento">
+      <!-- Hero: big health card -->
+      <div class="bento-cell hero" style="grid-column:span 5">
+        <div class="bc-label">Registration Health</div>
+        <div style="display:flex;align-items:flex-end;gap:20px">
+          <div class="bc-val" style="font-size:56px;color:var(--success)">3<span style="font-size:24px;color:var(--muted)">/5</span></div>
+          <div style="flex:1">
+            <div style="display:flex;gap:4px;margin-bottom:8px">
+              <div style="flex:3;height:8px;border-radius:4px;background:var(--success)"></div>
+              <div style="flex:1;height:8px;border-radius:4px;background:var(--destructive)"></div>
+              <div style="flex:1;height:8px;border-radius:4px;background:var(--warning)"></div>
+            </div>
+            <div style="display:flex;gap:16px;font-size:11px;color:var(--muted)">
+              <span><span style="color:var(--success);font-weight:600">3</span> active</span>
+              <span><span style="color:var(--destructive);font-weight:600">1</span> failed</span>
+              <span><span style="color:var(--warning);font-weight:600">1</span> idle</span>
+            </div>
+          </div>
+        </div>
+        <div class="bc-sub" style="margin-top:16px">Average response time: <strong style="color:var(--fg)">54ms</strong> &middot; Last refresh: <strong style="color:var(--fg)">2 min ago</strong></div>
+      </div>
+      <!-- Stat cells -->
+      <div class="bento-cell stat" style="grid-column:span 4">
+        <div class="bc-label">&#x260E; Calling</div>
+        <div class="bc-val">2<span style="font-size:14px;color:var(--muted)">/2</span></div>
+        <div class="bento-bar"><div class="fill" style="width:100%;background:var(--success)"></div></div>
+      </div>
+      <div class="bento-cell stat" style="grid-column:span 3">
+        <div class="bc-label">&#x1F4E0; Fax</div>
+        <div class="bc-val" style="color:var(--destructive)">0<span style="font-size:14px;color:var(--muted)">/1</span></div>
+        <div class="bento-bar"><div class="fill" style="width:0%"></div></div>
+      </div>
+      <!-- Registrar groups -->
+      <div class="bento-cell reg" style="grid-column:span 6">
+        <div class="bc-label">Production</div>
+        <div class="bento-reg">
+          <div class="bento-reg-row"><span class="dot g"></span><div style="flex:1;min-width:0"><div class="brr-name">Production PBX</div><div class="brr-uri mono">admin@sip.acme.com</div></div><span style="font-size:10px;color:var(--success)" class="mono">200</span></div>
+          <div class="bento-reg-row"><span class="dot r"></span><div style="flex:1;min-width:0"><div class="brr-name">Fax Gateway</div><div class="brr-uri mono">fax@fax.telco.net</div></div><span style="font-size:10px;color:var(--destructive)" class="mono">403</span></div>
+          <div class="bento-reg-row"><span class="dot g"></span><div style="flex:1;min-width:0"><div class="brr-name">Remote Office</div><div class="brr-uri mono">ext200@pbx.branch.co</div></div><span style="font-size:10px;color:var(--success)" class="mono">200</span></div>
+        </div>
+      </div>
+      <div class="bento-cell reg" style="grid-column:span 6">
+        <div class="bc-label">Testing</div>
+        <div class="bento-reg">
+          <div class="bento-reg-row"><span class="dot a"></span><div style="flex:1;min-width:0"><div class="brr-name">Staging Server</div><div class="brr-uri mono">test@staging.provider.io</div></div><span style="font-size:10px;color:var(--muted)">&mdash;</span></div>
+          <div class="bento-reg-row"><span class="dot g"></span><div style="flex:1;min-width:0"><div class="brr-name">Dev Asterisk</div><div class="brr-uri mono">dev@192.168.1.50</div></div><span style="font-size:10px;color:var(--success)" class="mono">200</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Highly scannable. Visual hierarchy via cell sizing. Stats and list in one view. Very 2026 &mdash; 67% of top SaaS products now use bento grids.</div>
+    <div class="note"><strong>Cons:</strong> Complex layout to maintain. Less room for per-row detail. Needs responsive breakpoints for narrow windows.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ I — Glass Panels ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label i">Concept I</div>
+    <h2>Glass Panels</h2>
+    <p class="desc">
+      Frosted glass cards over a subtle aurora gradient mesh. Each registrar floats
+      on a translucent panel. Status is conveyed through glowing initials. Modern
+      depth without being distracting.
+    </p>
+  </div>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Registrars</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:8px">3 of 5 active</span>
+      <div class="sp"></div>
+      <button class="btn p">+ Add</button>
+    </div>
+    <div class="glass-bg">
+      <div class="glass-content">
+        <div class="glass-card">
+          <div class="gc-row">
+            <div class="glass-pip ok">P</div>
+            <div class="gc-info"><div class="gc-name">Production PBX</div><div class="gc-uri mono">admin@sip.acme.com</div></div>
+            <div class="gc-meta" style="display:flex;gap:6px"><span class="tag">UDP</span><span class="tag">:5060</span><span class="badge ok"><span class="dot g" style="width:5px;height:5px"></span> Registered</span></div>
+            <div class="glass-actions"><button class="glass-action">Unregister</button><button class="glass-action">Edit</button></div>
+          </div>
+          <div class="gc-response"><span class="mono" style="color:var(--success);font-weight:600">200 OK</span><span style="color:hsl(235 14% 35%)">&middot;</span><span class="mono" style="font-variant-numeric:tabular-nums">42ms</span><span style="color:hsl(235 14% 35%)">&middot;</span><span>2 min ago</span></div>
+        </div>
+        <div class="glass-card">
+          <div class="gc-row">
+            <div class="glass-pip warn">S</div>
+            <div class="gc-info"><div class="gc-name">Staging Server</div><div class="gc-uri mono">test@staging.provider.io</div></div>
+            <div class="gc-meta" style="display:flex;gap:6px"><span class="tag">TCP</span><span class="tag">:5061</span><span class="badge warn"><span class="dot a" style="width:5px;height:5px"></span> Idle</span></div>
+            <div class="glass-actions"><button class="glass-action accent">Register</button><button class="glass-action">Edit</button></div>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="gc-row">
+            <div class="glass-pip fail">F</div>
+            <div class="gc-info"><div class="gc-name">Fax Gateway</div><div class="gc-uri mono">fax@fax.telco.net</div></div>
+            <div class="gc-meta" style="display:flex;gap:6px"><span class="tag">UDP</span><span class="tag">:5060</span><span class="badge fail"><span class="dot r" style="width:5px;height:5px"></span> Failed</span></div>
+            <div class="glass-actions"><button class="glass-action accent">Retry</button><button class="glass-action">Edit</button></div>
+          </div>
+          <div class="gc-response"><span class="mono" style="color:var(--destructive);font-weight:600">403 Forbidden</span><span style="color:hsl(235 14% 35%)">&middot;</span><span class="mono" style="font-variant-numeric:tabular-nums">189ms</span></div>
+        </div>
+        <div class="glass-card">
+          <div class="gc-row">
+            <div class="glass-pip ok">R</div>
+            <div class="gc-info"><div class="gc-name">Remote Office</div><div class="gc-uri mono">ext200@pbx.branch.co</div></div>
+            <div class="gc-meta" style="display:flex;gap:6px"><span class="tag">TLS</span><span class="badge ok"><span class="dot g" style="width:5px;height:5px"></span> Registered</span></div>
+            <div class="glass-actions"><button class="glass-action">Unregister</button><button class="glass-action">Edit</button></div>
+          </div>
+          <div class="gc-response"><span class="mono" style="color:var(--success);font-weight:600">200 OK</span><span style="color:hsl(235 14% 35%)">&middot;</span><span class="mono" style="font-variant-numeric:tabular-nums">18ms</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Stunning visual. Glassmorphism adds depth and modernity. Initials create a personal anchor. Hover-reveal keeps things clean. The aurora mesh is subtle but premium.</div>
+    <div class="note"><strong>Cons:</strong> Performance consideration with backdrop-filter. Glass can reduce contrast if not careful. Aesthetic may feel trendy rather than timeless.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ J — Command Palette ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label j">Concept J</div>
+    <h2>Command Palette</h2>
+    <p class="desc">
+      Keyboard-first, search-driven interface inspired by Raycast and VS Code.
+      Type to filter, arrow keys to navigate, Enter to act. Registrars are items
+      in a command list. Fastest possible workflow for power users.
+    </p>
+  </div>
+  <div class="frame cmd-frame">
+    <div class="cmd-search">
+      <span style="font-size:16px;color:var(--muted)">&#x1F50D;</span>
+      <input type="text" placeholder="Search registrars... or type a command" value="prod">
+      <span class="cmd-kbd">&#x2318;K</span>
+    </div>
+    <div class="cmd-group">
+      <div class="cmd-group-label">Matching &middot; 2 results</div>
+      <div class="cmd-item active">
+        <span class="ci-status"><span class="dot g"></span></span>
+        <div class="ci-info">
+          <div class="ci-name"><strong>Prod</strong>uction PBX <span class="badge ok" style="font-size:8px;padding:1px 6px">200 OK</span></div>
+          <div class="ci-uri mono">admin@sip.acme.com &middot; UDP :5060</div>
+        </div>
+        <div class="ci-right">
+          <span class="mono" style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums">42ms</span>
+          <div class="ci-shortcut"><span class="cmd-kbd">&#x21B5;</span></div>
+        </div>
+      </div>
+      <div class="cmd-item">
+        <span class="ci-status"><span class="dot r"></span></span>
+        <div class="ci-info">
+          <div class="ci-name"><strong>Prod</strong>uction Fax <span class="badge fail" style="font-size:8px;padding:1px 6px">403</span></div>
+          <div class="ci-uri mono">fax@fax.telco.net &middot; UDP :5060</div>
+        </div>
+        <div class="ci-right">
+          <span class="mono" style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums">189ms</span>
+        </div>
+      </div>
+    </div>
+    <div class="cmd-group">
+      <div class="cmd-group-label">All Registrars</div>
+      <div class="cmd-item">
+        <span class="ci-status"><span class="dot a"></span></span>
+        <div class="ci-info">
+          <div class="ci-name">Staging Server</div>
+          <div class="ci-uri mono">test@staging.provider.io &middot; TCP :5061</div>
+        </div>
+        <div class="ci-right"><span style="font-size:10px;color:var(--muted)">idle</span></div>
+      </div>
+      <div class="cmd-item">
+        <span class="ci-status"><span class="dot g"></span></span>
+        <div class="ci-info">
+          <div class="ci-name">Remote Office</div>
+          <div class="ci-uri mono">ext200@pbx.branch.co &middot; TLS :5061</div>
+        </div>
+        <div class="ci-right"><span class="mono" style="font-size:11px;color:var(--muted)">18ms</span></div>
+      </div>
+      <div class="cmd-item">
+        <span class="ci-status"><span class="dot g"></span></span>
+        <div class="ci-info">
+          <div class="ci-name">Dev Asterisk</div>
+          <div class="ci-uri mono">dev@192.168.1.50 &middot; UDP :5060</div>
+        </div>
+        <div class="ci-right"><span class="mono" style="font-size:11px;color:var(--muted)">3ms</span></div>
+      </div>
+    </div>
+    <div class="cmd-footer">
+      <span class="cf-key">&#x2191;&#x2193;</span> navigate
+      <span class="cf-key">&#x21B5;</span> register/unregister
+      <span class="cf-key">E</span> edit
+      <span class="cf-key">T</span> tests
+      <span class="cf-key">&#x232B;</span> delete
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Lightning-fast for keyboard users. Search-first means instant access to any registrar. Compact footprint. Very Raycast/Linear coded. Feels like the future.</div>
+    <div class="note"><strong>Cons:</strong> Steep learning curve for mouse-first users. Less visual status overview. Needs fallback for discovery. Best as a secondary access mode.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ K — Kanban Board ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label k">Concept K</div>
+    <h2>Kanban Columns</h2>
+    <p class="desc">
+      Three swim-lane columns: Registered, Idle, Failed. Registrars are draggable
+      cards &mdash; drag to "Registered" to register, drag to "Idle" to unregister.
+      Status changes via spatial interaction rather than buttons.
+    </p>
+  </div>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Registrars</span>
+      <div class="sp"></div>
+      <button class="btn p">+ Add</button>
+    </div>
+    <div class="kanban">
+      <!-- Registered column -->
+      <div class="kanban-col">
+        <div class="kanban-col-head"><div class="kch-dot" style="background:var(--success)"></div><div class="kch-name" style="color:var(--success)">Registered</div><div class="kch-count">3</div></div>
+        <div class="kanban-col-body">
+          <div class="kanban-card"><div class="kc-name">Production PBX</div><div class="kc-uri mono">admin@sip.acme.com</div><div class="kc-meta"><span class="tag">UDP :5060</span><span class="tag" style="border-color:hsl(152 62% 52%/.3);color:var(--success)">&#x260E;</span></div><div class="kc-bottom"><span class="kc-time">2m ago</span><span class="kc-latency mono" style="color:var(--success)">42ms</span></div></div>
+          <div class="kanban-card"><div class="kc-name">Remote Office</div><div class="kc-uri mono">ext200@pbx.branch.co</div><div class="kc-meta"><span class="tag">TLS :5061</span><span class="tag" style="border-color:hsl(152 62% 52%/.3);color:var(--success)">&#x260E;</span><span class="tag" style="border-color:hsl(152 62% 52%/.3);color:var(--success)">&#x1F4E0;</span></div><div class="kc-bottom"><span class="kc-time">just now</span><span class="kc-latency mono" style="color:var(--success)">18ms</span></div></div>
+          <div class="kanban-card"><div class="kc-name">Dev Asterisk</div><div class="kc-uri mono">dev@192.168.1.50</div><div class="kc-meta"><span class="tag">UDP :5060</span></div><div class="kc-bottom"><span class="kc-time">1m ago</span><span class="kc-latency mono" style="color:var(--success)">3ms</span></div></div>
+        </div>
+      </div>
+      <!-- Idle column -->
+      <div class="kanban-col">
+        <div class="kanban-col-head"><div class="kch-dot" style="background:var(--warning)"></div><div class="kch-name" style="color:var(--warning)">Idle</div><div class="kch-count">1</div></div>
+        <div class="kanban-col-body">
+          <div class="kanban-card"><div class="kc-name">Staging Server</div><div class="kc-uri mono">test@staging.provider.io</div><div class="kc-meta"><span class="tag">TCP :5061</span></div><div class="kc-bottom"><span class="kc-time">never</span><span class="kc-latency">&mdash;</span></div></div>
+          <div style="flex:1;border:2px dashed hsl(238 16% 25%);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;min-height:60px;margin-top:4px">Drop here to unregister</div>
+        </div>
+      </div>
+      <!-- Failed column -->
+      <div class="kanban-col">
+        <div class="kanban-col-head"><div class="kch-dot" style="background:var(--destructive)"></div><div class="kch-name" style="color:var(--destructive)">Failed</div><div class="kch-count">1</div></div>
+        <div class="kanban-col-body">
+          <div class="kanban-card"><div class="kc-name">Fax Gateway</div><div class="kc-uri mono">fax@fax.telco.net</div><div class="kc-meta"><span class="tag">UDP :5060</span><span class="tag" style="border-color:hsl(0 72% 62%/.3);color:var(--destructive)">&#x1F4E0;</span></div><div class="kc-bottom"><span class="kc-time">5m ago</span><span class="kc-latency mono" style="color:var(--destructive)">403</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Instantly see distribution of statuses. Drag-to-act is intuitive and satisfying. Card format gives room for detail. Very visual and spatial.</div>
+    <div class="note"><strong>Cons:</strong> Columns can be unbalanced (10 registered, 0 failed). Wasted horizontal space. Drag interaction is desktop-only. Unconventional for a monitoring tool.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ L — Ambient Heatmap ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label l">Concept L</div>
+    <h2>Ambient Heatmap</h2>
+    <p class="desc">
+      Each registrar is a tile with a radiant glow that reflects its health.
+      Green glow = healthy, red glow = failing, dim = idle. You sense the overall
+      health of your infrastructure at a glance, like a heat camera.
+    </p>
+  </div>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Registrars</span>
+      <div class="sp"></div>
+      <button class="btn p">+ Add</button>
+    </div>
+    <div class="heatmap-grid">
+      <div class="heat-cell ok"><div class="hc-glow"></div><div class="hc-content"><div class="hc-top"><div><div class="hc-name">Production PBX</div><div class="hc-uri mono">admin@sip.acme.com</div></div><span class="dot g"></span></div><div class="hc-bottom"><span class="hc-response mono" style="color:var(--success)">200 OK</span><span class="hc-latency mono">42ms</span></div></div></div>
+      <div class="heat-cell warn"><div class="hc-glow"></div><div class="hc-content"><div class="hc-top"><div><div class="hc-name">Staging Server</div><div class="hc-uri mono">test@staging.provider.io</div></div><span class="dot a"></span></div><div class="hc-bottom"><span class="hc-response" style="color:var(--warning)">Idle</span><span class="hc-latency">&mdash;</span></div></div></div>
+      <div class="heat-cell fail"><div class="hc-glow"></div><div class="hc-content"><div class="hc-top"><div><div class="hc-name">Fax Gateway</div><div class="hc-uri mono">fax@fax.telco.net</div></div><span class="dot r"></span></div><div class="hc-bottom"><span class="hc-response mono" style="color:var(--destructive)">403</span><span class="hc-latency mono">189ms</span></div></div></div>
+      <div class="heat-cell ok"><div class="hc-glow"></div><div class="hc-content"><div class="hc-top"><div><div class="hc-name">Remote Office</div><div class="hc-uri mono">ext200@pbx.branch.co</div></div><span class="dot g"></span></div><div class="hc-bottom"><span class="hc-response mono" style="color:var(--success)">200 OK</span><span class="hc-latency mono">18ms</span></div></div></div>
+      <div class="heat-cell ok"><div class="hc-glow"></div><div class="hc-content"><div class="hc-top"><div><div class="hc-name">Dev Asterisk</div><div class="hc-uri mono">dev@192.168.1.50</div></div><span class="dot g"></span></div><div class="hc-bottom"><span class="hc-response mono" style="color:var(--success)">200 OK</span><span class="hc-latency mono">3ms</span></div></div></div>
+      <div class="heat-cell idle"><div class="hc-glow"></div><div class="hc-content"><div class="hc-top"><div><div class="hc-name" style="color:var(--muted)">+ Add Registrar</div></div></div><div class="hc-bottom"><span class="hc-response" style="color:hsl(235 14% 35%);font-size:11px">Click to create</span></div></div></div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Beautifully dramatic. Infrared-camera metaphor is intuitive for monitoring. Failures scream red. Healthy registrars glow green. Very unique and memorable.</div>
+    <div class="note"><strong>Cons:</strong> Hard to fit detailed data. Tiles are small at scale. More aesthetic than functional. Better as a dashboard overview than a working list.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ M — Progressive Disclosure ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label m">Concept M</div>
+    <h2>Progressive Disclosure</h2>
+    <p class="desc">
+      Clean compact rows that expand inline to reveal rich detail: stats cards,
+      raw SIP messages, history, and actions. Closed state is ultra-minimal.
+      Follows the 2026 best practice of showing essentials first, detail on demand.
+    </p>
+  </div>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Registrars</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:8px">3/5 active</span>
+      <div class="sp"></div>
+      <button class="btn">&#x21bb; Refresh</button>
+      <button class="btn p">+ Add</button>
+    </div>
+    <div class="prog-list">
+      <!-- Collapsed rows -->
+      <div class="prog-row">
+        <div class="prog-main">
+          <div class="prog-bar" style="background:var(--success)"></div>
+          <div class="prog-info">
+            <div class="pi-top"><span class="pi-name">Production PBX</span><span class="badge ok" style="font-size:9px">Registered</span><span class="tag">UDP :5060</span></div>
+            <div class="pi-uri mono">admin@sip.acme.com</div>
+          </div>
+          <div class="prog-right">
+            <span class="mono" style="font-size:11px;color:var(--success);font-weight:500">200 OK</span>
+            <span class="mono" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums">42ms</span>
+            <span style="font-size:18px;color:var(--muted);transform:rotate(0deg);transition:transform .2s">&#x25B8;</span>
+          </div>
+        </div>
+      </div>
+      <!-- Expanded row -->
+      <div class="prog-row expanded">
+        <div class="prog-main">
+          <div class="prog-bar" style="background:var(--destructive)"></div>
+          <div class="prog-info">
+            <div class="pi-top"><span class="pi-name">Fax Gateway</span><span class="badge fail" style="font-size:9px">Failed</span><span class="tag">UDP :5060</span></div>
+            <div class="pi-uri mono">fax@fax.telco.net</div>
+          </div>
+          <div class="prog-right">
+            <span class="mono" style="font-size:11px;color:var(--destructive);font-weight:500">403 Forbidden</span>
+            <span class="mono" style="font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums">189ms</span>
+            <span style="font-size:18px;color:var(--primary);transform:rotate(90deg);display:inline-block">&#x25B8;</span>
+          </div>
+        </div>
+        <div class="prog-expand">
+          <div class="prog-expand-grid">
+            <div class="prog-stat"><div class="ps-label">Status</div><div class="ps-value" style="color:var(--destructive)">403</div></div>
+            <div class="prog-stat"><div class="ps-label">Response Time</div><div class="ps-value">189<span style="font-size:11px;color:var(--muted)">ms</span></div></div>
+            <div class="prog-stat"><div class="ps-label">Last Success</div><div class="ps-value" style="font-size:14px;color:var(--muted)">14:15</div></div>
+          </div>
+          <div class="prog-sip mono">
+            REGISTER sip:fax.telco.net SIP/2.0<br>
+            Via: SIP/2.0/UDP 192.168.1.10:5060;branch=z9hG4bK-776<br>
+            From: &lt;sip:fax@fax.telco.net&gt;;tag=a1b2c3<br>
+            To: &lt;sip:fax@fax.telco.net&gt;<br>
+            CSeq: 1 REGISTER<br>
+            Contact: &lt;sip:fax@192.168.1.10:5060&gt;<br>
+            Expires: 3600<br>
+            <br>
+            <span style="color:var(--destructive)">SIP/2.0 403 Forbidden</span>
+          </div>
+          <div class="prog-actions">
+            <button class="prog-btn accent">Register</button>
+            <button class="prog-btn">Run Tests</button>
+            <button class="prog-btn">Edit</button>
+            <button class="prog-btn" style="margin-left:auto;color:var(--destructive);border-color:hsl(0 72% 62%/.2)">Delete</button>
+          </div>
+        </div>
+      </div>
+      <!-- More collapsed rows -->
+      <div class="prog-row">
+        <div class="prog-main">
+          <div class="prog-bar" style="background:var(--warning)"></div>
+          <div class="prog-info">
+            <div class="pi-top"><span class="pi-name">Staging Server</span><span class="badge warn" style="font-size:9px">Idle</span><span class="tag">TCP :5061</span></div>
+            <div class="pi-uri mono">test@staging.provider.io</div>
+          </div>
+          <div class="prog-right"><span style="font-size:18px;color:var(--muted)">&#x25B8;</span></div>
+        </div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-main">
+          <div class="prog-bar" style="background:var(--success)"></div>
+          <div class="prog-info">
+            <div class="pi-top"><span class="pi-name">Remote Office</span><span class="badge ok" style="font-size:9px">Registered</span><span class="tag">TLS :5061</span></div>
+            <div class="pi-uri mono">ext200@pbx.branch.co</div>
+          </div>
+          <div class="prog-right">
+            <span class="mono" style="font-size:11px;color:var(--success);font-weight:500">200 OK</span>
+            <span class="mono" style="font-size:10px;color:var(--muted)">18ms</span>
+            <span style="font-size:18px;color:var(--muted)">&#x25B8;</span>
+          </div>
+        </div>
+      </div>
+      <div class="prog-row">
+        <div class="prog-main">
+          <div class="prog-bar" style="background:var(--success)"></div>
+          <div class="prog-info">
+            <div class="pi-top"><span class="pi-name">Dev Asterisk</span><span class="badge ok" style="font-size:9px">Registered</span><span class="tag">UDP :5060</span></div>
+            <div class="pi-uri mono">dev@192.168.1.50</div>
+          </div>
+          <div class="prog-right">
+            <span class="mono" style="font-size:11px;color:var(--success);font-weight:500">200 OK</span>
+            <span class="mono" style="font-size:10px;color:var(--muted)">3ms</span>
+            <span style="font-size:18px;color:var(--muted)">&#x25B8;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Best of both worlds: compact scanning + deep detail on demand. The expanded state shows raw SIP, stats, and actions &mdash; everything without leaving the list. Left bar provides instant status scanning. Clean closed state.</div>
+    <div class="note"><strong>Cons:</strong> Only one row expanded at a time might frustrate comparison. Expanded row can be tall, pushing others down. Needs smooth animation to feel right.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ N — Contextual Grid + Side Panel ═══════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label n">Concept N</div>
+    <h2>Contextual Side Panel</h2>
+    <p class="desc">
+      Main list on the left, persistent context panel on the right showing
+      aggregate health metrics, response-time chart, and a live activity feed.
+      Clicking a registrar updates the panel with individual detail. Always-on
+      situational awareness.
+    </p>
+  </div>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)">Registrars</span>
+      <div class="sp"></div>
+      <button class="btn">&#x21bb;</button>
+      <button class="btn p">+ Add</button>
+    </div>
+    <div class="ctx-layout">
+      <div class="ctx-main">
+        <div class="ctx-list">
+          <div class="ctx-row selected">
+            <div class="cr-bar" style="background:var(--success)"></div>
+            <div class="cr-info"><div class="cr-name">Production PBX</div><div class="cr-uri mono">admin@sip.acme.com</div></div>
+            <div class="cr-resp"><span class="mono" style="color:var(--success);font-weight:500">200 OK</span></div>
+            <div class="cr-actions"><button class="ib" style="width:24px;height:24px">&#x2716;</button><button class="ib" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="ctx-row">
+            <div class="cr-bar" style="background:var(--warning)"></div>
+            <div class="cr-info"><div class="cr-name">Staging Server</div><div class="cr-uri mono">test@staging.provider.io</div></div>
+            <div class="cr-resp"><span style="color:var(--muted);font-size:10px">idle</span></div>
+            <div class="cr-actions"><button class="ib" style="width:24px;height:24px;color:var(--primary)">&#x2713;</button><button class="ib" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="ctx-row">
+            <div class="cr-bar" style="background:var(--destructive)"></div>
+            <div class="cr-info"><div class="cr-name">Fax Gateway</div><div class="cr-uri mono">fax@fax.telco.net</div></div>
+            <div class="cr-resp"><span class="mono" style="color:var(--destructive);font-weight:500">403</span></div>
+            <div class="cr-actions"><button class="ib" style="width:24px;height:24px;color:var(--primary)">&#x21bb;</button><button class="ib" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="ctx-row">
+            <div class="cr-bar" style="background:var(--success)"></div>
+            <div class="cr-info"><div class="cr-name">Remote Office</div><div class="cr-uri mono">ext200@pbx.branch.co</div></div>
+            <div class="cr-resp"><span class="mono" style="color:var(--success);font-weight:500">200 OK</span></div>
+            <div class="cr-actions"><button class="ib" style="width:24px;height:24px">&#x2716;</button><button class="ib" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="ctx-row">
+            <div class="cr-bar" style="background:var(--success)"></div>
+            <div class="cr-info"><div class="cr-name">Dev Asterisk</div><div class="cr-uri mono">dev@192.168.1.50</div></div>
+            <div class="cr-resp"><span class="mono" style="color:var(--success);font-weight:500">200 OK</span></div>
+            <div class="cr-actions"><button class="ib" style="width:24px;height:24px">&#x2716;</button><button class="ib" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="ctx-side">
+        <h4>Response Time (last 24h)</h4>
+        <div class="ctx-chart">
+          <div class="ctx-chart-bar" style="height:30%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:45%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:35%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:55%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:40%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:50%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:42%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:38%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:60%;background:var(--warning)"></div>
+          <div class="ctx-chart-bar" style="height:45%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:35%;background:var(--success)"></div>
+          <div class="ctx-chart-bar" style="height:42%;background:var(--success)"></div>
+        </div>
+        <div class="ctx-health">
+          <div class="ctx-health-item"><div class="chi-label">Status</div><div class="chi-val" style="color:var(--success)">200</div></div>
+          <div class="ctx-health-item"><div class="chi-label">Latency</div><div class="chi-val">42<span style="font-size:11px;color:var(--muted)">ms</span></div></div>
+          <div class="ctx-health-item"><div class="chi-label">Uptime</div><div class="chi-val" style="color:var(--success)">99.8<span style="font-size:11px">%</span></div></div>
+          <div class="ctx-health-item"><div class="chi-label">Expires</div><div class="chi-val">3600<span style="font-size:11px;color:var(--muted)">s</span></div></div>
+        </div>
+        <h4>Activity</h4>
+        <div class="ctx-activity">
+          <div class="ctx-event"><span class="ce-time mono">14:35</span><span class="ce-dot" style="background:var(--success)"></span><span>Registered &middot; 200 OK (42ms)</span></div>
+          <div class="ctx-event"><span class="ce-time mono">14:32</span><span class="ce-dot" style="background:var(--primary)"></span><span>Manual refresh</span></div>
+          <div class="ctx-event"><span class="ce-time mono">14:15</span><span class="ce-dot" style="background:var(--success)"></span><span>Auto-registered on startup</span></div>
+          <div class="ctx-event"><span class="ce-time mono">13:50</span><span class="ce-dot" style="background:var(--warning)"></span><span>Re-registration (expires)</span></div>
+          <div class="ctx-event"><span class="ce-time mono">12:30</span><span class="ce-dot" style="background:var(--success)"></span><span>Registered &middot; 200 OK (38ms)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Always-on context without modal interruption. Chart and activity feed give temporal insight. Clicking rows updates the panel seamlessly. Professional monitoring-tool feel.</div>
+    <div class="note"><strong>Cons:</strong> Side panel consumes ~320px. Less effective on narrow viewports. Panel content needs to be genuinely useful to justify the space.</div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:50px 0 30px;max-width:700px;margin:0 auto">
+  <p style="font-size:14px;color:var(--muted);line-height:1.8">You now have <strong style="color:var(--fg)">14 concepts</strong> across two pages. These can be freely combined:</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;text-align:left">
+    <div style="padding:14px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:hsl(280 70% 68%)">Modern Premium</strong><br>
+      <span style="color:var(--muted)">Glass panels (I) + Progressive disclosure (M) + Bento stats header (H)</span>
+    </div>
+    <div style="padding:14px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:hsl(200 80% 60%)">Power User</strong><br>
+      <span style="color:var(--muted)">Dense table (B) + Command palette (J) + Contextual panel (N)</span>
+    </div>
+    <div style="padding:14px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:hsl(152 62% 55%)">Clean & Calm</strong><br>
+      <span style="color:var(--muted)">Zen rows (E) + Swimlane grouping (F) + Dashboard stats (G)</span>
+    </div>
+    <div style="padding:14px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:hsl(38 92% 56%)">NOC / Monitoring</strong><br>
+      <span style="color:var(--muted)">Heatmap tiles (L) + Timeline bars (C) + Side panel activity (N)</span>
+    </div>
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin-top:20px">Pick your favorites or describe the vibe you want, and I'll build the combination.</p>
+</div>
+
+</body>
+</html>

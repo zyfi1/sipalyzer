@@ -1,0 +1,84 @@
+name: Promote Release Channel
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Existing source tag (e.g. v1.2.3-beta.1 or v1.2.3-rc.1)"
+        required: true
+        type: string
+      target_channel:
+        description: "Target channel"
+        required: true
+        type: choice
+        options:
+          - rc
+          - stable
+      target_tag:
+        description: "Optional explicit target tag (defaults: rc=>vX.Y.Z-rc.1, stable=>vX.Y.Z)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    name: Promote ${{ inputs.source_tag }} -> ${{ inputs.target_channel }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and validate tags
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="${{ inputs.source_tag }}"
+          TARGET_CHANNEL="${{ inputs.target_channel }}"
+          TARGET="${{ inputs.target_tag }}"
+
+          git fetch --tags
+          git rev-parse "${SOURCE}^{tag}" >/dev/null
+
+          BASE="${SOURCE}"
+          BASE="${BASE%-beta.*}"
+          BASE="${BASE%-rc.*}"
+
+          if [[ -z "${TARGET}" ]]; then
+            if [[ "${TARGET_CHANNEL}" == "rc" ]]; then
+              TARGET="${BASE}-rc.1"
+            else
+              TARGET="${BASE}"
+            fi
+          fi
+
+          if [[ ! "${TARGET}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+|-rc\.[0-9]+)?$ ]]; then
+            echo "Invalid target tag: ${TARGET}" >&2
+            exit 1
+          fi
+
+          if git rev-parse "${TARGET}^{tag}" >/dev/null 2>&1; then
+            echo "Target tag already exists: ${TARGET}" >&2
+            exit 1
+          fi
+
+          SOURCE_COMMIT="$(git rev-list -n 1 "${SOURCE}")"
+          echo "target_tag=${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "source_commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
+
+      - name: Create promotion tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -a "${{ steps.resolve.outputs.target_tag }}" "${{ steps.resolve.outputs.source_commit }}" \
+            -m "Promote ${{ inputs.source_tag }} to ${{ steps.resolve.outputs.target_tag }}"
+          git push origin "${{ steps.resolve.outputs.target_tag }}"
+
+      - name: Promotion summary
+        shell: bash
+        run: |
+          echo "Created ${{ steps.resolve.outputs.target_tag }} from ${{ inputs.source_tag }} (${{ steps.resolve.outputs.source_commit }})"
+

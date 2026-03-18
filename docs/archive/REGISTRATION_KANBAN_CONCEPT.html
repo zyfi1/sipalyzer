@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIPalyzer — Kanban Registration View</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#09090b;--card:#111114;--card2:#16161a;--surface:#1a1a20;
+    --border:#222228;--border2:#2a2a32;
+    --fg:#eeeef0;--fg2:#c8c8cc;--muted:#6b6b78;--muted2:#45454f;
+    --green:#34d399;--green-dim:#34d39920;--green-soft:#34d39912;--green-glow:#34d39930;
+    --red:#f87171;--red-dim:#f8717120;--red-soft:#f8717112;--red-glow:#f8717130;
+    --amber:#fbbf24;--amber-dim:#fbbf2420;--amber-soft:#fbbf2412;--amber-glow:#fbbf2430;
+    --blue:#818cf8;--blue-dim:#818cf820;--blue-soft:#818cf812;
+    --cyan:#22d3ee;
+    --radius:12px;
+  }
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--fg);line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  /* ═══ Layout Shell ═══ */
+  .shell{display:flex;flex-direction:column;height:100vh;max-height:100vh}
+  .shell-header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+  .shell-title{font-size:13px;font-weight:700;letter-spacing:.3px}
+  .shell-count{font-size:11px;color:var(--muted);font-weight:500}
+  .sp{flex:1}
+  .shell-body{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+  /* ═══ Stats Bar (Bento-inspired mini strip) ═══ */
+  .stats{display:flex;gap:8px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+  .stat-pill{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);transition:all .15s}
+  .stat-pill:hover{border-color:var(--border2);background:#1e1e24}
+  .stat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .stat-val{font-size:18px;font-weight:700;letter-spacing:-.5px;line-height:1}
+  .stat-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);line-height:1;margin-top:1px}
+  .stat-bar{width:40px;height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:4px}
+  .stat-bar-fill{height:100%;border-radius:2px}
+
+  /* ═══ Controls Bar ═══ */
+  .controls{display:flex;align-items:center;gap:8px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+  .search{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:12px;min-width:200px;transition:all .15s}
+  .search:focus-within{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+  .search input{background:transparent;border:none;outline:none;color:var(--fg);font-size:12px;font-family:inherit;flex:1}
+  .search input::placeholder{color:var(--muted2)}
+  .ctrl-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg2);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .12s;white-space:nowrap}
+  .ctrl-btn:hover{background:var(--surface);border-color:var(--border2)}
+  .ctrl-btn.primary{background:var(--blue-dim);border-color:var(--blue);color:var(--fg)}
+  .ctrl-btn.primary:hover{background:#818cf830}
+  .ctrl-btn .kbd{font-size:9px;color:var(--muted);padding:1px 4px;border-radius:3px;background:var(--bg);border:1px solid var(--border);margin-left:4px}
+  .ctrl-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+  .ctrl-group{display:flex;gap:1px;background:var(--border);border-radius:8px;overflow:hidden}
+  .ctrl-group .ctrl-btn{border-radius:0;border:none}
+  .ctrl-group .ctrl-btn:first-child{border-radius:8px 0 0 8px}.ctrl-group .ctrl-btn:last-child{border-radius:0 8px 8px 0}
+  .ctrl-group .ctrl-btn.active{background:var(--surface);color:var(--fg)}
+
+  /* ═══ Execution Context ═══ */
+  .ctx-select{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:11px;color:var(--fg2);cursor:pointer;font-family:inherit;transition:all .12s}
+  .ctx-select:hover{border-color:var(--border2)}
+  .ctx-select .ctx-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .ctx-select select{background:transparent;border:none;color:var(--fg);font-size:11px;font-family:inherit;outline:none;cursor:pointer;-webkit-appearance:none}
+
+  /* ═══ Kanban Board ═══ */
+  .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:0;flex:1;overflow:hidden}
+  .column{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+  .column:last-child{border-right:none}
+  .col-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+  .col-icon{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .col-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;flex:1}
+  .col-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;font-size:10px;font-weight:700}
+  .col-actions{display:flex;gap:4px}
+  .col-action{width:24px;height:24px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .1s}
+  .col-action:hover{background:var(--surface);color:var(--fg)}
+  .col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+  .col-body::-webkit-scrollbar{width:4px}.col-body::-webkit-scrollbar-track{background:transparent}.col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .col-body::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+  .col-drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;color:var(--muted2);font-size:11px;transition:all .2s;margin-top:auto}
+  .col-drop-zone.active{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+
+  /* ═══ Cards ═══ */
+  .card{border-radius:var(--radius);background:var(--card2);border:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .2s}
+  .card:hover{border-color:var(--border2);transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .card:hover::before{opacity:1}
+  .card.ok::before{background:linear-gradient(90deg,var(--green),transparent)}.card.fail::before{background:linear-gradient(90deg,var(--red),transparent)}.card.idle::before{background:linear-gradient(90deg,var(--amber),transparent)}
+  .card.dragging{opacity:.4;transform:scale(.97)}
+  .card.selected{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue-dim)}
+
+  .card-main{padding:14px 16px 10px}
+  .card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+  .card-avatar{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;position:relative}
+  .card-avatar.ok{background:var(--green-dim);color:var(--green)}.card-avatar.fail{background:var(--red-dim);color:var(--red)}.card-avatar.idle{background:var(--amber-dim);color:var(--amber)}
+  .card-avatar .av-pulse{position:absolute;inset:-3px;border-radius:12px;border:1.5px solid;opacity:.4;animation:av-pulse 2s ease infinite}
+  @keyframes av-pulse{0%,100%{opacity:.2;transform:scale(1)}50%{opacity:.5;transform:scale(1.08)}}
+  .card-info{flex:1;min-width:0}
+  .card-name{font-size:13px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-uri{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-grip{width:20px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;opacity:.25;cursor:grab;transition:opacity .15s;padding-top:2px}
+  .card:hover .card-grip{opacity:.5}.card-grip:hover{opacity:.8!important}
+  .card-grip span{display:block;width:3px;height:3px;border-radius:50%;background:currentColor}
+
+  .card-tags{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+  .tag{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:600;text-transform:uppercase;background:var(--surface);color:var(--muted);border:1px solid var(--border);letter-spacing:.3px}
+  .tag.use-case{border-color:var(--blue-dim);color:var(--blue);background:var(--blue-soft)}
+  .tag.folder{border-color:var(--muted2);color:var(--muted)}
+
+  /* Waveform mini (from concept S) */
+  .card-wave{height:28px;border-radius:6px;background:var(--bg);margin-bottom:8px;overflow:hidden;position:relative}
+  .card-wave svg{width:100%;height:100%}
+  .card-wave .wave-label{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:rgba(9,9,11,.7);backdrop-filter:blur(4px)}
+
+  /* Response line */
+  .card-response{display:flex;align-items:center;gap:6px;padding:8px 16px;border-top:1px solid var(--border);font-size:11px}
+  .card-response .cr-code{font-weight:600;letter-spacing:.3px}
+  .card-response .cr-time{color:var(--muted);font-variant-numeric:tabular-nums}
+  .card-response .cr-ago{color:var(--muted2);font-size:10px;margin-left:auto}
+
+  /* Card Actions (Progressive disclosure — appear on hover) */
+  .card-actions{display:flex;gap:4px;padding:6px 16px 10px;opacity:0;max-height:0;overflow:hidden;transition:all .2s}
+  .card:hover .card-actions{opacity:1;max-height:50px;padding-bottom:12px}
+  .ca-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--fg2);font-size:10px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .12s;white-space:nowrap}
+  .ca-btn:hover{background:var(--border);color:var(--fg)}
+  .ca-btn.accent{border-color:var(--blue-dim);color:var(--blue)}.ca-btn.accent:hover{background:var(--blue-soft)}
+  .ca-btn.danger{border-color:var(--red-dim);color:var(--red)}.ca-btn.danger:hover{background:var(--red-soft)}
+
+  /* ═══ Expanded Card (Progressive disclosure from concept M) ═══ */
+  .card-expanded{border-top:1px solid var(--border);background:var(--bg);padding:12px 16px}
+  .card-expanded .exp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+  .exp-stat{padding:8px;border-radius:8px;background:var(--card);border:1px solid var(--border)}
+  .exp-stat .es-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px}
+  .exp-stat .es-val{font-size:16px;font-weight:700;line-height:1}
+  .exp-sip{padding:8px;border-radius:8px;background:var(--card);border:1px solid var(--border);font-size:10px;color:var(--muted);line-height:1.7;max-height:80px;overflow:auto;margin-bottom:8px}
+  .exp-actions{display:flex;gap:4px}
+
+  /* ═══ Footer ═══ */
+  .shell-footer{display:flex;align-items:center;gap:12px;padding:8px 20px;border-top:1px solid var(--border);background:var(--card);flex-shrink:0;font-size:10px;color:var(--muted)}
+  .footer-item{display:flex;align-items:center;gap:4px}
+  .footer-sep{width:1px;height:12px;background:var(--border)}
+  .footer-kbd{padding:1px 4px;border-radius:3px;background:var(--surface);border:1px solid var(--border);font-size:9px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ═══ Header ═══ -->
+  <div class="shell-header">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--blue)"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+    <span class="shell-title">Registration</span>
+    <span class="shell-count">5 registrars</span>
+    <div class="sp"></div>
+    <!-- Execution context (from agent integration) -->
+    <div class="ctx-select">
+      <span class="ctx-dot"></span>
+      <select>
+        <option>Local Machine</option>
+        <option>agent-nyc-01</option>
+        <option>agent-london-02</option>
+      </select>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <button class="ctrl-btn" onclick="document.getElementById('add-modal').style.display='flex'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Registrar
+    </button>
+  </div>
+
+  <!-- ═══ Stats Strip (Bento-inspired) ═══ -->
+  <div class="stats">
+    <div class="stat-pill">
+      <div>
+        <div class="stat-val" style="color:var(--green)">3<span style="font-size:11px;color:var(--muted)">/5</span></div>
+        <div class="stat-label">Registered</div>
+      </div>
+      <div class="stat-bar" style="width:50px"><div class="stat-bar-fill" style="width:60%;background:var(--green)"></div></div>
+    </div>
+    <div class="stat-pill">
+      <div>
+        <div class="stat-val" style="color:var(--red)">1</div>
+        <div class="stat-label">Failed</div>
+      </div>
+    </div>
+    <div class="stat-pill">
+      <div>
+        <div class="stat-val" style="color:var(--amber)">1</div>
+        <div class="stat-label">Idle</div>
+      </div>
+    </div>
+    <div style="width:1px;background:var(--border);margin:0 4px"></div>
+    <div class="stat-pill">
+      <div style="display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--fg2)">Calling</div>
+          <div style="font-size:10px;color:var(--muted)"><span style="color:var(--green)">2</span>/2 active</div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-pill">
+      <div style="display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--fg2)">Fax</div>
+          <div style="font-size:10px;color:var(--muted)"><span style="color:var(--red)">0</span>/1 active</div>
+        </div>
+      </div>
+    </div>
+    <div class="sp"></div>
+    <div class="stat-pill" style="gap:6px;cursor:pointer">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      <div style="font-size:10px;color:var(--muted)">Last refresh: <span style="color:var(--fg2)">2m ago</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ Controls ═══ -->
+  <div class="controls">
+    <div class="search">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="Filter registrars...">
+      <span style="font-size:9px;color:var(--muted2);padding:1px 4px;border-radius:3px;background:var(--bg);border:1px solid var(--border)">&#x2318;K</span>
+    </div>
+    <div class="ctrl-sep"></div>
+    <div class="ctrl-group">
+      <button class="ctrl-btn active">All</button>
+      <button class="ctrl-btn">Production</button>
+      <button class="ctrl-btn">Testing</button>
+    </div>
+    <div class="ctrl-sep"></div>
+    <button class="ctrl-btn">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      Manage Folders
+    </button>
+    <div class="sp"></div>
+    <button class="ctrl-btn primary">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Register All
+    </button>
+    <button class="ctrl-btn">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/></svg>
+      Unregister All
+    </button>
+  </div>
+
+  <!-- ═══ Kanban Board ═══ -->
+  <div class="kanban">
+
+    <!-- REGISTERED Column -->
+    <div class="column">
+      <div class="col-head">
+        <div class="col-icon" style="background:var(--green);box-shadow:0 0 10px var(--green-glow)"></div>
+        <div class="col-name" style="color:var(--green)">Registered</div>
+        <div class="col-count" style="background:var(--green-dim);color:var(--green)">3</div>
+        <div class="sp"></div>
+        <div class="col-actions">
+          <button class="col-action" title="Unregister all">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="col-body">
+
+        <!-- Card 1: Production PBX -->
+        <div class="card ok" id="card-prod">
+          <div class="card-main">
+            <div class="card-top">
+              <div class="card-avatar ok">
+                P
+                <div class="av-pulse" style="border-color:var(--green)"></div>
+              </div>
+              <div class="card-info">
+                <div class="card-name">Production PBX</div>
+                <div class="card-uri mono">admin@sip.acme.com</div>
+              </div>
+              <div class="card-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="card-tags">
+              <span class="tag">UDP</span>
+              <span class="tag">:5060</span>
+              <span class="tag use-case">&#x260E; Calling</span>
+            </div>
+            <div class="card-wave">
+              <svg viewBox="0 0 200 28" preserveAspectRatio="none">
+                <path d="M0,14 Q5,6 10,14 Q15,22 20,14 Q25,6 30,14 Q35,22 40,14 Q45,6 50,14 Q55,22 60,14 Q65,6 70,14 Q75,22 80,14 Q85,6 90,14 Q95,22 100,14 Q105,6 110,14 Q115,22 120,14 Q125,6 130,14 Q135,22 140,14 Q145,6 150,14 Q155,22 160,14 Q165,6 170,14 Q175,22 180,14 Q185,6 190,14 Q195,22 200,14" fill="none" stroke="#34d399" stroke-width="1.2" opacity=".6"/>
+                <path d="M0,14 Q5,6 10,14 Q15,22 20,14 Q25,6 30,14 Q35,22 40,14 Q45,6 50,14 Q55,22 60,14 Q65,6 70,14 Q75,22 80,14 Q85,6 90,14 Q95,22 100,14 Q105,6 110,14 Q115,22 120,14 Q125,6 130,14 Q135,22 140,14 Q145,6 150,14 Q155,22 160,14 Q165,6 170,14 Q175,22 180,14 Q185,6 190,14 Q195,22 200,14" fill="none" stroke="#34d399" stroke-width="4" opacity=".06"/>
+              </svg>
+              <span class="wave-label mono" style="color:var(--green)">42ms</span>
+            </div>
+          </div>
+          <div class="card-response">
+            <span class="cr-code mono" style="color:var(--green)">200 OK</span>
+            <span class="cr-time mono">42ms</span>
+            <span class="cr-ago">2 min ago</span>
+          </div>
+          <div class="card-actions">
+            <button class="ca-btn">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/></svg>
+              Unregister
+            </button>
+            <button class="ca-btn">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+              Tests
+            </button>
+            <button class="ca-btn">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+              Edit
+            </button>
+            <button class="ca-btn" style="margin-left:auto">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              SIP
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: Remote Office -->
+        <div class="card ok">
+          <div class="card-main">
+            <div class="card-top">
+              <div class="card-avatar ok">
+                R
+                <div class="av-pulse" style="border-color:var(--green)"></div>
+              </div>
+              <div class="card-info">
+                <div class="card-name">Remote Office</div>
+                <div class="card-uri mono">ext200@pbx.branch.co</div>
+              </div>
+              <div class="card-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="card-tags">
+              <span class="tag">TLS</span>
+              <span class="tag">:5061</span>
+              <span class="tag use-case">&#x260E; Calling</span>
+              <span class="tag use-case">&#x1F4E0; Fax</span>
+            </div>
+            <div class="card-wave">
+              <svg viewBox="0 0 200 28" preserveAspectRatio="none">
+                <path d="M0,14 Q8,8 16,14 Q24,20 32,14 Q40,8 48,14 Q56,20 64,14 Q72,8 80,14 Q88,20 96,14 Q104,8 112,14 Q120,20 128,14 Q136,8 144,14 Q152,20 160,14 Q168,8 176,14 Q184,20 192,14 L200,14" fill="none" stroke="#34d399" stroke-width="1.2" opacity=".6"/>
+              </svg>
+              <span class="wave-label mono" style="color:var(--green)">18ms</span>
+            </div>
+          </div>
+          <div class="card-response">
+            <span class="cr-code mono" style="color:var(--green)">200 OK</span>
+            <span class="cr-time mono">18ms</span>
+            <span class="cr-ago">just now</span>
+          </div>
+          <div class="card-actions">
+            <button class="ca-btn">Unregister</button>
+            <button class="ca-btn">Tests</button>
+            <button class="ca-btn">Edit</button>
+          </div>
+        </div>
+
+        <!-- Card 3: Dev Asterisk -->
+        <div class="card ok">
+          <div class="card-main">
+            <div class="card-top">
+              <div class="card-avatar ok">
+                D
+                <div class="av-pulse" style="border-color:var(--green)"></div>
+              </div>
+              <div class="card-info">
+                <div class="card-name">Dev Asterisk</div>
+                <div class="card-uri mono">dev@192.168.1.50</div>
+              </div>
+              <div class="card-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="card-tags">
+              <span class="tag">UDP</span>
+              <span class="tag">:5060</span>
+              <span class="tag folder">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                Testing
+              </span>
+            </div>
+            <div class="card-wave">
+              <svg viewBox="0 0 200 28" preserveAspectRatio="none">
+                <path d="M0,14 Q12,10 24,14 Q36,18 48,14 Q60,10 72,14 Q84,18 96,14 Q108,10 120,14 Q132,18 144,14 Q156,10 168,14 Q180,18 192,14 L200,14" fill="none" stroke="#34d399" stroke-width="1.2" opacity=".5"/>
+              </svg>
+              <span class="wave-label mono" style="color:var(--green)">3ms</span>
+            </div>
+          </div>
+          <div class="card-response">
+            <span class="cr-code mono" style="color:var(--green)">200 OK</span>
+            <span class="cr-time mono">3ms</span>
+            <span class="cr-ago">1 min ago</span>
+          </div>
+          <div class="card-actions">
+            <button class="ca-btn">Unregister</button>
+            <button class="ca-btn">Tests</button>
+            <button class="ca-btn">Edit</button>
+          </div>
+        </div>
+
+        <div class="col-drop-zone">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin:0 auto 4px;display:block"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Drop here to register
+        </div>
+      </div>
+    </div>
+
+    <!-- IDLE Column -->
+    <div class="column">
+      <div class="col-head">
+        <div class="col-icon" style="background:var(--amber);opacity:.7"></div>
+        <div class="col-name" style="color:var(--amber)">Unregistered</div>
+        <div class="col-count" style="background:var(--amber-dim);color:var(--amber)">1</div>
+        <div class="sp"></div>
+        <div class="col-actions">
+          <button class="col-action" title="Register all idle">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="col-body">
+
+        <!-- Card: Staging Server -->
+        <div class="card idle">
+          <div class="card-main">
+            <div class="card-top">
+              <div class="card-avatar idle">S</div>
+              <div class="card-info">
+                <div class="card-name">Staging Server</div>
+                <div class="card-uri mono">test@staging.provider.io</div>
+              </div>
+              <div class="card-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="card-tags">
+              <span class="tag">TCP</span>
+              <span class="tag">:5061</span>
+              <span class="tag folder">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                Testing
+              </span>
+            </div>
+            <div class="card-wave">
+              <svg viewBox="0 0 200 28" preserveAspectRatio="none">
+                <line x1="0" y1="14" x2="200" y2="14" stroke="#fbbf24" stroke-width="1" opacity=".2" stroke-dasharray="4 3"/>
+              </svg>
+              <span class="wave-label" style="color:var(--amber)">idle</span>
+            </div>
+          </div>
+          <div class="card-response" style="border-color:var(--border)">
+            <span style="color:var(--muted2);font-size:10px">No registration attempts</span>
+          </div>
+          <div class="card-actions">
+            <button class="ca-btn accent">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Register
+            </button>
+            <button class="ca-btn">Tests</button>
+            <button class="ca-btn">Edit</button>
+          </div>
+        </div>
+
+        <div class="col-drop-zone">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin:0 auto 4px;display:block"><path d="M15 7h3a5 5 0 010 10h-3m-6 0H6A5 5 0 016 7h3"/></svg>
+          Drop here to unregister
+        </div>
+      </div>
+    </div>
+
+    <!-- FAILED Column -->
+    <div class="column">
+      <div class="col-head">
+        <div class="col-icon" style="background:var(--red);box-shadow:0 0 10px var(--red-glow)"></div>
+        <div class="col-name" style="color:var(--red)">Failed</div>
+        <div class="col-count" style="background:var(--red-dim);color:var(--red)">1</div>
+        <div class="sp"></div>
+        <div class="col-actions">
+          <button class="col-action" title="Retry all failed">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="col-body">
+
+        <!-- Card: Fax Gateway — EXPANDED (Progressive Disclosure) -->
+        <div class="card fail selected">
+          <div class="card-main">
+            <div class="card-top">
+              <div class="card-avatar fail">F</div>
+              <div class="card-info">
+                <div class="card-name">Fax Gateway</div>
+                <div class="card-uri mono">fax@fax.telco.net</div>
+              </div>
+              <div class="card-grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="card-tags">
+              <span class="tag">UDP</span>
+              <span class="tag">:5060</span>
+              <span class="tag use-case" style="border-color:var(--red-dim);color:var(--red);background:var(--red-soft)">&#x1F4E0; Fax</span>
+              <span class="tag folder">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                Production
+              </span>
+            </div>
+            <div class="card-wave">
+              <svg viewBox="0 0 200 28" preserveAspectRatio="none">
+                <path d="M0,14 L3,4 L6,22 L9,2 L12,26 L15,8 L18,20 L21,3 L24,25 L27,6 L30,22 L33,4 L36,24 L39,5 L42,23 L45,7 L48,21 L51,3 L54,25 L57,8 L60,20 L63,4 L66,24 L69,6 L72,22 L75,4 L78,26 L81,8 L84,18 L87,2 L90,26 L93,6 L96,22 L99,4 L102,24 L105,7 L108,21 L111,5 L114,23 L117,8 L120,20 L123,3 L126,25 L129,6 L132,22 L135,4 L138,24 L141,7 L144,21 L147,3 L150,25 L153,8 L156,20 L159,4 L162,24 L165,6 L168,22 L171,4 L174,26 L177,8 L180,18 L183,2 L186,26 L189,6 L192,22 L195,4 L198,20 L200,14" fill="none" stroke="#f87171" stroke-width="1.2" opacity=".5"/>
+                <path d="M0,14 L3,4 L6,22 L9,2 L12,26 L15,8 L18,20 L21,3 L24,25 L27,6 L30,22 L33,4 L36,24 L39,5 L42,23 L45,7 L48,21 L51,3 L54,25 L57,8 L60,20 L63,4 L66,24 L69,6 L72,22 L75,4 L78,26 L81,8 L84,18 L87,2 L90,26 L93,6 L96,22 L99,4 L102,24 L105,7 L108,21 L111,5 L114,23 L117,8 L120,20 L123,3 L126,25 L129,6 L132,22 L135,4 L138,24 L141,7 L144,21 L147,3 L150,25 L153,8 L156,20 L159,4 L162,24 L165,6 L168,22 L171,4 L174,26 L177,8 L180,18 L183,2 L186,26 L189,6 L192,22 L195,4 L198,20 L200,14" fill="none" stroke="#f87171" stroke-width="5" opacity=".04"/>
+              </svg>
+              <span class="wave-label mono" style="color:var(--red)">189ms</span>
+            </div>
+          </div>
+          <div class="card-response">
+            <span class="cr-code mono" style="color:var(--red)">403 Forbidden</span>
+            <span class="cr-time mono">189ms</span>
+            <span class="cr-ago">5 min ago</span>
+          </div>
+          <!-- Expanded detail (Progressive Disclosure from concept M) -->
+          <div class="card-expanded">
+            <div class="exp-grid">
+              <div class="exp-stat">
+                <div class="es-label">Status</div>
+                <div class="es-val" style="color:var(--red)">403</div>
+              </div>
+              <div class="exp-stat">
+                <div class="es-label">Latency</div>
+                <div class="es-val">189<span style="font-size:9px;color:var(--muted)">ms</span></div>
+              </div>
+              <div class="exp-stat">
+                <div class="es-label">Last OK</div>
+                <div class="es-val" style="font-size:12px;color:var(--muted)">14:15</div>
+              </div>
+            </div>
+            <div class="exp-sip mono">
+              REGISTER sip:fax.telco.net SIP/2.0<br>
+              Via: SIP/2.0/UDP 192.168.1.10:5060;branch=z9hG4bK-776<br>
+              From: &lt;sip:fax@fax.telco.net&gt;;tag=a1b2c3<br>
+              To: &lt;sip:fax@fax.telco.net&gt;<br>
+              CSeq: 1 REGISTER<br>
+              Contact: &lt;sip:fax@192.168.1.10:5060&gt;<br>
+              Expires: 3600<br>
+              <br>
+              <span style="color:var(--red)">SIP/2.0 403 Forbidden</span>
+            </div>
+            <div class="exp-actions">
+              <button class="ca-btn accent">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Retry
+              </button>
+              <button class="ca-btn">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                Run Tests
+              </button>
+              <button class="ca-btn">Edit</button>
+              <button class="ca-btn">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                View in Packet Monitor
+              </button>
+              <button class="ca-btn danger" style="margin-left:auto">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-drop-zone">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin:0 auto 4px;display:block"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Drop here to retry
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Footer ═══ -->
+  <div class="shell-footer">
+    <span class="footer-item">
+      <span class="footer-kbd">&#x2318;K</span> Search
+    </span>
+    <span class="footer-sep"></span>
+    <span class="footer-item">
+      <span class="footer-kbd">&#x21B5;</span> Register/Unregister
+    </span>
+    <span class="footer-sep"></span>
+    <span class="footer-item">
+      <span class="footer-kbd">E</span> Edit
+    </span>
+    <span class="footer-sep"></span>
+    <span class="footer-item">
+      <span class="footer-kbd">T</span> Tests
+    </span>
+    <span class="footer-sep"></span>
+    <span class="footer-item">Drag cards between columns to change state</span>
+    <div class="sp"></div>
+    <span class="footer-item">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Avg latency: <strong style="color:var(--fg)">54ms</strong>
+    </span>
+    <span class="footer-sep"></span>
+    <span class="footer-item">
+      Uptime: <strong style="color:var(--green)">99.2%</strong>
+    </span>
+  </div>
+</div>
+
+<!-- Minimal interactive: clicking a card toggles expanded/selected state -->
+<script>
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.ca-btn') || e.target.closest('.card-grip')) return;
+    const wasSelected = card.classList.contains('selected');
+    document.querySelectorAll('.card.selected').forEach(c => {
+      if (c !== card) c.classList.remove('selected');
+    });
+    // Toggle expanded on the Fax Gateway card only (demo)
+    const expanded = card.querySelector('.card-expanded');
+    if (!expanded && !wasSelected) {
+      card.classList.add('selected');
+    } else if (wasSelected) {
+      card.classList.remove('selected');
+    } else {
+      card.classList.toggle('selected');
+    }
+  });
+});
+
+// Drag demo (visual only)
+let dragCard = null;
+document.querySelectorAll('.card-grip').forEach(grip => {
+  grip.addEventListener('mousedown', (e) => {
+    dragCard = grip.closest('.card');
+    if (dragCard) dragCard.classList.add('dragging');
+    const onUp = () => {
+      if (dragCard) dragCard.classList.remove('dragging');
+      dragCard = null;
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mouseup', onUp);
+  });
+});
+
+// Drop zone hover demo
+document.querySelectorAll('.col-drop-zone').forEach(zone => {
+  zone.addEventListener('mouseenter', () => zone.classList.add('active'));
+  zone.addEventListener('mouseleave', () => zone.classList.remove('active'));
+});
+</script>
+</div>
+</body>
+</html>

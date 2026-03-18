@@ -1,0 +1,34 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="bg" x1="100" y1="100" x2="924" y2="924" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#161a2b"/>
+            <stop offset="100%" stop-color="#0c0f18"/>
+        </linearGradient>
+
+        <!-- Apple HIG drop shadow: 28px blur, 12px Y-offset, black 50% -->
+        <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+            <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.5"/>
+        </filter>
+    </defs>
+
+    <!-- macOS Big Sur+ squircle — Apple HIG spec:
+         824×824 centered in 1024 canvas (100px gutter all sides)
+         rx=185.4 (continuous corner curve)
+         Drop shadow per Apple template -->
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#shadow)"/>
+
+    <!-- Subtle inner border for dark-on-dark readability -->
+    <rect x="101" y="101" width="822" height="822" rx="184" fill="none" stroke="#262b3d" stroke-width="1.5"/>
+
+    <!-- Gradient Solo "S" bars — Pink → Purple palette
+         Bars sit within the squircle with comfortable inner padding -->
+    <g transform="translate(196 192) scale(0.618)">
+        <rect x="215" y="72"  width="614" height="87" rx="41" fill="#f47bb8"/>
+        <rect x="113" y="205" width="420" height="87" rx="41" fill="#f06ac4"/>
+        <rect x="92"  y="338" width="297" height="87" rx="41" fill="#ee63db"/>
+        <rect x="236" y="471" width="554" height="87" rx="41" fill="#df5ceb"/>
+        <rect x="635" y="604" width="297" height="87" rx="41" fill="#c05ceb"/>
+        <rect x="492" y="738" width="430" height="87" rx="41" fill="#a863ee"/>
+        <rect x="195" y="871" width="625" height="87" rx="41" fill="#936af0"/>
+    </g>
+</svg>

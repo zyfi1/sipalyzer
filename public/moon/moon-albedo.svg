@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="gBase" cx="40%" cy="34%" r="62%">
+      <stop offset="0%" stop-color="#f4f6fa"/>
+      <stop offset="46%" stop-color="#d9dfeb"/>
+      <stop offset="78%" stop-color="#b6c0d4"/>
+      <stop offset="100%" stop-color="#909db7"/>
+    </radialGradient>
+    <filter id="softNoise" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="2" seed="17"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.05"/>
+      </feComponentTransfer>
+    </filter>
+    <radialGradient id="mariaDark" cx="48%" cy="44%" r="56%">
+      <stop offset="0%" stop-color="#7f8ca7" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#6d7c98" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="craterDark" cx="42%" cy="38%" r="60%">
+      <stop offset="0%" stop-color="#72819e" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#5f6f8d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="craterRim" cx="58%" cy="62%" r="58%">
+      <stop offset="0%" stop-color="#d9e0ee" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#e5eaf4" stop-opacity="0.22"/>
+    </radialGradient>
+    <clipPath id="disc">
+      <circle cx="512" cy="512" r="492"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#0a0f19"/>
+  <g clip-path="url(#disc)">
+    <circle cx="512" cy="512" r="492" fill="url(#gBase)"/>
+    <rect width="1024" height="1024" filter="url(#softNoise)" opacity="0.7"/>
+
+    <!-- maria / broad albedo structures -->
+    <ellipse cx="374" cy="420" rx="150" ry="112" fill="url(#mariaDark)"/>
+    <ellipse cx="610" cy="420" rx="134" ry="118" fill="url(#mariaDark)" opacity="0.78"/>
+    <ellipse cx="560" cy="620" rx="186" ry="132" fill="url(#mariaDark)" opacity="0.66"/>
+    <ellipse cx="330" cy="650" rx="110" ry="88" fill="url(#mariaDark)" opacity="0.6"/>
+    <ellipse cx="472" cy="290" rx="86" ry="66" fill="url(#mariaDark)" opacity="0.62"/>
+
+    <!-- crater fields -->
+    <g opacity="0.9">
+      <circle cx="280" cy="290" r="54" fill="url(#craterDark)"/>
+      <circle cx="280" cy="290" r="54" fill="url(#craterRim)"/>
+      <circle cx="690" cy="312" r="48" fill="url(#craterDark)"/>
+      <circle cx="690" cy="312" r="48" fill="url(#craterRim)"/>
+      <circle cx="750" cy="560" r="66" fill="url(#craterDark)"/>
+      <circle cx="750" cy="560" r="66" fill="url(#craterRim)"/>
+      <circle cx="220" cy="560" r="70" fill="url(#craterDark)"/>
+      <circle cx="220" cy="560" r="70" fill="url(#craterRim)"/>
+      <circle cx="506" cy="760" r="58" fill="url(#craterDark)"/>
+      <circle cx="506" cy="760" r="58" fill="url(#craterRim)"/>
+      <circle cx="392" cy="500" r="38" fill="url(#craterDark)"/>
+      <circle cx="392" cy="500" r="38" fill="url(#craterRim)"/>
+      <circle cx="602" cy="500" r="42" fill="url(#craterDark)"/>
+      <circle cx="602" cy="500" r="42" fill="url(#craterRim)"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SIPalyzer",
+  "version": "1.0.0",
+  "identifier": "com.sipalyzer.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "fullscreen": false,
+        "resizable": true,
+        "title": "SIPalyzer",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "backgroundColor": "#0f1013",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss: ws:; media-src 'self' data: blob:; worker-src 'self' blob:;",
+      "devCsp": "default-src 'self' http://localhost:* http://127.0.0.1:*; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-eval' http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*; img-src 'self' data: blob: https: http://localhost:* http://127.0.0.1:*; font-src 'self' data: http://localhost:* http://127.0.0.1:*; connect-src 'self' https: wss: ws: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; media-src 'self' data: blob:; worker-src 'self' blob:;",
+      "capabilities": [
+        "main-capability"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "resources": [
+      "resources/zsh-plugins",
+      "resources/vosk-model-small-en-us-0.15",
+      "resources/agent-go",
+      "resources/toolchains/go"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["pcap"],
+        "mimeType": "application/vnd.tcpdump.pcap",
+        "description": "PCAP Capture File"
+      },
+      {
+        "ext": ["pcapng"],
+        "mimeType": "application/x-pcapng",
+        "description": "PCAPNG Capture File"
+      },
+      {
+        "ext": ["cap"],
+        "mimeType": "application/vnd.tcpdump.pcap",
+        "description": "Network Capture File"
+      }
+    ],
+    "macOS": {
+      "frameworks": [
+        "./vendor/libs/libspandsp.dylib",
+        "./vendor/libs/libtiff.dylib",
+        "./vendor/libs/libjpeg.dylib",
+        "./vendor/libs/libzstd.dylib",
+        "./vendor/libs/liblzma.dylib",
+        "./vendor/libs/libvosk.dylib"
+      ],
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {}
+}

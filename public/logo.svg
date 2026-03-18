@@ -1,0 +1,10 @@
+<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Gradient Solo "S" bars — Pink → Purple palette -->
+    <rect x="42" y="14"  width="120" height="17" rx="8" fill="hsl(330 85% 72%)"/>
+    <rect x="22" y="40"  width="82"  height="17" rx="8" fill="hsl(320 82% 68%)"/>
+    <rect x="18" y="66"  width="58"  height="17" rx="8" fill="hsl(308 80% 66%)"/>
+    <rect x="46" y="92"  width="108" height="17" rx="8" fill="hsl(295 78% 64%)"/>
+    <rect x="124" y="118" width="58" height="17" rx="8" fill="hsl(282 78% 64%)"/>
+    <rect x="96" y="144" width="84"  height="17" rx="8" fill="hsl(270 80% 66%)"/>
+    <rect x="38" y="170" width="122" height="17" rx="8" fill="hsl(258 82% 68%)"/>
+</svg>

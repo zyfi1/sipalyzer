@@ -1,0 +1,61 @@
+name: Rollback Stable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_to_tag:
+        description: "Known-good tag to roll back to (e.g. v1.2.2 or v1.2.3-rc.2)"
+        required: true
+        type: string
+      new_stable_tag:
+        description: "New stable tag to publish for rollback (e.g. v1.2.4)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  rollback:
+    name: Roll back stable channel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rollback request
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="${{ inputs.rollback_to_tag }}"
+          TARGET="${{ inputs.new_stable_tag }}"
+          git fetch --tags
+
+          git rev-parse "${SOURCE}^{tag}" >/dev/null
+          if [[ ! "${TARGET}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "new_stable_tag must be stable format: vX.Y.Z" >&2
+            exit 1
+          fi
+          if git rev-parse "${TARGET}^{tag}" >/dev/null 2>&1; then
+            echo "new_stable_tag already exists: ${TARGET}" >&2
+            exit 1
+          fi
+
+          SOURCE_COMMIT="$(git rev-list -n 1 "${SOURCE}")"
+          echo "source_commit=${SOURCE_COMMIT}" >> "$GITHUB_OUTPUT"
+
+      - name: Create rollback stable tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -a "${{ inputs.new_stable_tag }}" "${{ steps.validate.outputs.source_commit }}" \
+            -m "Rollback stable to ${{ inputs.rollback_to_tag }}"
+          git push origin "${{ inputs.new_stable_tag }}"
+
+      - name: Rollback summary
+        shell: bash
+        run: |
+          echo "Rollback published: ${{ inputs.new_stable_tag }} -> commit from ${{ inputs.rollback_to_tag }}"
+

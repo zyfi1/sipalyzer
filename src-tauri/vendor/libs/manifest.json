@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "aarch64-apple-darwin": {
+      "requiredForRelease": true,
+      "libraries": [
+        "libspandsp.dylib",
+        "libtiff.dylib",
+        "libvosk.dylib"
+      ],
+      "includeDir": "include"
+    },
+    "x86_64-apple-darwin": {
+      "requiredForRelease": true,
+      "libraries": [
+        "libspandsp.dylib",
+        "libtiff.dylib",
+        "libvosk.dylib"
+      ],
+      "includeDir": "include"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "requiredForRelease": true,
+      "libraries": [
+        "libspandsp.so",
+        "libtiff.so",
+        "libvosk.so"
+      ],
+      "includeDir": "include"
+    },
+    "x86_64-pc-windows-msvc": {
+      "requiredForRelease": true,
+      "libraries": [
+        "spandsp.dll",
+        "tiff.dll",
+        "vosk.dll",
+        "libstdc++-6.dll",
+        "libgcc_s_seh-1.dll",
+        "libwinpthread-1.dll"
+      ],
+      "includeDir": "include"
+    }
+  }
+}

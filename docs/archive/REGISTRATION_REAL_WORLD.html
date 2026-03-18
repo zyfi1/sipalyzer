@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIPalyzer — Real-World Registration Layouts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0c0c0f;--bg2:#111114;--card:#161619;--surface:#1c1c20;
+    --border:#242429;--border2:#2e2e35;
+    --fg:#ededf0;--fg2:#c0c0c8;--muted:#737380;--dim:#4a4a55;
+    --green:#22c55e;--green-bg:#22c55e15;--green-fg:#4ade80;
+    --red:#ef4444;--red-bg:#ef444415;--red-fg:#f87171;
+    --amber:#eab308;--amber-bg:#eab30812;--amber-fg:#facc15;
+    --blue:#6366f1;--blue-bg:#6366f112;--blue-fg:#818cf8;
+    --r:10px;
+  }
+  body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;padding:48px;line-height:1.5}
+  .mono{font-family:'JetBrains Mono',monospace}
+  h1{font-size:32px;font-weight:800;margin-bottom:6px;letter-spacing:-.5px}
+  .subtitle{font-size:14px;color:var(--muted);margin-bottom:64px;max-width:680px;line-height:1.8}
+  .concept{margin-bottom:100px}
+  .clabel{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .clabel::before{content:'';width:16px;height:2px;background:var(--muted);border-radius:1px}
+  .concept h2{font-size:24px;font-weight:700;margin-bottom:4px;letter-spacing:-.3px}
+  .concept .ref{font-size:12px;color:var(--dim);margin-bottom:4px;font-style:italic}
+  .concept .desc{font-size:13px;color:var(--muted);margin-bottom:24px;max-width:600px;line-height:1.8}
+  .frame{border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--card);box-shadow:0 16px 48px rgba(0,0,0,.4)}
+  .notes{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .note{flex:1;min-width:260px;padding:12px 16px;border-radius:var(--r);background:var(--bg2);border:1px solid var(--border);font-size:11px;color:var(--muted);line-height:1.7}
+  .note strong{color:var(--fg);font-weight:600}
+
+  /* Shared */
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot.g{background:var(--green);box-shadow:0 0 6px var(--green)}.dot.r{background:var(--red);box-shadow:0 0 6px var(--red)}.dot.a{background:var(--amber)}.dot.x{background:var(--dim)}
+  .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
+  .pill.g{background:var(--green-bg);color:var(--green-fg)}.pill.r{background:var(--red-bg);color:var(--red-fg)}.pill.a{background:var(--amber-bg);color:var(--amber-fg)}
+  .tag{display:inline-flex;align-items:center;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+  .ib{width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .1s}
+  .ib:hover{background:var(--surface);color:var(--fg)}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--fg2);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .1s}
+  .btn:hover{background:var(--border);color:var(--fg)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.primary:hover{filter:brightness(1.1)}
+  .sp{flex:1}
+  .toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2)}
+
+  /* ═══════ 1 — LINEAR STYLE ═══════ */
+  .lin-table{width:100%}
+  .lin-header{display:grid;grid-template-columns:20px 20px 1.2fr 100px 120px 100px auto;gap:12px;align-items:center;padding:0 16px;height:32px;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
+  .lin-row{display:grid;grid-template-columns:20px 20px 1.2fr 100px 120px 100px auto;gap:12px;align-items:center;padding:0 16px;height:44px;border-bottom:1px solid #1a1a1e;transition:background .08s;cursor:pointer}
+  .lin-row:hover{background:#1a1a1f}
+  .lin-row:last-child{border-bottom:none}
+  .lin-check{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--border2);cursor:pointer;transition:all .1s;display:flex;align-items:center;justify-content:center}
+  .lin-check:hover{border-color:var(--muted)}
+  .lin-check.checked{background:var(--blue);border-color:var(--blue)}
+  .lin-check.checked::after{content:'✓';font-size:9px;color:#fff;font-weight:700}
+  .lin-name{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;min-width:0}
+  .lin-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lin-name .ln-id{font-size:10px;color:var(--dim);font-weight:500;flex-shrink:0}
+  .lin-uri{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lin-actions{display:flex;gap:2px;opacity:0;transition:opacity .1s}
+  .lin-row:hover .lin-actions{opacity:1}
+  .lin-groupbar{display:flex;align-items:center;gap:8px;padding:0 16px;height:32px;background:#13131a;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;cursor:pointer}
+  .lin-groupbar .lg-arrow{font-size:10px;color:var(--dim);transition:transform .15s}
+  .lin-groupbar .lg-count{font-size:10px;color:var(--dim);font-weight:500}
+
+  /* ═══════ 2 — VERCEL/RAILWAY ═══════ */
+  .dep-list{padding:8px}
+  .dep-card{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--r);margin-bottom:4px;transition:background .1s;cursor:pointer;position:relative}
+  .dep-card:hover{background:var(--surface)}
+  .dep-card .dc-status{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .dep-card .dc-status.g{background:var(--green-bg)}.dep-card .dc-status.r{background:var(--red-bg)}.dep-card .dc-status.a{background:var(--amber-bg)}
+  .dep-card .dc-info{flex:1;min-width:0}
+  .dep-card .dc-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .dep-card .dc-meta{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:8px}
+  .dep-card .dc-meta .dm-sep{color:var(--dim)}
+  .dep-card .dc-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .dep-card .dc-time{font-size:10px;color:var(--dim);text-align:right;min-width:60px}
+  .dep-card .dc-actions{display:flex;gap:2px;opacity:0;transition:opacity .1s}
+  .dep-card:hover .dc-actions{opacity:1}
+  .dep-card .dc-resp{text-align:right;min-width:80px}
+  .dep-card .dc-resp .dr-code{font-size:12px;font-weight:600}.dep-card .dc-resp .dr-ms{font-size:10px;color:var(--dim)}
+
+  /* ═══════ 3 — DOCKER DESKTOP ═══════ */
+  .dock-table{width:100%}
+  .dock-head{display:grid;grid-template-columns:20px 1fr 90px 90px 80px 100px auto;gap:10px;align-items:center;padding:0 14px;height:36px;border-bottom:1px solid var(--border);background:#111114;font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .dock-head span{cursor:pointer;display:flex;align-items:center;gap:3px;user-select:none}
+  .dock-head span:hover{color:var(--muted)}
+  .dock-row{display:grid;grid-template-columns:20px 1fr 90px 90px 80px 100px auto;gap:10px;align-items:center;padding:0 14px;height:48px;border-bottom:1px solid #18181c;transition:background .08s;cursor:pointer}
+  .dock-row:hover{background:#18181f}
+  .dock-row .dr-name{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .dock-row .dr-name .dn-primary{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dock-row .dr-name .dn-sub{font-size:10px;color:var(--muted)}
+  .dock-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500}
+  .dock-row .dr-port{font-size:11px;color:var(--muted)}
+  .dock-row .dr-transport{font-size:10px}
+  .dock-row .dr-response{font-size:11px}
+  .dock-row .dr-actions{display:flex;gap:1px}
+  .dock-row .dr-actions .da{width:24px;height:24px;border-radius:5px;border:none;background:transparent;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .08s}
+  .dock-row .dr-actions .da:hover{background:var(--surface);color:var(--fg)}
+  .dock-row .dr-actions .da.play:hover{color:var(--green-fg)}.dock-row .dr-actions .da.stop:hover{color:var(--red-fg)}
+
+  /* ═══════ 4 — UPTIME ROBOT / BETTER STACK ═══════ */
+  .up-list{padding:12px}
+  .up-card{display:flex;align-items:stretch;border-radius:var(--r);background:var(--bg2);border:1px solid var(--border);margin-bottom:8px;overflow:hidden;transition:all .15s;cursor:pointer}
+  .up-card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.15)}
+  .up-bar{width:4px;flex-shrink:0}
+  .up-bar.g{background:var(--green)}.up-bar.r{background:var(--red)}.up-bar.a{background:var(--amber)}.up-bar.x{background:var(--dim)}
+  .up-body{flex:1;padding:14px 16px;display:flex;align-items:center;gap:14px}
+  .up-info{flex:1;min-width:0}
+  .up-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .up-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .up-sparkline{width:120px;height:28px;flex-shrink:0;display:flex;align-items:flex-end;gap:1px;padding:0 2px}
+  .up-spark-bar{flex:1;border-radius:1px 1px 0 0;min-width:3px;transition:height .2s}
+  .up-right{display:flex;align-items:center;gap:16px;flex-shrink:0;padding-right:4px}
+  .up-uptime{text-align:center}
+  .up-uptime .uu-val{font-size:16px;font-weight:700;line-height:1}
+  .up-uptime .uu-label{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-top:2px}
+  .up-response{text-align:right;min-width:70px}
+  .up-response .ur-code{font-size:13px;font-weight:600}
+  .up-response .ur-ms{font-size:10px;color:var(--dim)}
+
+  /* ═══════ 5 — PAGERDUTY STYLE ═══════ */
+  .pd-summary{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg2)}
+  .pd-count{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);flex:1;cursor:pointer;transition:all .12s}
+  .pd-count:hover{border-color:var(--border2);background:var(--surface)}
+  .pd-count .pc-val{font-size:24px;font-weight:800;line-height:1;letter-spacing:-.5px}
+  .pd-count .pc-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .pd-count .pc-bar{width:3px;height:28px;border-radius:2px;flex-shrink:0}
+  .pd-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 16px}
+  .pd-tab{padding:8px 16px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .1s}
+  .pd-tab:hover{color:var(--fg2)}
+  .pd-tab.active{color:var(--fg);border-bottom-color:var(--blue)}
+  .pd-list{padding:0}
+  .pd-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #18181c;transition:background .08s;cursor:pointer}
+  .pd-row:hover{background:#18181f}
+  .pd-row .pr-urgency{width:3px;height:32px;border-radius:2px;flex-shrink:0}
+  .pd-row .pr-check{flex-shrink:0}
+  .pd-row .pr-info{flex:1;min-width:0}
+  .pd-row .pr-name{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px}
+  .pd-row .pr-detail{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px}
+  .pd-row .pr-status{flex-shrink:0}
+  .pd-row .pr-time{font-size:10px;color:var(--dim);min-width:60px;text-align:right}
+  .pd-row .pr-actions{display:flex;gap:2px;opacity:0;transition:opacity .1s}
+  .pd-row:hover .pr-actions{opacity:1}
+
+  /* ═══════ 6 — CLOUDFLARE / TAILSCALE ═══════ */
+  .cf-filters{display:flex;align-items:center;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
+  .cf-filter{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);font-size:11px;color:var(--fg2);cursor:pointer;font-family:inherit;transition:all .1s}
+  .cf-filter:hover{border-color:var(--border2)}
+  .cf-filter.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-fg)}
+  .cf-filter select{background:transparent;border:none;color:inherit;font:inherit;outline:none;cursor:pointer;-webkit-appearance:none}
+  .cf-list{padding:0}
+  .cf-row{display:grid;grid-template-columns:1fr 120px 90px 70px 80px auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid #18181c;transition:background .08s;cursor:pointer}
+  .cf-row:hover{background:#18181f}
+  .cf-row .cr-name{display:flex;align-items:center;gap:10px;min-width:0}
+  .cf-row .cr-name .cn-icon{width:32px;height:32px;border-radius:8px;background:var(--surface);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:12px;color:var(--muted)}
+  .cf-row .cr-name .cn-text{min-width:0}
+  .cf-row .cr-name .cn-primary{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cf-row .cr-name .cn-secondary{font-size:10px;color:var(--muted)}
+  .cf-row .cr-tags{display:flex;gap:3px;flex-wrap:wrap}
+  .cf-row .cr-status{font-size:11px;display:flex;align-items:center;gap:5px}
+  .cf-row .cr-resp{font-size:11px}
+  .cf-row .cr-time{font-size:10px;color:var(--dim)}
+  .cf-row .cr-actions{display:flex;gap:2px;justify-content:flex-end;opacity:0;transition:opacity .1s}
+  .cf-row:hover .cr-actions{opacity:1}
+  .cf-head{display:grid;grid-template-columns:1fr 120px 90px 70px 80px auto;gap:12px;align-items:center;padding:0 16px;height:32px;border-bottom:1px solid var(--border);background:var(--bg2);font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<h1>Real-World Layouts</h1>
+<p class="subtitle">
+  How actual products handle lists of items with status, actions, and metadata in 2025/2026.
+  No invented aesthetics — just proven patterns from apps you already use.
+</p>
+
+<!-- ═══════ 1 — LINEAR ═══════ -->
+<div class="concept">
+  <div class="clabel">Style 1</div>
+  <h2>Linear-Style Dense List</h2>
+  <p class="ref">Inspired by: Linear, GitHub Issues, Jira</p>
+  <p class="desc">Compact rows with status dot, inline metadata, and grouped sections. Keyboard-driven. Status is a priority icon, not a badge. Maximum density, minimum noise.</p>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:12px;font-weight:700">Registrars</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:4px">5</span>
+      <div class="sp"></div>
+      <div style="display:flex;gap:1px;background:var(--border);border-radius:6px;overflow:hidden">
+        <button class="btn" style="border:none;border-radius:0;font-size:10px;padding:4px 10px;background:var(--surface)">List</button>
+        <button class="btn" style="border:none;border-radius:0;font-size:10px;padding:4px 10px">Board</button>
+      </div>
+      <div style="width:1px;height:16px;background:var(--border)"></div>
+      <button class="btn" style="font-size:10px">Group: Status ▾</button>
+      <button class="btn" style="font-size:10px">Filter ▾</button>
+      <button class="btn primary" style="font-size:10px">+ Add</button>
+    </div>
+    <div class="lin-table">
+      <div class="lin-header">
+        <span></span><span></span><span>Name</span><span>Status</span><span>Domain</span><span>Response</span><span style="text-align:right">Actions</span>
+      </div>
+      <!-- Group: Registered -->
+      <div class="lin-groupbar">
+        <span class="lg-arrow">▼</span>
+        <span class="dot g" style="width:6px;height:6px"></span>
+        <span style="color:var(--green-fg)">Registered</span>
+        <span class="lg-count">3</span>
+      </div>
+      <div class="lin-row">
+        <div class="lin-check"></div>
+        <span class="dot g"></span>
+        <div class="lin-name"><span class="ln-id">REG-1</span><span>Production PBX</span></div>
+        <span class="pill g"><span class="dot g" style="width:5px;height:5px"></span> Active</span>
+        <span class="lin-uri mono">sip.acme.com</span>
+        <span class="mono" style="font-size:11px;color:var(--green-fg)">200 OK <span style="color:var(--dim)">42ms</span></span>
+        <div class="lin-actions"><button class="ib" title="Unregister">⏏</button><button class="ib" title="Tests">⚡</button><button class="ib" title="Edit">⚙</button><button class="ib" title="More">⋯</button></div>
+      </div>
+      <div class="lin-row">
+        <div class="lin-check"></div>
+        <span class="dot g"></span>
+        <div class="lin-name"><span class="ln-id">REG-2</span><span>Remote Office</span></div>
+        <span class="pill g"><span class="dot g" style="width:5px;height:5px"></span> Active</span>
+        <span class="lin-uri mono">pbx.branch.co</span>
+        <span class="mono" style="font-size:11px;color:var(--green-fg)">200 OK <span style="color:var(--dim)">18ms</span></span>
+        <div class="lin-actions"><button class="ib">⏏</button><button class="ib">⚡</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="lin-row">
+        <div class="lin-check"></div>
+        <span class="dot g"></span>
+        <div class="lin-name"><span class="ln-id">REG-5</span><span>Dev Asterisk</span></div>
+        <span class="pill g"><span class="dot g" style="width:5px;height:5px"></span> Active</span>
+        <span class="lin-uri mono">192.168.1.50</span>
+        <span class="mono" style="font-size:11px;color:var(--green-fg)">200 OK <span style="color:var(--dim)">3ms</span></span>
+        <div class="lin-actions"><button class="ib">⏏</button><button class="ib">⚡</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <!-- Group: Failed -->
+      <div class="lin-groupbar">
+        <span class="lg-arrow">▼</span>
+        <span class="dot r" style="width:6px;height:6px"></span>
+        <span style="color:var(--red-fg)">Failed</span>
+        <span class="lg-count">1</span>
+      </div>
+      <div class="lin-row">
+        <div class="lin-check"></div>
+        <span class="dot r"></span>
+        <div class="lin-name"><span class="ln-id">REG-3</span><span>Fax Gateway</span></div>
+        <span class="pill r"><span class="dot r" style="width:5px;height:5px"></span> Failed</span>
+        <span class="lin-uri mono">fax.telco.net</span>
+        <span class="mono" style="font-size:11px;color:var(--red-fg)">403 <span style="color:var(--dim)">189ms</span></span>
+        <div class="lin-actions"><button class="ib">↻</button><button class="ib">⚡</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <!-- Group: Idle -->
+      <div class="lin-groupbar">
+        <span class="lg-arrow">▼</span>
+        <span class="dot a" style="width:6px;height:6px"></span>
+        <span style="color:var(--amber-fg)">Unregistered</span>
+        <span class="lg-count">1</span>
+      </div>
+      <div class="lin-row">
+        <div class="lin-check"></div>
+        <span class="dot a"></span>
+        <div class="lin-name"><span class="ln-id">REG-4</span><span>Staging Server</span></div>
+        <span class="pill a"><span class="dot a" style="width:5px;height:5px"></span> Idle</span>
+        <span class="lin-uri mono">staging.provider.io</span>
+        <span style="font-size:11px;color:var(--dim)">—</span>
+        <div class="lin-actions"><button class="ib" style="color:var(--blue-fg)">▶</button><button class="ib">⚡</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>What makes it work:</strong> Group-by-status collapses give you instant overview. Row height is tight (44px). Hover-reveal actions keep the table clean. Inline IDs help with quick reference. This is Linear's bread and butter.</div>
+    <div class="note"><strong>Best for:</strong> 5-50 registrars. Users who value density and keyboard shortcuts. When the list IS the primary workspace.</div>
+  </div>
+</div>
+
+<!-- ═══════ 2 — VERCEL/RAILWAY ═══════ -->
+<div class="concept">
+  <div class="clabel">Style 2</div>
+  <h2>Vercel/Railway Service Cards</h2>
+  <p class="ref">Inspired by: Vercel deployments, Railway services, Render dashboard</p>
+  <p class="desc">Each registrar is a card-like row with a status icon, metadata line, and response on the right. Clean spacing, no grid lines. Feels like a deployment list.</p>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:12px;font-weight:700">Registrars</span>
+      <div class="sp"></div>
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);font-size:11px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search..." style="background:transparent;border:none;outline:none;color:var(--fg);font:inherit;width:120px">
+      </div>
+      <button class="btn" style="font-size:10px">Status: All ▾</button>
+      <button class="btn primary" style="font-size:10px">+ Add Registrar</button>
+    </div>
+    <div class="dep-list">
+      <div class="dep-card">
+        <div class="dc-status g"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="dc-info">
+          <div class="dc-name">Production PBX <span class="tag" style="font-size:8px">UDP :5060</span> <span class="tag use-case" style="font-size:8px;background:var(--green-bg);color:var(--green-fg);border-color:transparent">☎ Calling</span></div>
+          <div class="dc-meta"><span class="mono">admin@sip.acme.com</span> <span class="dm-sep">·</span> <span>auto-register</span> <span class="dm-sep">·</span> <span>Production folder</span></div>
+        </div>
+        <div class="dc-resp"><div class="dr-code mono" style="color:var(--green-fg)">200 OK</div><div class="dr-ms mono">42ms</div></div>
+        <div class="dc-time">2m ago</div>
+        <div class="dc-actions"><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="dep-card">
+        <div class="dc-status g"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="dc-info">
+          <div class="dc-name">Remote Office <span class="tag" style="font-size:8px">TLS :5061</span> <span class="tag use-case" style="font-size:8px;background:var(--green-bg);color:var(--green-fg);border-color:transparent">☎ Calling</span> <span class="tag use-case" style="font-size:8px;background:var(--green-bg);color:var(--green-fg);border-color:transparent">📠 Fax</span></div>
+          <div class="dc-meta"><span class="mono">ext200@pbx.branch.co</span> <span class="dm-sep">·</span> <span>Production folder</span></div>
+        </div>
+        <div class="dc-resp"><div class="dr-code mono" style="color:var(--green-fg)">200 OK</div><div class="dr-ms mono">18ms</div></div>
+        <div class="dc-time">just now</div>
+        <div class="dc-actions"><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="dep-card">
+        <div class="dc-status r"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+        <div class="dc-info">
+          <div class="dc-name">Fax Gateway <span class="tag" style="font-size:8px">UDP :5060</span> <span class="tag use-case" style="font-size:8px;background:var(--red-bg);color:var(--red-fg);border-color:transparent">📠 Fax</span></div>
+          <div class="dc-meta"><span class="mono">fax@fax.telco.net</span> <span class="dm-sep">·</span> <span style="color:var(--red-fg)">Authentication failed</span></div>
+        </div>
+        <div class="dc-resp"><div class="dr-code mono" style="color:var(--red-fg)">403</div><div class="dr-ms mono">189ms</div></div>
+        <div class="dc-time">5m ago</div>
+        <div class="dc-actions"><button class="ib">↻</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="dep-card">
+        <div class="dc-status a"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        <div class="dc-info">
+          <div class="dc-name">Staging Server <span class="tag" style="font-size:8px">TCP :5061</span></div>
+          <div class="dc-meta"><span class="mono">test@staging.provider.io</span> <span class="dm-sep">·</span> <span>Testing folder</span></div>
+        </div>
+        <div class="dc-resp"><div class="dr-code" style="color:var(--dim)">—</div></div>
+        <div class="dc-time" style="color:var(--dim)">never</div>
+        <div class="dc-actions"><button class="ib" style="color:var(--blue-fg)">▶</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="dep-card">
+        <div class="dc-status g"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="dc-info">
+          <div class="dc-name">Dev Asterisk <span class="tag" style="font-size:8px">UDP :5060</span></div>
+          <div class="dc-meta"><span class="mono">dev@192.168.1.50</span> <span class="dm-sep">·</span> <span>Testing folder</span></div>
+        </div>
+        <div class="dc-resp"><div class="dr-code mono" style="color:var(--green-fg)">200 OK</div><div class="dr-ms mono">3ms</div></div>
+        <div class="dc-time">1m ago</div>
+        <div class="dc-actions"><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>What makes it work:</strong> No grid borders = calmer feel. Status icons with colored backgrounds are immediately scannable. Metadata line gives context without consuming columns. The "deployment" metaphor maps perfectly to registration (each is a state change).</div>
+    <div class="note"><strong>Best for:</strong> Apps that feel modern but not experimental. Users who expect a Vercel/Railway-like experience. When you want breathing room without wasting space.</div>
+  </div>
+</div>
+
+<!-- ═══════ 3 — DOCKER DESKTOP ═══════ -->
+<div class="concept">
+  <div class="clabel">Style 3</div>
+  <h2>Docker Desktop Table</h2>
+  <p class="ref">Inspired by: Docker Desktop containers, Portainer, Kubernetes Dashboard</p>
+  <p class="desc">Full sortable table with resizable columns, inline play/stop/restart controls, and compact rows. The control buttons ARE the primary interaction — no menus needed.</p>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:12px;font-weight:700">Registrars</span>
+      <div class="sp"></div>
+      <div style="display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);font-size:11px;min-width:180px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search containers..." style="background:transparent;border:none;outline:none;color:var(--fg);font:inherit;flex:1">
+      </div>
+      <button class="btn primary" style="font-size:10px">+ Add</button>
+    </div>
+    <div class="dock-table">
+      <div class="dock-head">
+        <span><input type="checkbox" style="width:13px;height:13px;accent-color:var(--blue)"></span>
+        <span>Name ↕</span>
+        <span>Status ↕</span>
+        <span>Transport</span>
+        <span>Port</span>
+        <span>Response ↕</span>
+        <span style="text-align:right">Actions</span>
+      </div>
+      <div class="dock-row">
+        <input type="checkbox" style="width:13px;height:13px;accent-color:var(--blue)">
+        <div class="dr-name"><span class="dn-primary">Production PBX</span><span class="dn-sub mono">admin@sip.acme.com</span></div>
+        <div class="dock-status"><span class="dot g"></span><span style="color:var(--green-fg)">Running</span></div>
+        <span class="dr-transport"><span class="tag">UDP</span></span>
+        <span class="dr-port mono">5060</span>
+        <span class="dr-response mono" style="color:var(--green-fg)">200 OK</span>
+        <div class="dr-actions">
+          <button class="da stop" title="Stop">■</button>
+          <button class="da" title="Restart">↻</button>
+          <button class="da" title="Settings">⚙</button>
+          <button class="da" title="Delete">🗑</button>
+        </div>
+      </div>
+      <div class="dock-row">
+        <input type="checkbox" style="width:13px;height:13px;accent-color:var(--blue)">
+        <div class="dr-name"><span class="dn-primary">Remote Office</span><span class="dn-sub mono">ext200@pbx.branch.co</span></div>
+        <div class="dock-status"><span class="dot g"></span><span style="color:var(--green-fg)">Running</span></div>
+        <span class="dr-transport"><span class="tag">TLS</span></span>
+        <span class="dr-port mono">5061</span>
+        <span class="dr-response mono" style="color:var(--green-fg)">200 OK</span>
+        <div class="dr-actions">
+          <button class="da stop">■</button>
+          <button class="da">↻</button>
+          <button class="da">⚙</button>
+          <button class="da">🗑</button>
+        </div>
+      </div>
+      <div class="dock-row">
+        <input type="checkbox" style="width:13px;height:13px;accent-color:var(--blue)">
+        <div class="dr-name"><span class="dn-primary">Fax Gateway</span><span class="dn-sub mono">fax@fax.telco.net</span></div>
+        <div class="dock-status"><span class="dot r"></span><span style="color:var(--red-fg)">Error</span></div>
+        <span class="dr-transport"><span class="tag">UDP</span></span>
+        <span class="dr-port mono">5060</span>
+        <span class="dr-response mono" style="color:var(--red-fg)">403</span>
+        <div class="dr-actions">
+          <button class="da play" title="Start">▶</button>
+          <button class="da">↻</button>
+          <button class="da">⚙</button>
+          <button class="da">🗑</button>
+        </div>
+      </div>
+      <div class="dock-row">
+        <input type="checkbox" style="width:13px;height:13px;accent-color:var(--blue)">
+        <div class="dr-name"><span class="dn-primary">Staging Server</span><span class="dn-sub mono">test@staging.provider.io</span></div>
+        <div class="dock-status"><span class="dot x"></span><span style="color:var(--dim)">Stopped</span></div>
+        <span class="dr-transport"><span class="tag">TCP</span></span>
+        <span class="dr-port mono">5061</span>
+        <span class="dr-response" style="color:var(--dim)">—</span>
+        <div class="dr-actions">
+          <button class="da play">▶</button>
+          <button class="da" style="opacity:.3;pointer-events:none">↻</button>
+          <button class="da">⚙</button>
+          <button class="da">🗑</button>
+        </div>
+      </div>
+      <div class="dock-row">
+        <input type="checkbox" style="width:13px;height:13px;accent-color:var(--blue)">
+        <div class="dr-name"><span class="dn-primary">Dev Asterisk</span><span class="dn-sub mono">dev@192.168.1.50</span></div>
+        <div class="dock-status"><span class="dot g"></span><span style="color:var(--green-fg)">Running</span></div>
+        <span class="dr-transport"><span class="tag">UDP</span></span>
+        <span class="dr-port mono">5060</span>
+        <span class="dr-response mono" style="color:var(--green-fg)">200 OK</span>
+        <div class="dr-actions">
+          <button class="da stop">■</button>
+          <button class="da">↻</button>
+          <button class="da">⚙</button>
+          <button class="da">🗑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>What makes it work:</strong> Play/Stop/Restart buttons are always visible — no hover needed for the most common action. Sortable columns. Checkboxes for bulk operations. Container metaphor maps directly to register/unregister. This is what Docker users already know.</div>
+    <div class="note"><strong>Best for:</strong> Users who manage many registrars and value a predictable, tool-like interface. When you need visible controls at all times, not hidden behind hovers or menus.</div>
+  </div>
+</div>
+
+<!-- ═══════ 4 — UPTIME ROBOT / BETTER STACK ═══════ -->
+<div class="concept">
+  <div class="clabel">Style 4</div>
+  <h2>Better Stack / Uptime Monitor</h2>
+  <p class="ref">Inspired by: Better Stack, UptimeRobot, Checkly, Pingdom</p>
+  <p class="desc">Status bar on the left edge, sparkline showing uptime history, and uptime percentage. Designed for monitoring — because registration IS monitoring. The sparkline tells a story that status dots can't.</p>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:12px;font-weight:700">Monitors</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:6px">3 up · 1 down · 1 paused</span>
+      <div class="sp"></div>
+      <button class="btn" style="font-size:10px">↻ Refresh</button>
+      <button class="btn primary" style="font-size:10px">+ Add Monitor</button>
+    </div>
+    <div class="up-list">
+      <div class="up-card">
+        <div class="up-bar g"></div>
+        <div class="up-body">
+          <div class="up-info">
+            <div class="up-name"><span class="dot g" style="width:6px;height:6px"></span> Production PBX</div>
+            <div class="up-meta"><span class="mono" style="font-size:10px">admin@sip.acme.com</span> <span class="tag" style="font-size:8px">UDP :5060</span> <span class="tag" style="font-size:8px;background:var(--green-bg);color:var(--green-fg);border-color:transparent">☎ Calling</span></div>
+          </div>
+          <div class="up-sparkline">
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:40%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+          </div>
+          <div class="up-uptime"><div class="uu-val" style="color:var(--green-fg)">99.2%</div><div class="uu-label">Uptime</div></div>
+          <div class="up-response"><div class="ur-code mono" style="color:var(--green-fg)">200 OK</div><div class="ur-ms mono">42ms</div></div>
+        </div>
+      </div>
+      <div class="up-card">
+        <div class="up-bar g"></div>
+        <div class="up-body">
+          <div class="up-info">
+            <div class="up-name"><span class="dot g" style="width:6px;height:6px"></span> Remote Office</div>
+            <div class="up-meta"><span class="mono" style="font-size:10px">ext200@pbx.branch.co</span> <span class="tag" style="font-size:8px">TLS :5061</span></div>
+          </div>
+          <div class="up-sparkline">
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+          </div>
+          <div class="up-uptime"><div class="uu-val" style="color:var(--green-fg)">100%</div><div class="uu-label">Uptime</div></div>
+          <div class="up-response"><div class="ur-code mono" style="color:var(--green-fg)">200 OK</div><div class="ur-ms mono">18ms</div></div>
+        </div>
+      </div>
+      <div class="up-card">
+        <div class="up-bar r"></div>
+        <div class="up-body">
+          <div class="up-info">
+            <div class="up-name"><span class="dot r" style="width:6px;height:6px"></span> Fax Gateway</div>
+            <div class="up-meta"><span class="mono" style="font-size:10px">fax@fax.telco.net</span> <span class="tag" style="font-size:8px">UDP :5060</span> <span style="color:var(--red-fg);font-size:10px;font-weight:500">Down for 32 min</span></div>
+          </div>
+          <div class="up-sparkline">
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:80%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:40%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:30%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:60%;background:var(--amber)"></div>
+            <div class="up-spark-bar" style="height:20%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:20%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:20%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:20%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:20%;background:var(--red)"></div>
+            <div class="up-spark-bar" style="height:20%;background:var(--red)"></div>
+          </div>
+          <div class="up-uptime"><div class="uu-val" style="color:var(--red-fg)">74.1%</div><div class="uu-label">Uptime</div></div>
+          <div class="up-response"><div class="ur-code mono" style="color:var(--red-fg)">403</div><div class="ur-ms mono">189ms</div></div>
+        </div>
+      </div>
+      <div class="up-card">
+        <div class="up-bar x"></div>
+        <div class="up-body">
+          <div class="up-info">
+            <div class="up-name"><span class="dot x" style="width:6px;height:6px"></span> Staging Server <span class="pill" style="background:var(--surface);color:var(--dim);font-size:9px">Paused</span></div>
+            <div class="up-meta"><span class="mono" style="font-size:10px">test@staging.provider.io</span> <span class="tag" style="font-size:8px">TCP :5061</span></div>
+          </div>
+          <div class="up-sparkline">
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--dim);opacity:.3"></div>
+          </div>
+          <div class="up-uptime"><div class="uu-val" style="color:var(--dim)">—</div><div class="uu-label">Uptime</div></div>
+          <div class="up-response"><div class="ur-code" style="color:var(--dim)">—</div></div>
+        </div>
+      </div>
+      <div class="up-card">
+        <div class="up-bar g"></div>
+        <div class="up-body">
+          <div class="up-info">
+            <div class="up-name"><span class="dot g" style="width:6px;height:6px"></span> Dev Asterisk</div>
+            <div class="up-meta"><span class="mono" style="font-size:10px">dev@192.168.1.50</span> <span class="tag" style="font-size:8px">UDP :5060</span></div>
+          </div>
+          <div class="up-sparkline">
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:80%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+            <div class="up-spark-bar" style="height:100%;background:var(--green)"></div>
+          </div>
+          <div class="up-uptime"><div class="uu-val" style="color:var(--green-fg)">100%</div><div class="uu-label">Uptime</div></div>
+          <div class="up-response"><div class="ur-code mono" style="color:var(--green-fg)">200 OK</div><div class="ur-ms mono">3ms</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>What makes it work:</strong> The sparkline is the killer feature — you can see the last 24h of uptime at a glance without clicking anything. The thick left bar is instantly scannable. The uptime percentage gives a single number to judge health. This is exactly how UptimeRobot and Better Stack work.</div>
+    <div class="note"><strong>Best for:</strong> When registration health over time matters more than raw SIP details. When you want to answer "is this endpoint reliable?" not just "is it registered right now?"</div>
+  </div>
+</div>
+
+<!-- ═══════ 5 — PAGERDUTY ═══════ -->
+<div class="concept">
+  <div class="clabel">Style 5</div>
+  <h2>PagerDuty Incident List</h2>
+  <p class="ref">Inspired by: PagerDuty, OpsGenie, Statuspage, FireHydrant</p>
+  <p class="desc">Summary counters at the top, tab filters, urgency bars on rows, and bulk action checkboxes. Designed for incident response — because a failed registration IS an incident.</p>
+  <div class="frame">
+    <div class="pd-summary">
+      <div class="pd-count">
+        <div class="pc-bar" style="background:var(--red)"></div>
+        <div><div class="pc-val" style="color:var(--red-fg)">1</div><div class="pc-label">Triggered</div></div>
+      </div>
+      <div class="pd-count">
+        <div class="pc-bar" style="background:var(--amber)"></div>
+        <div><div class="pc-val" style="color:var(--amber-fg)">1</div><div class="pc-label">Idle</div></div>
+      </div>
+      <div class="pd-count">
+        <div class="pc-bar" style="background:var(--green)"></div>
+        <div><div class="pc-val" style="color:var(--green-fg)">3</div><div class="pc-label">Active</div></div>
+      </div>
+      <div style="flex:.5"></div>
+      <button class="btn primary" style="font-size:10px;align-self:center">+ Add Registrar</button>
+    </div>
+    <div class="pd-tabs">
+      <div class="pd-tab active">Open (2)</div>
+      <div class="pd-tab">Active (3)</div>
+      <div class="pd-tab">All (5)</div>
+    </div>
+    <div class="pd-list">
+      <div class="pd-row">
+        <div class="pr-urgency" style="background:var(--red)"></div>
+        <div class="pr-check"><div class="lin-check"></div></div>
+        <div class="pr-info">
+          <div class="pr-name"><span class="pill r" style="font-size:9px">HIGH</span> Fax Gateway registration failed</div>
+          <div class="pr-detail"><span class="mono" style="font-size:10px">fax@fax.telco.net</span> <span style="color:var(--dim)">·</span> <span>403 Forbidden</span> <span style="color:var(--dim)">·</span> <span>3 consecutive failures</span></div>
+        </div>
+        <div class="pr-status"><span class="pill r"><span class="dot r" style="width:5px;height:5px"></span> Triggered</span></div>
+        <div class="pr-time">5m ago</div>
+        <div class="pr-actions"><button class="btn" style="font-size:9px;padding:3px 8px">Retry</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="pd-row">
+        <div class="pr-urgency" style="background:var(--amber)"></div>
+        <div class="pr-check"><div class="lin-check"></div></div>
+        <div class="pr-info">
+          <div class="pr-name"><span class="pill a" style="font-size:9px">LOW</span> Staging Server not registered</div>
+          <div class="pr-detail"><span class="mono" style="font-size:10px">test@staging.provider.io</span> <span style="color:var(--dim)">·</span> <span>Never registered this session</span></div>
+        </div>
+        <div class="pr-status"><span class="pill a"><span class="dot a" style="width:5px;height:5px"></span> Idle</span></div>
+        <div class="pr-time">—</div>
+        <div class="pr-actions"><button class="btn" style="font-size:9px;padding:3px 8px">Register</button><button class="ib">⋯</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>What makes it work:</strong> Summary counters give instant triage. Tabs filter by state so you focus on what needs attention. Urgency bar on the left assigns priority. The "incident" framing means failed registrations feel actionable, not just informational.</div>
+    <div class="note"><strong>Best for:</strong> When failures are the primary concern. When you want to surface problems first and hide healthy registrars. Ops-focused teams who want a PagerDuty-like workflow for SIP.</div>
+  </div>
+</div>
+
+<!-- ═══════ 6 — CLOUDFLARE / TAILSCALE ═══════ -->
+<div class="concept">
+  <div class="clabel">Style 6</div>
+  <h2>Cloudflare / Tailscale Devices</h2>
+  <p class="ref">Inspired by: Cloudflare DNS records, Tailscale machines, AWS Console</p>
+  <p class="desc">Filter chips at the top, icon-avatar per row, property columns, and a clean admin-console feel. The filter bar is the primary interaction — not the rows. Built for managing many items.</p>
+  <div class="frame">
+    <div class="toolbar">
+      <span style="font-size:12px;font-weight:700">Registrars</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:6px">5 devices</span>
+      <div class="sp"></div>
+      <button class="btn primary" style="font-size:10px">+ Add Registrar</button>
+    </div>
+    <div class="cf-filters">
+      <div style="display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);font-size:11px;flex:1;max-width:240px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Filter by name, domain, IP..." style="background:transparent;border:none;outline:none;color:var(--fg);font:inherit;flex:1">
+      </div>
+      <span style="width:1px;height:16px;background:var(--border)"></span>
+      <button class="cf-filter active">All (5)</button>
+      <button class="cf-filter">Online (3)</button>
+      <button class="cf-filter">Offline (1)</button>
+      <button class="cf-filter">Idle (1)</button>
+      <span style="width:1px;height:16px;background:var(--border)"></span>
+      <button class="cf-filter">Transport ▾</button>
+      <button class="cf-filter">Folder ▾</button>
+      <button class="cf-filter">Use Case ▾</button>
+    </div>
+    <div class="cf-head">
+      <span>Registrar</span><span>Domain</span><span>Status</span><span>Latency</span><span>Response</span><span></span>
+    </div>
+    <div class="cf-list">
+      <div class="cf-row">
+        <div class="cr-name"><div class="cn-icon" style="background:var(--green-bg);color:var(--green-fg)">P</div><div class="cn-text"><div class="cn-primary">Production PBX</div><div class="cn-secondary mono">admin@sip.acme.com</div></div></div>
+        <div class="cr-tags"><span class="tag">UDP</span><span class="tag">:5060</span></div>
+        <div class="cr-status"><span class="dot g"></span><span style="color:var(--green-fg);font-weight:500">Online</span></div>
+        <span class="cr-resp mono" style="font-size:10px;color:var(--muted)">42ms</span>
+        <span class="cr-resp mono" style="font-size:11px;color:var(--green-fg)">200 OK</span>
+        <div class="cr-actions"><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="cf-row">
+        <div class="cr-name"><div class="cn-icon" style="background:var(--green-bg);color:var(--green-fg)">R</div><div class="cn-text"><div class="cn-primary">Remote Office</div><div class="cn-secondary mono">ext200@pbx.branch.co</div></div></div>
+        <div class="cr-tags"><span class="tag">TLS</span><span class="tag">:5061</span></div>
+        <div class="cr-status"><span class="dot g"></span><span style="color:var(--green-fg);font-weight:500">Online</span></div>
+        <span class="cr-resp mono" style="font-size:10px;color:var(--muted)">18ms</span>
+        <span class="cr-resp mono" style="font-size:11px;color:var(--green-fg)">200 OK</span>
+        <div class="cr-actions"><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="cf-row">
+        <div class="cr-name"><div class="cn-icon" style="background:var(--red-bg);color:var(--red-fg)">F</div><div class="cn-text"><div class="cn-primary">Fax Gateway</div><div class="cn-secondary mono">fax@fax.telco.net</div></div></div>
+        <div class="cr-tags"><span class="tag">UDP</span><span class="tag">:5060</span></div>
+        <div class="cr-status"><span class="dot r"></span><span style="color:var(--red-fg);font-weight:500">Offline</span></div>
+        <span class="cr-resp mono" style="font-size:10px;color:var(--muted)">189ms</span>
+        <span class="cr-resp mono" style="font-size:11px;color:var(--red-fg)">403</span>
+        <div class="cr-actions"><button class="ib">↻</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="cf-row">
+        <div class="cr-name"><div class="cn-icon">S</div><div class="cn-text"><div class="cn-primary">Staging Server</div><div class="cn-secondary mono">test@staging.provider.io</div></div></div>
+        <div class="cr-tags"><span class="tag">TCP</span><span class="tag">:5061</span></div>
+        <div class="cr-status"><span class="dot x"></span><span style="color:var(--dim)">Idle</span></div>
+        <span class="cr-resp" style="font-size:10px;color:var(--dim)">—</span>
+        <span class="cr-resp" style="font-size:11px;color:var(--dim)">—</span>
+        <div class="cr-actions"><button class="ib" style="color:var(--blue-fg)">▶</button><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+      <div class="cf-row">
+        <div class="cr-name"><div class="cn-icon" style="background:var(--green-bg);color:var(--green-fg)">D</div><div class="cn-text"><div class="cn-primary">Dev Asterisk</div><div class="cn-secondary mono">dev@192.168.1.50</div></div></div>
+        <div class="cr-tags"><span class="tag">UDP</span><span class="tag">:5060</span></div>
+        <div class="cr-status"><span class="dot g"></span><span style="color:var(--green-fg);font-weight:500">Online</span></div>
+        <span class="cr-resp mono" style="font-size:10px;color:var(--muted)">3ms</span>
+        <span class="cr-resp mono" style="font-size:11px;color:var(--green-fg)">200 OK</span>
+        <div class="cr-actions"><button class="ib">⚙</button><button class="ib">⋯</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>What makes it work:</strong> Filter chips are the hero — click "Offline" to instantly see only problems. Icon avatars with status-colored backgrounds give instant identity. Clean grid with clear columns. This is how Cloudflare manages thousands of DNS records and Tailscale manages devices.</div>
+    <div class="note"><strong>Best for:</strong> When you might have 10-100+ registrars. When filtering and searching matter more than drag-and-drop. Admin console users who want to find specific items fast.</div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div style="margin-top:60px;padding:40px;background:var(--bg2);border:1px solid var(--border);border-radius:14px">
+  <h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Which pattern fits your workflow?</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+    <div style="padding:14px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:var(--fg)">Dense worker</strong><br>
+      <span style="color:var(--muted)">Style 1 (Linear) or 3 (Docker) — max info density, keyboard-driven, rows are the workspace</span>
+    </div>
+    <div style="padding:14px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:var(--fg)">Modern product</strong><br>
+      <span style="color:var(--muted)">Style 2 (Vercel) or 6 (Cloudflare) — clean spacing, filter-first, feels like a SaaS app</span>
+    </div>
+    <div style="padding:14px;border-radius:var(--r);background:var(--card);border:1px solid var(--border);font-size:12px;line-height:1.7">
+      <strong style="color:var(--fg)">Monitoring focus</strong><br>
+      <span style="color:var(--muted)">Style 4 (Better Stack) or 5 (PagerDuty) — uptime sparklines, incident triage, reliability metrics</span>
+    </div>
+  </div>
+  <p style="font-size:12px;color:var(--muted);line-height:1.8">All six are standard production patterns used by real products in 2025/2026. Pick one as a base and I'll implement it, or combine elements (e.g. Vercel cards + Better Stack sparklines + Linear grouping).</p>
+</div>
+
+</body>
+</html>

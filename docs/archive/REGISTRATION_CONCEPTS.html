@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIPalyzer — Registration View Concepts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: hsl(240 22% 7%);
+    --card: hsl(238 20% 13%);
+    --card-light: hsl(238 20% 16%);
+    --secondary: hsl(238 18% 18%);
+    --accent: hsl(238 18% 21%);
+    --border: hsl(238 16% 25%);
+    --muted-fg: hsl(235 14% 70%);
+    --fg: hsl(230 15% 98%);
+    --primary: hsl(232 52% 62%);
+    --success: hsl(152 58% 55%);
+    --warning: hsl(38 92% 56%);
+    --destructive: hsl(0 72% 62%);
+    --glow-success: hsl(152 58% 55% / 0.15);
+    --glow-warning: hsl(38 92% 56% / 0.12);
+    --glow-fail: hsl(0 72% 62% / 0.12);
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    padding: 40px;
+  }
+
+  h1 {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, hsl(330 85% 72%), hsl(258 82% 68%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { font-size: 15px; color: var(--muted-fg); margin-bottom: 56px; max-width: 700px; }
+
+  .concept {
+    margin-bottom: 80px;
+    padding-bottom: 80px;
+    border-bottom: 1px solid hsl(238 16% 20%);
+  }
+  .concept:last-child { border-bottom: none; }
+
+  .concept-header {
+    margin-bottom: 8px;
+  }
+  .concept-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 12px;
+  }
+  .concept-label::before {
+    content: '';
+    display: block;
+    width: 16px;
+    height: 2px;
+    background: var(--primary);
+    border-radius: 2px;
+  }
+  .concept h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .concept .desc {
+    font-size: 14px;
+    color: var(--muted-fg);
+    margin-bottom: 32px;
+    max-width: 600px;
+    line-height: 1.7;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Shared component styles ─────────────────────────────── */
+
+  .demo-frame {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px hsl(0 0% 0% / 0.3);
+  }
+
+  .demo-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: hsl(238 20% 11%);
+  }
+  .demo-toolbar .spacer { flex: 1; }
+
+  .pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .pill-btn:hover { background: hsl(238 18% 26%); }
+  .pill-btn.primary { background: var(--primary); color: white; }
+  .pill-btn.primary:hover { background: hsl(232 52% 56%); }
+  .pill-btn .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .pill-btn .dot.green { background: var(--success); }
+  .pill-btn .dot.amber { background: var(--warning); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+  .badge.success { background: hsl(152 58% 55% / 0.15); color: var(--success); }
+  .badge.warning { background: hsl(38 92% 56% / 0.12); color: var(--warning); }
+  .badge.fail { background: hsl(0 72% 62% / 0.12); color: var(--destructive); }
+  .badge.neutral { background: var(--accent); color: var(--muted-fg); }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: var(--muted-fg);
+    border: 1px solid var(--border);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.green { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .status-dot.amber { background: var(--warning); box-shadow: 0 0 6px hsl(38 92% 56% / 0.4); }
+  .status-dot.red { background: var(--destructive); box-shadow: 0 0 6px hsl(0 72% 62% / 0.4); }
+  .status-dot.gray { background: var(--muted-fg); opacity: 0.3; }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--muted-fg);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover { background: var(--accent); color: var(--fg); }
+
+  .text-sm { font-size: 13px; }
+  .text-xs { font-size: 11px; }
+  .text-2xs { font-size: 10px; }
+  .text-muted { color: var(--muted-fg); }
+  .text-success { color: var(--success); }
+  .text-warning { color: var(--warning); }
+  .text-fail { color: var(--destructive); }
+  .fw-500 { font-weight: 500; }
+  .fw-600 { font-weight: 600; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* ── Notes between concepts ──────────────────────────────── */
+  .notes {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .note {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: hsl(238 20% 10%);
+    border: 1px solid hsl(238 16% 20%);
+    font-size: 12px;
+    color: var(--muted-fg);
+    line-height: 1.6;
+  }
+  .note strong { color: var(--fg); font-weight: 600; }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT A — "Status Cards" (card-based, visual-first)
+     ═══════════════════════════════════════════════════════════ */
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .reg-card {
+    position: relative;
+    background: var(--card-light);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s;
+    overflow: hidden;
+  }
+  .reg-card:hover { border-color: hsl(238 16% 35%); }
+  .reg-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .reg-card.status-ok::before { background: linear-gradient(135deg, hsl(152 58% 55% / 0.06), transparent 60%); }
+  .reg-card.status-warn::before { background: linear-gradient(135deg, hsl(38 92% 56% / 0.05), transparent 60%); }
+  .reg-card.status-fail::before { background: linear-gradient(135deg, hsl(0 72% 62% / 0.05), transparent 60%); }
+
+  .reg-card .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .reg-card .card-name { font-size: 14px; font-weight: 600; }
+  .reg-card .card-uri { font-size: 11px; color: var(--muted-fg); margin-top: 2px; }
+  .reg-card .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .reg-card .card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid hsl(238 16% 22%);
+  }
+  .reg-card .card-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .reg-card .card-response {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted-fg);
+  }
+  .card-response .code { font-weight: 600; }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT B — "Dense Table" (maximally data-dense)
+     ═══════════════════════════════════════════════════════════ */
+
+  .dense-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .dense-table thead th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted-fg);
+    border-bottom: 1px solid var(--border);
+    background: hsl(238 20% 11%);
+    position: sticky;
+    top: 0;
+  }
+  .dense-table tbody tr {
+    border-bottom: 1px solid hsl(238 16% 18%);
+    transition: background 0.1s;
+  }
+  .dense-table tbody tr:hover { background: hsl(238 18% 16%); }
+  .dense-table td {
+    padding: 10px 12px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .dense-table .cell-name {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .dense-table .cell-name .name { font-weight: 500; font-size: 13px; }
+  .dense-table .cell-name .uri { font-size: 10px; color: var(--muted-fg); }
+
+  .dense-table .status-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dense-table .inline-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .dense-table tbody tr:hover .inline-actions { opacity: 1; }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT C — "Timeline Rows" (horizontal timeline per row)
+     ═══════════════════════════════════════════════════════════ */
+
+  .timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+  }
+
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: var(--card-light);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: all 0.15s;
+  }
+  .timeline-row:hover { border-color: hsl(238 16% 32%); background: hsl(238 20% 17%); }
+
+  .timeline-info { min-width: 0; }
+  .timeline-info .tl-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .timeline-info .tl-uri { font-size: 10px; color: var(--muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .timeline-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 28px;
+    position: relative;
+  }
+  .timeline-bar .bar-segment {
+    height: 100%;
+    border-radius: 4px;
+    position: relative;
+    min-width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: white;
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 0 6px;
+  }
+  .bar-segment.register { background: hsl(232 52% 52%); flex: 1; }
+  .bar-segment.auth { background: hsl(270 50% 50%); flex: 0.5; }
+  .bar-segment.ok { background: var(--success); flex: 0.3; }
+  .bar-segment.fail { background: var(--destructive); flex: 0.3; }
+  .bar-segment.wait { background: var(--accent); flex: 2; }
+
+  .timeline-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 120px;
+    justify-content: flex-end;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT D — "Split Panel" (master-detail)
+     ═══════════════════════════════════════════════════════════ */
+
+  .split-panel {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 480px;
+  }
+
+  .split-sidebar {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    background: hsl(238 20% 10%);
+  }
+  .split-sidebar .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.1s;
+  }
+  .split-sidebar .sidebar-item:hover { background: hsl(238 18% 16%); }
+  .split-sidebar .sidebar-item.active {
+    background: hsl(238 18% 17%);
+    border-left-color: var(--primary);
+  }
+  .split-sidebar .sidebar-item .si-dot { flex-shrink: 0; }
+  .split-sidebar .sidebar-item .si-info { min-width: 0; flex: 1; }
+  .split-sidebar .sidebar-item .si-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .split-sidebar .sidebar-item .si-uri { font-size: 10px; color: var(--muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .split-sidebar .sidebar-item .si-badge { flex-shrink: 0; }
+
+  .split-detail {
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .detail-header h3 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .detail-header .dh-uri { font-size: 12px; color: var(--muted-fg); }
+  .detail-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .detail-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--secondary);
+    border: 1px solid var(--border);
+  }
+  .stat-card .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted-fg); margin-bottom: 6px; }
+  .stat-card .stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-card .stat-sub { font-size: 11px; color: var(--muted-fg); margin-top: 2px; }
+
+  .detail-history h4 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted-fg); margin-bottom: 12px; }
+  .history-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid hsl(238 16% 18%);
+    font-size: 12px;
+  }
+  .history-row .time { color: var(--muted-fg); min-width: 80px; }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT E — "Minimal Zen" (ultra-clean, space, large type)
+     ═══════════════════════════════════════════════════════════ */
+
+  .zen-list {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .zen-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    border-radius: 12px;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .zen-row:hover { background: hsl(238 18% 14%); }
+
+  .zen-status-pip {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .zen-status-pip.active { background: var(--success); box-shadow: 0 0 12px hsl(152 58% 55% / 0.5); }
+  .zen-status-pip.idle { background: hsl(238 14% 40%); }
+  .zen-status-pip.error { background: var(--destructive); box-shadow: 0 0 10px hsl(0 72% 62% / 0.4); }
+
+  .zen-main { flex: 1; min-width: 0; }
+  .zen-name { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+  .zen-uri { font-size: 12px; color: var(--muted-fg); }
+
+  .zen-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--muted-fg);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .zen-meta .sep { width: 1px; height: 16px; background: hsl(238 16% 25%); }
+
+  .zen-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .zen-row:hover .zen-actions { opacity: 1; }
+
+  .zen-action {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .zen-action:hover { background: var(--accent); }
+  .zen-action.primary-outline { border-color: var(--primary); color: var(--primary); }
+  .zen-action.primary-outline:hover { background: hsl(232 52% 62% / 0.1); }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT F — "Grouped Swimlanes" (swimlane by folder)
+     ═══════════════════════════════════════════════════════════ */
+
+  .swimlanes {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .swimlane {
+    background: hsl(238 20% 10%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .swimlane-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid hsl(238 16% 20%);
+    background: hsl(238 20% 12%);
+  }
+  .swimlane-header .sl-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    font-size: 13px;
+  }
+  .swimlane-header .sl-name { font-size: 13px; font-weight: 600; flex: 1; }
+  .swimlane-header .sl-count { font-size: 11px; color: var(--muted-fg); }
+  .swimlane-header .sl-badges { display: flex; gap: 6px; }
+
+  .swimlane-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: hsl(238 16% 16%);
+  }
+
+  .sl-row {
+    display: grid;
+    grid-template-columns: 10px 1fr auto auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--card-light);
+    transition: background 0.1s;
+  }
+  .sl-row:hover { background: hsl(238 20% 18%); }
+  .sl-row .sl-bar {
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+  }
+  .sl-row .sl-info { min-width: 0; }
+  .sl-row .sl-name { font-size: 13px; font-weight: 500; }
+  .sl-row .sl-uri { font-size: 10px; color: var(--muted-fg); }
+  .sl-row .sl-response { font-size: 11px; color: var(--muted-fg); min-width: 90px; text-align: right; }
+  .sl-row .sl-time { font-size: 10px; color: hsl(235 14% 55%); min-width: 60px; text-align: right; }
+  .sl-row .sl-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.1s;
+    min-width: 80px;
+    justify-content: flex-end;
+  }
+  .sl-row:hover .sl-actions { opacity: 1; }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONCEPT G — "Dashboard Mosaic"
+     ═══════════════════════════════════════════════════════════ */
+
+  .mosaic-top {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 16px 16px 0;
+  }
+  .mosaic-stat {
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--card-light);
+    border: 1px solid var(--border);
+  }
+  .mosaic-stat .ms-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted-fg); }
+  .mosaic-stat .ms-value { font-size: 28px; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; line-height: 1; }
+  .mosaic-stat .ms-bar { margin-top: 10px; height: 4px; border-radius: 2px; background: var(--accent); overflow: hidden; }
+  .mosaic-stat .ms-bar .ms-fill { height: 100%; border-radius: 2px; }
+
+  .mosaic-list {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mosaic-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto auto auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--card-light);
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .mosaic-row:hover { border-color: var(--border); background: hsl(238 20% 17%); }
+
+  .mosaic-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .mosaic-avatar.green { background: hsl(152 58% 55% / 0.15); color: var(--success); }
+  .mosaic-avatar.amber { background: hsl(38 92% 56% / 0.12); color: var(--warning); }
+  .mosaic-avatar.red { background: hsl(0 72% 62% / 0.12); color: var(--destructive); }
+  .mosaic-avatar.gray { background: var(--accent); color: var(--muted-fg); }
+
+  .mosaic-info { min-width: 0; }
+  .mosaic-info .mi-name { font-size: 13px; font-weight: 600; }
+  .mosaic-info .mi-uri { font-size: 10px; color: var(--muted-fg); }
+
+  .mosaic-badge-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .mosaic-resp {
+    font-size: 11px;
+    min-width: 70px;
+    text-align: right;
+  }
+  .mosaic-timing {
+    font-size: 10px;
+    color: hsl(235 14% 55%);
+    min-width: 50px;
+    text-align: right;
+  }
+  .mosaic-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .mosaic-row:hover .mosaic-actions { opacity: 1; }
+
+</style>
+</head>
+<body>
+
+<h1>Registration View Concepts</h1>
+<p class="subtitle">
+  Seven distinct layout approaches for presenting SIP registrars. Each concept
+  prioritizes different trade-offs: density vs clarity, at-a-glance status vs detail depth,
+  flat lists vs grouped views.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT A — Status Cards                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept A</div>
+    <h2>Status Cards</h2>
+    <p class="desc">
+      Each registrar gets its own card with a subtle status glow.
+      Great for visual scanning when you have fewer registrars (&lt;15).
+      Status-colored gradient wash makes state immediately obvious.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <div class="spacer"></div>
+      <button class="pill-btn"><span style="font-size:13px">&#x21bb;</span> Refresh</button>
+      <button class="pill-btn"><span style="font-size:12px">&#x1F4C1;</span> Folders</button>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div class="cards-grid">
+      <!-- Card 1: Registered -->
+      <div class="reg-card status-ok">
+        <div class="card-top">
+          <div>
+            <div class="card-name">Production PBX</div>
+            <div class="card-uri mono">admin@sip.acme.com</div>
+          </div>
+          <div class="badge success"><span class="status-dot green" style="width:6px;height:6px"></span> Registered</div>
+        </div>
+        <div class="card-meta">
+          <span class="tag">UDP</span>
+          <span class="tag">:5060</span>
+          <span class="tag" style="border-color: hsl(152 58% 55% / 0.3); color: var(--success);">&#x260E; Calling</span>
+        </div>
+        <div class="card-bottom">
+          <div class="card-response">
+            <span class="mono code text-success">200 OK</span>
+            <span>&middot;</span>
+            <span class="tabular">42ms</span>
+            <span>&middot;</span>
+            <span>2m ago</span>
+          </div>
+          <div class="card-actions">
+            <button class="icon-btn" title="Unregister">&#x2716;</button>
+            <button class="icon-btn" title="Tests">&#x1F9EA;</button>
+            <button class="icon-btn" title="Edit">&#x2699;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Unregistered -->
+      <div class="reg-card status-warn">
+        <div class="card-top">
+          <div>
+            <div class="card-name">Staging Server</div>
+            <div class="card-uri mono">test@staging.provider.io</div>
+          </div>
+          <div class="badge warning"><span class="status-dot amber" style="width:6px;height:6px"></span> Idle</div>
+        </div>
+        <div class="card-meta">
+          <span class="tag">TCP</span>
+          <span class="tag">:5061</span>
+        </div>
+        <div class="card-bottom">
+          <div class="card-response">
+            <span class="text-muted" style="font-size: 11px">No recent activity</span>
+          </div>
+          <div class="card-actions">
+            <button class="icon-btn" title="Register" style="color:var(--primary)">&#x2713;</button>
+            <button class="icon-btn" title="Edit">&#x2699;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Failed -->
+      <div class="reg-card status-fail">
+        <div class="card-top">
+          <div>
+            <div class="card-name">Fax Gateway</div>
+            <div class="card-uri mono">fax@fax.telco.net</div>
+          </div>
+          <div class="badge fail"><span class="status-dot red" style="width:6px;height:6px"></span> Failed</div>
+        </div>
+        <div class="card-meta">
+          <span class="tag">UDP</span>
+          <span class="tag">:5060</span>
+          <span class="tag" style="border-color: hsl(0 72% 62% / 0.3); color: var(--destructive);">&#x1F4E0; Fax</span>
+        </div>
+        <div class="card-bottom">
+          <div class="card-response">
+            <span class="mono code text-fail">403 Forbidden</span>
+            <span>&middot;</span>
+            <span class="tabular">189ms</span>
+          </div>
+          <div class="card-actions">
+            <button class="icon-btn" title="Retry" style="color:var(--primary)">&#x21bb;</button>
+            <button class="icon-btn" title="Edit">&#x2699;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Registered -->
+      <div class="reg-card status-ok">
+        <div class="card-top">
+          <div>
+            <div class="card-name">Remote Office</div>
+            <div class="card-uri mono">ext200@pbx.branch.co</div>
+          </div>
+          <div class="badge success"><span class="status-dot green" style="width:6px;height:6px"></span> Registered</div>
+        </div>
+        <div class="card-meta">
+          <span class="tag">TLS</span>
+          <span class="tag">:5061</span>
+          <span class="tag" style="border-color: hsl(152 58% 55% / 0.3); color: var(--success);">&#x260E; Calling</span>
+          <span class="tag" style="border-color: hsl(152 58% 55% / 0.3); color: var(--success);">&#x1F4E0; Fax</span>
+        </div>
+        <div class="card-bottom">
+          <div class="card-response">
+            <span class="mono code text-success">200 OK</span>
+            <span>&middot;</span>
+            <span class="tabular">18ms</span>
+            <span>&middot;</span>
+            <span>just now</span>
+          </div>
+          <div class="card-actions">
+            <button class="icon-btn" title="Unregister">&#x2716;</button>
+            <button class="icon-btn" title="Tests">&#x1F9EA;</button>
+            <button class="icon-btn" title="Edit">&#x2699;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Very visual. Status is unmissable. Each registrar has clear breathing room. Easy to add richer data per card without crowding.</div>
+    <div class="note"><strong>Cons:</strong> Doesn't scale well past ~12 registrars. Uses a lot of vertical space. Harder to compare across registrars side-by-side.</div>
+    <div class="note"><strong>Best for:</strong> Users with fewer registrars who want a dashboard-like feel. Could combine with a compact list toggle.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT B — Dense Table                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept B</div>
+    <h2>Dense Table</h2>
+    <p class="desc">
+      Classic data-table with sticky headers, sortable columns, and inline
+      actions on hover. Maximum information density &mdash; fit 20+ registrars
+      on screen without scrolling.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <span class="badge neutral tabular" style="margin-left: 4px;">5</span>
+      <div class="spacer"></div>
+      <button class="pill-btn"><span style="font-size:13px">&#x21bb;</span></button>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div style="overflow: auto; max-height: 400px;">
+      <table class="dense-table">
+        <thead>
+          <tr>
+            <th style="width: 28px;"></th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Transport</th>
+            <th>Response</th>
+            <th>Latency</th>
+            <th>Use Case</th>
+            <th style="text-align: right;">Last Check</th>
+            <th style="width: 100px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox" style="accent-color: var(--primary);"></td>
+            <td><div class="cell-name"><span class="name">Production PBX</span><span class="uri mono">admin@sip.acme.com</span></div></td>
+            <td><div class="status-cell"><span class="status-dot green"></span><span class="text-xs text-success fw-500">Registered</span></div></td>
+            <td><span class="tag">UDP :5060</span></td>
+            <td><span class="mono text-xs text-success">200 OK</span></td>
+            <td><span class="mono text-xs tabular text-muted">42ms</span></td>
+            <td><span class="text-xs">&#x260E; Calling</span></td>
+            <td style="text-align: right;"><span class="text-2xs text-muted tabular">2 min ago</span></td>
+            <td><div class="inline-actions">
+              <button class="icon-btn" style="width:24px;height:24px;" title="Unregister">&#x2716;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Tests">&#x1F9EA;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Edit">&#x2699;</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color: var(--primary);"></td>
+            <td><div class="cell-name"><span class="name">Staging Server</span><span class="uri mono">test@staging.provider.io</span></div></td>
+            <td><div class="status-cell"><span class="status-dot amber"></span><span class="text-xs text-warning fw-500">Idle</span></div></td>
+            <td><span class="tag">TCP :5061</span></td>
+            <td><span class="text-2xs text-muted">&mdash;</span></td>
+            <td><span class="text-2xs text-muted">&mdash;</span></td>
+            <td><span class="text-2xs text-muted">&mdash;</span></td>
+            <td style="text-align: right;"><span class="text-2xs text-muted tabular">never</span></td>
+            <td><div class="inline-actions">
+              <button class="icon-btn" style="width:24px;height:24px;color:var(--primary);" title="Register">&#x2713;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Edit">&#x2699;</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color: var(--primary);"></td>
+            <td><div class="cell-name"><span class="name">Fax Gateway</span><span class="uri mono">fax@fax.telco.net</span></div></td>
+            <td><div class="status-cell"><span class="status-dot red"></span><span class="text-xs text-fail fw-500">Failed</span></div></td>
+            <td><span class="tag">UDP :5060</span></td>
+            <td><span class="mono text-xs text-fail">403 Forbidden</span></td>
+            <td><span class="mono text-xs tabular text-muted">189ms</span></td>
+            <td><span class="text-xs">&#x1F4E0; Fax</span></td>
+            <td style="text-align: right;"><span class="text-2xs text-muted tabular">5 min ago</span></td>
+            <td><div class="inline-actions">
+              <button class="icon-btn" style="width:24px;height:24px;color:var(--primary);" title="Retry">&#x21bb;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Edit">&#x2699;</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color: var(--primary);"></td>
+            <td><div class="cell-name"><span class="name">Remote Office</span><span class="uri mono">ext200@pbx.branch.co</span></div></td>
+            <td><div class="status-cell"><span class="status-dot green"></span><span class="text-xs text-success fw-500">Registered</span></div></td>
+            <td><span class="tag">TLS :5061</span></td>
+            <td><span class="mono text-xs text-success">200 OK</span></td>
+            <td><span class="mono text-xs tabular text-muted">18ms</span></td>
+            <td><span class="text-xs">&#x260E; &#x1F4E0;</span></td>
+            <td style="text-align: right;"><span class="text-2xs text-muted tabular">just now</span></td>
+            <td><div class="inline-actions">
+              <button class="icon-btn" style="width:24px;height:24px;" title="Unregister">&#x2716;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Tests">&#x1F9EA;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Edit">&#x2699;</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" style="accent-color: var(--primary);"></td>
+            <td><div class="cell-name"><span class="name">Dev Asterisk</span><span class="uri mono">dev@192.168.1.50</span></div></td>
+            <td><div class="status-cell"><span class="status-dot green"></span><span class="text-xs text-success fw-500">Registered</span></div></td>
+            <td><span class="tag">UDP :5060</span></td>
+            <td><span class="mono text-xs text-success">200 OK</span></td>
+            <td><span class="mono text-xs tabular text-muted">3ms</span></td>
+            <td><span class="text-xs">&#x260E; Calling</span></td>
+            <td style="text-align: right;"><span class="text-2xs text-muted tabular">1 min ago</span></td>
+            <td><div class="inline-actions">
+              <button class="icon-btn" style="width:24px;height:24px;" title="Unregister">&#x2716;</button>
+              <button class="icon-btn" style="width:24px;height:24px;" title="Edit">&#x2699;</button>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Extreme data density. Sortable columns give control. Familiar spreadsheet pattern. Scales to dozens of registrars. Actions appear on hover keeping rows clean.</div>
+    <div class="note"><strong>Cons:</strong> Can feel cold/clinical. Status less visually prominent than cards. Requires horizontal space for all columns.</div>
+    <div class="note"><strong>Best for:</strong> Power users managing many registrars who want all data at a glance without expanding anything.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT C — Timeline Rows                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept C</div>
+    <h2>Timeline Rows</h2>
+    <p class="desc">
+      Each row includes a mini timeline bar showing the SIP flow
+      (REGISTER &rarr; 401 &rarr; Auth &rarr; 200 OK). Gives insight into
+      what happened at a glance without expanding test panels.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <div class="spacer"></div>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div class="timeline-list">
+      <div class="timeline-row">
+        <div class="timeline-info">
+          <div class="tl-name">Production PBX</div>
+          <div class="tl-uri mono">admin@sip.acme.com</div>
+        </div>
+        <div class="timeline-bar">
+          <div class="bar-segment register">REGISTER</div>
+          <div class="bar-segment auth">401</div>
+          <div class="bar-segment register">Auth</div>
+          <div class="bar-segment ok">200</div>
+        </div>
+        <div class="timeline-result">
+          <span class="badge success">Registered</span>
+          <span class="mono text-2xs tabular text-muted">42ms</span>
+        </div>
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-info">
+          <div class="tl-name">Staging Server</div>
+          <div class="tl-uri mono">test@staging.provider.io</div>
+        </div>
+        <div class="timeline-bar">
+          <div class="bar-segment wait" style="flex:1; opacity: 0.4;">Idle</div>
+        </div>
+        <div class="timeline-result">
+          <span class="badge warning">Idle</span>
+        </div>
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-info">
+          <div class="tl-name">Fax Gateway</div>
+          <div class="tl-uri mono">fax@fax.telco.net</div>
+        </div>
+        <div class="timeline-bar">
+          <div class="bar-segment register">REGISTER</div>
+          <div class="bar-segment auth">401</div>
+          <div class="bar-segment register">Auth</div>
+          <div class="bar-segment fail">403</div>
+        </div>
+        <div class="timeline-result">
+          <span class="badge fail">Failed</span>
+          <span class="mono text-2xs tabular text-muted">189ms</span>
+        </div>
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-info">
+          <div class="tl-name">Remote Office</div>
+          <div class="tl-uri mono">ext200@pbx.branch.co</div>
+        </div>
+        <div class="timeline-bar">
+          <div class="bar-segment register">REGISTER</div>
+          <div class="bar-segment ok">200</div>
+        </div>
+        <div class="timeline-result">
+          <span class="badge success">Registered</span>
+          <span class="mono text-2xs tabular text-muted">18ms</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Unique SIP-specific insight at a glance. Immediately shows whether auth was needed, how many round trips, where failures happen. Very "telecom engineer" feel.</div>
+    <div class="note"><strong>Cons:</strong> Only useful after a registration attempt — empty for idle registrars. Horizontal space needed for timeline. Novelty might confuse some users initially.</div>
+    <div class="note"><strong>Best for:</strong> SIP-savvy users who care about the handshake flow. Could be a toggle within another concept.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT D — Split Panel (Master-Detail)                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept D</div>
+    <h2>Split Panel</h2>
+    <p class="desc">
+      Sidebar list + detail pane. Clicking a registrar reveals rich detail:
+      stats, history, raw SIP, and actions. The sidebar stays compact while
+      the detail area has room to breathe.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <div class="spacer"></div>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div class="split-panel">
+      <div class="split-sidebar">
+        <div class="sidebar-item">
+          <span class="status-dot green si-dot"></span>
+          <div class="si-info">
+            <div class="si-name">Production PBX</div>
+            <div class="si-uri mono">admin@sip.acme.com</div>
+          </div>
+          <span class="badge success si-badge" style="font-size:9px; padding: 2px 6px;">OK</span>
+        </div>
+        <div class="sidebar-item active">
+          <span class="status-dot red si-dot"></span>
+          <div class="si-info">
+            <div class="si-name">Fax Gateway</div>
+            <div class="si-uri mono">fax@fax.telco.net</div>
+          </div>
+          <span class="badge fail si-badge" style="font-size:9px; padding: 2px 6px;">403</span>
+        </div>
+        <div class="sidebar-item">
+          <span class="status-dot amber si-dot"></span>
+          <div class="si-info">
+            <div class="si-name">Staging Server</div>
+            <div class="si-uri mono">test@staging.provider.io</div>
+          </div>
+          <span class="badge warning si-badge" style="font-size:9px; padding: 2px 6px;">Idle</span>
+        </div>
+        <div class="sidebar-item">
+          <span class="status-dot green si-dot"></span>
+          <div class="si-info">
+            <div class="si-name">Remote Office</div>
+            <div class="si-uri mono">ext200@pbx.branch.co</div>
+          </div>
+          <span class="badge success si-badge" style="font-size:9px; padding: 2px 6px;">OK</span>
+        </div>
+        <div class="sidebar-item">
+          <span class="status-dot green si-dot"></span>
+          <div class="si-info">
+            <div class="si-name">Dev Asterisk</div>
+            <div class="si-uri mono">dev@192.168.1.50</div>
+          </div>
+          <span class="badge success si-badge" style="font-size:9px; padding: 2px 6px;">OK</span>
+        </div>
+      </div>
+
+      <div class="split-detail">
+        <div class="detail-header">
+          <div>
+            <h3>Fax Gateway</h3>
+            <div class="dh-uri mono">fax@fax.telco.net &middot; UDP :5060</div>
+          </div>
+          <div class="detail-actions">
+            <button class="pill-btn" style="color:var(--primary)">Register</button>
+            <button class="pill-btn">Tests</button>
+            <button class="pill-btn">Edit</button>
+          </div>
+        </div>
+
+        <div class="detail-stats">
+          <div class="stat-card">
+            <div class="stat-label">Status</div>
+            <div class="stat-value text-fail">Failed</div>
+            <div class="stat-sub">403 Forbidden</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Response Time</div>
+            <div class="stat-value">189<span class="text-xs text-muted">ms</span></div>
+            <div class="stat-sub">avg 156ms</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Last Check</div>
+            <div class="stat-value text-sm" style="font-size:16px">5m ago</div>
+            <div class="stat-sub">14:32:18</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Use Case</div>
+            <div class="stat-value text-sm" style="font-size:16px">&#x1F4E0; Fax</div>
+            <div class="stat-sub">Fax Center</div>
+          </div>
+        </div>
+
+        <div class="detail-history">
+          <h4>Recent History</h4>
+          <div class="history-row">
+            <span class="time tabular mono">14:32:18</span>
+            <span class="badge fail" style="font-size:9px">403</span>
+            <span class="text-xs text-muted">Forbidden &middot; Digest auth failed</span>
+            <span class="text-2xs text-muted tabular" style="margin-left:auto">189ms</span>
+          </div>
+          <div class="history-row">
+            <span class="time tabular mono">14:28:04</span>
+            <span class="badge fail" style="font-size:9px">403</span>
+            <span class="text-xs text-muted">Forbidden &middot; Digest auth failed</span>
+            <span class="text-2xs text-muted tabular" style="margin-left:auto">194ms</span>
+          </div>
+          <div class="history-row">
+            <span class="time tabular mono">14:15:51</span>
+            <span class="badge success" style="font-size:9px">200</span>
+            <span class="text-xs text-muted">OK &middot; Registered (3600s)</span>
+            <span class="text-2xs text-muted tabular" style="margin-left:auto">41ms</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Rich detail without leaving the view. History and stats at a glance. Sidebar gives quick navigation and status scan. Professional feel.</div>
+    <div class="note"><strong>Cons:</strong> Requires wider viewport. The split can feel cramped on smaller windows. Detail pane is empty until you select something.</div>
+    <div class="note"><strong>Best for:</strong> Debugging-oriented users who want deep insight into each registrar. Great for troubleshooting. Could be a "detail" mode toggle.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT E — Minimal Zen                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept E</div>
+    <h2>Minimal Zen</h2>
+    <p class="desc">
+      Strips away all chrome. Large readable names, generous whitespace, and
+      hovering reveals actions. Status is conveyed through a single glowing pip.
+      Inspired by Linear, Raycast, and Arc.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <span class="text-xs text-muted" style="margin-left: 8px;">3 of 5 active</span>
+      <div class="spacer"></div>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div class="zen-list">
+      <div class="zen-row">
+        <span class="zen-status-pip active"></span>
+        <div class="zen-main">
+          <div class="zen-name">Production PBX</div>
+          <div class="zen-uri mono">admin@sip.acme.com</div>
+        </div>
+        <div class="zen-meta">
+          <span class="tag">UDP :5060</span>
+          <span class="sep"></span>
+          <span class="mono tabular text-success" style="font-size:12px">200 OK</span>
+          <span class="sep"></span>
+          <span class="tabular" style="font-size:11px">42ms</span>
+        </div>
+        <div class="zen-actions">
+          <button class="zen-action">Unregister</button>
+          <button class="zen-action">Edit</button>
+        </div>
+      </div>
+
+      <div class="zen-row">
+        <span class="zen-status-pip idle"></span>
+        <div class="zen-main">
+          <div class="zen-name">Staging Server</div>
+          <div class="zen-uri mono">test@staging.provider.io</div>
+        </div>
+        <div class="zen-meta">
+          <span class="tag">TCP :5061</span>
+        </div>
+        <div class="zen-actions">
+          <button class="zen-action primary-outline">Register</button>
+          <button class="zen-action">Edit</button>
+        </div>
+      </div>
+
+      <div class="zen-row">
+        <span class="zen-status-pip error"></span>
+        <div class="zen-main">
+          <div class="zen-name">Fax Gateway</div>
+          <div class="zen-uri mono">fax@fax.telco.net</div>
+        </div>
+        <div class="zen-meta">
+          <span class="tag">UDP :5060</span>
+          <span class="sep"></span>
+          <span class="mono tabular text-fail" style="font-size:12px">403</span>
+          <span class="sep"></span>
+          <span class="tabular" style="font-size:11px">189ms</span>
+        </div>
+        <div class="zen-actions">
+          <button class="zen-action primary-outline">Retry</button>
+          <button class="zen-action">Edit</button>
+        </div>
+      </div>
+
+      <div class="zen-row">
+        <span class="zen-status-pip active"></span>
+        <div class="zen-main">
+          <div class="zen-name">Remote Office</div>
+          <div class="zen-uri mono">ext200@pbx.branch.co</div>
+        </div>
+        <div class="zen-meta">
+          <span class="tag">TLS :5061</span>
+          <span class="sep"></span>
+          <span class="mono tabular text-success" style="font-size:12px">200 OK</span>
+          <span class="sep"></span>
+          <span class="tabular" style="font-size:11px">18ms</span>
+        </div>
+        <div class="zen-actions">
+          <button class="zen-action">Unregister</button>
+          <button class="zen-action">Edit</button>
+        </div>
+      </div>
+
+      <div class="zen-row">
+        <span class="zen-status-pip active"></span>
+        <div class="zen-main">
+          <div class="zen-name">Dev Asterisk</div>
+          <div class="zen-uri mono">dev@192.168.1.50</div>
+        </div>
+        <div class="zen-meta">
+          <span class="tag">UDP :5060</span>
+          <span class="sep"></span>
+          <span class="mono tabular text-success" style="font-size:12px">200 OK</span>
+          <span class="sep"></span>
+          <span class="tabular" style="font-size:11px">3ms</span>
+        </div>
+        <div class="zen-actions">
+          <button class="zen-action">Unregister</button>
+          <button class="zen-action">Edit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Beautiful, calming, modern. Actions don't clutter unless needed. Focus on names and status. Scales well vertically. Very readable.</div>
+    <div class="note"><strong>Cons:</strong> Might feel too sparse for data-hungry users. Less info visible at rest (no use-case badges, no checkboxes). Hovering required to act.</div>
+    <div class="note"><strong>Best for:</strong> Users who value aesthetics and simplicity. Pairs well with keyboard shortcuts for power users. Good default with a "show more" expansion.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT F — Grouped Swimlanes                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept F</div>
+    <h2>Grouped Swimlanes</h2>
+    <p class="desc">
+      Registrars grouped by folder in collapsible swimlane sections. Each group
+      has its own header with aggregate status. Replaces the current folder-tile
+      navigation with inline grouping &mdash; everything visible at once.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <div class="spacer"></div>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div class="swimlanes">
+      <!-- Group: Production -->
+      <div class="swimlane">
+        <div class="swimlane-header">
+          <div class="sl-icon">&#x1F4C1;</div>
+          <div class="sl-name">Production</div>
+          <div class="sl-count">3 registrars</div>
+          <div class="sl-badges">
+            <span class="badge success" style="font-size:9px"><span class="status-dot green" style="width:5px;height:5px"></span> 2</span>
+            <span class="badge fail" style="font-size:9px"><span class="status-dot red" style="width:5px;height:5px"></span> 1</span>
+          </div>
+        </div>
+        <div class="swimlane-body">
+          <div class="sl-row">
+            <div class="sl-bar" style="background: var(--success)"></div>
+            <div class="sl-info"><div class="sl-name" style="font-size:13px">Production PBX</div><div class="sl-uri mono" style="font-size:10px;color:var(--muted-fg)">admin@sip.acme.com</div></div>
+            <div class="sl-response"><span class="mono text-success">200 OK</span></div>
+            <div class="sl-time tabular mono">42ms</div>
+            <div class="sl-actions"><button class="icon-btn" style="width:24px;height:24px">&#x2716;</button><button class="icon-btn" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="sl-row">
+            <div class="sl-bar" style="background: var(--destructive)"></div>
+            <div class="sl-info"><div class="sl-name" style="font-size:13px">Fax Gateway</div><div class="sl-uri mono" style="font-size:10px;color:var(--muted-fg)">fax@fax.telco.net</div></div>
+            <div class="sl-response"><span class="mono text-fail">403</span></div>
+            <div class="sl-time tabular mono">189ms</div>
+            <div class="sl-actions"><button class="icon-btn" style="width:24px;height:24px;color:var(--primary)">&#x21bb;</button><button class="icon-btn" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="sl-row">
+            <div class="sl-bar" style="background: var(--success)"></div>
+            <div class="sl-info"><div class="sl-name" style="font-size:13px">Remote Office</div><div class="sl-uri mono" style="font-size:10px;color:var(--muted-fg)">ext200@pbx.branch.co</div></div>
+            <div class="sl-response"><span class="mono text-success">200 OK</span></div>
+            <div class="sl-time tabular mono">18ms</div>
+            <div class="sl-actions"><button class="icon-btn" style="width:24px;height:24px">&#x2716;</button><button class="icon-btn" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Group: Testing -->
+      <div class="swimlane">
+        <div class="swimlane-header">
+          <div class="sl-icon">&#x1F4C1;</div>
+          <div class="sl-name">Testing</div>
+          <div class="sl-count">2 registrars</div>
+          <div class="sl-badges">
+            <span class="badge success" style="font-size:9px"><span class="status-dot green" style="width:5px;height:5px"></span> 1</span>
+            <span class="badge warning" style="font-size:9px"><span class="status-dot amber" style="width:5px;height:5px"></span> 1</span>
+          </div>
+        </div>
+        <div class="swimlane-body">
+          <div class="sl-row">
+            <div class="sl-bar" style="background: var(--warning)"></div>
+            <div class="sl-info"><div class="sl-name" style="font-size:13px">Staging Server</div><div class="sl-uri mono" style="font-size:10px;color:var(--muted-fg)">test@staging.provider.io</div></div>
+            <div class="sl-response"><span class="text-muted text-2xs">&mdash;</span></div>
+            <div class="sl-time tabular mono"></div>
+            <div class="sl-actions"><button class="icon-btn" style="width:24px;height:24px;color:var(--primary)">&#x2713;</button><button class="icon-btn" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+          <div class="sl-row">
+            <div class="sl-bar" style="background: var(--success)"></div>
+            <div class="sl-info"><div class="sl-name" style="font-size:13px">Dev Asterisk</div><div class="sl-uri mono" style="font-size:10px;color:var(--muted-fg)">dev@192.168.1.50</div></div>
+            <div class="sl-response"><span class="mono text-success">200 OK</span></div>
+            <div class="sl-time tabular mono">3ms</div>
+            <div class="sl-actions"><button class="icon-btn" style="width:24px;height:24px">&#x2716;</button><button class="icon-btn" style="width:24px;height:24px">&#x2699;</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> No folder navigation needed — everything on one page. Aggregate badges per group. Clean row design with left-bar status accent. Collapsible groups reduce clutter.</div>
+    <div class="note"><strong>Cons:</strong> Long page if many groups with many registrars. Groups take extra vertical space vs a flat list. Need clear ungrouped handling.</div>
+    <div class="note"><strong>Best for:</strong> Users who have organized registrars into folders and want a single-page overview without clicking between folder views.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- CONCEPT G — Dashboard Mosaic                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <div class="concept-label">Concept G</div>
+    <h2>Dashboard Mosaic</h2>
+    <p class="desc">
+      Summary stats at the top with a clean row list below. Stat cards
+      give an instant health overview, rows below give individual detail.
+      Combines the best of cards and tables.
+    </p>
+  </div>
+
+  <div class="demo-frame">
+    <div class="demo-toolbar">
+      <span class="text-xs fw-600 text-muted" style="letter-spacing: 0.5px; text-transform: uppercase;">Registrars</span>
+      <div class="spacer"></div>
+      <button class="pill-btn"><span style="font-size:13px">&#x21bb;</span> Refresh</button>
+      <button class="pill-btn primary">+ Add</button>
+    </div>
+
+    <div class="mosaic-top">
+      <div class="mosaic-stat">
+        <div class="ms-label">Total</div>
+        <div class="ms-value">5</div>
+        <div class="ms-bar"><div class="ms-fill" style="width:100%; background: var(--primary);"></div></div>
+      </div>
+      <div class="mosaic-stat">
+        <div class="ms-label">Registered</div>
+        <div class="ms-value text-success">3</div>
+        <div class="ms-bar"><div class="ms-fill" style="width:60%; background: var(--success);"></div></div>
+      </div>
+      <div class="mosaic-stat">
+        <div class="ms-label">Failed</div>
+        <div class="ms-value text-fail">1</div>
+        <div class="ms-bar"><div class="ms-fill" style="width:20%; background: var(--destructive);"></div></div>
+      </div>
+      <div class="mosaic-stat">
+        <div class="ms-label">Avg Latency</div>
+        <div class="ms-value">54<span class="text-xs text-muted fw-500">ms</span></div>
+        <div class="ms-bar"><div class="ms-fill" style="width:35%; background: var(--warning);"></div></div>
+      </div>
+    </div>
+
+    <div class="mosaic-list">
+      <div class="mosaic-row">
+        <div class="mosaic-avatar green">P</div>
+        <div class="mosaic-info"><div class="mi-name">Production PBX</div><div class="mi-uri mono">admin@sip.acme.com</div></div>
+        <div class="mosaic-badge-group"><span class="tag">UDP</span><span class="tag">:5060</span></div>
+        <div class="mosaic-resp"><span class="mono text-success fw-500">200 OK</span></div>
+        <div class="mosaic-timing tabular mono">42ms</div>
+        <div class="mosaic-actions">
+          <button class="icon-btn" style="width:26px;height:26px">&#x2716;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x1F9EA;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x2699;</button>
+        </div>
+      </div>
+
+      <div class="mosaic-row">
+        <div class="mosaic-avatar amber">S</div>
+        <div class="mosaic-info"><div class="mi-name">Staging Server</div><div class="mi-uri mono">test@staging.provider.io</div></div>
+        <div class="mosaic-badge-group"><span class="tag">TCP</span><span class="tag">:5061</span></div>
+        <div class="mosaic-resp"><span class="text-2xs text-muted">&mdash;</span></div>
+        <div class="mosaic-timing tabular mono"></div>
+        <div class="mosaic-actions">
+          <button class="icon-btn" style="width:26px;height:26px;color:var(--primary)">&#x2713;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x2699;</button>
+        </div>
+      </div>
+
+      <div class="mosaic-row">
+        <div class="mosaic-avatar red">F</div>
+        <div class="mosaic-info"><div class="mi-name">Fax Gateway</div><div class="mi-uri mono">fax@fax.telco.net</div></div>
+        <div class="mosaic-badge-group"><span class="tag">UDP</span><span class="tag">:5060</span></div>
+        <div class="mosaic-resp"><span class="mono text-fail fw-500">403</span></div>
+        <div class="mosaic-timing tabular mono">189ms</div>
+        <div class="mosaic-actions">
+          <button class="icon-btn" style="width:26px;height:26px;color:var(--primary)">&#x21bb;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x2699;</button>
+        </div>
+      </div>
+
+      <div class="mosaic-row">
+        <div class="mosaic-avatar green">R</div>
+        <div class="mosaic-info"><div class="mi-name">Remote Office</div><div class="mi-uri mono">ext200@pbx.branch.co</div></div>
+        <div class="mosaic-badge-group"><span class="tag">TLS</span><span class="tag">:5061</span></div>
+        <div class="mosaic-resp"><span class="mono text-success fw-500">200 OK</span></div>
+        <div class="mosaic-timing tabular mono">18ms</div>
+        <div class="mosaic-actions">
+          <button class="icon-btn" style="width:26px;height:26px">&#x2716;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x1F9EA;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x2699;</button>
+        </div>
+      </div>
+
+      <div class="mosaic-row">
+        <div class="mosaic-avatar green">D</div>
+        <div class="mosaic-info"><div class="mi-name">Dev Asterisk</div><div class="mi-uri mono">dev@192.168.1.50</div></div>
+        <div class="mosaic-badge-group"><span class="tag">UDP</span><span class="tag">:5060</span></div>
+        <div class="mosaic-resp"><span class="mono text-success fw-500">200 OK</span></div>
+        <div class="mosaic-timing tabular mono">3ms</div>
+        <div class="mosaic-actions">
+          <button class="icon-btn" style="width:26px;height:26px">&#x2716;</button>
+          <button class="icon-btn" style="width:26px;height:26px">&#x2699;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><strong>Pros:</strong> Stat cards give immediate health snapshot. Avatar initials add personality and quick visual anchor. Clean rows with good data density. Progress bars in stats add visual interest.</div>
+    <div class="note"><strong>Cons:</strong> Stat cards take vertical space. Avatar initials are somewhat arbitrary. Could feel like two separate UIs stacked together.</div>
+    <div class="note"><strong>Best for:</strong> Users who want a quick health dashboard at the top and detailed list below. The stat bar + list pattern is well-proven in monitoring tools.</div>
+  </div>
+</div>
+
+<div style="text-align: center; padding: 40px 0 20px; color: var(--muted-fg); font-size: 13px;">
+  <p>These concepts can be mixed and matched. For example:</p>
+  <p style="margin-top: 8px; color: var(--fg); font-weight: 500;">
+    Dashboard stats (G) + Zen rows (E) + Split detail on click (D) + Swimlane grouping (F)
+  </p>
+  <p style="margin-top: 12px; font-size: 11px;">Pick your favorites and I'll implement the combination.</p>
+</div>
+
+</body>
+</html>
