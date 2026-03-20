@@ -1,15 +1,20 @@
 name: Release Channels
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
         description: "Tag to release (e.g. v1.2.3-rc.1)"
         required: true
         type: string
+      build_strategy:
+        description: "Release build strategy"
+        required: true
+        type: choice
+        default: local-uploaded-assets
+        options:
+          - local-uploaded-assets
+          - github-hosted
 
 env:
   CARGO_TERM_COLOR: always
@@ -44,7 +49,7 @@ jobs:
             exit 1
           fi
 
-          CHANNEL="stable"
+          CHANNEL="main"
           PRERELEASE="false"
           if [[ "${TAG}" =~ -beta\.[0-9]+$ ]]; then
             CHANNEL="beta"
@@ -64,11 +69,17 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     steps:
+      - name: Local strategy skip
+        if: inputs.build_strategy == 'local-uploaded-assets'
+        run: echo "Local strategy selected; skipping hosted strict preflight."
+
       - uses: actions/checkout@v4
+        if: inputs.build_strategy == 'github-hosted'
         with:
           ref: ${{ needs.prepare.outputs.release_tag }}
 
       - name: Guard strict lane against host package manager setup
+        if: inputs.build_strategy == 'github-hosted'
         shell: bash
         run: |
           set -euo pipefail
@@ -91,29 +102,36 @@ jobs:
 
       # strict-lane:start
       - name: Install Rust toolchain
+        if: inputs.build_strategy == 'github-hosted'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
 
       - name: Setup Node.js
+        if: inputs.build_strategy == 'github-hosted'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install frontend dependencies
+        if: inputs.build_strategy == 'github-hosted'
         run: npm ci
 
       - name: Fetch upstream native artifacts (strict lane)
+        if: inputs.build_strategy == 'github-hosted'
         run: npm run fetch:native-artifacts:upstream
 
       - name: Frontend build check (strict lane)
+        if: inputs.build_strategy == 'github-hosted'
         run: npm run build
 
       - name: Validate native artifact manifest (strict lane)
+        if: inputs.build_strategy == 'github-hosted'
         run: npm run validate:native-artifacts:strict
 
       - name: Rust app compile check (strict lane)
+        if: inputs.build_strategy == 'github-hosted'
         run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets --target x86_64-unknown-linux-gnu
       # strict-lane:end
 
@@ -122,15 +140,22 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     steps:
+      - name: Local strategy skip
+        if: inputs.build_strategy == 'local-uploaded-assets'
+        run: echo "Local strategy selected; hosted signing secrets validation skipped."
+
       - name: Validate updater signing inputs
+        if: inputs.build_strategy == 'github-hosted'
         shell: bash
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
         run: |
           set -euo pipefail
           [[ -n "${TAURI_PRIVATE_KEY}" ]] || { echo "Missing TAURI_PRIVATE_KEY"; exit 1; }
           [[ -n "${TAURI_KEY_PASSWORD}" ]] || { echo "Missing TAURI_KEY_PASSWORD"; exit 1; }
+          [[ -n "${TAURI_UPDATER_PUBKEY}" ]] || { echo "Missing TAURI_UPDATER_PUBKEY"; exit 1; }
           echo "Updater signing secrets detected."
 
   release-extended:
@@ -138,65 +163,61 @@ jobs:
     needs: [prepare, strict-preflight, validate-secrets]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            label: linux-x64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            label: macOS-arm64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            label: macOS-x64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            label: windows-x64
+      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-gnu","label":"linux-x64"},{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64"},{"os":"macos-latest","target":"x86_64-apple-darwin","label":"macOS-x64"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc","label":"windows-x64"}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts"}]}') }}
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Local strategy skip
+        if: matrix.target == 'local-noop'
+        run: echo "Local strategy selected; hosted build matrix skipped."
+
       - uses: actions/checkout@v4
+        if: matrix.target != 'local-noop'
         with:
           ref: ${{ needs.prepare.outputs.release_tag }}
 
       - name: Install Rust toolchain
+        if: matrix.target != 'local-noop'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
       - name: Setup Node.js
+        if: matrix.target != 'local-noop'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install frontend dependencies
+        if: matrix.target != 'local-noop'
         run: npm ci
 
       - name: Fetch native artifacts bundle (extended lane)
-        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL != ''
+        if: matrix.target != 'local-noop' && env.SIPALYZER_NATIVE_ARTIFACTS_URL != ''
         run: node ./scripts/fetch-native-artifacts.mjs --source "${{ env.SIPALYZER_NATIVE_ARTIFACTS_URL }}" --dest "${{ runner.temp }}/native-artifacts"
 
       - name: Hydrate target native artifacts from fetched bundle (extended lane)
-        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL != ''
+        if: matrix.target != 'local-noop' && env.SIPALYZER_NATIVE_ARTIFACTS_URL != ''
         run: node ./scripts/hydrate-native-artifacts.mjs --source "${{ runner.temp }}/native-artifacts" --target ${{ matrix.target }}
 
       - name: Hydrate target native artifacts from mounted directory (extended lane)
-        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR != ''
+        if: matrix.target != 'local-noop' && env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR != ''
         run: node ./scripts/hydrate-native-artifacts.mjs --source "${{ env.SIPALYZER_NATIVE_ARTIFACTS_DIR }}" --target ${{ matrix.target }}
 
       - name: Fetch upstream native artifacts (extended lane fallback)
-        if: env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR == ''
+        if: matrix.target != 'local-noop' && env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR == ''
         run: npm run fetch:native-artifacts:upstream
 
       - name: Validate target native artifacts (extended lane)
+        if: matrix.target != 'local-noop'
         run: node ./scripts/validate-native-artifacts.mjs --strict --target ${{ matrix.target }}
 
       - name: Install macOS dependencies (extended lane)
-        if: runner.os == 'macOS'
+        if: matrix.target != 'local-noop' && runner.os == 'macOS'
         run: brew install libpcap
 
       - name: Install Windows dependencies (extended lane)
-        if: runner.os == 'Windows'
+        if: matrix.target != 'local-noop' && runner.os == 'Windows'
         shell: pwsh
         run: |
           try {
@@ -206,7 +227,7 @@ jobs:
           }
 
       - name: Install Linux dependencies (extended lane)
-        if: runner.os == 'Linux'
+        if: matrix.target != 'local-noop' && runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -217,15 +238,52 @@ jobs:
             libpcap-dev
 
       - name: Build and upload channel release
+        if: matrix.target != 'local-noop'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          SIPALYZER_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
         with:
           tagName: ${{ needs.prepare.outputs.release_tag }}
           releaseName: ${{ needs.prepare.outputs.release_name }}
           releaseDraft: false
           prerelease: ${{ needs.prepare.outputs.prerelease }}
           args: --target ${{ matrix.target }}
+
+  publish-updater-manifest:
+    name: Publish updater manifest (${{ needs.prepare.outputs.channel }})
+    needs: [prepare, release-extended]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Commit manifest into beta branch
+        env:
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "${RELEASE_TAG}" --repo "${{ github.repository }}" >/dev/null
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin beta
+          git checkout -B beta origin/beta
+          node ./scripts/github/generate-updater-manifest.mjs \
+            --repo "${{ github.repository }}" \
+            --tag "${RELEASE_TAG}" \
+            --channel "${CHANNEL}" \
+            --out "./updater/${CHANNEL}.json"
+          mkdir -p updater
+          git add "./updater/${CHANNEL}.json"
+          if git diff --cached --quiet; then
+            echo "No updater manifest changes detected."
+            exit 0
+          fi
+          git commit -m "Update ${CHANNEL} updater manifest for ${RELEASE_TAG}"
+          git push origin beta
 

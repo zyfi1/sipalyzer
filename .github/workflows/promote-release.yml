@@ -13,9 +13,9 @@ on:
         type: choice
         options:
           - rc
-          - stable
+          - main
       target_tag:
-        description: "Optional explicit target tag (defaults: rc=>vX.Y.Z-rc.1, stable=>vX.Y.Z)"
+        description: "Optional explicit target tag (defaults: rc=>vX.Y.Z-rc.1, main=>vX.Y.Z)"
         required: false
         type: string
 

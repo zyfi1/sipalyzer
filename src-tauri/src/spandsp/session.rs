@@ -10,6 +10,7 @@
 //! - ITU-T V.29: 9600/7200 bps modulation  
 //! - ITU-T V.27ter: 4800/2400 bps modulation
 //! - G.711 µ-law (PCMU) and A-law (PCMA) codec support
+#![cfg_attr(not(feature = "spandsp-native"), allow(unused_imports, unused_variables, dead_code))]
 
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
@@ -625,6 +626,7 @@ impl FaxSession {
             .and_then(|s| CString::new(s.as_str()).ok());
         
         // Get raw pointer to pinned state for FFI callbacks
+        #[cfg(feature = "spandsp-native")]
         let state_ptr = &*phase_e_state as *const PhaseEState as *mut c_void;
         
         #[cfg(feature = "spandsp-native")]
@@ -714,6 +716,7 @@ impl FaxSession {
         let station_id = opts.station_id.as_ref()
             .and_then(|s| CString::new(s.as_str()).ok());
         
+        #[cfg(feature = "spandsp-native")]
         let state_ptr = &*phase_e_state as *const PhaseEState as *mut c_void;
         
         #[cfg(feature = "spandsp-native")]

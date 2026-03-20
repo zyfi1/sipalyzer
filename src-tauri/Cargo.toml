@@ -22,6 +22,7 @@ sipalyzer-core = { path = "crates/sipalyzer-core" }
 tauri = { version = "2.9", features = ["devtools", "tray-icon", "image-png"] }
 tauri-plugin-shell = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -100,6 +101,7 @@ bzip2 = "0.5"
 tempfile = "3.25.0"
 tauri-plugin-dialog = "2.6.0"
 lettre = { version = "0.11.19", default-features = false, features = ["tokio1-rustls-tls", "builder", "smtp-transport", "pool", "hostname"] }
+url = "2"
 
 # Tracing
 tracing = "0.1"

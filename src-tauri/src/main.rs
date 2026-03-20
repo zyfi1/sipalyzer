@@ -41,11 +41,11 @@ use commands::remote_agent as remote_agent_commands;
 use commands::tools as tools_commands;
 use commands::multicast as multicast_commands;
 use commands::mcp as mcp_commands;
+use commands::updater as updater_commands;
 use packet_capture::scheduler::ScheduledCaptureScheduler;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::image::Image;
 
 use std::sync::Mutex as StdMutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -66,21 +66,14 @@ static HIDE_DOCK_ICON: AtomicBool = AtomicBool::new(false);
 /// Controlled by the frontend settings and synced via `set_show_tray_icon`.
 static SHOW_TRAY_ICON: AtomicBool = AtomicBool::new(true);
 
-fn build_main_tray_menu(app: &tauri::AppHandle, unread_text: &str) -> tauri::Result<Menu<tauri::Wry>> {
-    let open_chat_item = MenuItem::with_id(
-        app,
-        "open_chat",
-        format!("Open Chat ({unread_text})"),
-        true,
-        None::<&str>,
-    )?;
+fn build_main_tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let show_item = MenuItem::with_id(app, "show", "Show SIPalyzer", true, None::<&str>)?;
     let hide_item = MenuItem::with_id(app, "hide", "Hide Window", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit SIPalyzer", true, None::<&str>)?;
     Menu::with_items(
         app,
-        &[&open_chat_item, &show_item, &hide_item, &separator, &quit_item],
+        &[&show_item, &hide_item, &separator, &quit_item],
     )
 }
 
@@ -110,31 +103,9 @@ pub(crate) fn open_remote_chat_window(app: &tauri::AppHandle) -> Result<(), Stri
 }
 
 pub(crate) fn refresh_remote_chat_tray(app: &tauri::AppHandle) {
-    let snapshot = remote_agent_commands::remote_chat_tray_state();
-    let connected_count = tauri::async_runtime::block_on(async {
-        let mgr = crate::remote_agent::manager::AGENT_MANAGER.lock().await;
-        mgr.list_connections()
-            .iter()
-            .filter(|c| c.status == crate::remote_agent::manager::AgentStatus::Connected)
-            .count()
-    });
-
-    let status = if connected_count > 0 {
-        format!("Remote agent: {connected_count} online")
-    } else {
-        "Remote agent: idle".to_string()
-    };
-    let sender = snapshot
-        .last_sender
-        .unwrap_or_else(|| "none".to_string());
-    let snippet = snapshot
-        .last_snippet
-        .unwrap_or_else(|| "No messages yet".to_string());
-    let tooltip = format!("{status}\n{}\n{}: {}", snapshot.unread_text, sender, snippet);
-
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(tooltip));
-        if let Ok(menu) = build_main_tray_menu(app, &snapshot.unread_text) {
+        let _ = tray.set_tooltip(Some("SIPalyzer".to_string()));
+        if let Ok(menu) = build_main_tray_menu(app) {
             let _ = tray.set_menu(Some(menu));
         }
     }
@@ -423,6 +394,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -476,22 +448,14 @@ fn main() {
             
             // ── System tray icon (all platforms) ─────────────────────
             {
-                let menu = build_main_tray_menu(&app.handle().clone(), "Unread: 0")?;
+                let menu = build_main_tray_menu(&app.handle().clone())?;
 
-                let tray_icon = Image::from_bytes(include_bytes!("../icons/tray-template.png"))
-                    .expect("failed to load tray icon");
-
-                let _tray = TrayIconBuilder::with_id("main")
-                    .icon(tray_icon)
-                    .icon_as_template(true)
-                    .show_menu_on_left_click(false)
-                    .tooltip("Remote agent: idle\nUnread: 0\nnone: No messages yet")
+                let mut tray_builder = TrayIconBuilder::with_id("main")
+                    .show_menu_on_left_click(true)
+                    .tooltip("SIPalyzer")
                     .menu(&menu)
                     .on_menu_event(|app, event| {
                         match event.id.as_ref() {
-                            "open_chat" => {
-                                let _ = open_remote_chat_window(app);
-                            }
                             "show" => {
                                 if let Some(window) = app.get_webview_window("main") {
                                     let _ = window.show();
@@ -517,14 +481,24 @@ fn main() {
                             }
                             _ => {}
                         }
-                    })
-                    .on_tray_icon_event(|tray, event| {
-                        if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, button_state: tauri::tray::MouseButtonState::Up, .. } = event {
-                            let app = tray.app_handle();
-                            let _ = open_remote_chat_window(&app);
-                        }
-                    })
-                    .build(app)?;
+                    });
+
+                #[cfg(target_os = "macos")]
+                {
+                    let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-template.png"))
+                        .expect("failed to load macOS tray template icon");
+                    tray_builder = tray_builder.icon(tray_icon).icon_as_template(true);
+                }
+                #[cfg(not(target_os = "macos"))]
+                if let Some(icon) = app.default_window_icon().cloned() {
+                    tray_builder = tray_builder.icon(icon);
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    tray_builder = tray_builder.icon_as_template(false);
+                }
+
+                let _tray = tray_builder.build(app)?;
 
                 if !SHOW_TRAY_ICON.load(Ordering::SeqCst) {
                     let _ = _tray.set_visible(false);
@@ -609,6 +583,8 @@ fn main() {
             get_platform,
             perform_app_cleanup,
             exit_app,
+            updater_commands::updater_check,
+            updater_commands::updater_install,
             import_pcap_from_path,
             import_pcap_from_base64,
             // Config commands

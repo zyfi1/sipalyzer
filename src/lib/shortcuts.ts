@@ -34,6 +34,7 @@ export const SHORTCUTS = {
   viewPacketCaptures: "ctrl+shift+w",
   viewPacketViewer: "ctrl+shift+e",
   viewPacketAnalysis: "ctrl+shift+a",
+  viewPacketDiff: "ctrl+shift+z",
   viewPacketRemote: "ctrl+shift+s",
   viewPacketScheduled: "ctrl+shift+d",
 

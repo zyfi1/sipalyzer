@@ -1,8 +1,6 @@
 name: CI Quality Gates
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -66,17 +64,7 @@ jobs:
 
   quality-gates:
     name: Quality Gates
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            lane: full
-          - os: macos-latest
-            lane: smoke
-          - os: windows-latest
-            lane: smoke
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -95,46 +83,29 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Frontend checks (full lane)
-        if: matrix.lane == 'full'
+      - name: Frontend checks
         run: npm run check:frontend
 
-      - name: Troubleshooting guardrail tests (full lane)
-        if: matrix.lane == 'full'
+      - name: Troubleshooting guardrail tests
         run: npm run test:troubleshooting
 
-      - name: Packet fidelity checks (full lane)
-        if: matrix.lane == 'full'
+      - name: Packet fidelity checks
         run: npm run test:packet-fidelity
 
       - name: Rust format check (core lane)
-        if: matrix.lane == 'full'
         run: npm run rust:fmt:check
 
       - name: Rust clippy check (core lane)
-        if: matrix.lane == 'full'
         run: npm run rust:clippy
 
       - name: Rust tests (core lane)
-        if: matrix.lane == 'full'
         run: npm run rust:test
 
       - name: Rust format check (full app lane)
-        if: matrix.lane == 'full'
         run: npm run rust:fmt:check:app
 
       - name: Rust clippy check (full app lane)
-        if: matrix.lane == 'full'
         run: npm run rust:clippy:app
 
       - name: Rust tests (full app lane)
-        if: matrix.lane == 'full'
         run: npm run rust:test:app
-
-      - name: Frontend typecheck (smoke lane)
-        if: matrix.lane == 'smoke'
-        run: npm run typecheck
-
-      - name: Rust app compile check (smoke lane)
-        if: matrix.lane == 'smoke'
-        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets

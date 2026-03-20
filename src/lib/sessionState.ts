@@ -30,6 +30,7 @@ import { useHomeStore, DEFAULT_HERO, type HomeMode, type HomePreset, type HomeQu
 import { useMcpStore, type McpActivityEntry } from "@/stores/mcpStore";
 import type { LayoutItem } from "react-grid-layout";
 import { toolRegistry, HOME_TOOL_ID } from "@/lib/toolRegistry";
+import { coerceReleaseChannel, DEFAULT_RELEASE_CHANNEL } from "@/lib/updater/channels";
 import type { FaxFolder, ReceivedFax, SentFaxJob } from "@/types/fax";
 import type {
   UserAgentSettings,
@@ -107,6 +108,10 @@ export interface SessionStateSchema {
     minimizeToTray?: boolean;
     hideDockIcon?: boolean;
     showTrayIcon?: boolean;
+    updates?: {
+      channel?: string;
+      autoCheckOnLaunch?: boolean;
+    };
   };
   softphone?: {
     activeRegistrarId: string | null;
@@ -828,6 +833,7 @@ export function collectStateSlicesFromStores(
           minimizeToTray: settings.minimizeToTray,
           hideDockIcon: settings.hideDockIcon,
           showTrayIcon: settings.showTrayIcon,
+          updates: settings.updates,
         };
         break;
       case "softphone":
@@ -1053,6 +1059,17 @@ export function applyStateToStores(state: SessionStateSchema): void {
     // Strip stale header config from old session states (header is now static)
     const { header: _header, ...rest } = state.settings as Record<string, unknown>;
     useSettingsStore.setState(rest);
+    if (state.settings.updates) {
+      useSettingsStore.setState((current) => ({
+        updates: {
+          channel: coerceReleaseChannel(state.settings?.updates?.channel ?? DEFAULT_RELEASE_CHANNEL),
+          autoCheckOnLaunch:
+            typeof state.settings?.updates?.autoCheckOnLaunch === "boolean"
+              ? state.settings.updates.autoCheckOnLaunch
+              : current.updates.autoCheckOnLaunch,
+        },
+      }));
+    }
     if (state.settings.weatherLat !== undefined) useSettingsStore.setState({ weatherLat: state.settings.weatherLat });
     if (state.settings.weatherLon !== undefined) useSettingsStore.setState({ weatherLon: state.settings.weatherLon });
   }

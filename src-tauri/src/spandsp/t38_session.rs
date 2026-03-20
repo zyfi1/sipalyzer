@@ -13,6 +13,7 @@
 //! - Uses Pin<Box<SessionState>> for FFI callback data to prevent moves
 //! - Per-session counters (no global statics shared across sessions)
 //! - Proper cleanup via Drop implementation
+#![cfg_attr(not(feature = "spandsp-native"), allow(unused_imports, unused_variables, dead_code))]
 
 use std::ffi::CString;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};

@@ -22,3 +22,4 @@ pub mod remote_agent;
 pub mod tools;
 pub mod multicast;
 pub mod mcp;
+pub mod updater;

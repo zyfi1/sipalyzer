@@ -13,11 +13,8 @@
  */
 
 import {
-  Home,
   Network,
-  Server,
   PhoneCall,
-  Printer,
   Search,
   Keyboard,
   Settings,
@@ -39,7 +36,6 @@ import {
   Activity,
   Trash2,
   Globe,
-  FileSearch,
   Terminal,
   TestTube,
   Mic,
@@ -51,14 +47,12 @@ import {
   ArrowRightLeft,
   Hash,
   Power,
-  Package,
   Scan,
-  Satellite,
   Wrench,
-  Toolbox,
 } from "@/lib/icons";
 import { navigateTo } from "./navigation";
 import { toolRegistry, HOME_TOOL_ID } from "./toolRegistry";
+import { getSubviewIcon, getToolIcon, getVisibleNavigationTools, getVisibleToolSubviews } from "./navigationCatalog";
 import { SHORTCUTS, shortcutLabel } from "./shortcuts";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useTroubleshootingStore } from "@/stores/troubleshootingStore";
@@ -70,65 +64,93 @@ import { useRegistrationStore } from "@/stores/registrationStore";
 import { useRemoteAgentStore } from "@/stores/remoteAgentStore";
 import { useComposerStore } from "@/stores/composerStore";
 import { handleCut, handleCopy, handlePaste, handleSelectAll } from "./standardEditActions";
-import type { ContextMenuSection, ContextMenuContext, ContextMenuSubmenu, ContextMenuItemAction } from "@/types/contextMenu";
+import type {
+  ContextMenuSection,
+  ContextMenuContext,
+  ContextMenuSubmenu,
+  ContextMenuItemAction,
+  ContextMenuEntry,
+} from "@/types/contextMenu";
+
+interface ToolSectionContributions {
+  views?: ContextMenuEntry[];
+  actions?: ContextMenuEntry[];
+  danger?: ContextMenuEntry[];
+}
 
 /* ================================================================== */
-/*  Edit (Cut / Copy / Paste / Select All) — always first             */
+/*  Edit (Cut / Copy / Paste / Select All)                             */
 /* ================================================================== */
-function editSection(ctx: ContextMenuContext): ContextMenuSection {
-  return {
-    id: "edit",
-    entries: [
-      {
-        id: "cut",
-        label: "Cut",
-        icon: Scissors,
-        shortcut: "⌘X",
-        disabled: !ctx.capabilities.canCut,
-        disabledReason: !ctx.capabilities.canCut ? "Read-only" : undefined,
-        onClick: handleCut,
-      },
-      {
-        id: "copy",
-        label: "Copy",
-        icon: Copy,
-        shortcut: "⌘C",
-        disabled: !ctx.capabilities.canCopy,
-        disabledReason: !ctx.capabilities.canCopy ? "Unavailable" : undefined,
-        onClick: handleCopy,
-      },
-      {
-        id: "paste",
-        label: "Paste",
-        icon: ClipboardPaste,
-        shortcut: "⌘V",
-        disabled: !ctx.capabilities.canPaste,
-        disabledReason: !ctx.capabilities.canPaste ? "No insertion point" : undefined,
-        onClick: handlePaste,
-      },
-      {
-        id: "select-all",
-        label: "Select All",
-        icon: Square,
-        shortcut: "⌘A",
-        disabled: !ctx.capabilities.canSelectAll,
-        disabledReason: !ctx.capabilities.canSelectAll ? "Not selectable" : undefined,
-        onClick: handleSelectAll,
-      },
-    ],
-  };
+function editActions(ctx: ContextMenuContext): ContextMenuItemAction[] {
+  return [
+    {
+      id: "cut",
+      label: "Cut",
+      icon: Scissors,
+      shortcut: "⌘X",
+      disabled: !ctx.capabilities.canCut,
+      disabledReason: !ctx.capabilities.canCut ? "Read-only" : undefined,
+      onClick: handleCut,
+    },
+    {
+      id: "copy",
+      label: "Copy",
+      icon: Copy,
+      shortcut: "⌘C",
+      disabled: !ctx.capabilities.canCopy,
+      disabledReason: !ctx.capabilities.canCopy ? "Unavailable" : undefined,
+      onClick: handleCopy,
+    },
+    {
+      id: "paste",
+      label: "Paste",
+      icon: ClipboardPaste,
+      shortcut: "⌘V",
+      disabled: !ctx.capabilities.canPaste,
+      disabledReason: !ctx.capabilities.canPaste ? "No insertion point" : undefined,
+      onClick: handlePaste,
+    },
+    {
+      id: "select-all",
+      label: "Select All",
+      icon: Square,
+      shortcut: "⌘A",
+      disabled: !ctx.capabilities.canSelectAll,
+      disabledReason: !ctx.capabilities.canSelectAll ? "Not selectable" : undefined,
+      onClick: handleSelectAll,
+    },
+  ];
+}
+
+function hasEnabledAction(entries: ContextMenuEntry[]): boolean {
+  return entries.some((entry) => {
+    if ("children" in entry) return hasEnabledAction(entry.children);
+    return !entry.disabled;
+  });
+}
+
+function keepUsefulEntries(entries: ContextMenuEntry[]): ContextMenuEntry[] {
+  return entries.filter((entry) => {
+    if ("children" in entry) {
+      return entry.children.length > 0 && hasEnabledAction(entry.children);
+    }
+    return !entry.disabled;
+  });
 }
 
 function toolViewsSubmenu(ctx: ContextMenuContext, toolId: string): ContextMenuSubmenu | null {
   const tool = toolRegistry.get(toolId);
   if (!tool?.subviews?.length) return null;
+  const visibleSubviews = getVisibleToolSubviews(tool);
+  if (!visibleSubviews.length) return null;
   return {
     id: `${toolId}-views`,
     label: "Views",
     icon: Layers,
-    children: tool.subviews.map((sv) => ({
+    children: visibleSubviews.map((sv) => ({
       id: `${toolId}-view-${sv.id}`,
       label: sv.label,
+      icon: getSubviewIcon(toolId, sv.id),
       active: ctx.subviewId === sv.id,
       onClick: () => navigateTo(toolId, sv.id),
     })),
@@ -138,7 +160,7 @@ function toolViewsSubmenu(ctx: ContextMenuContext, toolId: string): ContextMenuS
 function dangerSubmenu(id: string, children: ContextMenuItemAction[]): ContextMenuSubmenu {
   return {
     id,
-    label: "Danger",
+    label: "Danger Zone",
     icon: Trash2,
     children,
   };
@@ -148,20 +170,7 @@ function dangerSubmenu(id: string, children: ContextMenuItemAction[]): ContextMe
 /*  Navigate ▸ — every tool, with active indicator                    */
 /* ================================================================== */
 function navSection(ctx: ContextMenuContext): ContextMenuSection {
-  const tools = toolRegistry.getAll().filter((tool) => !tool.hidden);
-
-  const iconMap: Record<string, typeof Home> = {
-    [HOME_TOOL_ID]: Home,
-    "packet-capture": Package,
-    registration: Server,
-    "soft-phone": PhoneCall,
-    "fax-center": Printer,
-    "provision-viewer": FileSearch,
-    network: Network,
-    "remote-agent": Satellite,
-    composer: Wrench,
-    tools: Toolbox,
-  };
+  const tools = getVisibleNavigationTools();
 
   const shortcutMap: Record<string, string | undefined> = {
     [HOME_TOOL_ID]: shortcutLabel(SHORTCUTS.goHome),
@@ -176,7 +185,7 @@ function navSection(ctx: ContextMenuContext): ContextMenuSection {
   const children: ContextMenuItemAction[] = tools.map((tool) => ({
     id: `nav-${tool.id}`,
     label: tool.name,
-    icon: iconMap[tool.id] ?? Activity,
+    icon: getToolIcon(tool.id, Activity),
     shortcut: shortcutMap[tool.id],
     active: ctx.toolId === tool.id,
     onClick: () => navigateTo(tool.id, tool.subviews?.[0]?.id ?? undefined),
@@ -184,6 +193,7 @@ function navSection(ctx: ContextMenuContext): ContextMenuSection {
 
   return {
     id: "navigate",
+    label: "Navigate",
     entries: [{ id: "nav-sub", label: "Navigate", icon: Globe, children } satisfies ContextMenuSubmenu],
   };
 }
@@ -195,6 +205,7 @@ function appSection(ctx: ContextMenuContext): ContextMenuSection {
   const layout = useLayoutStore.getState();
   return {
     id: "app",
+    label: "App Actions",
     entries: [
       {
         id: "search",
@@ -252,7 +263,7 @@ function appSection(ctx: ContextMenuContext): ContextMenuSection {
 /* ================================================================== */
 /*  Home / Troubleshooting                                            */
 /* ================================================================== */
-function homeSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function homeSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== HOME_TOOL_ID) return null;
   const ts = useTroubleshootingStore.getState();
   const sp = useSoftphoneStore.getState();
@@ -289,13 +300,13 @@ function homeSection(ctx: ContextMenuContext): ContextMenuSection | null {
     },
   ]);
 
-  return { id: "home-ctx", entries: [viewsSubmenu, actionsSubmenu, danger] };
+  return { views: [viewsSubmenu], actions: [actionsSubmenu], danger: [danger] };
 }
 
 /* ================================================================== */
 /*  Packet Capture                                                    */
 /* ================================================================== */
-function packetSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function packetSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "packet-capture") return null;
   const pc = usePacketCaptureStore.getState();
   const viewsSubmenu = toolViewsSubmenu(ctx, "packet-capture");
@@ -320,6 +331,15 @@ function packetSection(ctx: ContextMenuContext): ContextMenuSection | null {
         disabled: !pc.activeSessionId,
         onClick: () => { if (pc.activeSessionId) pc.fetchStatistics(pc.activeSessionId); },
       },
+      {
+        id: "pcc-open-diff",
+        label: "Open Packet Diff",
+        icon: ArrowRightLeft,
+        onClick: () =>
+          navigateTo("packet-capture", "packet-diff", {
+            packetCaptureSessionId: pc.activeSessionId ?? undefined,
+          }),
+      },
     ],
   };
   const danger = dangerSubmenu("packet-danger", [
@@ -332,36 +352,27 @@ function packetSection(ctx: ContextMenuContext): ContextMenuSection | null {
     },
   ]);
 
-  return { id: "packet-ctx", entries: viewsSubmenu ? [viewsSubmenu, actionsSubmenu, danger] : [actionsSubmenu, danger] };
+  return {
+    views: viewsSubmenu ? [viewsSubmenu] : [],
+    actions: [actionsSubmenu],
+    danger: [danger],
+  };
 }
 
 /* ================================================================== */
 /*  Packet Monitor (subview of Packet Capture)                        */
 /* ================================================================== */
-function packetMonitorSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function packetMonitorSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "packet-capture" || ctx.subviewId !== "monitor") return null;
   const pc = usePacketCaptureStore.getState();
 
-  return {
-    id: "pktmon-ctx",
-    entries: [
-      { id: "pm-refresh", label: "Refresh Sessions", icon: RefreshCw, onClick: () => pc.fetchSessions() },
-      { id: "pm-interfaces", label: "Refresh Interfaces", icon: Network, onClick: () => pc.fetchInterfaces() },
-      {
-        id: "pm-export",
-        label: "Export PCAP",
-        icon: Download,
-        disabled: !pc.activeSessionId,
-        onClick: () => { if (pc.activeSessionId) pc.exportPcap(pc.activeSessionId); },
-      },
-    ],
-  };
+  return { actions: [{ id: "pm-interfaces", label: "Refresh Interfaces", icon: Network, onClick: () => pc.fetchInterfaces() }] };
 }
 
 /* ================================================================== */
 /*  Registration                                                      */
 /* ================================================================== */
-function registrationSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function registrationSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "registration") return null;
   const reg = useRegistrationStore.getState();
 
@@ -375,13 +386,13 @@ function registrationSection(ctx: ContextMenuContext): ContextMenuSection | null
     ],
   };
 
-  return { id: "reg-ctx", entries: [actionsSubmenu] };
+  return { actions: [actionsSubmenu] };
 }
 
 /* ================================================================== */
 /*  Soft Phone                                                        */
 /* ================================================================== */
-function softPhoneSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function softPhoneSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "soft-phone") return null;
   const sp = useSoftphoneStore.getState();
 
@@ -446,29 +457,31 @@ function softPhoneSection(ctx: ContextMenuContext): ContextMenuSection | null {
     { id: "sp-clear-calls", label: "Clear Call History", icon: Trash2, destructive: true, onClick: () => sp.clearCalls() },
   ]);
 
-  const entries: (ContextMenuSubmenu | ContextMenuItemAction)[] = [callActions, danger];
-  if (viewsSubmenu) entries.unshift(viewsSubmenu);
-  return { id: "softphone-ctx", entries };
+  return {
+    views: viewsSubmenu ? [viewsSubmenu] : [],
+    actions: [callActions],
+    danger: [danger],
+  };
 }
 
 /* ================================================================== */
 /*  Fax Center                                                        */
 /* ================================================================== */
-function faxSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function faxSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "fax-center") return null;
   const viewsSubmenu = toolViewsSubmenu(ctx, "fax-center");
   if (!viewsSubmenu) return null;
-  return { id: "fax-ctx", entries: [viewsSubmenu] };
+  return { views: [viewsSubmenu] };
 }
 
 /* ================================================================== */
 /*  Device Provisioning                                               */
 /* ================================================================== */
-function provisionSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function provisionSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "provision-viewer") return null;
   const viewsSubmenu = toolViewsSubmenu(ctx, "provision-viewer");
   if (!viewsSubmenu) return null;
-  return { id: "prov-ctx", entries: [viewsSubmenu] };
+  return { views: [viewsSubmenu] };
 }
 
 const NETWORK_PATH_SUBVIEWS = new Set(["path-performance", "connectivity", "path", "overview"]);
@@ -479,7 +492,7 @@ const NETWORK_MULTICAST_SUBVIEWS = new Set(["multicast", "media", "devices-media
 /* ================================================================== */
 /*  Network (unified: path/dns/discovery/media)                       */
 /* ================================================================== */
-function networkSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function networkSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "network") return null;
   const nt = useNetworkTestStore.getState();
   const nd = useNetworkDevicesStore.getState();
@@ -541,28 +554,29 @@ function networkSection(ctx: ContextMenuContext): ContextMenuSection | null {
   ]);
 
   // Contextual: show different action groups based on the active subview
-  const entries: (ContextMenuSubmenu | ContextMenuItemAction)[] = [];
-  if (viewsSubmenu) entries.push(viewsSubmenu);
+  const actions: ContextMenuEntry[] = [];
   if (ctx.subviewId && NETWORK_DISCOVERY_SUBVIEWS.has(ctx.subviewId)) {
-    entries.push(deviceActions);
+    actions.push(deviceActions);
   } else if (ctx.subviewId && NETWORK_MULTICAST_SUBVIEWS.has(ctx.subviewId)) {
-    entries.push(quickTools, monitorSubmenu);
+    actions.push(quickTools, monitorSubmenu);
   } else if (ctx.subviewId && NETWORK_DNS_SUBVIEWS.has(ctx.subviewId)) {
-    entries.push(quickTools, voipTools, monitorSubmenu);
+    actions.push(quickTools, voipTools, monitorSubmenu);
   } else if (ctx.subviewId && NETWORK_PATH_SUBVIEWS.has(ctx.subviewId)) {
-    entries.push(quickTools, monitorSubmenu);
+    actions.push(quickTools, monitorSubmenu);
   } else {
-    entries.push(quickTools, voipTools, monitorSubmenu, deviceActions);
+    actions.push(quickTools, voipTools, monitorSubmenu, deviceActions);
   }
-  entries.push(danger);
-
-  return { id: "network-ctx", entries };
+  return {
+    views: viewsSubmenu ? [viewsSubmenu] : [],
+    actions,
+    danger: [danger],
+  };
 }
 
 /* ================================================================== */
 /*  Remote Agent                                                      */
 /* ================================================================== */
-function remoteAgentSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function remoteAgentSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "remote-agent") return null;
   const ra = useRemoteAgentStore.getState();
   const viewsSubmenu = toolViewsSubmenu(ctx, "remote-agent");
@@ -580,13 +594,17 @@ function remoteAgentSection(ctx: ContextMenuContext): ContextMenuSection | null 
     { id: "ra-clear-configs", label: "Clear Generated Configs", icon: Trash2, destructive: true, onClick: () => ra.clearGeneratedConfigs() },
   ]);
 
-  return { id: "remote-ctx", entries: viewsSubmenu ? [viewsSubmenu, actionsSubmenu, danger] : [actionsSubmenu, danger] };
+  return {
+    views: viewsSubmenu ? [viewsSubmenu] : [],
+    actions: [actionsSubmenu],
+    danger: [danger],
+  };
 }
 
 /* ================================================================== */
 /*  Composer (SSH + Requests)                                         */
 /* ================================================================== */
-function composerSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function composerSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "composer") return null;
   const cs = useComposerStore.getState();
   const viewsSubmenu = toolViewsSubmenu(ctx, "composer");
@@ -604,21 +622,25 @@ function composerSection(ctx: ContextMenuContext): ContextMenuSection | null {
     { id: "cs-clear-history", label: "Clear History", icon: Trash2, destructive: true, onClick: () => cs.clearHistory() },
   ]);
 
-  return { id: "composer-ctx", entries: viewsSubmenu ? [viewsSubmenu, actionsSubmenu, danger] : [actionsSubmenu, danger] };
+  return {
+    views: viewsSubmenu ? [viewsSubmenu] : [],
+    actions: [actionsSubmenu],
+    danger: [danger],
+  };
 }
 
 /* ================================================================== */
 /*  Tools (Syslog, Log Viewer, File Server, Password Gen)             */
 /* ================================================================== */
-function toolsSection(ctx: ContextMenuContext): ContextMenuSection | null {
+function toolsSection(ctx: ContextMenuContext): ToolSectionContributions | null {
   if (ctx.toolId !== "tools") return null;
   const viewsSubmenu = toolViewsSubmenu(ctx, "tools");
   if (!viewsSubmenu) return null;
-  return { id: "tools-ctx", entries: [viewsSubmenu] };
+  return { views: [viewsSubmenu] };
 }
 
 /* ================================================================== */
-/*  Assemble: Edit → Tool-specific → Navigate ▸ → App                */
+/*  Assemble: Navigate → Views → Context Actions → App → Danger       */
 /* ================================================================== */
 export function getContextMenuSections(ctx: ContextMenuContext): ContextMenuSection[] {
   const softphone = useSoftphoneStore.getState();
@@ -635,7 +657,7 @@ export function getContextMenuSections(ctx: ContextMenuContext): ContextMenuSect
     },
   };
 
-  const sections: ContextMenuSection[] = [editSection(effectiveCtx)];
+  const sections: ContextMenuSection[] = [navSection(effectiveCtx)];
 
   const toolFns = [
     homeSection,
@@ -651,12 +673,49 @@ export function getContextMenuSections(ctx: ContextMenuContext): ContextMenuSect
     toolsSection,
   ];
 
+  const merged: Required<ToolSectionContributions> = {
+    views: [],
+    actions: [],
+    danger: [],
+  };
+
   for (const fn of toolFns) {
-    const s = fn(effectiveCtx);
-    if (s) { sections.push(s); break; }
+    const contribution = fn(effectiveCtx);
+    if (!contribution) continue;
+    if (contribution.views?.length) merged.views.push(...contribution.views);
+    if (contribution.actions?.length) merged.actions.push(...contribution.actions);
+    if (contribution.danger?.length) merged.danger.push(...contribution.danger);
   }
 
-  sections.push(navSection(effectiveCtx));
-  sections.push(appSection(effectiveCtx));
+  const viewEntries = keepUsefulEntries(merged.views);
+  if (viewEntries.length > 0) {
+    sections.push({ id: "views", label: "Views", entries: viewEntries });
+  }
+
+  const contextActionEntries: ContextMenuEntry[] = [];
+  const edits = editActions(effectiveCtx);
+  if (hasEnabledAction(edits)) {
+    contextActionEntries.push({
+      id: "context-edit",
+      label: "Edit",
+      icon: Scissors,
+      children: edits,
+    } satisfies ContextMenuSubmenu);
+  }
+  contextActionEntries.push(...keepUsefulEntries(merged.actions));
+  if (contextActionEntries.length > 0) {
+    sections.push({ id: "context-actions", label: "Context Actions", entries: contextActionEntries });
+  }
+
+  const app = appSection(effectiveCtx);
+  if (hasEnabledAction(app.entries)) {
+    sections.push(app);
+  }
+
+  const dangerEntries = keepUsefulEntries(merged.danger);
+  if (dangerEntries.length > 0) {
+    sections.push({ id: "danger", label: "Danger Zone", entries: dangerEntries });
+  }
+
   return sections;
 }

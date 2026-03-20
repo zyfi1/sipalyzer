@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { toolRegistry, HOME_TOOL_ID } from "./toolRegistry";
 import { Server, Network, PhoneCall, Home, Printer, FileSearch, SquareTerminal, Package, Satellite, Toolbox, Shield } from "@/lib/icons";
 import type { IconComponent } from "@/lib/icons";
+import styles from "./tools.module.css";
 
 const UnifiedTroubleshootingTool = lazy(() =>
   import("@/components/troubleshooting/UnifiedTroubleshootingTool").then((m) => ({ default: m.UnifiedTroubleshootingTool }))
@@ -47,17 +48,17 @@ function ToolFallback({
   Icon: IconComponent;
 }) {
   return (
-    <div className="flex-1 min-h-0 w-full flex flex-col rounded-lg border border-border/30 bg-card/40">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/25">
-        <Icon className="h-4 w-4 text-primary/80" />
-        <span className="text-sm font-medium text-foreground/85">{label}</span>
-        <span className="ml-auto text-2xs text-muted-foreground">Loading modules...</span>
+    <div className={styles.fallbackRoot}>
+      <div className={styles.fallbackHeader}>
+        <Icon className={styles.fallbackIcon} />
+        <span className={styles.fallbackTitle}>{label}</span>
+        <span className={styles.fallbackMeta}>Loading modules...</span>
       </div>
-      <div className="flex-1 p-3 grid grid-cols-2 gap-3">
-        <div className="col-span-2 h-10 skeleton" />
-        <div className="h-40 skeleton" />
-        <div className="h-40 skeleton" />
-        <div className="col-span-2 h-28 skeleton" />
+      <div className={styles.fallbackGrid}>
+        <div className={`${styles.spanTwo} ${styles.skeletonSm} skeleton`} />
+        <div className={`${styles.skeletonLg} skeleton`} />
+        <div className={`${styles.skeletonLg} skeleton`} />
+        <div className={`${styles.spanTwo} ${styles.skeletonMd} skeleton`} />
       </div>
     </div>
   );
@@ -91,6 +92,7 @@ export function registerTools() {
       { id: "captures", label: "Captures" },
       { id: "viewer", label: "Viewer" },
       { id: "analysis", label: "Analysis" },
+      { id: "packet-diff", label: "Packet Diff" },
       { id: "remote", label: "Remote SSH" },
       { id: "scheduled", label: "Scheduled" },
     ],
@@ -225,13 +227,15 @@ export function registerTools() {
       </Suspense>
     ),
     route: "/tools",
+    /** Order matches `ToolsTool` tab strip / breadcrumb (see `tabItems` there). */
     subviews: [
       { id: "syslog", label: "Syslog" },
       { id: "logs", label: "Log Viewer" },
       { id: "file-server", label: "File Server" },
-      { id: "firmware", label: "Firmware" },
       { id: "password-gen", label: "Password Generator" },
+      { id: "firmware", label: "Firmware" },
       { id: "text-forge", label: "Text Forge" },
+      { id: "mockup", label: "Mockup" },
       { id: "mcp", label: "MCP" },
     ],
   });

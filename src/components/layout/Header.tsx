@@ -19,21 +19,31 @@ import { BreadcrumbNav } from "@/components/layout/header-items/BreadcrumbNav";
 import { NotesButton } from "@/components/layout/header-items/NotesButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SettingsButton } from "@/components/layout/header-items/SettingsButton";
+import { UpdateAvailableButton } from "@/components/layout/header-items/UpdateAvailableButton";
 import { KnowledgeBaseButton } from "@/components/layout/header-items/KnowledgeBaseButton";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { ExecutionContextSelector } from "@/components/ui/execution-context-selector";
 import { tooltips } from "@/lib/tooltips";
-import { cn } from "@/lib/utils";
+import clsx from "clsx";
+import styles from "./header.module.css";
 import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from "@/lib/icons";
+import { Flex, Group, UnstyledButton } from "@mantine/core";
 
 interface HeaderProps {
   onNotificationClick: () => void;
   onNotesClick: () => void;
   onKnowledgeBaseClick: () => void;
   onSettingsClick: () => void;
+  hasUpdateAvailable: boolean;
 }
 
-export function Header({ onNotificationClick, onNotesClick, onKnowledgeBaseClick, onSettingsClick }: HeaderProps) {
+export function Header({
+  onNotificationClick,
+  onNotesClick,
+  onKnowledgeBaseClick,
+  onSettingsClick,
+  hasUpdateAvailable,
+}: HeaderProps) {
   const isSidebarCollapsed = useSidebarStore((s) => s.isCollapsed);
   const toggleSidebar = useSidebarStore((s) => s.toggle);
   const activeToolId = useToolStore((s) => s.activeToolId);
@@ -72,108 +82,124 @@ export function Header({ onNotificationClick, onNotesClick, onKnowledgeBaseClick
 
   return (
     <header
-      className={cn("app-header app-titlebar app-chrome-surface relative !gap-0", isMac && "h-10")}
+      role="banner"
+      className={clsx(
+        "app-header app-titlebar app-chrome-surface",
+        styles.headerRoot,
+        isMac && styles.headerMac,
+      )}
       onMouseDown={handleWindowDrag}
       onDoubleClick={handleDoubleClick}
     >
       {/* ── Left: sidebar toggle ── */}
-      <div className={cn(
-        "flex-1 min-w-0 flex items-center pl-0 pr-1 overflow-hidden pointer-events-none [&>*]:pointer-events-auto",
-        isMac && "pl-20"
-      )}>
-        <div
-          className={cn("shrink-0 flex items-center w-16 justify-center")}
-        >
+      <Flex
+        align="center"
+        className={clsx(styles.left, isMac && styles.leftMac)}
+      >
+        <Flex align="center" className={styles.sidebarToggleWrap}>
           <TooltipWrapper
             entry={isSidebarCollapsed ? tooltips.sidebarExpand : tooltips.sidebarCollapse}
             side="bottom"
           >
-            <button
+            <UnstyledButton
               type="button"
               onClick={toggleSidebar}
-              className="header-icon-button h-7 w-7 ui-hover-press motion-reduce:transform-none"
+              className={clsx("header-icon-button ui-hover-press", styles.sidebarToggle)}
               aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {isSidebarCollapsed ? (
-                <PanelLeftOpen className="h-4 w-4" />
+                <PanelLeftOpen className={styles.sidebarToggleIcon} />
               ) : (
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className={styles.sidebarToggleIcon} />
               )}
-            </button>
+            </UnstyledButton>
           </TooltipWrapper>
-        </div>
-        <div className="inline-flex items-center min-w-0">
-          <div id="header-tool-widget" className="flex items-center gap-2 min-w-0 mr-4">
+        </Flex>
+        <div className={styles.inlineRow}>
+          <div id="header-tool-widget" className={styles.toolWidget}>
             <div
               id="header-tool-widget-custom"
-              className="flex items-center gap-2 min-w-0 max-w-[min(36vw,440px)] overflow-hidden"
+              className={styles.toolWidgetCustom}
             />
             {execToolId && (
-              <div id="header-tool-widget-exec" className="flex items-center shrink-0">
+              <div id="header-tool-widget-exec" className={styles.execWrap}>
                 <ExecutionContextSelector
                   toolId={execToolId}
-                  variant="header"
-                  className="w-[150px] max-w-[150px]"
+                  className={styles.execSelector}
                 />
               </div>
             )}
           </div>
         </div>
-      </div>
+      </Flex>
 
       {/* ── Center: dead-center title, arrows on both sides ── */}
-      <div className="absolute left-1/2 -translate-x-1/2 max-w-[44vw] min-w-0 pointer-events-none app-chrome-content-swap">
-        <div className="relative inline-flex items-center min-w-0 pointer-events-auto">
-          <div className="absolute right-full mr-2">
+      <div className={clsx(styles.centerWrap, "app-chrome-content-swap")}>
+        <Flex align="center" className={styles.centerInner}>
+          <div className={styles.navCluster}>
             <TooltipWrapper title="Back" side="bottom">
-              <button
+              <UnstyledButton
                 type="button"
                 onClick={handleBack}
-                className="header-icon-button h-6 w-6 ui-hover-press motion-reduce:transform-none"
+                className={clsx("header-icon-button ui-hover-press", styles.navBtn)}
                 aria-label="Go back"
               >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
+                <ChevronLeft className={styles.navBtnIcon} />
+              </UnstyledButton>
             </TooltipWrapper>
           </div>
-          <div className="inline-flex items-center min-w-0 rounded-[var(--radius-sm)] px-1.5 py-0.5 bg-sidebar/75">
-            <div className="flex items-center gap-1 min-w-0">
+          <div className={styles.titleCluster}>
+            <Group gap="xs" wrap="nowrap" className={styles.titleRow}>
               <ToolTitle />
               <BreadcrumbNav />
-            </div>
+            </Group>
           </div>
-          <div className="absolute left-full ml-2">
+          <div className={styles.forwardWrap}>
             <TooltipWrapper title="Forward" side="bottom">
-              <button
+              <UnstyledButton
                 type="button"
                 onClick={handleForward}
-                className="header-icon-button h-6 w-6 ui-hover-press motion-reduce:transform-none"
+                className={clsx("header-icon-button ui-hover-press", styles.navBtn)}
                 aria-label="Go forward"
               >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
+                <ChevronRight className={styles.navBtnIcon} />
+              </UnstyledButton>
             </TooltipWrapper>
           </div>
-        </div>
+        </Flex>
       </div>
 
       {/* ── Search slot between center cluster and right actions ── */}
-      <div className="w-[210px] max-w-[24vw] min-w-[160px] mr-2 app-chrome-content-swap">
+      <div
+        className={clsx(styles.searchSlot, "app-chrome-content-swap")}
+        role="search"
+        aria-label="Global search"
+      >
         <SearchButton variant="field" />
       </div>
 
       {/* ── Right: global actions ── */}
-      <div className="flex items-center flex-shrink-0 gap-0.5 pr-1 app-chrome-content-swap">
+      <Group
+        component="div"
+        gap={3}
+        wrap="nowrap"
+        className={clsx(styles.right, "app-chrome-content-swap")}
+        role="toolbar"
+        aria-label="Global actions"
+      >
         <KnowledgeBaseButton onClick={onKnowledgeBaseClick} />
         <NotesButton onClick={onNotesClick} />
         <NotificationBell onClick={onNotificationClick} />
+        {hasUpdateAvailable ? (
+          <UpdateAvailableButton hasUpdate={hasUpdateAvailable} onClick={onSettingsClick} />
+        ) : null}
 
-        <div className="w-px h-5 bg-border/50 flex-shrink-0 mx-1" aria-hidden />
+        <div className={styles.divider} aria-hidden />
 
         <IpBadge />
         <SettingsButton onClick={onSettingsClick} />
         {!isMac && <WindowControls />}
-      </div>
+      </Group>
     </header>
   );
 }

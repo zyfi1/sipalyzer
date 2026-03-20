@@ -36,6 +36,7 @@ import { useGlobalFileDropStore } from "./stores/globalFileDropStore";
 import { useRemoteChatStore } from "./stores/remoteChatStore";
 import { useMcpStore } from "./stores/mcpStore";
 import { useIncomingFaxStore } from "./stores/incomingFaxStore";
+import { useUpdaterStore } from "./stores/updaterStore";
 import { RemoteChatWindow } from "./components/remote-agent/RemoteChatWindow";
 import type { RemoteChatMessage, RemoteChatState } from "./api/remoteAgent";
 
@@ -67,6 +68,7 @@ import { setCachedFeatureFlag } from "./lib/featureFlagCache";
 import { useShallow } from "zustand/react/shallow";
 import { useOpenCaptureStore } from "./hooks/useOpenCapture";
 import { onMcpAgentProgress, onMcpServerStatus } from "./api/mcp";
+import styles from "./App.module.css";
 
 const NotesCenter = lazy(() =>
   import("./components/notes/NotesCenter").then((m) => ({ default: m.NotesCenter }))
@@ -146,6 +148,10 @@ function AppContent() {
   const saveUnsubs = useRef<Array<() => void>>([]);
   const settings = useNotificationStore((s) => s.settings);
   const highVisibility = useSettingsStore((s) => s.highVisibility);
+  const reducedMotion = useSettingsStore((s) => s.reducedMotion);
+  const updatePrefs = useSettingsStore((s) => s.updates);
+  const availableUpdate = useUpdaterStore((s) => s.availableUpdate);
+  const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
   const layout = useLayoutStore(
     useShallow((s) => ({
       notesCenterOpen: s.notesCenterOpen,
@@ -659,6 +665,20 @@ function AppContent() {
     useSettingsStore.getState().syncShowTrayIconToBackend();
   }, []);
 
+  // Channel-aware updater checks:
+  // - immediate check after app boot (if enabled)
+  // - periodic checks while app is open
+  // - re-check when channel changes
+  useEffect(() => {
+    if (!toolsReady) return;
+    if (!updatePrefs.autoCheckOnLaunch) return;
+    void checkForUpdates(updatePrefs.channel);
+    const intervalId = window.setInterval(() => {
+      void checkForUpdates(updatePrefs.channel);
+    }, 30 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [toolsReady, updatePrefs.autoCheckOnLaunch, updatePrefs.channel, checkForUpdates]);
+
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
@@ -1156,8 +1176,9 @@ function AppContent() {
 
   return (
     <div
-      className="text-foreground flex flex-col overflow-hidden min-h-screen min-w-full bg-sidebar"
+      className={styles.appShell}
       data-visibility={highVisibility ? "high" : "default"}
+      data-motion={reducedMotion ? "reduced" : "default"}
       style={{ height: "100vh", width: "100vw" }}
     >
       <GlobalContextMenu />
@@ -1167,19 +1188,26 @@ function AppContent() {
         onNotesClick={handleToggleNotes}
         onKnowledgeBaseClick={handleToggleKnowledgeBase}
         onSettingsClick={handleToggleSettings}
+        hasUpdateAvailable={Boolean(availableUpdate)}
       />
-      <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden app-content-island isolate">
+      <div className={styles.mainRow}>
+        {/*
+          Isolate + high z-index so tool surfaces (sticky/fixed children, panels) cannot
+          steal clicks from the sidebar navigation column.
+        */}
+        <div className={styles.sidebarRail}>
+          <Sidebar />
+        </div>
+        <div className={`${styles.contentIsland} app-content-island`}>
           <TopographicBackground />
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className={styles.contentStack}>
             <ToolContainer />
           </div>
         </div>
       </div>
       <div
         id="app-global-footer-layer"
-        className="h-7 flex-shrink-0 bg-sidebar border-t border-border/50 pointer-events-none app-chrome-surface"
+        className={`${styles.footerLayer} app-chrome-surface`}
       />
       {settings.showToasts && <Toaster position={settings.position} />}
       {layout.notesCenterOpen && (

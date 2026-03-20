@@ -7,17 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { RotateCcw, X, Shield, Info, MapPin, Loader2, AppleLogo, WindowsLogo, Package } from "@/lib/icons";
+import { RotateCcw, X, Shield, Info, MapPin, Loader2, AppleLogo, WindowsLogo, Package, RefreshCw, Download, GitBranch } from "@/lib/icons";
 import { AdminPasswordDialog } from "@/components/admin/AdminPasswordDialog";
 import { navigateTo } from "@/lib/navigation";
 import { fetchUrl } from "@/api/provision";
 import { exportFullAppBackup, restoreFullAppBackupFromText, auditBackupRestoreFailure } from "@/lib/appBackup";
 
-import { cn } from "@/lib/utils";
+import clsx from "clsx";
+import settingsStyles from "./settingsCenter.module.css";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useUpdaterStore } from "@/stores/updaterStore";
+import { RELEASE_CHANNELS, type ReleaseChannel } from "@/lib/updater/channels";
 import {
   Select,
   SelectContent,
@@ -28,6 +32,17 @@ import {
 import { FAX_BAUD_RATES } from "@/api/fax";
 import type { FaxResolution, FaxSettings, PacketMonitorSettings } from "@/stores/settingsStore";
 import { APP_TIMEZONE_OPTIONS } from "@/lib/dateTime";
+import {
+  autoUpdate,
+  flip,
+  offset,
+  size,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useRole,
+} from "@floating-ui/react";
+import { Group, Paper, Stack } from "@mantine/core";
 const SettingsAboutPanel = lazy(() =>
   import("./SettingsAboutPanel").then((m) => ({ default: m.SettingsAboutPanel })),
 );
@@ -46,6 +61,15 @@ interface LocationSuggestion {
   query: string;
   lat: number;
   lon: number;
+}
+
+function isUpdaterNotConfiguredError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("updater is not configured yet") ||
+    normalized.includes("missing sipalyzer_updater_pubkey")
+  );
 }
 
 async function searchLocations(search: string): Promise<LocationSuggestion[]> {
@@ -102,6 +126,32 @@ function WeatherLocationInput({ value, onChange }: { value: string; onChange: (v
   const blurTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const containerRef = useRef<HTMLDivElement>(null);
   const justCommittedRef = useRef(false);
+  const {
+    refs,
+    floatingStyles,
+    context: floatingContext,
+  } = useFloating({
+    open: showSuggestions && suggestions.length > 0,
+    onOpenChange: setShowSuggestions,
+    placement: "bottom-start",
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset(4),
+      flip({ padding: 8 }),
+      size({
+        apply({ rects, elements }) {
+          Object.assign(elements.floating.style, {
+            width: `${rects.reference.width}px`,
+            maxHeight: "260px",
+          });
+        },
+        padding: 8,
+      }),
+    ],
+  });
+  const dismiss = useDismiss(floatingContext, { outsidePressEvent: "mousedown" });
+  const role = useRole(floatingContext, { role: "listbox" });
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss, role]);
 
   useEffect(() => { setDraft(value); }, [value]);
 
@@ -176,8 +226,8 @@ function WeatherLocationInput({ value, onChange }: { value: string; onChange: (v
   }, []);
 
   return (
-    <div ref={containerRef} className="relative">
-      <div className="relative">
+    <div ref={containerRef} className={settingsStyles.weatherLocationContainer}>
+      <div ref={refs.setReference} className={settingsStyles.weatherLocationContainer}>
         <Input
           id="settings-weather-location"
           placeholder="Search city, ZIP, or coordinates..."
@@ -193,28 +243,36 @@ function WeatherLocationInput({ value, onChange }: { value: string; onChange: (v
             }, 200);
           }}
           onKeyDown={handleKeyDown}
-          className="pr-8"
+          className={settingsStyles.weatherLocationInput}
+          {...getReferenceProps()}
         />
-        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40">
+        <div className={settingsStyles.weatherLocationAdornment}>
           {searching ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className={settingsStyles.weatherLocationSpinner} />
           ) : (
-            <MapPin className="h-3.5 w-3.5" />
+            <MapPin className={settingsStyles.weatherLocationIcon} />
           )}
         </div>
       </div>
 
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full ui-floating-surface rounded-md overflow-hidden">
+        <div
+          ref={refs.setFloating}
+          style={floatingStyles}
+          className={clsx(
+            "ui-floating-menu-panel ui-floating-surface",
+            settingsStyles.weatherSuggestions,
+          )}
+          {...getFloatingProps()}
+        >
           {suggestions.map((s, i) => (
             <button
               key={`${s.display}-${i}`}
               type="button"
-              className={cn(
-                "w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2",
-                i === highlightIdx
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-muted/50 text-foreground/80",
+              className={clsx(
+                "ui-floating-item",
+                settingsStyles.suggestBtn,
+                i === highlightIdx && settingsStyles.suggestBtnHighlight,
               )}
               onMouseEnter={() => setHighlightIdx(i)}
               onMouseDown={(e) => {
@@ -223,8 +281,8 @@ function WeatherLocationInput({ value, onChange }: { value: string; onChange: (v
                 setWeatherCoords(s.lat, s.lon);
               }}
             >
-              <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/50" />
-              <span className="truncate">{s.display}</span>
+              <MapPin className={settingsStyles.suggestionIcon} />
+              <span className={settingsStyles.suggestionLabel}>{s.display}</span>
             </button>
           ))}
         </div>
@@ -267,6 +325,8 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
   const setWeatherLocation = useSettingsStore((s) => s.setWeatherLocation);
   const highVisibility = useSettingsStore((s) => s.highVisibility);
   const setHighVisibility = useSettingsStore((s) => s.setHighVisibility);
+  const reducedMotion = useSettingsStore((s) => s.reducedMotion);
+  const setReducedMotion = useSettingsStore((s) => s.setReducedMotion);
   const resetFax = useSettingsStore((s) => s.resetFax);
   const terminalSettings = useSettingsStore((s) => s.terminal);
   const setTerminal = useSettingsStore((s) => s.setTerminal);
@@ -280,6 +340,16 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
   const showTrayIcon = useSettingsStore((s) => s.showTrayIcon);
   const setShowTrayIcon = useSettingsStore((s) => s.setShowTrayIcon);
   const addNotification = useNotificationStore((s) => s.addNotification);
+  const updates = useSettingsStore((s) => s.updates);
+  const setUpdateChannel = useSettingsStore((s) => s.setUpdateChannel);
+  const setUpdateAutoCheckOnLaunch = useSettingsStore((s) => s.setUpdateAutoCheckOnLaunch);
+  const updaterChecking = useUpdaterStore((s) => s.checking);
+  const updaterInstalling = useUpdaterStore((s) => s.installing);
+  const availableUpdate = useUpdaterStore((s) => s.availableUpdate);
+  const updaterLastCheckedAt = useUpdaterStore((s) => s.lastCheckedAt);
+  const updaterLastError = useUpdaterStore((s) => s.lastError);
+  const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
+  const installAvailableUpdate = useUpdaterStore((s) => s.installAvailableUpdate);
   const isMac = navigator.platform.includes("Mac");
   const isWindows = navigator.platform.includes("Win");
   const macVisibilityMode: "dock" | "menu-bar" | "both" = hideDockIcon
@@ -300,6 +370,70 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
   const [backupBusy, setBackupBusy] = useState(false);
   const [restoreBusy, setRestoreBusy] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const runUpdateCheck = useCallback(async () => {
+    const result = await checkForUpdates(updates.channel);
+    const checkError = useUpdaterStore.getState().lastError;
+    if (checkError) {
+      if (isUpdaterNotConfiguredError(checkError)) {
+        return;
+      }
+      addNotification({
+        type: "error",
+        title: "Update Check Failed",
+        description: checkError,
+        source: "settings",
+      });
+      return;
+    }
+    if (result) {
+      addNotification({
+        type: "info",
+        title: "Update Available",
+        description: `Version ${result.version} is ready on the ${updates.channel} channel.`,
+        source: "settings",
+      });
+    } else {
+      addNotification({
+        type: "success",
+        title: "Up to Date",
+        description: `No updates available on the ${updates.channel} channel.`,
+        source: "settings",
+      });
+    }
+  }, [addNotification, checkForUpdates, updates.channel]);
+
+  const runInstallUpdate = useCallback(async () => {
+    const installed = await installAvailableUpdate(updates.channel);
+    const installError = useUpdaterStore.getState().lastError;
+    if (installError) {
+      if (isUpdaterNotConfiguredError(installError)) {
+        return;
+      }
+      addNotification({
+        type: "error",
+        title: "Install Failed",
+        description: installError,
+        source: "settings",
+      });
+      return;
+    }
+    if (installed) {
+      addNotification({
+        type: "success",
+        title: "Update Installed",
+        description: `Version ${installed.version} was installed. Restart SIPalyzer to finish applying it.`,
+        source: "settings",
+      });
+      return;
+    }
+    addNotification({
+      type: "info",
+      title: "No Update Available",
+      description: `No installable update was found on the ${updates.channel} channel.`,
+      source: "settings",
+    });
+  }, [addNotification, installAvailableUpdate, updates.channel]);
 
   const handleAdminClick = useCallback(async () => {
     try {
@@ -468,87 +602,81 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
   return (
     <>
       <div
-        className="fixed inset-x-0 bottom-0 top-9 bg-black/50 z-40 transition-smooth"
+        className={settingsStyles.overlay}
         onClick={onClose}
       />
-      <div
-        className={cn(
-          "fixed top-9 right-0 h-[calc(100%-2.25rem)] w-full max-w-[980px] bg-card border-l border-border z-50",
-          "flex flex-col shadow-elevated transition-smooth",
-          "animate-in slide-in-from-right duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)]"
-        )}
-      >
+      <div className={settingsStyles.sheet}>
         <Tabs
           value={settingsCenterTab}
           onValueChange={(v) => setSettingsCenterTab(v as SettingsCenterTab)}
-          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          className={settingsStyles.tabsRoot}
         >
           {/* Header with top-level tabs */}
-          <header className="ui-section-header-md flex items-end justify-between gap-3 px-3 pt-2 pb-0">
-            <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
-              <TabsList className="settings-nav-tabs min-w-max">
+          <header className={clsx("ui-section-header-md", settingsStyles.headerShell)}>
+            <div className={settingsStyles.headerTabsScroll}>
+              <TabsList className={clsx("settings-nav-tabs", settingsStyles.navTabsMin)}>
                 <TooltipWrapper entry={tooltips.settingsGeneral}>
-                  <TabsTrigger value="general" className="settings-nav-tab">
+                  <TabsTrigger value="general" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     General
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper entry={tooltips.settingsNotifications}>
-                  <TabsTrigger value="notifications" className="settings-nav-tab">
+                  <TabsTrigger value="notifications" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     Notifications
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper entry={tooltips.settingsUserAgent}>
-                  <TabsTrigger value="user-agent" className="settings-nav-tab">
+                  <TabsTrigger value="user-agent" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     User-Agent
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper entry={tooltips.settingsPacketMonitor}>
-                  <TabsTrigger value="packet-monitor" className="settings-nav-tab">
+                  <TabsTrigger value="packet-monitor" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     Packet Monitor
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper entry={tooltips.settingsFax}>
-                  <TabsTrigger value="fax" className="settings-nav-tab">
+                  <TabsTrigger value="fax" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     Fax
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper entry={tooltips.settingsTerminal}>
-                  <TabsTrigger value="terminal" className="settings-nav-tab">
+                  <TabsTrigger value="terminal" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     Terminal
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper entry={tooltips.settingsSoftPhone}>
-                  <TabsTrigger value="soft-phone" className="settings-nav-tab">
+                  <TabsTrigger value="soft-phone" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     Soft Phone
                   </TabsTrigger>
                 </TooltipWrapper>
                 <TooltipWrapper content="Tools and license inventory">
-                  <TabsTrigger value="inventory" className="settings-nav-tab">
+                  <TabsTrigger value="inventory" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
                     Inventory
                   </TabsTrigger>
                 </TooltipWrapper>
               </TabsList>
             </div>
-            <div className="flex items-center gap-1 pb-1 shrink-0">
+            <div className={settingsStyles.headerActionsRow}>
               <TooltipWrapper entry={tooltips.settingsAdmin}>
-                <Button variant="neutral" size="icon" onClick={handleAdminClick} className="h-8 w-8" aria-label="Admin">
-                  <Shield className="h-4 w-4" />
+                <Button variant="secondary" size="icon" onClick={handleAdminClick} className={settingsStyles.iconButtonSize} aria-label="Admin">
+                  <Shield className={settingsStyles.iconMd} />
                 </Button>
               </TooltipWrapper>
               <TooltipWrapper content="About SIPalyzer">
                 <Button
-                  variant={aboutOpen ? "neutral" : "ghost"}
+                  variant={aboutOpen ? "secondary" : "outline"}
                   size="icon"
                   onClick={() => setAboutOpen((o) => !o)}
-                  className="h-8 w-8"
+                  className={settingsStyles.iconButtonSize}
                   aria-label="About SIPalyzer"
                 >
-                  <Info className="h-4 w-4" />
+                  <Info className={settingsStyles.iconMd} />
                 </Button>
               </TooltipWrapper>
               <TooltipWrapper content="Close settings">
-                <Button variant="neutral" size="icon" onClick={onClose} className="h-8 w-8" aria-label="Close settings">
-                  <X className="h-4 w-4" />
+                <Button variant="secondary" size="icon" onClick={onClose} className={settingsStyles.iconButtonSize} aria-label="Close settings">
+                  <X className={settingsStyles.iconMd} />
                 </Button>
               </TooltipWrapper>
             </div>
@@ -557,8 +685,8 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
           {aboutOpen && (
             <Suspense
               fallback={
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-card">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <div className={settingsStyles.aboutFallbackOverlay}>
+                  <Loader2 className={settingsStyles.iconSpinnerLgMuted} />
                 </div>
               }
             >
@@ -566,21 +694,21 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </Suspense>
           )}
 
-          <TabsContent value="general" className="flex-1 overflow-y-auto mt-0 p-6 space-y-6">
-            <div className="space-y-1.5 mb-2">
-              <h2 className="text-base font-semibold">Date & time</h2>
-              <p className="text-sm text-muted-foreground">
+          <TabsContent value="general" className={settingsStyles.tabsContentP6Space6}>
+            <div className={settingsStyles.sectionIntro}>
+              <h2 className={settingsStyles.textBaseSemibold}>Date & time</h2>
+              <p className={settingsStyles.textSmMuted}>
                 All timestamps in the app are shown in this timezone and format.
               </p>
             </div>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
+            <div className={settingsStyles.gridGap6Cols2}>
+              <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-timezone">Time zone</Label>
                 <Select
                   value={timezone === "" ? "local" : timezone}
                   onValueChange={(v) => setTimezone(v === "local" ? "" : v)}
                 >
-                  <SelectTrigger id="settings-timezone" className="w-full">
+                  <SelectTrigger id="settings-timezone" className={settingsStyles.wFull}>
                     <SelectValue placeholder="Local (system)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -593,13 +721,13 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-time-format">Time format</Label>
                 <Select
                   value={timeFormat}
                   onValueChange={(v) => setTimeFormat(v as TimeFormatSetting)}
                 >
-                  <SelectTrigger id="settings-time-format" className="w-full">
+                  <SelectTrigger id="settings-time-format" className={settingsStyles.wFull}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -608,13 +736,13 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-date-format">Date format</Label>
                 <Select
                   value={dateFormat}
                   onValueChange={(v) => setDateFormat(v as DateFormatSetting)}
                 >
-                  <SelectTrigger id="settings-date-format" className="w-full">
+                  <SelectTrigger id="settings-date-format" className={settingsStyles.wFull}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -626,13 +754,13 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-temp-unit">Temperature unit</Label>
                 <Select
                   value={temperatureUnit}
                   onValueChange={(v) => setTemperatureUnit(v as TemperatureUnit)}
                 >
-                  <SelectTrigger id="settings-temp-unit" className="w-full">
+                  <SelectTrigger id="settings-temp-unit" className={settingsStyles.wFull}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -644,20 +772,20 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Weather */}
-            <div className="space-y-1.5 mb-2">
-              <h2 className="text-base font-semibold">Weather</h2>
-              <p className="text-sm text-muted-foreground">
+            <div className={settingsStyles.sectionIntro}>
+              <h2 className={settingsStyles.textBaseSemibold}>Weather</h2>
+              <p className={settingsStyles.textSmMuted}>
                 Set a location for the home screen weather display. Leave empty to auto-detect.
               </p>
             </div>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
+            <div className={settingsStyles.gridGap6Cols2}>
+              <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-weather-location">Location</Label>
                 <WeatherLocationInput
                   value={weatherLocation}
                   onChange={setWeatherLocation}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className={settingsStyles.textXsMuted}>
                   City name, ZIP code, or coordinates (e.g. "New York", "10001", "40.7,-74.0").
                   Press Enter or click away to apply.
                 </p>
@@ -665,43 +793,151 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Visibility */}
-            <div className="space-y-1.5 mb-2">
-              <h2 className="text-base font-semibold">Visibility</h2>
-              <p className="text-sm text-muted-foreground">
+            <div className={settingsStyles.sectionIntro}>
+              <h2 className={settingsStyles.textBaseSemibold}>Visibility</h2>
+              <p className={settingsStyles.textSmMuted}>
                 Improve readability in bright or high-glare environments.
               </p>
             </div>
-            <div className="ui-panel-shell overflow-hidden divide-y divide-border/30">
-              <div className="flex items-center justify-between p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="settings-high-visibility" className="cursor-pointer">
+            <Paper className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowDivided)}>
+              <Group className={settingsStyles.rowBetweenP4} justify="space-between" align="center" wrap="nowrap">
+                <div className={settingsStyles.stack0_5}>
+                  <Label htmlFor="settings-high-visibility" className={settingsStyles.cursorPointer}>
                     High visibility mode
                   </Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className={settingsStyles.textXsMuted}>
                     Boost contrast, strengthen borders, and reduce transparency app-wide.
                   </p>
                 </div>
-                <Checkbox
+                <Switch
                   id="settings-high-visibility"
                   checked={highVisibility}
-                  onCheckedChange={(v) => setHighVisibility(v === true)}
+                  onCheckedChange={setHighVisibility}
+                  aria-label="High visibility mode"
                 />
+              </Group>
+              <Group className={settingsStyles.rowBetweenP4} justify="space-between" align="center" wrap="nowrap">
+                <div className={settingsStyles.stack0_5}>
+                  <Label htmlFor="settings-reduced-motion" className={settingsStyles.cursorPointer}>
+                    Reduced motion
+                  </Label>
+                  <p className={settingsStyles.textXsMuted}>
+                    Minimize animations and transitions for more comfortable motion-sensitive use.
+                  </p>
+                </div>
+                <Switch
+                  id="settings-reduced-motion"
+                  checked={reducedMotion}
+                  onCheckedChange={setReducedMotion}
+                  aria-label="Reduced motion"
+                />
+              </Group>
+            </Paper>
+
+            {/* Updates */}
+            <div className={settingsStyles.sectionIntro}>
+              <div className={settingsStyles.rowGap2}>
+                <h2 className={settingsStyles.textBaseSemibold}>Updates</h2>
+                <GitBranch className={settingsStyles.iconSmMuted} />
               </div>
+              <p className={settingsStyles.textSmMuted}>
+                Subscribe to GitHub release channels and manually install updates when available.
+              </p>
             </div>
+            <Paper className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowDivided)}>
+              <div className={settingsStyles.gridGap4P4Cols2}>
+                <div className={settingsStyles.stack2}>
+                  <Label htmlFor="settings-update-channel">Release channel</Label>
+                  <Select
+                    value={updates.channel}
+                    onValueChange={(value) => setUpdateChannel(value as ReleaseChannel)}
+                  >
+                    <SelectTrigger id="settings-update-channel">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELEASE_CHANNELS.map((channel) => (
+                        <SelectItem key={channel} value={channel}>
+                          {channel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className={settingsStyles.textXsMuted}>
+                    Main is the full release channel. Beta and RC receive pre-release builds.
+                  </p>
+                </div>
+                <div className={settingsStyles.stack2}>
+                  <Label>Channel status</Label>
+                  <div className={settingsStyles.channelStatusBox}>
+                    {availableUpdate ? (
+                      <div className={settingsStyles.stack1}>
+                        <p className={settingsStyles.fontMediumForeground}>Update available: {availableUpdate.version}</p>
+                        {availableUpdate.publishedAt ? (
+                          <p className={settingsStyles.textXsMuted}>Published: {new Date(availableUpdate.publishedAt).toLocaleString()}</p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className={settingsStyles.textMuted}>
+                        {updaterLastCheckedAt
+                          ? `No pending updates (last check: ${new Date(updaterLastCheckedAt).toLocaleString()})`
+                          : "No checks run yet"}
+                      </p>
+                    )}
+                  </div>
+                  {isUpdaterNotConfiguredError(updaterLastError) ? (
+                    <p className={settingsStyles.textXsMuted}>
+                      Updater is not configured in this build. Set `SIPALYZER_UPDATER_PUBKEY` at build time to enable update checks.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <Group className={settingsStyles.rowBetweenP4} justify="space-between" align="center" wrap="nowrap">
+                <div className={settingsStyles.stack0_5}>
+                  <Label htmlFor="settings-update-check-launch" className={settingsStyles.cursorPointer}>
+                    Check for updates on launch
+                  </Label>
+                  <p className={settingsStyles.textXsMuted}>
+                    Run a background check at startup and show a header badge when a new release is found.
+                  </p>
+                </div>
+                <Switch
+                  id="settings-update-check-launch"
+                  checked={updates.autoCheckOnLaunch}
+                  onCheckedChange={setUpdateAutoCheckOnLaunch}
+                  aria-label="Check for updates on launch"
+                />
+              </Group>
+              <Group className={settingsStyles.wrapGap2P4} gap="sm" align="center">
+                <Button variant="secondary" size="sm" onClick={() => void runUpdateCheck()} disabled={updaterChecking || updaterInstalling}>
+                  {updaterChecking ? <Loader2 className={settingsStyles.iconSpinnerSmMr} /> : <RefreshCw className={settingsStyles.iconSmMr} />}
+                  Check Now
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void runInstallUpdate()}
+                  disabled={!availableUpdate || updaterChecking || updaterInstalling}
+                >
+                  {updaterInstalling ? <Loader2 className={settingsStyles.iconSpinnerSmMr} /> : <Download className={settingsStyles.iconSmMr} />}
+                  Install Update
+                </Button>
+              </Group>
+            </Paper>
 
             {/* Window Behavior */}
-            <div className="space-y-1.5 mb-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold">Window Behavior</h2>
+            <div className={settingsStyles.sectionIntro}>
+              <div className={settingsStyles.rowGap2}>
+                <h2 className={settingsStyles.textBaseSemibold}>Window Behavior</h2>
                 {(isMac || isWindows) && (
                   isMac ? (
-                    <AppleLogo className="h-3.5 w-3.5 text-muted-foreground" aria-label="macOS settings" />
+                    <AppleLogo className={settingsStyles.iconSmMuted} aria-label="macOS settings" />
                   ) : (
-                    <WindowsLogo className="h-3.5 w-3.5 text-muted-foreground" aria-label="Windows settings" />
+                    <WindowsLogo className={settingsStyles.iconSmMuted} aria-label="Windows settings" />
                   )
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className={settingsStyles.textSmMuted}>
                 {isMac
                   ? "Configure Dock/menu bar presence and quit behavior for macOS."
                   : isWindows
@@ -709,13 +945,13 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     : "Control how the app appears in the system and behaves when closing."}
               </p>
             </div>
-            <div className="ui-panel-shell overflow-hidden divide-y divide-border/30">
+            <div className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowDivided)}>
               {isMac ? (
                 <>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label className="cursor-default">App visibility</Label>
-                      <p className="text-xs text-muted-foreground">
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label className={settingsStyles.cursorDefault}>App visibility</Label>
+                      <p className={settingsStyles.textXsMuted}>
                         Choose how SIPalyzer appears on macOS: Dock, menu bar, or both.
                       </p>
                     </div>
@@ -733,38 +969,29 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                           setShowTrayIcon(true);
                         }
                       }}
-                      className="grid grid-cols-3 gap-1 rounded-md border border-border/50 bg-muted/20 p-1"
+                      className={settingsStyles.macVisibilityGroup}
                       aria-label="macOS app visibility"
                     >
-                      <div className={cn(
-                        "flex items-center gap-1.5 rounded border border-transparent px-2 py-1.5",
-                        macVisibilityMode === "dock" && "bg-card border-border/60",
-                      )}>
+                      <div className={clsx(settingsStyles.macVisOption, macVisibilityMode === "dock" && settingsStyles.macVisOptionActive)}>
                         <RadioGroupItem id="settings-mac-visibility-dock" value="dock" />
-                        <Label htmlFor="settings-mac-visibility-dock" className="cursor-pointer text-xs">Dock</Label>
+                        <Label htmlFor="settings-mac-visibility-dock" className={settingsStyles.cursorPointerTextXs}>Dock</Label>
                       </div>
-                      <div className={cn(
-                        "flex items-center gap-1.5 rounded border border-transparent px-2 py-1.5",
-                        macVisibilityMode === "menu-bar" && "bg-card border-border/60",
-                      )}>
+                      <div className={clsx(settingsStyles.macVisOption, macVisibilityMode === "menu-bar" && settingsStyles.macVisOptionActive)}>
                         <RadioGroupItem id="settings-mac-visibility-menu" value="menu-bar" />
-                        <Label htmlFor="settings-mac-visibility-menu" className="cursor-pointer text-xs">Menu Bar</Label>
+                        <Label htmlFor="settings-mac-visibility-menu" className={settingsStyles.cursorPointerTextXs}>Menu Bar</Label>
                       </div>
-                      <div className={cn(
-                        "flex items-center gap-1.5 rounded border border-transparent px-2 py-1.5",
-                        macVisibilityMode === "both" && "bg-card border-border/60",
-                      )}>
+                      <div className={clsx(settingsStyles.macVisOption, macVisibilityMode === "both" && settingsStyles.macVisOptionActive)}>
                         <RadioGroupItem id="settings-mac-visibility-both" value="both" />
-                        <Label htmlFor="settings-mac-visibility-both" className="cursor-pointer text-xs">Both</Label>
+                        <Label htmlFor="settings-mac-visibility-both" className={settingsStyles.cursorPointerTextXs}>Both</Label>
                       </div>
                     </RadioGroup>
                   </div>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="settings-keep-running" className="cursor-pointer">
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label htmlFor="settings-keep-running" className={settingsStyles.cursorPointer}>
                         Keep app running when window closes
                       </Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={settingsStyles.textXsMuted}>
                         Closing the window keeps the app running in the background. Reopen from Dock or menu bar.
                       </p>
                     </div>
@@ -774,12 +1001,12 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       onCheckedChange={(v) => setMinimizeToTray(v === true)}
                     />
                   </div>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="settings-confirm-quit" className="cursor-pointer">
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label htmlFor="settings-confirm-quit" className={settingsStyles.cursorPointer}>
                         Confirm before quit (Cmd+Q)
                       </Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={settingsStyles.textXsMuted}>
                         {minimizeToTray
                           ? "Show a confirmation when quitting from Cmd+Q or the app menu. Closing the window only hides it."
                           : "Show a confirmation dialog when closing the app to prevent accidental data loss."}
@@ -794,10 +1021,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 </>
               ) : isWindows ? (
                 <>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="settings-show-dock" className="cursor-pointer">Show in taskbar</Label>
-                      <p className="text-xs text-muted-foreground">
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label htmlFor="settings-show-dock" className={settingsStyles.cursorPointer}>Show in taskbar</Label>
+                      <p className={settingsStyles.textXsMuted}>
                         Display the app in the Windows taskbar.
                         {!showTrayIcon && " Cannot be disabled while the tray icon is hidden."}
                       </p>
@@ -809,10 +1036,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       onCheckedChange={(v) => setHideDockIcon(v !== true)}
                     />
                   </div>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="settings-show-tray" className="cursor-pointer">Show in system tray</Label>
-                      <p className="text-xs text-muted-foreground">
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label htmlFor="settings-show-tray" className={settingsStyles.cursorPointer}>Show in system tray</Label>
+                      <p className={settingsStyles.textXsMuted}>
                         Display an icon in the system tray notification area.
                         {hideDockIcon && " Required while the app is hidden from the taskbar."}
                       </p>
@@ -824,12 +1051,12 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       onCheckedChange={(v) => setShowTrayIcon(v === true)}
                     />
                   </div>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="settings-keep-running" className={cn("cursor-pointer", !showTrayIcon && "text-muted-foreground")}>
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label htmlFor="settings-keep-running" className={clsx("cursor-pointer", !showTrayIcon && settingsStyles.labelMuted)}>
                         Minimize to tray on close
                       </Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={settingsStyles.textXsMuted}>
                         {showTrayIcon
                           ? "Closing the window minimizes to the system tray instead of quitting."
                           : "Requires the system tray icon to be enabled."}
@@ -842,12 +1069,12 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       onCheckedChange={(v) => setMinimizeToTray(v === true)}
                     />
                   </div>
-                  <div className="flex items-center justify-between p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="settings-confirm-quit" className="cursor-pointer">
+                  <div className={settingsStyles.rowBetweenP4}>
+                    <div className={settingsStyles.stack0_5}>
+                      <Label htmlFor="settings-confirm-quit" className={settingsStyles.cursorPointer}>
                         Confirm before exit
                       </Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={settingsStyles.textXsMuted}>
                         {minimizeToTray
                           ? "Show a confirmation when quitting from the tray menu. Closing the window only hides it."
                           : "Show a confirmation dialog when exiting the app."}
@@ -861,199 +1088,199 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   </div>
                 </>
               ) : (
-                <div className="p-4 text-xs text-muted-foreground">
+                <div className={settingsStyles.p4TextXsMuted}>
                   Window behavior controls are currently optimized for macOS and Windows.
                 </div>
               )}
             </div>
 
             {/* Backup & Restore */}
-            <div className="space-y-1.5 mb-2">
-              <h2 className="text-base font-semibold">Backup & Restore</h2>
-              <p className="text-sm text-muted-foreground">
+            <div className={settingsStyles.sectionIntro}>
+              <h2 className={settingsStyles.textBaseSemibold}>Backup & Restore</h2>
+              <p className={settingsStyles.textSmMuted}>
                 Create a full app backup file or restore one to recover your full workspace state.
               </p>
             </div>
-            <div className="ui-panel-shell p-4 space-y-3">
+            <Paper className={clsx("ui-panel-shell", settingsStyles.panelShellP4Stack3)}>
               <input
                 ref={backupFileInputRef}
                 type="file"
                 accept=".json,application/json"
-                className="hidden"
+                className={settingsStyles.hiddenInput}
                 onChange={(e) => handleRestoreFilePicked(e.target.files?.[0] ?? null)}
               />
-              <div className="flex flex-wrap items-center gap-2">
+              <Group className={settingsStyles.wrapItemsGap2} gap="sm" align="center">
                 <Button
-                  variant="neutral"
+                  variant="secondary"
                   size="sm"
                   disabled={backupBusy || restoreBusy}
                   onClick={handleCreateFullBackup}
                 >
-                  {backupBusy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+                  {backupBusy ? <Loader2 className={settingsStyles.iconSpinnerSmMr} /> : null}
                   Create Full Backup
                 </Button>
                 <Button
-                  variant="neutral"
+                  variant="secondary"
                   size="sm"
                   disabled={backupBusy || restoreBusy}
                   onClick={() => backupFileInputRef.current?.click()}
                 >
-                  {restoreBusy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+                  {restoreBusy ? <Loader2 className={settingsStyles.iconSpinnerSmMr} /> : null}
                   Restore Backup
                 </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
+              </Group>
+              <p className={settingsStyles.textXsMuted}>
                 Restore applies the backup immediately and persists it for the next launch.
               </p>
-            </div>
+            </Paper>
           </TabsContent>
 
-          <TabsContent value="notifications" className="flex-1 overflow-y-auto mt-0">
+          <TabsContent value="notifications" className={settingsStyles.tabsContentBase}>
             <NotificationSettings />
           </TabsContent>
 
-          <TabsContent value="user-agent" className="flex-1 overflow-y-auto mt-0 p-6 space-y-6">
-            <div className="space-y-1.5 mb-2">
-              <h2 className="text-base font-semibold">User-Agent Identity</h2>
-              <p className="text-sm text-muted-foreground">
+          <TabsContent value="user-agent" className={settingsStyles.tabsContentP6Space6}>
+            <div className={settingsStyles.sectionIntro}>
+              <h2 className={settingsStyles.textBaseSemibold}>User-Agent Identity</h2>
+              <p className={settingsStyles.textSmMuted}>
                 Configure a global User-Agent and optional per-feature overrides where supported.
               </p>
             </div>
 
-            <div className="ui-panel-shell rounded-md px-3 py-2">
-              <p className="text-xs text-muted-foreground">
+            <div className={clsx("ui-panel-shell", settingsStyles.panelShellRoundedContent)}>
+              <p className={settingsStyles.textXsMuted}>
                 Leave an override blank to inherit the global value. This keeps behavior consistent while still allowing targeted compatibility fixes.
               </p>
             </div>
 
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Global preset</Label>
+            <Stack className={settingsStyles.stack3} gap="sm">
+              <Label className={settingsStyles.textSmMedium}>Global preset</Label>
               <RadioGroup
                 value={userAgent.preset}
                 onValueChange={(v) => setUserAgentPreset(v as UserAgentPreset)}
-                className="grid gap-2"
+                className={settingsStyles.gridGap2}
               >
-                <label htmlFor="ua-default" className="flex items-start gap-3 rounded-md surface p-3 cursor-pointer hover:bg-muted/40 transition-smooth has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                  <RadioGroupItem value="default" id="ua-default" className="mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="font-medium">Default</span>
-                    <p className="text-xs text-muted-foreground">
+                <label htmlFor="ua-default" className={settingsStyles.uaPresetOption}>
+                  <RadioGroupItem value="default" id="ua-default" />
+                  <div className={settingsStyles.stack1}>
+                    <span className={settingsStyles.fontMedium}>Default</span>
+                    <p className={settingsStyles.textXsMuted}>
                       SIPalyzer version + OS + username
                     </p>
                   </div>
                 </label>
-                <label htmlFor="ua-info" className="flex items-start gap-3 rounded-md surface p-3 cursor-pointer hover:bg-muted/40 transition-smooth has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                  <RadioGroupItem value="info" id="ua-info" className="mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="font-medium">Info</span>
-                    <p className="text-xs text-muted-foreground">
+                <label htmlFor="ua-info" className={settingsStyles.uaPresetOption}>
+                  <RadioGroupItem value="info" id="ua-info" />
+                  <div className={settingsStyles.stack1}>
+                    <span className={settingsStyles.fontMedium}>Info</span>
+                    <p className={settingsStyles.textXsMuted}>
                       SIPalyzer version + OS only
                     </p>
                   </div>
                 </label>
-                <label htmlFor="ua-minimal" className="flex items-start gap-3 rounded-md surface p-3 cursor-pointer hover:bg-muted/40 transition-smooth has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                  <RadioGroupItem value="minimal" id="ua-minimal" className="mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="font-medium">Minimal</span>
-                    <p className="text-xs text-muted-foreground">
+                <label htmlFor="ua-minimal" className={settingsStyles.uaPresetOption}>
+                  <RadioGroupItem value="minimal" id="ua-minimal" />
+                  <div className={settingsStyles.stack1}>
+                    <span className={settingsStyles.fontMedium}>Minimal</span>
+                    <p className={settingsStyles.textXsMuted}>
                       SIPalyzer + version only
                     </p>
                   </div>
                 </label>
-                <label htmlFor="ua-custom" className="flex items-start gap-3 rounded-md surface p-3 cursor-pointer hover:bg-muted/40 transition-smooth has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                  <RadioGroupItem value="custom" id="ua-custom" className="mt-0.5" />
-                  <div className="space-y-1 flex-1">
-                    <span className="font-medium">Custom</span>
-                    <p className="text-xs text-muted-foreground">
+                <label htmlFor="ua-custom" className={settingsStyles.uaPresetOption}>
+                  <RadioGroupItem value="custom" id="ua-custom" />
+                  <div className={settingsStyles.stack1Flex1}>
+                    <span className={settingsStyles.fontMedium}>Custom</span>
+                    <p className={settingsStyles.textXsMuted}>
                       Use a custom User-Agent string
                     </p>
                   </div>
                 </label>
               </RadioGroup>
-            </div>
+            </Stack>
 
             {userAgent.preset === "custom" && (
-              <div className="space-y-2 rounded-md surface p-3">
+              <div className={settingsStyles.surfaceStack2P3}>
                 <Label htmlFor="user-agent-custom">Custom User-Agent</Label>
                 <Input
                   id="user-agent-custom"
                   value={userAgent.customValue}
                   onChange={(e) => setUserAgentCustomValue(e.target.value)}
                   placeholder="e.g. MyClient/1.0"
-                  className="font-mono text-sm"
+                  className={settingsStyles.monoTextSm}
                 />
               </div>
             )}
 
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Per-feature overrides</Label>
-              <div className="rounded-md surface divide-y divide-border/30">
+            <Stack className={settingsStyles.stack3} gap="sm">
+              <Label className={settingsStyles.textSmMedium}>Per-feature overrides</Label>
+              <div className={settingsStyles.surfaceRoundedDivided}>
                 {userAgentScopeRows.map((row) => (
-                  <div key={row.scope} className="p-3 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{row.label}</p>
-                      <p className="text-2xs text-muted-foreground">
+                  <div key={row.scope} className={settingsStyles.p3Stack1_5}>
+                    <div className={settingsStyles.rowBetweenGap2}>
+                      <p className={settingsStyles.textSmMedium}>{row.label}</p>
+                      <p className={settingsStyles.text2xsMuted}>
                         {userAgent.overrides?.[row.scope]?.trim() ? "Override" : "Inherit"}
                       </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{row.description}</p>
+                    <p className={settingsStyles.textXsMuted}>{row.description}</p>
                     <Input
                       value={userAgent.overrides?.[row.scope] ?? ""}
                       onChange={(e) => setUserAgentScopeOverride(row.scope, e.target.value)}
                       placeholder={row.placeholder}
-                      className="font-mono text-sm"
+                      className={settingsStyles.monoTextSm}
                     />
                   </div>
                 ))}
               </div>
-            </div>
+            </Stack>
 
-            <div className="ui-panel-shell p-4 space-y-2">
-              <Label className="section-label">Current value</Label>
-              <p className={cn("font-mono text-sm break-all", preview ? "text-foreground" : "text-muted-foreground")}>
+            <div className={clsx("ui-panel-shell", settingsStyles.panelShellP4Stack2)}>
+              <Label className={settingsStyles.sectionLabel}>Current value</Label>
+              <p className={clsx(settingsStyles.uaPreview, preview ? settingsStyles.uaPreviewActive : settingsStyles.uaPreviewInactive)}>
                 {preview || "—"}
               </p>
-              <div className="pt-1 space-y-1 text-xs">
-                <p className="text-muted-foreground">Composer HTTP: <span className="font-mono text-foreground">{scopePreview.composerHttp}</span></p>
-                <p className="text-muted-foreground">Composer GraphQL: <span className="font-mono text-foreground">{scopePreview.composerGraphql}</span></p>
-                <p className="text-muted-foreground">Composer SIP: <span className="font-mono text-foreground">{scopePreview.composerSip}</span></p>
-                <p className="text-muted-foreground">Provision fetches: <span className="font-mono text-foreground">{scopePreview.provisionFetch}</span></p>
+              <div className={settingsStyles.pt1Stack1TextXs}>
+                <p className={settingsStyles.textMuted}>Composer HTTP: <span className={settingsStyles.monoTextForeground}>{scopePreview.composerHttp}</span></p>
+                <p className={settingsStyles.textMuted}>Composer GraphQL: <span className={settingsStyles.monoTextForeground}>{scopePreview.composerGraphql}</span></p>
+                <p className={settingsStyles.textMuted}>Composer SIP: <span className={settingsStyles.monoTextForeground}>{scopePreview.composerSip}</span></p>
+                <p className={settingsStyles.textMuted}>Provision fetches: <span className={settingsStyles.monoTextForeground}>{scopePreview.provisionFetch}</span></p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div className={settingsStyles.rowBetweenPt1}>
               <TooltipWrapper entry={tooltips.settingsResetDefaults}>
                 <Button
-                  variant="neutral"
+                  variant="secondary"
                   size="sm"
                   onClick={() => {
                     resetUserAgent();
                     resetUserAgentScopeOverrides();
                   }}
                 >
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  <RotateCcw className={settingsStyles.iconMdMr} />
                   Reset all User-Agent settings
                 </Button>
               </TooltipWrapper>
             </div>
           </TabsContent>
 
-          <TabsContent value="packet-monitor" className="flex-1 overflow-y-auto mt-0 p-6 space-y-8">
-            <div className="space-y-1.5">
-              <h2 className="text-base font-semibold">Packet Monitor</h2>
-              <p className="text-sm text-muted-foreground">
+          <TabsContent value="packet-monitor" className={settingsStyles.tabsContentP6Space8}>
+            <div className={settingsStyles.stack1_5}>
+              <h2 className={settingsStyles.textBaseSemibold}>Packet Monitor</h2>
+              <p className={settingsStyles.textSmMuted}>
                 Capture engine, display behavior, and performance tuning for the packet monitor.
               </p>
             </div>
 
             {/* Capture Behavior */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Capture</h3>
-              <div className="ui-panel-shell divide-y divide-border/30">
-                <div className="flex items-center justify-between p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="pm-pipeline-mode" className="cursor-pointer">Pipeline mode (multi-threaded)</Label>
-                    <p className="text-xs text-muted-foreground">High-throughput capture with dedicated parser threads. Recommended for 100k+ pps.</p>
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Capture</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellDivided)}>
+                <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.stack0_5}>
+                    <Label htmlFor="pm-pipeline-mode" className={settingsStyles.cursorPointer}>Pipeline mode (multi-threaded)</Label>
+                    <p className={settingsStyles.textXsMuted}>High-throughput capture with dedicated parser threads. Recommended for 100k+ pps.</p>
                   </div>
                   <Checkbox
                     id="pm-pipeline-mode"
@@ -1061,10 +1288,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     onCheckedChange={(v) => setPacketMonitor({ pipelineMode: v === true })}
                   />
                 </div>
-                <div className="flex items-center justify-between p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="pm-auto-scroll" className="cursor-pointer">Auto-scroll to new packets</Label>
-                    <p className="text-xs text-muted-foreground">Automatically scroll to the latest packet during live capture.</p>
+                <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.stack0_5}>
+                    <Label htmlFor="pm-auto-scroll" className={settingsStyles.cursorPointer}>Auto-scroll to new packets</Label>
+                    <p className={settingsStyles.textXsMuted}>Automatically scroll to the latest packet during live capture.</p>
                   </div>
                   <Checkbox
                     id="pm-auto-scroll"
@@ -1076,11 +1303,11 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Memory & Sessions */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Memory & Sessions</h3>
-              <div className="ui-panel-shell grid gap-4 p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Memory & Sessions</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4P4)}>
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-ring-buffer">Ring buffer capacity</Label>
                     <Select
                       value={String(pm.ringBufferCapacity)}
@@ -1097,9 +1324,9 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                         <SelectItem value="10000000">10M packets</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Max packets held in memory per session.</p>
+                    <p className={settingsStyles.textXsMuted}>Max packets held in memory per session.</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-stream-max">Live stream buffer</Label>
                     <Select
                       value={String(pm.streamMaxPackets)}
@@ -1116,11 +1343,11 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                         <SelectItem value="100000">100K packets</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Max packets in the live streaming view.</p>
+                    <p className={settingsStyles.textXsMuted}>Max packets in the live streaming view.</p>
                   </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-max-sessions">Max sessions in memory</Label>
                     <Select
                       value={String(pm.maxSessionsInMemory)}
@@ -1136,7 +1363,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-session-timeout">Session timeout</Label>
                     <Select
                       value={String(pm.sessionTimeoutSecs)}
@@ -1153,18 +1380,18 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                         <SelectItem value="7200">2 hours</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Evict stopped sessions after this time.</p>
+                    <p className={settingsStyles.textXsMuted}>Evict stopped sessions after this time.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Polling & Display */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Polling & Display</h3>
-              <div className="ui-panel-shell grid gap-4 p-4">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Polling & Display</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4P4)}>
+                <div className={settingsStyles.gridGap4Cols3}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-packet-poll">Packet poll interval</Label>
                     <Select
                       value={String(pm.packetPollIntervalMs)}
@@ -1182,7 +1409,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-stats-poll">Stats poll interval</Label>
                     <Select
                       value={String(pm.statsPollIntervalMs)}
@@ -1199,7 +1426,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-page-size">Fetch page size</Label>
                     <Select
                       value={String(pm.pageSize)}
@@ -1215,21 +1442,21 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                         <SelectItem value="10000">10K</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Packets per batch fetch.</p>
+                    <p className={settingsStyles.textXsMuted}>Packets per batch fetch.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Pipeline Tuning */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold">Pipeline Tuning</h3>
-                <span className="text-xs text-muted-foreground">Advanced</span>
+            <div className={settingsStyles.stack4}>
+              <div className={settingsStyles.rowGap2}>
+                <h3 className={settingsStyles.textSmSemibold}>Pipeline Tuning</h3>
+                <span className={settingsStyles.textXsMuted}>Advanced</span>
               </div>
-              <div className="ui-panel-shell grid gap-4 p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4P4)}>
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-raw-queue">Raw packet queue</Label>
                     <Select
                       value={String(pm.pipelineRawQueueSize)}
@@ -1247,7 +1474,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-parsed-queue">Parsed packet queue</Label>
                     <Select
                       value={String(pm.pipelineParsedQueueSize)}
@@ -1266,8 +1493,8 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     </Select>
                   </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-parser-threads">Parser threads</Label>
                     <Select
                       value={String(pm.pipelineParserThreads)}
@@ -1286,7 +1513,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-write-batch">Write batch size</Label>
                     <Select
                       value={String(pm.pipelineWriteBatchSize)}
@@ -1303,18 +1530,18 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                         <SelectItem value="5000">5,000</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Packets written per PCAP batch.</p>
+                    <p className={settingsStyles.textXsMuted}>Packets written per PCAP batch.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* RTP Detection */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">RTP Detection</h3>
-              <div className="ui-panel-shell p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>RTP Detection</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellP4)}>
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-rtp-low">RTP port range (low)</Label>
                     <Input
                       id="pm-rtp-low"
@@ -1323,10 +1550,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       max="65535"
                       value={pm.rtpPortRangeLow}
                       onChange={(e) => setPacketMonitor({ rtpPortRangeLow: Math.max(1024, Math.min(65535, parseInt(e.target.value) || 10000)) })}
-                      className="font-mono text-sm"
+                      className={settingsStyles.monoTextSm}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-rtp-high">RTP port range (high)</Label>
                     <Input
                       id="pm-rtp-high"
@@ -1335,40 +1562,40 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       max="65535"
                       value={pm.rtpPortRangeHigh}
                       onChange={(e) => setPacketMonitor({ rtpPortRangeHigh: Math.max(1024, Math.min(65535, parseInt(e.target.value) || 60000)) })}
-                      className="font-mono text-sm"
+                      className={settingsStyles.monoTextSm}
                     />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
+                <p className={settingsStyles.textXsMutedMt3}>
                   UDP ports in this range are classified as RTP for stream detection and quality analysis.
                 </p>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className={settingsStyles.pt2}>
               <TooltipWrapper entry={tooltips.settingsResetDefaults}>
-                <Button variant="neutral" size="sm" onClick={resetPacketMonitor}>
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                <Button variant="secondary" size="sm" onClick={resetPacketMonitor}>
+                  <RotateCcw className={settingsStyles.iconMdMr} />
                   Reset all to defaults
                 </Button>
               </TooltipWrapper>
             </div>
           </TabsContent>
 
-          <TabsContent value="fax" className="flex-1 overflow-y-auto mt-0 p-6 space-y-8">
-            <div className="space-y-1.5">
-              <h2 className="text-base font-semibold">Fax Settings</h2>
-              <p className="text-sm text-muted-foreground">
+          <TabsContent value="fax" className={settingsStyles.tabsContentP6Space8}>
+            <div className={settingsStyles.stack1_5}>
+              <h2 className={settingsStyles.textBaseSemibold}>Fax Settings</h2>
+              <p className={settingsStyles.textSmMuted}>
                 T.30 / T.38 options for sending and receiving faxes.
               </p>
             </div>
 
             {/* Shared media allocation */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Media Port Range (Shared)</h3>
-              <div className="ui-panel-shell p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Media Port Range (Shared)</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellP4)}>
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-media-range-low">RTP/UDPTL range (low)</Label>
                     <Input
                       id="fax-media-range-low"
@@ -1381,10 +1608,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                           rangeLow: Math.max(1024, Math.min(65535, parseInt(e.target.value, 10) || 10000)),
                         })
                       }
-                      className="font-mono text-sm"
+                      className={settingsStyles.monoTextSm}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-media-range-high">RTP/UDPTL range (high)</Label>
                     <Input
                       id="fax-media-range-high"
@@ -1397,28 +1624,28 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                           rangeHigh: Math.max(1024, Math.min(65535, parseInt(e.target.value, 10) || 65500)),
                         })
                       }
-                      className="font-mono text-sm"
+                      className={settingsStyles.monoTextSm}
                     />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
+                <p className={settingsStyles.textXsMutedMt3}>
                   Shared allocation used by both Fax Center and Soft Phone media sessions.
                 </p>
               </div>
             </div>
 
             {/* Send & Receive Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold">Send & Receive (T.30)</h3>
-                <span className="text-xs text-muted-foreground">Common options</span>
+            <div className={settingsStyles.stack4}>
+              <div className={settingsStyles.rowGap2}>
+                <h3 className={settingsStyles.textSmSemibold}>Send & Receive (T.30)</h3>
+                <span className={settingsStyles.textXsMuted}>Common options</span>
               </div>
               
-              <div className="ui-panel-shell grid gap-4 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="fax-settings-ecm" className="cursor-pointer">ECM (Error Correction Mode)</Label>
-                    <p className="text-xs text-muted-foreground">Reduces errors over poor lines</p>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4P4)}>
+                <div className={settingsStyles.rowBetween}>
+                  <div className={settingsStyles.stack0_5}>
+                    <Label htmlFor="fax-settings-ecm" className={settingsStyles.cursorPointer}>ECM (Error Correction Mode)</Label>
+                    <p className={settingsStyles.textXsMuted}>Reduces errors over poor lines</p>
                   </div>
                   <Checkbox
                     id="fax-settings-ecm"
@@ -1426,10 +1653,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     onCheckedChange={(v) => setFax({ ecm: v === true })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="fax-settings-g711-only" className="cursor-pointer">Use G.711 only (no T.38)</Label>
-                    <p className="text-xs text-muted-foreground">Send fax over G.711 audio only</p>
+                <div className={settingsStyles.rowBetween}>
+                  <div className={settingsStyles.stack0_5}>
+                    <Label htmlFor="fax-settings-g711-only" className={settingsStyles.cursorPointer}>Use G.711 only (no T.38)</Label>
+                    <p className={settingsStyles.textXsMuted}>Send fax over G.711 audio only</p>
                   </div>
                   <Checkbox
                     id="fax-settings-g711-only"
@@ -1437,8 +1664,8 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     onCheckedChange={(v) => setFax({ useG711Only: v === true })}
                   />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 pt-2">
-                  <div className="space-y-2">
+                <div className={settingsStyles.gridGap4Cols2Pt2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-baud">Baud rate</Label>
                     <Select
                       value={String(faxSafe.baudRate)}
@@ -1456,7 +1683,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-resolution">Resolution</Label>
                     <Select
                       value={faxSafe.resolution}
@@ -1476,10 +1703,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Send Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Send</h3>
-              <div className="ui-panel-shell grid gap-4 sm:grid-cols-3 p-4">
-                <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Send</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4Cols3P4)}>
+                <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-send-retries">Max retries</Label>
                   <Select
                     value={String(faxSafe.sendRetries)}
@@ -1497,7 +1724,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-dis-timeout">DIS timeout</Label>
                   <Select
                     value={String(faxSafe.disTimeoutSecs)}
@@ -1515,7 +1742,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-mcf-timeout">MCF timeout</Label>
                   <Select
                     value={String(faxSafe.mcfTimeoutSecs)}
@@ -1537,11 +1764,11 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Receive Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Receive</h3>
-              <div className="ui-panel-shell grid gap-4 p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Receive</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4P4)}>
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-receive-timeout">Receive timeout</Label>
                     <Select
                       value={String(faxSafe.receiveTimeoutSecs)}
@@ -1559,7 +1786,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-auto-answer">Auto-answer after</Label>
                     <Select
                       value={String(faxSafe.autoAnswerRings)}
@@ -1579,46 +1806,46 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-save-folder">Save received to folder</Label>
                   <Input
                     id="fax-settings-save-folder"
                     value={faxSafe.saveReceivedToFolder}
                     onChange={(e) => setFax({ saveReceivedToFolder: e.target.value })}
                     placeholder="Leave empty for app only"
-                    className="font-mono text-sm"
+                    className={settingsStyles.monoTextSm}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className={settingsStyles.textXsMuted}>
                     Optional folder path. Empty = store in app only.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className={settingsStyles.pt2}>
               <TooltipWrapper entry={tooltips.settingsResetDefaults}>
-                <Button variant="neutral" size="sm" onClick={resetFax}>
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                <Button variant="secondary" size="sm" onClick={resetFax}>
+                  <RotateCcw className={settingsStyles.iconMdMr} />
                   Reset all to defaults
                 </Button>
               </TooltipWrapper>
             </div>
           </TabsContent>
 
-          <TabsContent value="terminal" className="flex-1 overflow-y-auto mt-0 p-6 space-y-8">
-            <div className="space-y-1.5">
-              <h2 className="text-base font-semibold">Terminal</h2>
-              <p className="text-sm text-muted-foreground">
+          <TabsContent value="terminal" className={settingsStyles.tabsContentP6Space8}>
+            <div className={settingsStyles.stack1_5}>
+              <h2 className={settingsStyles.textBaseSemibold}>Terminal</h2>
+              <p className={settingsStyles.textSmMuted}>
                 Appearance and behavior settings for the built-in terminal emulator.
               </p>
             </div>
 
             {/* Appearance */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Appearance</h3>
-              <div className="ui-panel-shell grid gap-4 p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Appearance</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4P4)}>
+                <div className={settingsStyles.gridGap4Cols2}>
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="term-font-size">Font size</Label>
                     <Select
                       value={String(terminalSettings.fontSize)}
@@ -1634,7 +1861,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className={settingsStyles.stack2}>
                     <Label htmlFor="term-line-height">Line height</Label>
                     <Select
                       value={String(terminalSettings.lineHeight)}
@@ -1655,16 +1882,16 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Cursor */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Cursor</h3>
-              <div className="ui-panel-shell divide-y divide-border/30">
-                <div className="p-4 space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Cursor</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellDivided)}>
+                <div className={settingsStyles.p4Stack2}>
                   <Label htmlFor="term-cursor-style">Cursor style</Label>
                   <Select
                     value={terminalSettings.cursorStyle}
                     onValueChange={(v) => setTerminal({ cursorStyle: v as TerminalCursorStyle })}
                   >
-                    <SelectTrigger id="term-cursor-style" className="w-full sm:w-48">
+                    <SelectTrigger id="term-cursor-style" className={settingsStyles.wFullSm48}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1674,10 +1901,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center justify-between p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="term-cursor-blink" className="cursor-pointer">Blinking cursor</Label>
-                    <p className="text-xs text-muted-foreground">Animate the terminal cursor.</p>
+                <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.stack0_5}>
+                    <Label htmlFor="term-cursor-blink" className={settingsStyles.cursorPointer}>Blinking cursor</Label>
+                    <p className={settingsStyles.textXsMuted}>Animate the terminal cursor.</p>
                   </div>
                   <Checkbox
                     id="term-cursor-blink"
@@ -1689,16 +1916,16 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </div>
 
             {/* Behavior */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Behavior</h3>
-              <div className="ui-panel-shell divide-y divide-border/30">
-                <div className="p-4 space-y-2">
+            <div className={settingsStyles.stack4}>
+              <h3 className={settingsStyles.textSmSemibold}>Behavior</h3>
+              <div className={clsx("ui-panel-shell", settingsStyles.panelShellDivided)}>
+                <div className={settingsStyles.p4Stack2}>
                   <Label htmlFor="term-scrollback">Scrollback buffer</Label>
                   <Select
                     value={String(terminalSettings.scrollback)}
                     onValueChange={(v) => setTerminal({ scrollback: Number(v) })}
                   >
-                    <SelectTrigger id="term-scrollback" className="w-full sm:w-48">
+                    <SelectTrigger id="term-scrollback" className={settingsStyles.wFullSm48}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1710,14 +1937,14 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       <SelectItem value="100000">100,000 lines</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
+                  <p className={settingsStyles.textXsMuted}>
                     Number of lines kept in the scroll history. Higher values use more memory.
                   </p>
                 </div>
-                <div className="flex items-center justify-between p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="term-confirm-close" className="cursor-pointer">Confirm before closing</Label>
-                    <p className="text-xs text-muted-foreground">Show a confirmation dialog when closing the terminal window. All active sessions will be terminated.</p>
+                <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.stack0_5}>
+                    <Label htmlFor="term-confirm-close" className={settingsStyles.cursorPointer}>Confirm before closing</Label>
+                    <p className={settingsStyles.textXsMuted}>Show a confirmation dialog when closing the terminal window. All active sessions will be terminated.</p>
                   </div>
                   <Checkbox
                     id="term-confirm-close"
@@ -1728,21 +1955,21 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className={settingsStyles.pt2}>
               <TooltipWrapper entry={tooltips.settingsResetDefaults}>
-                <Button variant="neutral" size="sm" onClick={resetTerminal}>
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                <Button variant="secondary" size="sm" onClick={resetTerminal}>
+                  <RotateCcw className={settingsStyles.iconMdMr} />
                   Reset all to defaults
                 </Button>
               </TooltipWrapper>
             </div>
           </TabsContent>
 
-          <TabsContent value="soft-phone" className="flex-1 overflow-y-auto mt-0">
+          <TabsContent value="soft-phone" className={settingsStyles.tabsContentBase}>
             <Suspense
               fallback={
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <div className={settingsStyles.centerPy12}>
+                  <Loader2 className={settingsStyles.iconSpinnerLgMuted} />
                 </div>
               }
             >
@@ -1750,21 +1977,21 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             </Suspense>
           </TabsContent>
 
-          <TabsContent value="inventory" className="flex-1 overflow-y-auto mt-0 p-6">
-            <div className="space-y-1.5 mb-4">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" />
-                <h2 className="text-base font-semibold">Tools & Licenses</h2>
+          <TabsContent value="inventory" className={settingsStyles.tabsContentP6}>
+            <div className={settingsStyles.sectionIntroLg}>
+              <div className={settingsStyles.rowGap2}>
+                <Package className={settingsStyles.iconMdPrimary} />
+                <h2 className={settingsStyles.textBaseSemibold}>Tools & Licenses</h2>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className={settingsStyles.textSmMuted}>
                 Manifest-driven inventory of tool modules and dependency licenses.
               </p>
             </div>
-            <div className="ui-panel-shell overflow-hidden">
+            <div className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowHidden)}>
               <Suspense
                 fallback={
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <div className={settingsStyles.centerPy12}>
+                    <Loader2 className={settingsStyles.iconSpinnerLgMuted} />
                   </div>
                 }
               >

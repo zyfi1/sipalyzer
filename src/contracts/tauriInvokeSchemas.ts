@@ -275,6 +275,13 @@ const mcpConnectionTestResultSchema = z.object({
   message: z.string(),
 });
 
+const updaterReleaseInfoSchema = z.object({
+  version: z.string(),
+  currentVersion: z.string(),
+  notes: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+});
+
 export const tauriInvokeResponseSchemas: Record<string, z.ZodTypeAny> = {
   remote_agent_start_listener: tauriUnitResultSchema,
   remote_agent_stop_listener: tauriUnitResultSchema,
@@ -325,6 +332,8 @@ export const tauriInvokeResponseSchemas: Record<string, z.ZodTypeAny> = {
   mcp_start_hosted_server: mcpHostedServerStateSchema,
   mcp_stop_hosted_server: tauriUnitResultSchema,
   mcp_get_hosted_server_state: mcpHostedServerStateSchema.nullable(),
+  updater_check: updaterReleaseInfoSchema.nullable(),
+  updater_install: updaterReleaseInfoSchema.nullable(),
 };
 
 export const tauriInvokePayloadSchemas: Record<string, z.ZodTypeAny> = {
@@ -476,4 +485,10 @@ export const tauriInvokePayloadSchemas: Record<string, z.ZodTypeAny> = {
   }),
   mcp_stop_hosted_server: z.object({}).passthrough().optional(),
   mcp_get_hosted_server_state: z.object({}).passthrough().optional(),
+  updater_check: z.object({
+    channel: z.enum(["beta", "rc", "main"]),
+  }),
+  updater_install: z.object({
+    channel: z.enum(["beta", "rc", "main"]),
+  }),
 };

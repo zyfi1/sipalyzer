@@ -13,14 +13,17 @@ fn main() {
     // Always run Tauri build
     tauri_build::build();
 
-    // Strict agnostic mode (default): skip all host-native probing/tooling.
-    // Opt in with `--features native_extensions` when native SpanDSP/Vosk integration
+    // Vosk STT is a regular dependency, so always configure its library path when
+    // bundled artifacts are present for the active target.
+    link_vosk();
+
+    // Strict agnostic mode (default): skip SpanDSP host-native probing/tooling.
+    // Opt in with `--features native_extensions` when native SpanDSP integration
     // is explicitly desired for local/dev or distribution builds.
     if native_extensions_enabled() {
-        link_vosk();
         link_spandsp();
     } else {
-        println!("cargo:warning=native_extensions disabled; skipping SpanDSP/Vosk native build steps.");
+        println!("cargo:warning=native_extensions disabled; skipping SpanDSP native build steps.");
     }
 
     // Link macOS Foundation framework (used by various system integrations)

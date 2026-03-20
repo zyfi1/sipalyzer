@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invokeTauri } from "@/api/invoke";
+import { DEFAULT_RELEASE_CHANNEL, type ReleaseChannel } from "@/lib/updater/channels";
 
 export type UserAgentPreset = "default" | "info" | "minimal" | "custom";
 export type UserAgentScope = "composerHttp" | "composerGraphql" | "composerSip" | "provisionFetch";
@@ -116,6 +117,12 @@ export type DateFormatSetting = "system" | "MM/DD/YYYY" | "DD/MM/YYYY" | "YYYY-M
 /** Temperature unit. Stored in Settings → General. */
 export type TemperatureUnit = "celsius" | "fahrenheit";
 
+/** App update channel/preferences. Stored in Settings → General. */
+export interface UpdateSettings {
+  channel: ReleaseChannel;
+  autoCheckOnLaunch: boolean;
+}
+
 export interface AppSettingsState {
   userAgent: UserAgentSettings;
   fax: FaxSettings;
@@ -137,6 +144,8 @@ export interface AppSettingsState {
   weatherLon: number | null;
   /** Increase contrast and reduce transparency for bright/high-glare environments. */
   highVisibility: boolean;
+  /** Reduce or disable most animations/transitions app-wide for accessibility. */
+  reducedMotion: boolean;
   /** When true, show a confirmation dialog before closing the app window. */
   confirmOnClose: boolean;
   /** When true, closing the window hides it to the system tray instead of quitting. */
@@ -145,6 +154,8 @@ export interface AppSettingsState {
   hideDockIcon: boolean;
   /** When true, show the system tray (Windows/Linux) or menu bar (macOS) icon. */
   showTrayIcon: boolean;
+  /** Update source channel and launch check behavior. */
+  updates: UpdateSettings;
   setUserAgentPreset: (preset: UserAgentPreset) => void;
   setUserAgentCustomValue: (value: string) => void;
   setUserAgentScopeOverride: (scope: UserAgentScope, value: string) => void;
@@ -171,6 +182,7 @@ export interface AppSettingsState {
   setWeatherLocation: (location: string) => void;
   setWeatherCoords: (lat: number | null, lon: number | null) => void;
   setHighVisibility: (v: boolean) => void;
+  setReducedMotion: (v: boolean) => void;
   setConfirmOnClose: (v: boolean) => void;
   setMinimizeToTray: (v: boolean) => void;
   syncMinimizeToTrayToBackend: () => Promise<void>;
@@ -178,6 +190,8 @@ export interface AppSettingsState {
   syncHideDockIconToBackend: () => Promise<void>;
   setShowTrayIcon: (v: boolean) => void;
   syncShowTrayIconToBackend: () => Promise<void>;
+  setUpdateChannel: (channel: ReleaseChannel) => void;
+  setUpdateAutoCheckOnLaunch: (enabled: boolean) => void;
 }
 
 const defaultUserAgentScopeOverrides: UserAgentScopeOverrides = {
@@ -242,6 +256,10 @@ const defaultMediaPortSettings: MediaPortSettings = {
 
 const defaultTimezone: TimezoneSetting = "";
 const defaultTimeFormat: TimeFormatSetting = "24h";
+const defaultUpdateSettings: UpdateSettings = {
+  channel: DEFAULT_RELEASE_CHANNEL,
+  autoCheckOnLaunch: true,
+};
 
 export const useSettingsStore = create<AppSettingsState>()(
   (set, get) => ({
@@ -258,10 +276,12 @@ export const useSettingsStore = create<AppSettingsState>()(
     weatherLat: null,
     weatherLon: null,
     highVisibility: false,
+    reducedMotion: false,
     confirmOnClose: false,
     minimizeToTray: false,
     hideDockIcon: false,
     showTrayIcon: true,
+    updates: defaultUpdateSettings,
 
       setTimezone: (tz) => set({ timezone: tz }),
       setTimeFormat: (format) => set({ timeFormat: format }),
@@ -270,6 +290,7 @@ export const useSettingsStore = create<AppSettingsState>()(
       setWeatherLocation: (location) => set({ weatherLocation: location }),
       setWeatherCoords: (lat, lon) => set({ weatherLat: lat, weatherLon: lon }),
       setHighVisibility: (v) => set({ highVisibility: v }),
+      setReducedMotion: (v) => set({ reducedMotion: v }),
       setConfirmOnClose: (v) => set({ confirmOnClose: v }),
       setMinimizeToTray: (v) => {
         set({ minimizeToTray: v });
@@ -328,6 +349,10 @@ export const useSettingsStore = create<AppSettingsState>()(
           // Backend not ready (dev without Tauri)
         }
       },
+      setUpdateChannel: (channel) =>
+        set((s) => ({ updates: { ...s.updates, channel } })),
+      setUpdateAutoCheckOnLaunch: (enabled) =>
+        set((s) => ({ updates: { ...s.updates, autoCheckOnLaunch: enabled } })),
 
       setUserAgentPreset: (preset) => {
         set((s) => ({
