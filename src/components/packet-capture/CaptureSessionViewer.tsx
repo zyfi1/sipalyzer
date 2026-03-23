@@ -546,6 +546,25 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
     }
   }, [session.id, stopCapture, wiresharkFilter, fetchPackets, fetchStats]);
 
+  const prepareForPcapExport = useCallback(async (): Promise<boolean> => {
+    if (!isRunning) return true;
+    try {
+      await stopCapture(session.id);
+      await fetchPackets(wiresharkFilter);
+      await fetchStats();
+      return true;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      notify({
+        source: "packet-capture",
+        type: "error",
+        title: "Stop failed",
+        description: msg,
+      });
+      return false;
+    }
+  }, [isRunning, session.id, stopCapture, wiresharkFilter, fetchPackets, fetchStats, notify]);
+
   // Refresh packets
   const handleRefresh = useCallback(() => {
     fetchPackets(wiresharkFilter);

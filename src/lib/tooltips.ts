@@ -168,7 +168,11 @@ export const tooltips = {
   captureFilter: { title: "Display filter", description: "Wireshark-style BPF filter applied after capture. Filters the displayed packets without affecting what's captured." },
   captureInvalidFilter: (msg: string) => ({ title: "Invalid filter", description: msg } as TooltipEntry),
   captureImportPcap: { title: "Import PCAP", description: "Load a PCAP file from disk into a new capture session." },
-  captureExport: { title: "Export", description: "Export packets to PCAP, JSON, or CSV. Useful for sharing with Wireshark or other tools." },
+  captureExport: {
+    title: "Save or export",
+    description:
+      "Save PCAP to disk, add a copy to Captures, or export the visible packets as CSV, JSON, or HTML.",
+  },
   captureBookmarks: { title: "Bookmarks", description: "Saved packet positions for quick navigation during analysis." },
   captureSavedFilters: { title: "Saved filters", description: "Reuse previously saved display filters for common analysis patterns." },
   captureRtpStreams: { title: "RTP streams", description: "Real-time Transport Protocol media streams: SSRC, codec, jitter, loss, and MOS quality." },

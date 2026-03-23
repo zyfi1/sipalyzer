@@ -146,6 +146,11 @@ interface ExportDialogProps {
   packets: PacketInfo[];
   /** Active capture session ID — required for PCAP export and lazy-loading. */
   sessionId: string | null;
+  /**
+   * Run before PCAP export (file or Captures). Return false to abort (e.g. user cancelled stop).
+   * Use to stop a live capture so a PCAP file exists on disk.
+   */
+  prepareForPcapExport?: () => Promise<boolean>;
 }
 
 export function ExportDialog({
@@ -153,6 +158,7 @@ export function ExportDialog({
   onOpenChange,
   packets,
   sessionId,
+  prepareForPcapExport,
 }: ExportDialogProps) {
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [includeDecoded, setIncludeDecoded] = useState(false);
@@ -312,6 +318,13 @@ export function ExportDialog({
     setExporting(true);
     try {
       if (format === "pcap") {
+        if (prepareForPcapExport) {
+          const ok = await prepareForPcapExport();
+          if (!ok) {
+            setExporting(false);
+            return;
+          }
+        }
         if (pcapDestination === "library") {
           const newSessionId = await duplicateCaptureToLibrary(sessionId!);
           await fetchSessions();

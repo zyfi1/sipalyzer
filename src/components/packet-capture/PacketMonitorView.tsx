@@ -20,13 +20,11 @@ import {
   RefreshCw,
   Bookmark,
   ExternalLink,
-  Download,
   Save,
   PanelRightOpen,
   PanelRightClose,
   Scan,
   Activity,
-  ChevronDown,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { AppDivider, PanelResizeHandle } from "@/components/ui/panel-chrome";
@@ -40,17 +38,9 @@ import {
   startCapturePipeline,
   getLiveStatistics,
   getPipelineStats,
-  exportPcap,
-  duplicateCaptureToLibrary,
   type LiveStatsSnapshot,
   type PipelineStats,
 } from "@/api/packetCapture";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import { UnifiedControlBar } from "./monitor/UnifiedControlBar";
 import { WarperPacketList } from "./monitor/WarperPacketList";
@@ -70,6 +60,8 @@ import {
   getPrimaryPacketIndex,
 } from "@/lib/expertFindingUtils";
 import { FilterDialog } from "./FilterDialog";
+import { ExportDialog } from "./monitor/ExportDialog";
+import { tooltips } from "@/lib/tooltips";
 
 type DiagnosticsSectionId = "findings" | "stats" | "flow" | "rtp";
 type SidebarPane = "details" | "diagnostics";
@@ -175,9 +167,9 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [captureFilterConfig, setCaptureFilterConfig] = useState<FilterConfig>(DEFAULT_CAPTURE_FILTER_CONFIG);
   const [showCaptureFilterDialog, setShowCaptureFilterDialog] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
   const setPacketMonitorActive = usePacketCaptureStore((s) => s.setPacketMonitorActive);
-  const fetchSessions = usePacketCaptureStore((s) => s.fetchSessions);
   useEffect(() => {
     if (isActiveTab) setPacketMonitorActive(isCapturing);
     return () => { if (isActiveTab) setPacketMonitorActive(false); };
@@ -447,39 +439,6 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
     }
   }, [sessionId, isCapturing, notify, tabId, updateTab, storeStopCapture]);
 
-  const handleExportPcap = useCallback(async () => {
-    if (!(await ensureStoppedForExport())) return;
-    if (!sessionId) return;
-    try {
-      const path = await exportPcap(sessionId);
-      notify({ source: "packet-capture", type: "success", title: "PCAP Exported", description: `Saved to ${path}` });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      if (!msg.includes("cancelled")) {
-        notify({ source: "packet-capture", type: "error", title: "Export Failed", description: msg });
-      }
-    }
-  }, [sessionId, notify, ensureStoppedForExport]);
-
-  const handleDuplicateToCapturesLibrary = useCallback(async () => {
-    if (!(await ensureStoppedForExport())) return;
-    if (!sessionId) return;
-    try {
-      await duplicateCaptureToLibrary(sessionId);
-      await fetchSessions();
-      navigateTo("packet-capture", "captures");
-      notify({
-        source: "packet-capture",
-        type: "success",
-        title: "Added to Captures",
-        description: "A new session was created from this PCAP. Open it in Viewer or splice again.",
-      });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      notify({ source: "packet-capture", type: "error", title: "Could not add to Captures", description: msg });
-    }
-  }, [sessionId, notify, ensureStoppedForExport, fetchSessions]);
-
   const annotationStore = usePacketAnnotationStore();
   const annotationSessionId = sessionId ?? `__tab_${tabId}__`;
   const annotationsMap = useMemo<Record<number, PacketAnnotation>>(() => {
@@ -705,30 +664,17 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
                     </Button>
                   </TooltipWrapper>
                   <AppDivider orientation="vertical" size="md" className="mx-0.5 shrink-0" />
-                  <TooltipWrapper content="Save PCAP to disk or add a copy to the Captures library">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="neutral"
-                          size="sm"
-                          className="h-7 gap-0.5 px-1.5"
-                          aria-label="Export PCAP options"
-                          disabled={!hasData}
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          <ChevronDown className="h-3 w-3 opacity-70" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-[13.5rem]">
-                        <DropdownMenuItem onClick={handleExportPcap}>
-                          Save PCAP to file…
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleDuplicateToCapturesLibrary}>
-                          Add copy to Captures…
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <TooltipWrapper entry={tooltips.captureExport}>
+                    <Button
+                      type="button"
+                      variant="neutral"
+                      size="icon-sm"
+                      aria-label="Save or export packets"
+                      disabled={!hasData}
+                      onClick={() => setShowExport(true)}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                    </Button>
                   </TooltipWrapper>
                   <TooltipWrapper content="Save this capture and open it in the Captures viewer">
                     <Button
@@ -977,6 +923,16 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
             setShowCaptureFilterDialog(false);
           }}
           onCancel={() => setShowCaptureFilterDialog(false)}
+        />
+      )}
+
+      {showExport && (
+        <ExportDialog
+          open={showExport}
+          onOpenChange={setShowExport}
+          packets={displayPackets}
+          sessionId={sessionId}
+          prepareForPcapExport={ensureStoppedForExport}
         />
       )}
     </div>
