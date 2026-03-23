@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useToolStore } from "@/stores/toolStore";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer, ViewFooterDivider } from "@/components/layout/ViewFooter";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import { cn } from "@/lib/utils";
-import { Activity, Globe, Network, AlertCircle } from "@/lib/icons";
-import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { LiveIndicator } from "@/components/ui/live-indicator";
-import { tooltips } from "@/lib/tooltips";
-import { useNetworkTestStore } from "@/stores/networkTestStore";
+import { AlertCircle } from "@/lib/icons";
 import type { NetworkCapabilityReport } from "@/types/networkTest";
 import { networkGetCapabilities } from "@/api/networkTest";
 
@@ -50,11 +45,6 @@ export function NetworkTestTool() {
   const [activeTab, setActiveTab] = useState<string>(SUBVIEW_PING);
   const [capabilities, setCapabilities] = useState<NetworkCapabilityReport | null>(null);
 
-  const healthCheck = useNetworkTestStore((s) => s.healthCheck);
-  const bulkRunning = useNetworkTestStore((s) => s.bulkRunning);
-  const monitorRunning = useNetworkTestStore((s) => s.monitorRunning);
-  const monitorSamples = useNetworkTestStore((s) => s.monitorSamples);
-
   useEffect(() => {
     if (activeToolId !== "network-test") return;
     if (activeSubviewId && VALID_SUBVIEWS.includes(activeSubviewId as (typeof VALID_SUBVIEWS)[number])) {
@@ -81,11 +71,6 @@ export function NetworkTestTool() {
       cancelled = true;
     };
   }, []);
-
-  const isMonitorTab = activeTab === SUBVIEW_MONITOR;
-  const isCurrentSubviewRunning = isMonitorTab
-    ? monitorRunning
-    : healthCheck.status === "running" || bulkRunning;
 
   const DEFAULT_EXEC_MAP: Record<string, string> = useMemo(() => ({
     [SUBVIEW_PING]: "ping",
@@ -195,45 +180,6 @@ export function NetworkTestTool() {
           </TabsContent>
         </div>
 
-        <ViewFooter>
-          {isCurrentSubviewRunning ? (
-            <ViewFooterItem>
-              <LiveIndicator variant="dot" size="sm" />
-              <span className="text-foreground font-medium">
-                {isMonitorTab ? "Monitoring" : bulkRunning ? "Testing All" : healthCheck.status === "running" ? "Health Check" : "Testing"}
-              </span>
-            </ViewFooterItem>
-          ) : (
-            <ViewFooterItem>
-              <Activity className="h-3 w-3" />
-              <span>Ready</span>
-            </ViewFooterItem>
-          )}
-
-          {!isMonitorTab && healthCheck.result && (
-            <>
-              <ViewFooterDivider />
-              <TooltipWrapper entry={tooltips.netEnvInternet}>
-                <ViewFooterItem className="cursor-help">
-                  <Globe className="h-3 w-3" />
-                  <span>{healthCheck.result.internet_reachable ? "Online" : "Offline"}</span>
-                </ViewFooterItem>
-              </TooltipWrapper>
-            </>
-          )}
-
-          <ViewFooterSpacer />
-
-          {isMonitorTab && monitorSamples.length > 0 && (
-            <TooltipWrapper entry={tooltips.netMonitorLive}>
-              <ViewFooterItem className="cursor-help">
-                <Network className="h-3 w-3" />
-                <span className="tabular-nums">{monitorSamples.length}</span>
-                <span>samples</span>
-              </ViewFooterItem>
-            </TooltipWrapper>
-          )}
-        </ViewFooter>
       </Tabs>
     </div>
   );

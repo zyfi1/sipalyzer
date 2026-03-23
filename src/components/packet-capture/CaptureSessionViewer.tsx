@@ -25,15 +25,18 @@ import {
   MaximizeScreen,
   MinimizeScreen,
   Square,
-  Download,
+  Save,
   Upload,
   Loader2,
   ExternalLink,
+  Scan,
+  Activity,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider, PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
-import type { CaptureSession, PacketInfo, CaptureStatistics } from "@/types/packetCapture";
+import type { CaptureSession, PacketInfo, CaptureStatistics, ExpertFinding } from "@/types/packetCapture";
 import {
   getFilteredPackets,
   getCaptureStatistics,
@@ -57,12 +60,21 @@ import { LiveStatsPanel } from "./monitor/LiveStatsPanel";
 import { ExportDialog } from "./monitor/ExportDialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FindingsPanel } from "./monitor/FindingsPanel";
-import { CallFlowTab } from "./monitor/CallFlowTab";
+import { LiveRtpQualityPanel } from "./monitor/LiveRtpQualityPanel";
 import { PacketDetailsPopout } from "./monitor/PacketDetailsPopout";
 import {
   buildFindingDisplayFilter,
   getPrimaryPacketIndex,
 } from "@/lib/expertFindingUtils";
+
+type DiagnosticsSectionId = "findings" | "stats" | "rtp";
+type SidebarPane = "details" | "diagnostics";
+
+const DIAGNOSTICS_SECTIONS: { id: DiagnosticsSectionId; label: string }[] = [
+  { id: "findings", label: "Findings" },
+  { id: "stats", label: "Stats" },
+  { id: "rtp", label: "RTP" },
+];
 
 function didPacketWindowChange(prev: PacketInfo[], next: PacketInfo[]): boolean {
   if (prev === next) return false;
@@ -195,11 +207,11 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const [detailsPopoutOpen, setDetailsPopoutOpen] = useState(false);
   const contentSplitRef = useRef<HTMLDivElement | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<"details" | "stats" | "expert">("details");
-  const [popoutTab, setPopoutTab] = useState<"details" | "stats" | "expert">("details");
+  const [sidebarPane, setSidebarPane] = useState<SidebarPane>("details");
+  const [diagnosticsSection, setDiagnosticsSection] = useState<DiagnosticsSectionId>("findings");
   const [showExport, setShowExport] = useState(false);
   const [autoScroll, setAutoScroll] = useState(session.status === "Running");
-  const [contentView, setContentView] = useState<"packets" | "calls" | "rtp">("packets");
+  const [contentView, setContentView] = useState<"packets" | "rtp">("packets");
   const [showMarkedOnly, setShowMarkedOnly] = useState(false);
   const annotationStore = usePacketAnnotationStore();
 
@@ -208,6 +220,23 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
 
   const expertCriticalCount = useMemo(() => expertFindings.filter((f) => f.severity === "critical").length, [expertFindings]);
   const expertWarningCount = useMemo(() => expertFindings.filter((f) => f.severity === "warning").length, [expertFindings]);
+
+  const statsPollIntervalMs = useMemo(() => {
+    const baseMs = pmSettings.statsPollIntervalMs;
+    if (!isRunning) return Math.min(baseMs * 2, 5000);
+    const statsVisible =
+      sidebarOpen && sidebarPane === "diagnostics" && diagnosticsSection === "stats";
+    return statsVisible ? baseMs : Math.min(baseMs * 2, 5000);
+  }, [
+    pmSettings.statsPollIntervalMs,
+    isRunning,
+    sidebarOpen,
+    sidebarPane,
+    diagnosticsSection,
+  ]);
+
+  const statsSectionVisible =
+    sidebarOpen && sidebarPane === "diagnostics" && diagnosticsSection === "stats";
 
   // Selected packet
   const selectedPacket = useMemo(() => {
@@ -312,10 +341,9 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
   }, [packets, contentView]);
   const panelStatistics = useMemo(() => {
     if (statistics) return statistics;
-    const statsVisible = sidebarTab === "stats" || (detailsPopoutOpen && popoutTab === "stats");
-    if (!statsVisible) return null;
+    if (!statsSectionVisible) return null;
     return buildCaptureStatisticsFromPackets(packets);
-  }, [statistics, packets, sidebarTab, detailsPopoutOpen, popoutTab]);
+  }, [statistics, packets, statsSectionVisible]);
   const annotationSessionId = session.id;
   const annotationsMap = useMemo<Record<number, PacketAnnotation>>(() => {
     const map: Record<number, PacketAnnotation> = {};
@@ -384,9 +412,20 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
     const next = initialFilter ?? "";
     setWiresharkFilter(next);
     setSelectedPacketIndex(null);
-    setSidebarTab(showDiagnostics ? "expert" : "details");
+    if (showDiagnostics) {
+      setSidebarPane("diagnostics");
+      setDiagnosticsSection("findings");
+    } else {
+      setSidebarPane("details");
+    }
     fetchPackets(next);
   }, [initialFilter, fetchPackets, showDiagnostics]);
+
+  useEffect(() => {
+    if (!showDiagnostics && sidebarPane === "diagnostics") {
+      setSidebarPane("details");
+    }
+  }, [showDiagnostics, sidebarPane]);
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -408,15 +447,6 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
     fetchStats().finally(() => setIsLoading(false));
     if (showDiagnostics) fetchExpertFindings(session.id);
   }, [session.id, showDiagnostics]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!showDiagnostics && sidebarTab === "expert") {
-      setSidebarTab("details");
-    }
-  }, [showDiagnostics, sidebarTab]);
-  useEffect(() => {
-    if (detailsPopoutOpen) setPopoutTab(sidebarTab);
-  }, [detailsPopoutOpen, sidebarTab]);
 
   useEffect(() => {
     if (!sidebarResizing) return;
@@ -466,8 +496,8 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
   useEffect(() => {
     if (!isRunning) return;
     return subscribeSharedPoll({
-      key: `capture:${session.id}:stats`,
-      intervalMs: pmSettings.statsPollIntervalMs,
+      key: `capture:${session.id}:stats:${statsPollIntervalMs}`,
+      intervalMs: statsPollIntervalMs,
       fetcher: async () => {
         const [stats, lStats] = await Promise.all([
           getCaptureStatistics(session.id).catch(() => null),
@@ -480,7 +510,7 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
         setLiveStats(lStats);
       },
     });
-  }, [isRunning, session.id, pmSettings.statsPollIntervalMs]);
+  }, [isRunning, session.id, statsPollIntervalMs]);
 
   // Handle filter change — debounce backend calls for large packet sets
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -500,10 +530,8 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
     const sourceIndex = toSourceIndex(index);
     if (sourceIndex == null || sourceIndex < 0) return;
     setSelectedPacketIndex(sourceIndex);
-    if (!sidebarOpen) {
-      setSidebarOpen(true);
-      setSidebarTab("details");
-    }
+    setSidebarPane("details");
+    if (!sidebarOpen) setSidebarOpen(true);
   }, [sidebarOpen, toSourceIndex]);
 
   // Stop running capture
@@ -537,147 +565,235 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
     });
   }, [session.id, notify]);
 
+  const handleInvestigateFinding = useCallback(
+    (finding: ExpertFinding) => {
+      const packetIndex = getPrimaryPacketIndex(finding);
+      const suggestedFilter = buildFindingDisplayFilter(finding);
+      setSidebarPane("details");
+      setSidebarOpen(true);
+      setWiresharkFilter(suggestedFilter);
+      void fetchPackets(suggestedFilter);
+      useOpenCaptureStore.getState().openViewer(session.id, undefined, { filter: suggestedFilter });
+      navigateTo("packet-capture", "viewer");
+      notify({
+        source: "packet-capture",
+        type: "info",
+        title: "Opened Packet Viewer",
+        description: "Showing related packets in Packet Viewer.",
+      });
+      if (packetIndex !== null) {
+        setSelectedPacketIndex(packetIndex);
+      }
+    },
+    [session.id, notify, fetchPackets],
+  );
+
+  const useFlatChrome = expanded || embedded;
+
   return (
     <div
       className={cn(
-        embedded
-          ? "flex h-full min-h-0 flex-col overflow-hidden"
-          : "packet-graphite-stage flex h-full min-h-0 flex-col overflow-hidden rounded-lg",
-        expanded ? "flex-1" : "h-[500px]",
+        "flex min-h-0 flex-col overflow-hidden",
+        embedded && "h-full",
+        useFlatChrome && !embedded && "h-full flex-1 bg-transparent",
+        !useFlatChrome && "packet-graphite-stage h-[500px] rounded-lg",
       )}
     >
-      <div className="flex-1 min-h-0 p-1.5">
-        <div className={cn(panelClass, "h-full min-h-0 flex flex-col", isRunning && liveRingClass)}>
-          {/* ── Primary row: session context + filter ── */}
-          <div className="ui-section-header-md flex shrink-0 items-center gap-2 px-3 pt-2 pb-1.5">
-            <div className="ui-control-shell inline-flex h-7 min-w-0 max-w-[360px] items-center gap-1.5 px-2 text-xs text-foreground/90">
+      <div className={cn(useFlatChrome ? "flex h-full min-h-0 flex-1 flex-col" : "min-h-0 flex-1 p-1.5")}>
+        <div
+          className={cn(
+            "flex min-h-0 flex-col overflow-hidden",
+            useFlatChrome ? "h-full flex-1" : cn(panelClass, "h-full"),
+            isRunning && liveRingClass,
+          )}
+        >
+          {/* Single toolbar row — aligned with Packet Monitor (icon actions + shared header tokens) */}
+          <div className="ui-section-header-md flex min-w-0 shrink-0 items-center gap-2 px-3 py-2">
+            <div className="ui-control-shell inline-flex h-[var(--ui-control-height-sm)] min-w-0 max-w-[min(360px,32vw)] shrink-0 items-center gap-1.5 px-2 text-xs text-foreground/90">
               <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate font-medium">{session.name}</span>
             </div>
-            {isRunning ? (
-              <LiveIndicator variant="badge" label="LIVE" size="xs" />
-            ) : (
-              <span className="text-2xs text-muted-foreground shrink-0">{session.status}</span>
+            {!isRunning && (
+              <span className="shrink-0 text-2xs text-muted-foreground">{session.status}</span>
             )}
             <TooltipWrapper entry={tooltips.statInterface}>
-              <span className="px-1 text-2xs text-muted-foreground tabular-nums cursor-help shrink-0">
+              <span className="shrink-0 cursor-help px-1 font-mono text-2xs text-muted-foreground tabular-nums">
                 {session.interface}
               </span>
             </TooltipWrapper>
-            <div className="flex-1 min-w-0">
+            <TooltipWrapper
+              content={
+                annotatedCount.marked > 0
+                  ? `${showMarkedOnly ? "Show all packets" : "Show only marked packets"} (${annotatedCount.marked} marked)`
+                  : showMarkedOnly
+                    ? "Show all packets"
+                    : "No marked packets — bookmark rows in the list"
+              }
+            >
+              <Button
+                type="button"
+                variant={showMarkedOnly ? "default" : "neutral"}
+                size="icon-sm"
+                className={cn(
+                  showMarkedOnly
+                    ? "border border-warning/25 bg-warning/15 text-warning hover:bg-warning/25"
+                    : "",
+                )}
+                aria-label={
+                  annotatedCount.marked > 0
+                    ? `Marked packets, ${annotatedCount.marked} (${showMarkedOnly ? "showing marked only" : "show all"})`
+                    : "Marked packets"
+                }
+                onClick={() => setShowMarkedOnly((v) => !v)}
+                disabled={annotatedCount.marked === 0 && !showMarkedOnly}
+              >
+                <Bookmark className={cn("h-3.5 w-3.5", showMarkedOnly && "fill-current")} />
+              </Button>
+            </TooltipWrapper>
+            {isRunning ? (
+              <div className="inline-flex h-7 shrink-0 items-center gap-2 rounded-[var(--radius-md)] border border-border/35 bg-muted/18 px-2 text-xs">
+                <LiveIndicator variant="badge" label="LIVE" size="xs" />
+                <span className="font-mono tabular-nums text-muted-foreground">
+                  {totalPacketCount.toLocaleString()} pkts
+                </span>
+              </div>
+            ) : (
+              <TooltipWrapper entry={tooltips.statTotalPackets}>
+                <span className="shrink-0 cursor-help text-2xs text-muted-foreground tabular-nums">
+                  {totalPacketCount.toLocaleString()} pkts
+                </span>
+              </TooltipWrapper>
+            )}
+            <div className="flex min-h-0 min-w-0 flex-1 items-center">
               <WiresharkFilterBar
                 filter={wiresharkFilter}
                 onFilterChange={handleFilterChange}
                 filteredCount={totalPacketCount}
               />
             </div>
-          </div>
-
-          {/* ── Secondary row: actions ── */}
-          <div className="ui-section-header-sm flex shrink-0 items-center gap-2 px-3 py-1.5">
-            <div className="inline-flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <TooltipWrapper entry={tooltips.captureRefresh}>
-                <Button size="sm" variant="neutral" className="gap-1.5 px-2 text-xs" onClick={handleRefresh}>
+                <Button
+                  type="button"
+                  variant="neutral"
+                  size="icon-sm"
+                  aria-label="Refresh packet list"
+                  onClick={handleRefresh}
+                >
                   <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
-                  Refresh
                 </Button>
               </TooltipWrapper>
-              <Button
-                size="sm"
-                variant={showMarkedOnly ? "default" : "neutral"}
-                className={cn(
-                  "gap-1.5 px-2 text-xs",
-                  showMarkedOnly
-                    ? "bg-warning/15 hover:bg-warning/25 text-warning border border-warning/25"
-                    : "",
-                )}
-                onClick={() => setShowMarkedOnly((v) => !v)}
-                disabled={annotatedCount.marked === 0 && !showMarkedOnly}
-              >
-                <Bookmark className={cn("h-3.5 w-3.5", showMarkedOnly && "fill-current")} />
-                Marked
-                {annotatedCount.marked > 0 && (
-                  <span className={cn(
-                    "h-4 min-w-4 px-1 rounded-full text-2xs font-semibold flex items-center justify-center tabular-nums",
-                    showMarkedOnly ? "bg-warning/25 text-warning" : "bg-muted/40 border border-border/35 text-muted-foreground",
-                  )}>
-                    {annotatedCount.marked}
-                  </span>
-                )}
-              </Button>
-
               {isRunning && (
                 <TooltipWrapper entry={tooltips.captureStop}>
                   <Button
-                    size="sm"
+                    type="button"
                     variant="destructive"
-                    className="h-7 gap-1.5 px-2.5 text-xs"
+                    size="icon-sm"
+                    aria-label="Stop capture"
                     onClick={handleStop}
                   >
-                    <Square className="h-3.5 w-3.5" />
-                    Stop
+                    <Square className="h-3 w-3 fill-current" />
                   </Button>
                 </TooltipWrapper>
               )}
-
               {onImport && (
-                <TooltipWrapper entry={tooltips.captureImportPcap}>
-                  <Button
-                    size="sm"
-                    variant="neutral"
-                    className="gap-1.5 px-2 text-xs"
-                    onClick={onImport}
-                    disabled={importing}
-                  >
-                    {importing ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5" />
-                    )}
-                    {importing ? "Importing…" : "Import"}
-                  </Button>
-                </TooltipWrapper>
+                <>
+                  <AppDivider orientation="vertical" size="md" className="mx-0.5 h-5 shrink-0 self-center" />
+                  <TooltipWrapper entry={tooltips.captureImportPcap}>
+                    <Button
+                      type="button"
+                      variant="neutral"
+                      size="icon-sm"
+                      aria-label={importing ? "Importing PCAP" : "Import PCAP"}
+                      onClick={onImport}
+                      disabled={importing}
+                    >
+                      {importing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipWrapper>
+                </>
               )}
-
-            </div>
-
-            {isRunning && (
-              <div className="inline-flex h-7 items-center gap-2 rounded-[var(--radius-md)] border border-border/35 bg-muted/18 px-2 text-xs">
-                <LiveIndicator variant="badge" label="LIVE" size="xs" />
-                <span className="font-mono tabular-nums text-muted-foreground">
-                  {totalPacketCount.toLocaleString()} pkts
-                </span>
-              </div>
-            )}
-
-            {!isRunning && (
-              <TooltipWrapper entry={tooltips.statTotalPackets}>
-                <span className="text-2xs text-muted-foreground tabular-nums cursor-help">
-                  {totalPacketCount.toLocaleString()} pkts
-                </span>
-              </TooltipWrapper>
-            )}
-
-            <div className="ml-auto inline-flex items-center gap-1">
+              <AppDivider orientation="vertical" size="md" className="mx-0.5 shrink-0" />
               <TooltipWrapper entry={tooltips.captureExport}>
                 <Button
-                  size="sm"
+                  type="button"
                   variant="neutral"
-                  className="gap-1.5 px-2 text-xs"
+                  size="icon-sm"
+                  aria-label="Save or export packets"
                   onClick={() => setShowExport(true)}
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  Export
+                  <Save className="h-3.5 w-3.5" />
                 </Button>
               </TooltipWrapper>
-
-              <div className="h-4 w-px bg-border/55 mx-0.5" />
-
+              {showDiagnostics && (
+                <>
+                  <AppDivider orientation="vertical" size="md" className="mx-0.5 shrink-0" />
+                  <TooltipWrapper
+                    content={
+                      <div className="space-y-1">
+                        <p className="font-medium">Diagnostics</p>
+                        <p className="text-xs text-muted-foreground">
+                          Findings, live stats, and RTP quality in the side panel.
+                        </p>
+                        {(expertCriticalCount > 0 || expertWarningCount > 0) && (
+                          <p className="text-2xs text-muted-foreground">
+                            {expertCriticalCount > 0 && `${expertCriticalCount} critical`}
+                            {expertCriticalCount > 0 && expertWarningCount > 0 ? " · " : ""}
+                            {expertWarningCount > 0 && `${expertWarningCount} warnings`}
+                          </p>
+                        )}
+                      </div>
+                    }
+                  >
+                    <Button
+                      type="button"
+                      variant="neutral"
+                      size="icon-sm"
+                      className={cn(
+                        "relative",
+                        sidebarOpen && sidebarPane === "diagnostics" && "bg-accent text-foreground",
+                      )}
+                      aria-label={
+                        sidebarOpen && sidebarPane === "diagnostics"
+                          ? "Show packet details panel"
+                          : "Show diagnostics panel"
+                      }
+                      aria-pressed={sidebarOpen && sidebarPane === "diagnostics"}
+                      onClick={() => {
+                        if (sidebarPane === "diagnostics") {
+                          setSidebarPane("details");
+                        } else {
+                          setSidebarPane("diagnostics");
+                          setSidebarOpen(true);
+                        }
+                      }}
+                    >
+                      <Activity className="h-3.5 w-3.5" />
+                      {expertCriticalCount > 0 ? (
+                        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+                          {expertCriticalCount > 99 ? "99+" : expertCriticalCount}
+                        </span>
+                      ) : expertWarningCount > 0 ? (
+                        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-warning px-0.5 text-[9px] font-bold text-warning-foreground">
+                          {expertWarningCount > 99 ? "99+" : expertWarningCount}
+                        </span>
+                      ) : null}
+                    </Button>
+                  </TooltipWrapper>
+                </>
+              )}
+              <AppDivider orientation="vertical" size="md" className="mx-0.5 shrink-0" />
               <TooltipWrapper entry={tooltips.captureSidebarToggle(sidebarOpen)}>
                 <Button
+                  type="button"
                   variant="neutral"
                   size="icon-sm"
                   className={cn(sidebarOpen && "text-primary")}
+                  aria-label={sidebarOpen ? "Collapse right panel" : "Expand right panel"}
                   onClick={() => setSidebarOpen(!sidebarOpen)}
                 >
                   {sidebarOpen ? (
@@ -687,53 +803,32 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
                   )}
                 </Button>
               </TooltipWrapper>
-
               <TooltipWrapper content="Open selected packet details in popout">
                 <Button
-                  size="icon-sm"
+                  type="button"
                   variant="neutral"
-                  className="h-7 w-7"
+                  size="icon-sm"
                   aria-label="Open selected packet details in popout"
-                  onClick={() => {
-                    setPopoutTab(sidebarTab);
-                    setDetailsPopoutOpen(true);
-                  }}
+                  onClick={() => setDetailsPopoutOpen(true)}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
               </TooltipWrapper>
-
               {onToggleExpand && (
-                <Button
-                  size="sm"
-                  variant="neutral"
-                  className="h-7 gap-1.5 px-2.5 text-xs"
-                  onClick={onToggleExpand}
-                >
-                  {expanded ? (
-                    <>
+                <TooltipWrapper content={expanded ? "Collapse viewer" : "Expand viewer"}>
+                  <Button type="button" variant="neutral" size="icon-sm" aria-label={expanded ? "Collapse" : "Expand"} onClick={onToggleExpand}>
+                    {expanded ? (
                       <MinimizeScreen className="h-3.5 w-3.5" />
-                      Collapse
-                    </>
-                  ) : (
-                    <>
+                    ) : (
                       <MaximizeScreen className="h-3.5 w-3.5" />
-                      Expand
-                    </>
-                  )}
-                </Button>
+                    )}
+                  </Button>
+                </TooltipWrapper>
               )}
-
               {!expanded && (
                 <TooltipWrapper entry={tooltips.captureClosePreview}>
-                  <Button
-                    size="sm"
-                    variant="neutral"
-                    className="h-7 gap-1.5 px-2.5 text-xs"
-                    onClick={onClose}
-                  >
+                  <Button type="button" variant="neutral" size="icon-sm" aria-label="Close" onClick={onClose}>
                     <X className="h-3.5 w-3.5" />
-                    Close
                   </Button>
                 </TooltipWrapper>
               )}
@@ -742,14 +837,12 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
           {/* ── Main Content ── */}
           <div
             ref={contentSplitRef}
-            className={cn("flex-1 flex min-h-0 border-t border-border/35", sidebarResizing && "cursor-col-resize select-none")}
+            className={cn("flex min-h-0 flex-1", sidebarResizing && "cursor-col-resize select-none")}
           >
         {contentView === "packets" && (
           <>
             {/* Packet List */}
-            <div className={cn(
-              "flex min-w-0 flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,hsl(var(--card)/0.54),hsl(var(--card)/0.40))]",
-            )}>
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-muted/[0.06]">
               {isLoading && packets.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm gap-2">
                   <RefreshCw className="h-4 w-4 animate-spin" />
@@ -820,207 +913,166 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
             {/* Details Sidebar */}
             {sidebarOpen && (
               <>
-                <button
-                  type="button"
-                  aria-label="Resize packet list and details panel"
+                <PanelResizeHandle
+                  orientation="vertical"
+                  density="compact"
+                  appearance="rail"
+                  label="Resize packet list and details panel"
+                  className="shrink-0 rounded-none"
                   onPointerDown={(e) => {
                     e.preventDefault();
                     setSidebarResizing(true);
                   }}
                   onDoubleClick={() => setSidebarWidthPx(420)}
-                  className="group relative w-2 shrink-0 border-x border-border/35 bg-card/30 cursor-col-resize hover:bg-accent/35"
-                >
-                  <span className="pointer-events-none absolute inset-y-1/2 left-1/2 h-12 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 group-hover:bg-foreground/70" />
-                </button>
+                />
                 <div
-                  className="flex min-h-0 shrink-0 flex-col overflow-hidden bg-transparent"
+                  className="flex min-h-0 shrink-0 flex-col overflow-hidden bg-muted/[0.08]"
                   style={{ width: `${sidebarWidthPx}px` }}
                 >
-                <Tabs
-                  value={sidebarTab}
-                  onValueChange={(v) => setSidebarTab(v as typeof sidebarTab)}
-                  className="flex-1 flex flex-col min-h-0"
-                >
-                  <div className="ui-section-header-sm flex-none h-10 box-border px-2.5 py-0">
-                    <div className="flex h-full items-center gap-2">
-                    <TabsList className="monitor-side-tabs !h-7 !min-h-7 flex-1">
-                      <TabsTrigger value="details" className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs">
-                        Details
-                      </TabsTrigger>
-                      <TabsTrigger value="stats" className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs">
-                        Stats
-                      </TabsTrigger>
-                      {showDiagnostics && (
-                        <TabsTrigger value="expert" className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs">
-                          Diagnostics
-                          {expertCriticalCount > 0 && (
-                            <Badge variant="destructive" className="text-3xs px-1 py-0 h-3.5 min-w-[14px]">
-                              {expertCriticalCount}
-                            </Badge>
-                          )}
-                          {expertCriticalCount === 0 && expertWarningCount > 0 && (
-                            <Badge variant="secondary" className="text-3xs px-1 py-0 h-3.5 min-w-[14px]">
-                              {expertWarningCount}
-                            </Badge>
-                          )}
-                        </TabsTrigger>
-                      )}
-                    </TabsList>
-                    <TooltipWrapper content="Open selected packet details in popout">
-                      <Button
-                        variant="neutral"
-                        size="icon-sm"
-                        className="h-7 w-7"
-                        aria-label="Open selected packet details in popout"
-                        onClick={() => {
-                          setPopoutTab(sidebarTab);
-                          setDetailsPopoutOpen(true);
-                        }}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </Button>
-                    </TooltipWrapper>
-                    </div>
-                  </div>
-
-                  <TabsContent value="details" className="flex-1 m-0 overflow-auto">
-                    {selectedPacket ? (
-                      <PacketDetailsView
-                        packet={selectedPacket}
-                        sessionId={session.id}
-                        packetIndex={selectedPacket.originalIndex ?? selectedPacketIndex}
-                        initialTab={initialDetailsTab}
-                      />
-                    ) : (
-                      <EmptyState compact variant="inline" title="Select a packet to view details" />
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="stats" className="flex-1 m-0 overflow-auto">
-                    <LiveStatsPanel
-                      stats={liveStats}
-                      pipelineStats={null}
-                      isCapturing={isRunning}
-                      historicalStats={panelStatistics}
-                    />
-                    {/* Basic statistics */}
-                    {panelStatistics && (
-                      <div className="ui-section-header-sm space-y-2 border-t border-border/45 p-3">
-                        <div className="section-label">Session Info</div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <div className="text-muted-foreground">Start Time</div>
-                            <div className="font-mono tabular-nums">{formatDateTime(session.startTime, { timeStyle: "medium" })}</div>
-                          </div>
-                          {session.endTime && (
-                            <div>
-                              <div className="text-muted-foreground">End Time</div>
-                              <div className="font-mono tabular-nums">{formatDateTime(session.endTime, { timeStyle: "medium" })}</div>
-                            </div>
-                          )}
-                          <div>
-                            <TooltipWrapper entry={tooltips.statTotalBytes}>
-                              <div className="text-muted-foreground cursor-help">Total Bytes</div>
-                            </TooltipWrapper>
-                            <div className="font-medium tabular-nums">
-                              {panelStatistics.totalBytes ? panelStatistics.totalBytes.toLocaleString() : "N/A"}
-                            </div>
-                          </div>
-                          <div>
-                            <TooltipWrapper entry={tooltips.statPacketsPerSec}>
-                              <div className="text-muted-foreground cursor-help">Pkts/sec</div>
-                            </TooltipWrapper>
-                            <div className="font-medium tabular-nums">
-                              {panelStatistics.packetsPerSecond ? panelStatistics.packetsPerSecond.toFixed(1) : "N/A"}
-                            </div>
-                          </div>
-                        </div>
-                        {panelStatistics.packetsByProtocol && (
-                          <div>
-                            <div className="text-muted-foreground text-xs mb-1">Protocols</div>
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(panelStatistics.packetsByProtocol)
-                                .sort(([, a]: any, [, b]: any) => b - a)
-                                .slice(0, 8)
-                                .map(([proto, count]: any) => (
-                                  <Badge key={proto} variant="outline" className="text-2xs">
-                                    {proto}: {count}
-                                  </Badge>
-                                ))}
-                            </div>
-                          </div>
+                <div className="flex min-h-0 flex-1 flex-col">
+                  {sidebarPane === "details" ? (
+                    <>
+                      <div className="ui-section-header-sm box-border flex h-10 flex-none items-center justify-between gap-2 border-b border-[var(--ui-rule)] px-2.5 py-0">
+                        <span className="truncate text-xs font-semibold text-foreground">Details</span>
+                        <TooltipWrapper content="Open selected packet details in popout">
+                          <Button
+                            variant="neutral"
+                            size="icon-sm"
+                            className="h-7 w-7 shrink-0"
+                            aria-label="Open selected packet details in popout"
+                            onClick={() => setDetailsPopoutOpen(true)}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipWrapper>
+                      </div>
+                      <div className="min-h-0 flex-1 overflow-auto">
+                        {selectedPacket ? (
+                          <PacketDetailsView
+                            packet={selectedPacket}
+                            sessionId={session.id}
+                            packetIndex={selectedPacket.originalIndex ?? selectedPacketIndex}
+                            initialTab={initialDetailsTab}
+                          />
+                        ) : (
+                          <EmptyState
+                            variant="inline"
+                            icon={<Scan />}
+                            title="No packet selected"
+                            description="Select a packet row to inspect details and decoded fields."
+                            className="h-full p-6"
+                          />
                         )}
                       </div>
-                    )}
-                  </TabsContent>
-
-                  {showDiagnostics && (
-                    <TabsContent value="expert" className="flex-1 m-0 overflow-auto">
-                      <div className="flex h-full min-h-0 flex-col">
-                        <div className="flex-1 min-h-0 overflow-auto">
-                          <FindingsPanel
-                            findings={expertFindings}
-                            loading={expertFindingsLoading}
-                            livePollingActive={expertLivePollingActive}
-                            onRefresh={() => fetchExpertFindings(session.id)}
-                            onSelectPacket={(idx) => {
-                              setSelectedPacketIndex(idx);
-                              void loadExactEvidencePacket(idx);
-                            }}
-                            onInvestigateFinding={(finding) => {
-                              setSidebarOpen(true);
-                              setSidebarTab("expert");
-                              const nextFilter = buildFindingDisplayFilter(finding);
-                              useOpenCaptureStore.getState().openViewer(session.id, undefined, { filter: nextFilter });
-                              navigateTo("packet-capture", "viewer");
-                              notify({
-                                source: "packet-capture",
-                                type: "info",
-                                title: "Opened Packet Viewer",
-                                description: "Showing related packets in Packet Viewer.",
-                              });
-                              const packetIndex = getPrimaryPacketIndex(finding);
-                              if (packetIndex !== null) {
-                                setSelectedPacketIndex(packetIndex);
-                              }
-                            }}
-                          />
+                    </>
+                  ) : (
+                    showDiagnostics && (
+                      <Tabs
+                        value={diagnosticsSection}
+                        onValueChange={(v) => setDiagnosticsSection(v as DiagnosticsSectionId)}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        <div className="ui-section-header-sm box-border flex h-10 shrink-0 flex-none items-center border-b border-[var(--ui-rule)] px-2.5 py-0">
+                          <TabsList
+                            className="monitor-side-tabs !h-7 !min-h-7 w-full max-w-full flex-1 bg-transparent"
+                            aria-label="Diagnostics panels"
+                          >
+                            {DIAGNOSTICS_SECTIONS.map(({ id, label }) => (
+                              <TabsTrigger
+                                key={id}
+                                value={id}
+                                className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs"
+                              >
+                                {label}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
                         </div>
-                      </div>
-                    </TabsContent>
+                        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2">
+                          <TabsContent value="findings" className="m-0 outline-none">
+                            <FindingsPanel
+                              findings={expertFindings}
+                              loading={expertFindingsLoading}
+                              livePollingActive={expertLivePollingActive}
+                              onRefresh={() => fetchExpertFindings(session.id)}
+                              onSelectPacket={(idx) => {
+                                setSelectedPacketIndex(idx);
+                                setSidebarPane("details");
+                                void loadExactEvidencePacket(idx);
+                              }}
+                              onInvestigateFinding={handleInvestigateFinding}
+                            />
+                          </TabsContent>
+                          <TabsContent value="stats" className="m-0 outline-none">
+                            <LiveStatsPanel
+                              stats={liveStats}
+                              pipelineStats={null}
+                              isCapturing={isRunning}
+                              historicalStats={panelStatistics}
+                            />
+                            {panelStatistics && (
+                              <div className="ui-section-header-sm space-y-2 border-t border-border/45 p-3">
+                                <div className="section-label">Session Info</div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div>
+                                    <div className="text-muted-foreground">Start Time</div>
+                                    <div className="font-mono tabular-nums">{formatDateTime(session.startTime, { timeStyle: "medium" })}</div>
+                                  </div>
+                                  {session.endTime && (
+                                    <div>
+                                      <div className="text-muted-foreground">End Time</div>
+                                      <div className="font-mono tabular-nums">{formatDateTime(session.endTime, { timeStyle: "medium" })}</div>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <TooltipWrapper entry={tooltips.statTotalBytes}>
+                                      <div className="text-muted-foreground cursor-help">Total Bytes</div>
+                                    </TooltipWrapper>
+                                    <div className="font-medium tabular-nums">
+                                      {panelStatistics.totalBytes ? panelStatistics.totalBytes.toLocaleString() : "N/A"}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <TooltipWrapper entry={tooltips.statPacketsPerSec}>
+                                      <div className="text-muted-foreground cursor-help">Pkts/sec</div>
+                                    </TooltipWrapper>
+                                    <div className="font-medium tabular-nums">
+                                      {panelStatistics.packetsPerSecond ? panelStatistics.packetsPerSecond.toFixed(1) : "N/A"}
+                                    </div>
+                                  </div>
+                                </div>
+                                {panelStatistics.packetsByProtocol && (
+                                  <div>
+                                    <div className="mb-1 text-xs text-muted-foreground">Protocols</div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {Object.entries(panelStatistics.packetsByProtocol)
+                                        .sort(([, a]: any, [, b]: any) => b - a)
+                                        .slice(0, 8)
+                                        .map(([proto, count]: any) => (
+                                          <Badge key={proto} variant="secondary" className="text-2xs">
+                                            {proto}: {count}
+                                          </Badge>
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </TabsContent>
+                          <TabsContent value="rtp" className="m-0 outline-none">
+                            <div className="flex min-h-[14rem] flex-col overflow-hidden">
+                              <LiveRtpQualityPanel sessionId={session.id} isCapturing={isRunning} />
+                            </div>
+                          </TabsContent>
+                        </div>
+                      </Tabs>
+                    )
                   )}
-                </Tabs>
+                </div>
                 </div>
               </>
             )}
           </>
-        )}
-
-        {contentView === "calls" && (
-          <div className={cn("flex-1 min-w-0 overflow-hidden rounded-t-none border-t-0", panelClass)}>
-            <CallFlowTab
-              packets={packets}
-              findings={expertFindings}
-              onOpenTabbedPopout={() => {
-                setSidebarTab("details");
-                setPopoutTab("details");
-                setDetailsPopoutOpen(true);
-              }}
-              onSelectPacket={(packet) => {
-                const idx = packets.findIndex((p) =>
-                  (typeof p.originalIndex === "number" && typeof packet.originalIndex === "number")
-                    ? p.originalIndex === packet.originalIndex
-                    : p === packet
-                );
-                if (idx >= 0) {
-                  setSelectedPacketIndex(idx);
-                  setSidebarOpen(true);
-                  setSidebarTab("details");
-                  setContentView("packets");
-                }
-              }}
-            />
-          </div>
         )}
 
         {contentView === "rtp" && (
@@ -1052,7 +1104,7 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
                           </Badge>
                           <span className="font-mono text-foreground">SSRC 0x{stream.ssrc.toString(16).toUpperCase().padStart(8, "0")}</span>
                           <span className="text-muted-foreground">PT {stream.payloadType}</span>
-                          {stream.encrypted && <Badge variant="outline" className="h-5">SRTP</Badge>}
+                          {stream.encrypted && <Badge variant="secondary" className="h-5">SRTP</Badge>}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1106,129 +1158,7 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
         sessionId={session.id}
         packetIndex={selectedPacket?.originalIndex ?? selectedPacketIndex}
         initialTab={initialDetailsTab}
-      >
-        <Tabs value={popoutTab} onValueChange={(v) => setPopoutTab(v as typeof popoutTab)} className="flex h-full min-h-0 flex-col">
-          <div className="ui-section-header-sm flex-none h-10 box-border px-2.5 py-0">
-            <div className="flex h-full items-center gap-2">
-              <TabsList className="monitor-side-tabs !h-7 !min-h-7 flex-1">
-                <TabsTrigger value="details" className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs">
-                  Details
-                </TabsTrigger>
-                <TabsTrigger value="stats" className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs">
-                  Stats
-                </TabsTrigger>
-                {showDiagnostics && (
-                  <TabsTrigger value="expert" className="monitor-side-tab !h-7 !min-h-7 px-3 text-xs">
-                    Diagnostics
-                    {expertCriticalCount > 0 && (
-                      <Badge variant="destructive" className="text-3xs px-1 py-0 h-3.5 min-w-[14px]">
-                        {expertCriticalCount}
-                      </Badge>
-                    )}
-                    {expertCriticalCount === 0 && expertWarningCount > 0 && (
-                      <Badge variant="secondary" className="text-3xs px-1 py-0 h-3.5 min-w-[14px]">
-                        {expertWarningCount}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </div>
-          </div>
-
-          <TabsContent value="details" className="flex-1 m-0 overflow-auto">
-            {selectedPacket ? (
-              <PacketDetailsView
-                packet={selectedPacket}
-                sessionId={session.id}
-                packetIndex={selectedPacket.originalIndex ?? selectedPacketIndex}
-                initialTab={initialDetailsTab}
-              />
-            ) : (
-              <EmptyState compact variant="inline" title="Select a packet to view details" />
-            )}
-          </TabsContent>
-
-          <TabsContent value="stats" className="flex-1 m-0 overflow-auto">
-            <LiveStatsPanel
-              stats={liveStats}
-              pipelineStats={null}
-              isCapturing={isRunning}
-              historicalStats={panelStatistics}
-            />
-            {panelStatistics && (
-              <div className="ui-section-header-sm space-y-2 border-t border-border/45 p-3">
-                <div className="section-label">Session Info</div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <div className="text-muted-foreground">Start Time</div>
-                    <div className="font-mono tabular-nums">{formatDateTime(session.startTime, { timeStyle: "medium" })}</div>
-                  </div>
-                  {session.endTime && (
-                    <div>
-                      <div className="text-muted-foreground">End Time</div>
-                      <div className="font-mono tabular-nums">{formatDateTime(session.endTime, { timeStyle: "medium" })}</div>
-                    </div>
-                  )}
-                  <div>
-                    <TooltipWrapper entry={tooltips.statTotalBytes}>
-                      <div className="text-muted-foreground cursor-help">Total Bytes</div>
-                    </TooltipWrapper>
-                    <div className="font-medium tabular-nums">
-                      {panelStatistics.totalBytes ? panelStatistics.totalBytes.toLocaleString() : "N/A"}
-                    </div>
-                  </div>
-                  <div>
-                    <TooltipWrapper entry={tooltips.statPacketsPerSec}>
-                      <div className="text-muted-foreground cursor-help">Pkts/sec</div>
-                    </TooltipWrapper>
-                    <div className="font-medium tabular-nums">
-                      {panelStatistics.packetsPerSecond ? panelStatistics.packetsPerSecond.toFixed(1) : "N/A"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {showDiagnostics && (
-            <TabsContent value="expert" className="flex-1 m-0 overflow-auto">
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <FindingsPanel
-                    findings={expertFindings}
-                    loading={expertFindingsLoading}
-                    livePollingActive={expertLivePollingActive}
-                    onRefresh={() => fetchExpertFindings(session.id)}
-                    onSelectPacket={(idx) => {
-                      setSelectedPacketIndex(idx);
-                      void loadExactEvidencePacket(idx);
-                    }}
-                    onInvestigateFinding={(finding) => {
-                      setSidebarOpen(true);
-                      setSidebarTab("expert");
-                      setPopoutTab("expert");
-                      const nextFilter = buildFindingDisplayFilter(finding);
-                      useOpenCaptureStore.getState().openViewer(session.id, undefined, { filter: nextFilter });
-                      navigateTo("packet-capture", "viewer");
-                      notify({
-                        source: "packet-capture",
-                        type: "info",
-                        title: "Opened Packet Viewer",
-                        description: "Showing related packets in Packet Viewer.",
-                      });
-                      const packetIndex = getPrimaryPacketIndex(finding);
-                      if (packetIndex !== null) {
-                        setSelectedPacketIndex(packetIndex);
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
-      </PacketDetailsPopout>
+      />
 
       {/* Export Dialog */}
       {showExport && (
@@ -1237,6 +1167,7 @@ export const CaptureSessionViewer = memo(function CaptureSessionViewer({
           onOpenChange={setShowExport}
           packets={packets}
           sessionId={session.id}
+          prepareForPcapExport={prepareForPcapExport}
         />
       )}
     </div>

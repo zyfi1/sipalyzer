@@ -3,11 +3,12 @@ import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Loader2, Search, Terminal, Info, Copy, Check } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { useState } from "react";
 
 // ── Record type metadata ────────────────────────────────────────
@@ -28,6 +29,11 @@ const RECORD_TYPES: RecordTypeMeta[] = [
   { value: "CAA",   label: "CAA",   desc: "Certificate Authority Authorization",           category: "security" },
   { value: "ANY",   label: "ANY",   desc: "Request all record types (may be restricted)",  category: "advanced" },
 ];
+
+const DIG_RECORD_TYPE_OPTIONS = RECORD_TYPES.map((rt) => ({
+  value: rt.value,
+  label: rt.label,
+}));
 
 // ── Flag definitions ────────────────────────────────────────────
 
@@ -125,21 +131,13 @@ export default function DigPanel() {
           {/* Record type select */}
           <TooltipWrapper title="Record Type" description="DNS record type to query. Common types: A (IPv4), AAAA (IPv6), CNAME (alias), MX (mail), TXT (text), NS (nameserver)." side="bottom">
             <div>
-              <Select value={digRecordType} onValueChange={setDigRecordType}>
-                <SelectTrigger className="h-9 w-[90px] text-xs font-mono">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {RECORD_TYPES.map((rt) => (
-                    <SelectItem key={rt.value} value={rt.value} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold w-12">{rt.label}</span>
-                        <span className="text-muted-foreground/60 text-2xs truncate">{rt.desc}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AppDropdown
+                value={digRecordType}
+                onValueChange={setDigRecordType}
+                options={DIG_RECORD_TYPE_OPTIONS}
+                className="h-9 w-[90px] text-xs font-mono"
+                itemClassName="text-xs font-mono"
+              />
             </div>
           </TooltipWrapper>
 
@@ -189,7 +187,7 @@ export default function DigPanel() {
             ))}
           </div>
 
-          <div className="w-px h-4 bg-border/20" />
+          <AppDivider orientation="vertical" size="md" className="mx-0" />
 
           {/* Server presets */}
           <div className="flex items-center gap-1.5">
@@ -254,7 +252,7 @@ export default function DigPanel() {
                 </TooltipWrapper>
               )}
 
-              <div className="w-px h-3.5 bg-border/20" />
+              <AppDivider orientation="vertical" size="sm" className="mx-0" />
 
               {/* Response flags */}
               <FlagBadge flag="AA" active={result.header.aa} tip="Authoritative Answer — the responding server is authoritative for this zone." />
@@ -294,7 +292,7 @@ export default function DigPanel() {
 
               {result.edns && (
                 <>
-                  <div className="w-px h-3 bg-border/15" />
+                  <AppDivider orientation="vertical" size="xs" className="mx-0 opacity-90" />
                   <TooltipWrapper title="EDNS" description={`Extension Mechanisms for DNS v${result.edns.version}. UDP payload ${result.edns.udp_payload_size} bytes.${result.edns.dnssec_ok ? " DNSSEC OK (DO) flag set." : ""}`} side="bottom">
                     <span className="text-muted-foreground/60 cursor-help">
                       EDNS{result.edns.version} · {result.edns.udp_payload_size}B
@@ -375,7 +373,7 @@ function RecordSection({ title, records, color }: {
             <TooltipWrapper title="TTL" description={`Time to live: ${r.ttl} seconds (${formatTtl(r.ttl)}). Caching resolvers will store this record for this duration.`} side="bottom">
               <span className="text-2xs font-mono tabular-nums text-muted-foreground/60 cursor-help">{r.ttl}</span>
             </TooltipWrapper>
-            <Badge variant="outline" className="text-3xs px-1 py-0 h-4 font-mono">{r.record_type}</Badge>
+            <Badge variant="secondary" className="text-3xs px-1 py-0 h-4 font-mono">{r.record_type}</Badge>
             <span className="text-xs font-mono text-foreground/80 truncate">{r.data}</span>
           </div>
         ))}

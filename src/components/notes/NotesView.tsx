@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Plus, Search, X, Grid3x3, List, Star, StickyNote } from "@/lib/icons";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -165,18 +165,18 @@ export function NotesView() {
               </TooltipWrapper>
             )}
           </div>
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-            <TooltipWrapper title="Sort notes">
-              <SelectTrigger size="sm" className="w-[140px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-            </TooltipWrapper>
-            <SelectContent>
-              <SelectItem value="updated">Recently Updated</SelectItem>
-              <SelectItem value="created">Recently Created</SelectItem>
-              <SelectItem value="title">Title (A-Z)</SelectItem>
-            </SelectContent>
-          </Select>
+          <TooltipWrapper title="Sort notes">
+            <AppDropdown
+              value={sortBy}
+              onValueChange={(v) => setSortBy(v as typeof sortBy)}
+              className="w-[140px] h-8 text-xs"
+              options={[
+                { value: "updated", label: "Recently Updated" },
+                { value: "created", label: "Recently Created" },
+                { value: "title", label: "Title (A-Z)" },
+              ]}
+            />
+          </TooltipWrapper>
           <TooltipWrapper title={viewMode === "grid" ? "List view" : "Grid view"}>
             <Button variant="neutral" size="sm" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")} className="h-8 w-8 p-0">
               {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid3x3 className="h-4 w-4" />}

@@ -404,7 +404,7 @@ function SipConnectivity() {
       <div className="flex items-center justify-between mb-3">
         <SectionHeader icon={Shield} color="text-destructive" title="SIP Ports"
           badge={result && !running ? (
-            <Badge variant="outline" className={cn("text-2xs px-1.5 py-0",
+            <Badge variant="secondary" className={cn("text-2xs px-1.5 py-0",
               passCount > 0 ? "bg-success/10 text-success border-success/30" : "bg-destructive/10 text-destructive border-destructive/30"
             )}>{passCount}/{result.results.length}</Badge>
           ) : undefined}
@@ -485,13 +485,13 @@ function SipDns() {
       {result && !running && (
         <div className="space-y-1 text-xs">
           {result.a_records.map((ip, i) => (
-            <div key={i} className="font-mono flex items-center gap-1.5"><Badge variant="outline" className="text-3xs px-1 py-0 h-4">A</Badge> {ip}</div>
+            <div key={i} className="font-mono flex items-center gap-1.5"><Badge variant="secondary" className="text-3xs px-1 py-0 h-4">A</Badge> {ip}</div>
           ))}
           {result.srv_records.map((r, i) => (
-            <div key={i} className="font-mono text-muted-foreground/70 truncate flex items-center gap-1.5"><Badge variant="outline" className="text-3xs px-1 py-0 h-4">SRV</Badge> {r.target}:{r.port}</div>
+            <div key={i} className="font-mono text-muted-foreground/70 truncate flex items-center gap-1.5"><Badge variant="secondary" className="text-3xs px-1 py-0 h-4">SRV</Badge> {r.target}:{r.port}</div>
           ))}
           {result.naptr_records.map((r, i) => (
-            <div key={i} className="font-mono text-muted-foreground/70 truncate flex items-center gap-1.5"><Badge variant="outline" className="text-3xs px-1 py-0 h-4">NAPTR</Badge> {r.replacement}</div>
+            <div key={i} className="font-mono text-muted-foreground/70 truncate flex items-center gap-1.5"><Badge variant="secondary" className="text-3xs px-1 py-0 h-4">NAPTR</Badge> {r.replacement}</div>
           ))}
           {result.a_records.length === 0 && result.srv_records.length === 0 && (
             <EmptyState
@@ -620,7 +620,7 @@ function UdpQuality() {
       <div className="flex items-center justify-between mb-3">
         <SectionHeader icon={Wifi} color="text-info" title="UDP Quality"
           badge={result && !running ? (
-            <Badge variant="outline" className={cn("text-2xs px-1.5 py-0",
+            <Badge variant="secondary" className={cn("text-2xs px-1.5 py-0",
               result.mos >= 4.0 ? "bg-success/10 text-success border-success/30" :
               result.mos >= 3.6 ? "bg-warning/10 text-warning border-warning/30" :
               "bg-destructive/10 text-destructive border-destructive/30"
@@ -893,7 +893,7 @@ function SipProbe() {
     <div>
       <div className="flex items-center justify-between mb-3">
         <SectionHeader icon={PhoneCall} color="text-primary" title="SIP Probe"
-          badge={<Badge variant="outline" className="text-3xs px-1 py-0 text-muted-foreground/60 border-muted-foreground/15">Advanced</Badge>}
+          badge={<Badge variant="secondary" className="text-3xs px-1 py-0 text-muted-foreground/60 border-muted-foreground/15">Advanced</Badge>}
         />
         <div className="flex items-center gap-1">
           {PROBE_METHODS.map((m) => (
@@ -956,7 +956,7 @@ function SipProbe() {
           <div className="flex items-center gap-2 text-2xs text-muted-foreground/60">
           <span>{probe.method_used.toUpperCase()}</span>
           <span className="font-mono">{probe.resolved_ip}:{probe.port}</span>
-          <Badge variant={probe.success ? "outline" : "destructive"} className="text-3xs px-1 py-0">
+          <Badge variant={probe.success ? "secondary" : "destructive"} className="text-3xs px-1 py-0">
             {probe.success ? `${probe.packets_received}/${probe.packets_sent}` : "No resp"}
           </Badge>
           {probe.success && (

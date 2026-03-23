@@ -19,10 +19,8 @@ export interface ToolHeaderProps {
 }
 
 /**
- * Headless tool header — registers navigation data in the breadcrumb store.
- * All visual rendering happens in BreadcrumbNav (inside the Header).
- *
- * Replaces the old portal-based ToolHeader that rendered TabsList into the header.
+ * Headless tool header — registers navigation data in the breadcrumb store
+ * (e.g. sidebar tertiary tabs). Center search is HeaderUnifiedOmniBar, not breadcrumbs.
  */
 export function ToolHeader({
   toolId,

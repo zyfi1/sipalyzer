@@ -12,6 +12,8 @@ interface IpAddressProps {
   variant?: "default" | "mono" | "inline";
   /** Show IP intelligence tooltip (hostname, ASN, org, country). Defaults to true. */
   showIpInfo?: boolean;
+  /** When true, long values (e.g. IPv6 + port) ellipsize inside flex/grid cells. */
+  truncate?: boolean;
 }
 
 // ─── IP Info Tooltip Content ────────────────────────────────────────────────
@@ -113,6 +115,7 @@ export function IpAddress({
   size = "md",
   variant = "default",
   showIpInfo = true,
+  truncate: truncateProp = false,
 }: IpAddressProps) {
   const [copied, setCopied] = useState(false);
 
@@ -157,13 +160,15 @@ export function IpAddress({
     </TooltipWrapper>
   );
 
+  const textShrink = truncateProp ? "block min-w-0 w-full truncate" : "";
+
   // The IP text element
-  const ipText = <span className={cn("font-mono", sizeClasses[size])}>{ip}</span>;
+  const ipText = <span className={cn("font-mono", sizeClasses[size], textShrink)}>{ip}</span>;
 
   // Wrap the IP text in a tooltip if showIpInfo is enabled
   const wrappedIpText = showIpInfo ? (
     <TooltipWrapper content={<IpInfoTooltipContent ip={ip} />}>
-      <span className={cn("font-mono cursor-help", sizeClasses[size])}>{ip}</span>
+      <span className={cn("font-mono cursor-help", sizeClasses[size], textShrink)}>{ip}</span>
     </TooltipWrapper>
   ) : (
     ipText
@@ -171,7 +176,7 @@ export function IpAddress({
 
   if (variant === "inline") {
     return (
-      <span className={cn("inline-flex items-center", className)}>
+      <span className={cn("inline-flex min-w-0 max-w-full items-center", className)}>
         {wrappedIpText}
         <span
           className={cn(
@@ -189,7 +194,7 @@ export function IpAddress({
 
   if (variant === "mono") {
     return (
-      <span className={cn("inline-flex items-center gap-1.5 group", className)}>
+      <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5 group", className)}>
         {wrappedIpText}
         <span
           className={cn(
@@ -205,12 +210,17 @@ export function IpAddress({
   }
 
   // Default variant
+  const defaultAddress = truncateProp ? (
+    <span className="min-w-0 flex-1 overflow-hidden">{wrappedIpText}</span>
+  ) : (
+    wrappedIpText
+  );
   return (
-    <div className={cn("flex items-center gap-2 group", className)}>
-      {wrappedIpText}
+    <div className={cn("flex min-w-0 max-w-full items-center gap-2 group", className)}>
+      {defaultAddress}
       <span
         className={cn(
-          "transition-opacity duration-[var(--motion-duration-micro)] [transition-timing-function:var(--motion-ease-micro)]",
+          "shrink-0 transition-opacity duration-[var(--motion-duration-micro)] [transition-timing-function:var(--motion-ease-micro)]",
           showCopyOnHover && "opacity-0 group-hover:opacity-100",
           copied && "opacity-100"
         )}

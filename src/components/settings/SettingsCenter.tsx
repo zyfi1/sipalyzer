@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, lazy, Suspense, type HTMLAttributes } from "react";
 import { useSettingsStore, UserAgentPreset, type UserAgentScope, type TimeFormatSetting, type DateFormatSetting, type TemperatureUnit, type TerminalCursorStyle } from "@/stores/settingsStore";
 import { useLayoutStore, type SettingsCenterTab } from "@/stores/layoutStore";
 import { NotificationSettings } from "@/components/notifications/NotificationSettings";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { RotateCcw, X, Shield, Info, MapPin, Loader2, AppleLogo, WindowsLogo, Package, RefreshCw, Download, GitBranch } from "@/lib/icons";
+import { RotateCcw, X, Shield, Info, MapPin, Loader2, AppleLogo, WindowsLogo, RefreshCw, Download, GitBranch } from "@/lib/icons";
 import { AdminPasswordDialog } from "@/components/admin/AdminPasswordDialog";
 import { navigateTo } from "@/lib/navigation";
 import { fetchUrl } from "@/api/provision";
@@ -22,13 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useUpdaterStore } from "@/stores/updaterStore";
 import { RELEASE_CHANNELS, type ReleaseChannel } from "@/lib/updater/channels";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { FAX_BAUD_RATES } from "@/api/fax";
 import type { FaxResolution, FaxSettings, PacketMonitorSettings } from "@/stores/settingsStore";
 import { APP_TIMEZONE_OPTIONS } from "@/lib/dateTime";
@@ -42,17 +36,45 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { Group, Paper, Stack } from "@mantine/core";
+
+type DivProps = HTMLAttributes<HTMLDivElement>;
+type StackProps = DivProps & { gap?: string | number };
+type GroupProps = DivProps & {
+  justify?: string;
+  align?: string;
+  wrap?: string;
+  gap?: string | number;
+};
+
+function Paper({ className, children, ...rest }: DivProps) {
+  return (
+    <div className={className} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+function Stack({ className, children, ...rest }: StackProps) {
+  return (
+    <div className={className} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+function Group({ className, children, ...rest }: GroupProps) {
+  return (
+    <div className={className} {...rest}>
+      {children}
+    </div>
+  );
+}
 const SettingsAboutPanel = lazy(() =>
   import("./SettingsAboutPanel").then((m) => ({ default: m.SettingsAboutPanel })),
 );
 const SoftphoneSettingsView = lazy(() =>
   import("@/components/soft-phone/SettingsView").then((m) => ({ default: m.SettingsView })),
 );
-const AdminInventoryView = lazy(() =>
-  import("@/components/admin/AdminInventoryView").then((m) => ({ default: m.AdminInventoryView })),
-);
-
 
 interface LocationSuggestion {
   /** Friendly label shown in the dropdown */
@@ -650,11 +672,6 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     Soft Phone
                   </TabsTrigger>
                 </TooltipWrapper>
-                <TooltipWrapper content="Tools and license inventory">
-                  <TabsTrigger value="inventory" className={clsx("settings-nav-tab", settingsStyles.navTabTrigger)}>
-                    Inventory
-                  </TabsTrigger>
-                </TooltipWrapper>
               </TabsList>
             </div>
             <div className={settingsStyles.headerActionsRow}>
@@ -704,70 +721,62 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             <div className={settingsStyles.gridGap6Cols2}>
               <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-timezone">Time zone</Label>
-                <Select
+                <AppDropdown
+                  id="settings-timezone"
+                  className={settingsStyles.wFull}
                   value={timezone === "" ? "local" : timezone}
                   onValueChange={(v) => setTimezone(v === "local" ? "" : v)}
-                >
-                  <SelectTrigger id="settings-timezone" className={settingsStyles.wFull}>
-                    <SelectValue placeholder="Local (system)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="local">Local (system)</SelectItem>
-                    {APP_TIMEZONE_OPTIONS.filter((o) => o.value !== "").map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Local (system)"
+                  options={[
+                    { value: "local", label: "Local (system)" },
+                    ...APP_TIMEZONE_OPTIONS.filter((o) => o.value !== "").map((o) => ({
+                      value: o.value,
+                      label: o.label,
+                    })),
+                  ]}
+                />
               </div>
               <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-time-format">Time format</Label>
-                <Select
+                <AppDropdown
+                  id="settings-time-format"
+                  className={settingsStyles.wFull}
                   value={timeFormat}
                   onValueChange={(v) => setTimeFormat(v as TimeFormatSetting)}
-                >
-                  <SelectTrigger id="settings-time-format" className={settingsStyles.wFull}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="24h">24-hour (e.g. 14:30)</SelectItem>
-                    <SelectItem value="12h">12-hour AM/PM (e.g. 2:30 PM)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "24h", label: "24-hour (e.g. 14:30)" },
+                    { value: "12h", label: "12-hour AM/PM (e.g. 2:30 PM)" },
+                  ]}
+                />
               </div>
               <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-date-format">Date format</Label>
-                <Select
+                <AppDropdown
+                  id="settings-date-format"
+                  className={settingsStyles.wFull}
                   value={dateFormat}
                   onValueChange={(v) => setDateFormat(v as DateFormatSetting)}
-                >
-                  <SelectTrigger id="settings-date-format" className={settingsStyles.wFull}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system">System default</SelectItem>
-                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (US)</SelectItem>
-                    <SelectItem value="DD/MM/YYYY">DD/MM/YYYY (UK/EU)</SelectItem>
-                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (ISO)</SelectItem>
-                    <SelectItem value="DD.MM.YYYY">DD.MM.YYYY (DE)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "system", label: "System default" },
+                    { value: "MM/DD/YYYY", label: "MM/DD/YYYY (US)" },
+                    { value: "DD/MM/YYYY", label: "DD/MM/YYYY (UK/EU)" },
+                    { value: "YYYY-MM-DD", label: "YYYY-MM-DD (ISO)" },
+                    { value: "DD.MM.YYYY", label: "DD.MM.YYYY (DE)" },
+                  ]}
+                />
               </div>
               <div className={settingsStyles.stack2}>
                 <Label htmlFor="settings-temp-unit">Temperature unit</Label>
-                <Select
+                <AppDropdown
+                  id="settings-temp-unit"
+                  className={settingsStyles.wFull}
                   value={temperatureUnit}
                   onValueChange={(v) => setTemperatureUnit(v as TemperatureUnit)}
-                >
-                  <SelectTrigger id="settings-temp-unit" className={settingsStyles.wFull}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="celsius">Celsius (°C)</SelectItem>
-                    <SelectItem value="fahrenheit">Fahrenheit (°F)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "celsius", label: "Celsius (°C)" },
+                    { value: "fahrenheit", label: "Fahrenheit (°F)" },
+                  ]}
+                />
               </div>
             </div>
 
@@ -848,21 +857,15 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
               <div className={settingsStyles.gridGap4P4Cols2}>
                 <div className={settingsStyles.stack2}>
                   <Label htmlFor="settings-update-channel">Release channel</Label>
-                  <Select
+                  <AppDropdown
+                    id="settings-update-channel"
                     value={updates.channel}
                     onValueChange={(value) => setUpdateChannel(value as ReleaseChannel)}
-                  >
-                    <SelectTrigger id="settings-update-channel">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RELEASE_CHANNELS.map((channel) => (
-                        <SelectItem key={channel} value={channel}>
-                          {channel}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={RELEASE_CHANNELS.map((channel) => ({
+                      value: channel,
+                      label: channel,
+                    }))}
+                  />
                   <p className={settingsStyles.textXsMuted}>
                     Main is the full release channel. Beta and RC receive pre-release builds.
                   </p>
@@ -1309,77 +1312,64 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 <div className={settingsStyles.gridGap4Cols2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-ring-buffer">Ring buffer capacity</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-ring-buffer"
                       value={String(pm.ringBufferCapacity)}
                       onValueChange={(v) => setPacketMonitor({ ringBufferCapacity: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-ring-buffer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="500000">500K packets</SelectItem>
-                        <SelectItem value="1000000">1M packets</SelectItem>
-                        <SelectItem value="2000000">2M packets</SelectItem>
-                        <SelectItem value="5000000">5M packets</SelectItem>
-                        <SelectItem value="10000000">10M packets</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "500000", label: "500K packets" },
+                        { value: "1000000", label: "1M packets" },
+                        { value: "2000000", label: "2M packets" },
+                        { value: "5000000", label: "5M packets" },
+                        { value: "10000000", label: "10M packets" },
+                      ]}
+                    />
                     <p className={settingsStyles.textXsMuted}>Max packets held in memory per session.</p>
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-stream-max">Live stream buffer</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-stream-max"
                       value={String(pm.streamMaxPackets)}
                       onValueChange={(v) => setPacketMonitor({ streamMaxPackets: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-stream-max">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5000">5K packets</SelectItem>
-                        <SelectItem value="10000">10K packets</SelectItem>
-                        <SelectItem value="25000">25K packets</SelectItem>
-                        <SelectItem value="50000">50K packets</SelectItem>
-                        <SelectItem value="100000">100K packets</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "5000", label: "5K packets" },
+                        { value: "10000", label: "10K packets" },
+                        { value: "25000", label: "25K packets" },
+                        { value: "50000", label: "50K packets" },
+                        { value: "100000", label: "100K packets" },
+                      ]}
+                    />
                     <p className={settingsStyles.textXsMuted}>Max packets in the live streaming view.</p>
                   </div>
                 </div>
                 <div className={settingsStyles.gridGap4Cols2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-max-sessions">Max sessions in memory</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-max-sessions"
                       value={String(pm.maxSessionsInMemory)}
                       onValueChange={(v) => setPacketMonitor({ maxSessionsInMemory: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-max-sessions">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[3, 5, 10, 15, 20].map((n) => (
-                          <SelectItem key={n} value={String(n)}>{n} sessions</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[3, 5, 10, 15, 20].map((n) => ({
+                        value: String(n),
+                        label: `${n} sessions`,
+                      }))}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-session-timeout">Session timeout</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-session-timeout"
                       value={String(pm.sessionTimeoutSecs)}
                       onValueChange={(v) => setPacketMonitor({ sessionTimeoutSecs: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-session-timeout">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="300">5 minutes</SelectItem>
-                        <SelectItem value="900">15 minutes</SelectItem>
-                        <SelectItem value="1800">30 minutes</SelectItem>
-                        <SelectItem value="3600">1 hour</SelectItem>
-                        <SelectItem value="7200">2 hours</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "300", label: "5 minutes" },
+                        { value: "900", label: "15 minutes" },
+                        { value: "1800", label: "30 minutes" },
+                        { value: "3600", label: "1 hour" },
+                        { value: "7200", label: "2 hours" },
+                      ]}
+                    />
                     <p className={settingsStyles.textXsMuted}>Evict stopped sessions after this time.</p>
                   </div>
                 </div>
@@ -1393,55 +1383,46 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 <div className={settingsStyles.gridGap4Cols3}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-packet-poll">Packet poll interval</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-packet-poll"
                       value={String(pm.packetPollIntervalMs)}
                       onValueChange={(v) => setPacketMonitor({ packetPollIntervalMs: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-packet-poll">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="100">100ms</SelectItem>
-                        <SelectItem value="250">250ms</SelectItem>
-                        <SelectItem value="500">500ms</SelectItem>
-                        <SelectItem value="1000">1s</SelectItem>
-                        <SelectItem value="2000">2s</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "100", label: "100ms" },
+                        { value: "250", label: "250ms" },
+                        { value: "500", label: "500ms" },
+                        { value: "1000", label: "1s" },
+                        { value: "2000", label: "2s" },
+                      ]}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-stats-poll">Stats poll interval</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-stats-poll"
                       value={String(pm.statsPollIntervalMs)}
                       onValueChange={(v) => setPacketMonitor({ statsPollIntervalMs: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-stats-poll">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="500">500ms</SelectItem>
-                        <SelectItem value="1000">1s</SelectItem>
-                        <SelectItem value="2000">2s</SelectItem>
-                        <SelectItem value="5000">5s</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "500", label: "500ms" },
+                        { value: "1000", label: "1s" },
+                        { value: "2000", label: "2s" },
+                        { value: "5000", label: "5s" },
+                      ]}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-page-size">Fetch page size</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-page-size"
                       value={String(pm.pageSize)}
                       onValueChange={(v) => setPacketMonitor({ pageSize: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-page-size">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1000">1K</SelectItem>
-                        <SelectItem value="2500">2.5K</SelectItem>
-                        <SelectItem value="5000">5K</SelectItem>
-                        <SelectItem value="10000">10K</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "1000", label: "1K" },
+                        { value: "2500", label: "2.5K" },
+                        { value: "5000", label: "5K" },
+                        { value: "10000", label: "10K" },
+                      ]}
+                    />
                     <p className={settingsStyles.textXsMuted}>Packets per batch fetch.</p>
                   </div>
                 </div>
@@ -1458,78 +1439,66 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 <div className={settingsStyles.gridGap4Cols2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-raw-queue">Raw packet queue</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-raw-queue"
                       value={String(pm.pipelineRawQueueSize)}
                       onValueChange={(v) => setPacketMonitor({ pipelineRawQueueSize: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-raw-queue">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="16384">16K</SelectItem>
-                        <SelectItem value="32768">32K</SelectItem>
-                        <SelectItem value="65536">64K</SelectItem>
-                        <SelectItem value="131072">128K</SelectItem>
-                        <SelectItem value="262144">256K</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "16384", label: "16K" },
+                        { value: "32768", label: "32K" },
+                        { value: "65536", label: "64K" },
+                        { value: "131072", label: "128K" },
+                        { value: "262144", label: "256K" },
+                      ]}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-parsed-queue">Parsed packet queue</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-parsed-queue"
                       value={String(pm.pipelineParsedQueueSize)}
                       onValueChange={(v) => setPacketMonitor({ pipelineParsedQueueSize: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-parsed-queue">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="8192">8K</SelectItem>
-                        <SelectItem value="16384">16K</SelectItem>
-                        <SelectItem value="32768">32K</SelectItem>
-                        <SelectItem value="65536">64K</SelectItem>
-                        <SelectItem value="131072">128K</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "8192", label: "8K" },
+                        { value: "16384", label: "16K" },
+                        { value: "32768", label: "32K" },
+                        { value: "65536", label: "64K" },
+                        { value: "131072", label: "128K" },
+                      ]}
+                    />
                   </div>
                 </div>
                 <div className={settingsStyles.gridGap4Cols2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-parser-threads">Parser threads</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-parser-threads"
                       value={String(pm.pipelineParserThreads)}
                       onValueChange={(v) => setPacketMonitor({ pipelineParserThreads: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-parser-threads">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Auto (CPU cores)</SelectItem>
-                        <SelectItem value="1">1 thread</SelectItem>
-                        <SelectItem value="2">2 threads</SelectItem>
-                        <SelectItem value="4">4 threads</SelectItem>
-                        <SelectItem value="8">8 threads</SelectItem>
-                        <SelectItem value="16">16 threads</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "0", label: "Auto (CPU cores)" },
+                        { value: "1", label: "1 thread" },
+                        { value: "2", label: "2 threads" },
+                        { value: "4", label: "4 threads" },
+                        { value: "8", label: "8 threads" },
+                        { value: "16", label: "16 threads" },
+                      ]}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="pm-write-batch">Write batch size</Label>
-                    <Select
+                    <AppDropdown
+                      id="pm-write-batch"
                       value={String(pm.pipelineWriteBatchSize)}
                       onValueChange={(v) => setPacketMonitor({ pipelineWriteBatchSize: Number(v) })}
-                    >
-                      <SelectTrigger id="pm-write-batch">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="250">250</SelectItem>
-                        <SelectItem value="500">500</SelectItem>
-                        <SelectItem value="1000">1,000</SelectItem>
-                        <SelectItem value="2500">2,500</SelectItem>
-                        <SelectItem value="5000">5,000</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "250", label: "250" },
+                        { value: "500", label: "500" },
+                        { value: "1000", label: "1,000" },
+                        { value: "2500", label: "2,500" },
+                        { value: "5000", label: "5,000" },
+                      ]}
+                    />
                     <p className={settingsStyles.textXsMuted}>Packets written per PCAP batch.</p>
                   </div>
                 </div>
@@ -1667,36 +1636,27 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 <div className={settingsStyles.gridGap4Cols2Pt2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-baud">Baud rate</Label>
-                    <Select
+                    <AppDropdown
+                      id="fax-settings-baud"
                       value={String(faxSafe.baudRate)}
                       onValueChange={(v) => setFax({ baudRate: Number(v) })}
-                    >
-                      <SelectTrigger id="fax-settings-baud">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FAX_BAUD_RATES.map((r) => (
-                          <SelectItem key={r} value={String(r)}>
-                            {r} baud
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={FAX_BAUD_RATES.map((r) => ({
+                        value: String(r),
+                        label: `${r} baud`,
+                      }))}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-resolution">Resolution</Label>
-                    <Select
+                    <AppDropdown
+                      id="fax-settings-resolution"
                       value={faxSafe.resolution}
                       onValueChange={(v) => setFax({ resolution: v as FaxResolution })}
-                    >
-                      <SelectTrigger id="fax-settings-resolution">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard (204×98 lpi)</SelectItem>
-                        <SelectItem value="fine">Fine (204×196 lpi)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "standard", label: "Standard (204×98 lpi)" },
+                        { value: "fine", label: "Fine (204×196 lpi)" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -1708,57 +1668,36 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
               <div className={clsx("ui-panel-shell", settingsStyles.panelShellGridGap4Cols3P4)}>
                 <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-send-retries">Max retries</Label>
-                  <Select
+                  <AppDropdown
+                    id="fax-settings-send-retries"
                     value={String(faxSafe.sendRetries)}
                     onValueChange={(v) => setFax({ sendRetries: Number(v) })}
-                  >
-                    <SelectTrigger id="fax-settings-send-retries">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
+                  />
                 </div>
                 <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-dis-timeout">DIS timeout</Label>
-                  <Select
+                  <AppDropdown
+                    id="fax-settings-dis-timeout"
                     value={String(faxSafe.disTimeoutSecs)}
                     onValueChange={(v) => setFax({ disTimeoutSecs: Number(v) })}
-                  >
-                    <SelectTrigger id="fax-settings-dis-timeout">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[5, 10, 15, 20, 25, 30].map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}s
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={[5, 10, 15, 20, 25, 30].map((n) => ({
+                      value: String(n),
+                      label: `${n}s`,
+                    }))}
+                  />
                 </div>
                 <div className={settingsStyles.stack2}>
                   <Label htmlFor="fax-settings-mcf-timeout">MCF timeout</Label>
-                  <Select
+                  <AppDropdown
+                    id="fax-settings-mcf-timeout"
                     value={String(faxSafe.mcfTimeoutSecs)}
                     onValueChange={(v) => setFax({ mcfTimeoutSecs: Number(v) })}
-                  >
-                    <SelectTrigger id="fax-settings-mcf-timeout">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[5, 10, 15, 20, 25, 30].map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}s
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={[5, 10, 15, 20, 25, 30].map((n) => ({
+                      value: String(n),
+                      label: `${n}s`,
+                    }))}
+                  />
                 </div>
               </div>
             </div>
@@ -1770,40 +1709,30 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 <div className={settingsStyles.gridGap4Cols2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-receive-timeout">Receive timeout</Label>
-                    <Select
+                    <AppDropdown
+                      id="fax-settings-receive-timeout"
                       value={String(faxSafe.receiveTimeoutSecs)}
                       onValueChange={(v) => setFax({ receiveTimeoutSecs: Number(v) })}
-                    >
-                      <SelectTrigger id="fax-settings-receive-timeout">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[30, 60, 90, 120, 180, 240, 300].map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n}s
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[30, 60, 90, 120, 180, 240, 300].map((n) => ({
+                        value: String(n),
+                        label: `${n}s`,
+                      }))}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="fax-settings-auto-answer">Auto-answer after</Label>
-                    <Select
+                    <AppDropdown
+                      id="fax-settings-auto-answer"
                       value={String(faxSafe.autoAnswerRings)}
                       onValueChange={(v) => setFax({ autoAnswerRings: Number(v) })}
-                    >
-                      <SelectTrigger id="fax-settings-auto-answer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Manual only</SelectItem>
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n} ring{n !== 1 ? "s" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "0", label: "Manual only" },
+                        ...[1, 2, 3, 4, 5].map((n) => ({
+                          value: String(n),
+                          label: `${n} ring${n !== 1 ? "s" : ""}`,
+                        })),
+                      ]}
+                    />
                   </div>
                 </div>
                 <div className={settingsStyles.stack2}>
@@ -1847,35 +1776,27 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 <div className={settingsStyles.gridGap4Cols2}>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="term-font-size">Font size</Label>
-                    <Select
+                    <AppDropdown
+                      id="term-font-size"
                       value={String(terminalSettings.fontSize)}
                       onValueChange={(v) => setTerminal({ fontSize: Number(v) })}
-                    >
-                      <SelectTrigger id="term-font-size">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[10, 11, 12, 13, 14, 15, 16, 18, 20].map((s) => (
-                          <SelectItem key={s} value={String(s)}>{s}px</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[10, 11, 12, 13, 14, 15, 16, 18, 20].map((s) => ({
+                        value: String(s),
+                        label: `${s}px`,
+                      }))}
+                    />
                   </div>
                   <div className={settingsStyles.stack2}>
                     <Label htmlFor="term-line-height">Line height</Label>
-                    <Select
+                    <AppDropdown
+                      id="term-line-height"
                       value={String(terminalSettings.lineHeight)}
                       onValueChange={(v) => setTerminal({ lineHeight: Number(v) })}
-                    >
-                      <SelectTrigger id="term-line-height">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0].map((h) => (
-                          <SelectItem key={h} value={String(h)}>{h}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 2.0].map((h) => ({
+                        value: String(h),
+                        label: String(h),
+                      }))}
+                    />
                   </div>
                 </div>
               </div>
@@ -1887,19 +1808,17 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
               <div className={clsx("ui-panel-shell", settingsStyles.panelShellDivided)}>
                 <div className={settingsStyles.p4Stack2}>
                   <Label htmlFor="term-cursor-style">Cursor style</Label>
-                  <Select
+                  <AppDropdown
+                    id="term-cursor-style"
+                    className={settingsStyles.wFullSm48}
                     value={terminalSettings.cursorStyle}
                     onValueChange={(v) => setTerminal({ cursorStyle: v as TerminalCursorStyle })}
-                  >
-                    <SelectTrigger id="term-cursor-style" className={settingsStyles.wFullSm48}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bar">Bar (|)</SelectItem>
-                      <SelectItem value="block">Block (█)</SelectItem>
-                      <SelectItem value="underline">Underline (_)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "bar", label: "Bar (|)" },
+                      { value: "block", label: "Block (█)" },
+                      { value: "underline", label: "Underline (_)" },
+                    ]}
+                  />
                 </div>
                 <div className={settingsStyles.rowBetweenP4}>
                   <div className={settingsStyles.stack0_5}>
@@ -1921,22 +1840,20 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
               <div className={clsx("ui-panel-shell", settingsStyles.panelShellDivided)}>
                 <div className={settingsStyles.p4Stack2}>
                   <Label htmlFor="term-scrollback">Scrollback buffer</Label>
-                  <Select
+                  <AppDropdown
+                    id="term-scrollback"
+                    className={settingsStyles.wFullSm48}
                     value={String(terminalSettings.scrollback)}
                     onValueChange={(v) => setTerminal({ scrollback: Number(v) })}
-                  >
-                    <SelectTrigger id="term-scrollback" className={settingsStyles.wFullSm48}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1000">1,000 lines</SelectItem>
-                      <SelectItem value="5000">5,000 lines</SelectItem>
-                      <SelectItem value="10000">10,000 lines</SelectItem>
-                      <SelectItem value="25000">25,000 lines</SelectItem>
-                      <SelectItem value="50000">50,000 lines</SelectItem>
-                      <SelectItem value="100000">100,000 lines</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "1000", label: "1,000 lines" },
+                      { value: "5000", label: "5,000 lines" },
+                      { value: "10000", label: "10,000 lines" },
+                      { value: "25000", label: "25,000 lines" },
+                      { value: "50000", label: "50,000 lines" },
+                      { value: "100000", label: "100,000 lines" },
+                    ]}
+                  />
                   <p className={settingsStyles.textXsMuted}>
                     Number of lines kept in the scroll history. Higher values use more memory.
                   </p>
@@ -1975,29 +1892,6 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             >
               <SoftphoneSettingsView />
             </Suspense>
-          </TabsContent>
-
-          <TabsContent value="inventory" className={settingsStyles.tabsContentP6}>
-            <div className={settingsStyles.sectionIntroLg}>
-              <div className={settingsStyles.rowGap2}>
-                <Package className={settingsStyles.iconMdPrimary} />
-                <h2 className={settingsStyles.textBaseSemibold}>Tools & Licenses</h2>
-              </div>
-              <p className={settingsStyles.textSmMuted}>
-                Manifest-driven inventory of tool modules and dependency licenses.
-              </p>
-            </div>
-            <div className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowHidden)}>
-              <Suspense
-                fallback={
-                  <div className={settingsStyles.centerPy12}>
-                    <Loader2 className={settingsStyles.iconSpinnerLgMuted} />
-                  </div>
-                }
-              >
-                <AdminInventoryView />
-              </Suspense>
-            </div>
           </TabsContent>
 
         </Tabs>

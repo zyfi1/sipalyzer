@@ -17,6 +17,7 @@ import {
   EyeOff,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { MarkdownRenderer } from "../MarkdownRenderer";
 
 interface SimpleMarkdownEditorProps {
@@ -183,7 +184,7 @@ export function SimpleMarkdownEditor({
         <ToolbarBtn onClick={() => wrap("`", "`")} title="Inline code">
           <Code className="h-4 w-4" />
         </ToolbarBtn>
-        <div className="w-px h-5 bg-border mx-1 shrink-0" />
+        <AppDivider orientation="vertical" size="lg" className="mx-1" />
         <ToolbarBtn onClick={() => linePrefix("# ", /^#+\s*/)} title="Heading 1">
           <Heading1 className="h-4 w-4" />
         </ToolbarBtn>
@@ -193,7 +194,7 @@ export function SimpleMarkdownEditor({
         <ToolbarBtn onClick={() => linePrefix("### ", /^#+\s*/)} title="Heading 3">
           <Heading3 className="h-4 w-4" />
         </ToolbarBtn>
-        <div className="w-px h-5 bg-border mx-1 shrink-0" />
+        <AppDivider orientation="vertical" size="lg" className="mx-1" />
         <ToolbarBtn onClick={() => linePrefix("- ", /^[-*]\s/)} title="Bullet list">
           <List className="h-4 w-4" />
         </ToolbarBtn>

@@ -17,13 +17,7 @@ import { useToolVisible } from "@/hooks/useToolVisible";
 import { FileText, Radio } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 
 export function RawPacketMonitor() {
   // Use selectors to prevent unnecessary re-renders
@@ -510,24 +504,19 @@ export function RawPacketMonitor() {
           <CardContent className="flex items-center gap-2 px-3 py-2">
             <Radio className="h-4 w-4 text-success shrink-0" />
             <span className="text-sm text-muted-foreground shrink-0">View session:</span>
-            <Select
+            <AppDropdown
               value={activeSessionId ?? ""}
               onValueChange={(id) => setActiveSession(id || null)}
-            >
-              <SelectTrigger className="h-8 w-[220px] text-sm">
-                <SelectValue placeholder="Select session" />
-              </SelectTrigger>
-              <SelectContent>
-                {runningSessionIds.map((id) => {
-                  const session = sessions.find((s) => s.id === id);
-                  return (
-                    <SelectItem key={id} value={id}>
-                      {session?.name ?? id.slice(0, 8)}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+              className="h-8 w-[220px] text-sm"
+              placeholder="Select session"
+              options={runningSessionIds.map((id) => {
+                const session = sessions.find((s) => s.id === id);
+                return {
+                  value: id,
+                  label: session?.name ?? id.slice(0, 8),
+                };
+              })}
+            />
           </CardContent>
         </Card>
       )}

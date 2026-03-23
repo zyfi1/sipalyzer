@@ -431,7 +431,7 @@ Questions: ${dnsData.queries && Array.isArray(dnsData.queries) ? dnsData.queries
           <TooltipWrapper entry={tooltips.colProtocol}><span className="text-muted-foreground cursor-help">Protocol</span></TooltipWrapper>
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips[`proto${packet.protocol.charAt(0).toUpperCase() + packet.protocol.slice(1).toLowerCase()}` as keyof typeof tooltips] as any || { title: packet.protocol }}>
-              <Badge variant="outline" className="text-xs h-5 cursor-help">{packet.protocol}</Badge>
+              <Badge variant="secondary" className="text-xs h-5 cursor-help">{packet.protocol}</Badge>
             </TooltipWrapper>
             <CopyButton text={packet.protocol} />
           </div>
@@ -797,7 +797,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
       {decoded?.ethernet && (
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-accent text-foreground border-border">
+            <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-accent text-foreground border-border">
               Ethernet II
             </Badge>
           </div>
@@ -813,7 +813,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
       {(decoded?.ip || packet.srcIp || packet.dstIp) && (
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-success/10 text-success border-success/20">
+            <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-success/10 text-success border-success/20">
               {decoded?.ip ? `IPv${decoded.ip.version}` : 'IP'}
             </Badge>
             <span className="text-xs text-muted-foreground">Network</span>
@@ -860,7 +860,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoTcp}>
-              <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-warning/10 text-warning-foreground border-warning/20 cursor-help">
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-warning/10 text-warning-foreground border-warning/20 cursor-help">
                 TCP
               </Badge>
             </TooltipWrapper>
@@ -881,7 +881,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoUdp}>
-              <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-info/10 text-info border-info/20 cursor-help">
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-info/10 text-info border-info/20 cursor-help">
                 UDP
               </Badge>
             </TooltipWrapper>
@@ -901,7 +901,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoSip}>
-              <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-destructive/10 text-destructive border-destructive/20 cursor-help">
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-destructive/10 text-destructive border-destructive/20 cursor-help">
                 SIP
               </Badge>
             </TooltipWrapper>
@@ -955,7 +955,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoRtp}>
-              <Badge variant="outline" className={`text-2xs px-1.5 py-0 cursor-help ${decoded.application.type === "Srtp" ? "bg-warning/10 text-warning border-warning/20" : "bg-info/10 text-info border-info/20"}`}>
+              <Badge variant="secondary" className={`text-2xs px-1.5 py-0 cursor-help ${decoded.application.type === "Srtp" ? "bg-warning/10 text-warning border-warning/20" : "bg-info/10 text-info border-info/20"}`}>
                 {decoded.application.type === "Srtp" ? "SRTP" : "RTP"}
               </Badge>
             </TooltipWrapper>
@@ -987,7 +987,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoRtcp}>
-              <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-success/10 text-success border-success/20 cursor-help">
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-success/10 text-success border-success/20 cursor-help">
                 RTCP
               </Badge>
             </TooltipWrapper>
@@ -1146,7 +1146,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoDns}>
-              <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-info/10 text-info border-info/20 cursor-help">
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-info/10 text-info border-info/20 cursor-help">
                 DNS
               </Badge>
             </TooltipWrapper>
@@ -1215,7 +1215,7 @@ function ProtocolTreeTab({ packet, decoded }: { packet: PacketInfo; decoded?: De
         <div className="space-y-2 px-2.5 py-2 border-b border-border/20">
           <div className="flex items-center gap-2">
             <TooltipWrapper entry={tooltips.protoT38}>
-              <Badge variant="outline" className="text-2xs px-1.5 py-0 bg-warning/10 text-warning border-warning/20 cursor-help">
+              <Badge variant="secondary" className="text-2xs px-1.5 py-0 bg-warning/10 text-warning border-warning/20 cursor-help">
                 T.38 / FAX
               </Badge>
             </TooltipWrapper>

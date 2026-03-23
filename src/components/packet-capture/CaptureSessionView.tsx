@@ -40,9 +40,9 @@ export function CaptureSessionView({ sessionId }: CaptureSessionViewProps) {
       case "stopped":
         return <Badge variant="secondary">Stopped</Badge>;
       case "paused":
-        return <Badge variant="outline">Paused</Badge>;
+        return <Badge variant="secondary">Paused</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
@@ -97,7 +97,7 @@ export function CaptureSessionView({ sessionId }: CaptureSessionViewProps) {
           <div className="text-sm font-medium mb-2">Protocols</div>
           <div className="flex flex-wrap gap-2">
             {session.filterConfig.protocols.map((protocol) => (
-              <Badge key={protocol} variant="outline">
+              <Badge key={protocol} variant="secondary">
                 {protocol}
               </Badge>
             ))}

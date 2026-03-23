@@ -288,6 +288,7 @@ input[type="checkbox"].sr-only {
   --shadow-tooltip: var(--shadow-tooltip);
   --shadow-header: var(--shadow-header);
   --shadow-glass: var(--shadow-glass);
+  --shadow-surface: var(--shadow-surface);
   /* Keyframes */
   @keyframes live-breathe {
   0%, 100% { opacity: 0.55; }
@@ -539,15 +540,14 @@ input[type="checkbox"].sr-only {
   }
 }
 @utility surface-subtle {
-  background:
-    linear-gradient(180deg, hsl(var(--foreground) / 0.014), transparent 56%),
-    linear-gradient(180deg, var(--ops-panel-bg-subtle), hsl(var(--ops-panel-bg-subtle) / 0.84));
-  border: 1px solid var(--ops-panel-border-subtle);
-  box-shadow: inset 0 1px 0 hsl(var(--ops-panel-edge-subtle));
+  background: hsl(var(--muted) / 0.08);
+  border: none;
+  box-shadow: none;
 }
 @utility surface-flat {
-  border: 1px solid hsl(var(--border) / 0.4);
-  background: hsl(var(--card) / 0.5);
+  border: 1px solid var(--ui-rule);
+  border-style: solid;
+  background: hsl(var(--muted) / 0.1);
   border-radius: var(--radius-md);
   box-shadow: none;
 }
@@ -600,7 +600,8 @@ input[type="checkbox"].sr-only {
   --terminal-bg: 220 28% 5%;
   --background: 218 21% 7%;
   --foreground: 230 15% 98%;
-  --card: 216 18% 11%;
+  /* Closer to background — less disjoint “card” lift */
+  --card: 218 20% 9.5%;
   --card-foreground: 230 15% 98%;
   --popover: 216 18% 11%;
   --popover-foreground: 230 15% 98%;
@@ -656,51 +657,39 @@ input[type="checkbox"].sr-only {
   --ease-out-expo: var(--motion-ease-overlay);
   --ease-in-out: var(--motion-ease-emphasis);
 
-  /* Shadows — bright-edge inset + layered dark depth */
-  --shadow-card:
-    inset 0 1px 0 0 hsl(var(--foreground) / 0.045),
-    0 4px 12px hsl(0 0% 0% / 0.45);
-  --shadow-card-hover:
-    inset 0 1px 0 0 hsl(var(--foreground) / 0.08),
-    0 12px 28px hsl(0 0% 0% / 0.5);
-  --shadow-elevated:
-    inset 0 1px 0 0 hsl(var(--foreground) / 0.06),
-    0 8px 24px hsl(0 0% 0% / 0.5);
-  --shadow-glass:
-    inset 0 1px 0 0 hsl(var(--foreground) / 0.08),
-    0 8px 32px hsl(0 0% 0% / 0.5);
-  --shadow-dropdown:
-    0 0 0 1px hsl(var(--foreground) / 0.08),
-    0 16px 48px hsl(0 0% 0% / 0.6),
-    0 4px 12px hsl(0 0% 0% / 0.4);
-  --shadow-focus: 0 0 0 3px hsl(var(--foreground) / 0.2);
-  --shadow-tooltip:
-    0 0 0 1px hsl(var(--foreground) / 0.08),
-    0 12px 32px hsl(0 0% 0% / 0.75),
-    0 4px 8px hsl(0 0% 0% / 0.5);
-  --shadow-header: 0 4px 16px hsl(0 0% 0% / 0.3);
-  --shadow-sidebar: 8px 0 24px hsl(0 0% 0% / 0.2);
+  /* Crisp edges: hairlines only (no soft halos / elevation blur) */
+  --shadow-card: none;
+  --shadow-card-hover: none;
+  --shadow-elevated: none;
+  --shadow-glass: none;
+  --shadow-surface: 0 0 0 1px hsl(var(--foreground) / 0.08);
+  --shadow-dropdown: 0 0 0 1px hsl(var(--foreground) / 0.1);
+  --shadow-focus: 0 0 0 2px hsl(var(--ring) / 0.55);
+  --shadow-tooltip: 0 0 0 1px hsl(var(--foreground) / 0.1);
+  --shadow-header: 0 1px 0 0 hsl(var(--foreground) / 0.06);
+  --shadow-sidebar: 1px 0 0 0 hsl(var(--foreground) / 0.08);
 
-  /* Operational surface contract (Graphite Cobalt) */
-  --ops-panel-bg: hsl(217 24% 12% / 0.94);
-  --ops-panel-bg-elevated: hsl(217 28% 14% / 0.97);
-  --ops-panel-bg-subtle: hsl(217 20% 14% / 0.78);
-  --ops-panel-border: hsl(var(--foreground) / 0.07);
-  --ops-panel-border-subtle: hsl(var(--foreground) / 0.06);
-  --ops-panel-edge: hsl(var(--foreground) / 0.08);
-  --ops-panel-edge-subtle: hsl(var(--foreground) / 0.055);
+  /* Hairlines — slightly higher alpha = less partial-pixel “fuzz” on edges */
+  --ui-rule: hsl(var(--foreground) / 0.052);
+  --ui-rule-strong: hsl(var(--foreground) / 0.078);
+  --ui-rule-list: hsl(var(--foreground) / 0.04);
+
+  /* Operational surfaces — near-flat tonal steps (continuous canvas) */
+  --ops-panel-bg: hsl(218 22% 10% / 0.97);
+  --ops-panel-bg-elevated: hsl(218 22% 10.5% / 0.98);
+  --ops-panel-bg-subtle: hsl(218 21% 11% / 0.9);
+  --ops-panel-border: var(--ui-rule);
+  --ops-panel-border-subtle: hsl(var(--foreground) / 0.03);
+  --ops-panel-edge: hsl(var(--foreground) / 0.05);
+  --ops-panel-edge-subtle: hsl(var(--foreground) / 0.04);
   --ops-control-bg: hsl(218 22% 16% / 0.96);
   --ops-control-bg-hover: hsl(218 24% 19% / 0.99);
   --ops-control-border: hsl(var(--foreground) / 0.1);
   --ops-control-border-hover: hsl(var(--foreground) / 0.18);
   --ops-control-text: hsl(var(--foreground) / 0.95);
   --ops-interactive-translate: -1px;
-  --ops-interactive-shadow:
-    inset 0 1px 0 0 hsl(var(--foreground) / 0.09),
-    0 6px 14px hsl(0 0% 0% / 0.4);
-  --ops-interactive-shadow-hover:
-    inset 0 1px 0 0 hsl(var(--foreground) / 0.12),
-    0 10px 22px hsl(0 0% 0% / 0.48);
+  --ops-interactive-shadow: none;
+  --ops-interactive-shadow-hover: none;
 
   /* Graphite tab contract (global baseline + family wrappers) */
   --tab-compact-list-min-h: 2.2rem;
@@ -711,10 +700,19 @@ input[type="checkbox"].sr-only {
   --tab-compact-trigger-letter-spacing: 0.005em;
   --tab-compact-row-px: 0.5rem;
   --tab-compact-row-py: 0.375rem;
-  /* Shared primitive sizing contract */
-  --ui-control-height: 2.25rem;
-  --ui-control-height-sm: 2rem;
+  /* Shared primitive sizing contract — buttons, AppDropdown/Select triggers, inputs */
+  --ui-control-height-sm: 1.75rem;
+  --ui-control-height-md: 2.25rem;
+  --ui-control-height-lg: 2.5rem;
+  /* Legacy alias: default / md tier */
+  --ui-control-height: var(--ui-control-height-md);
   --ui-menu-item-height: 2rem;
+  /* Panel chrome — split rails (hit targets align to density classes) */
+  --ui-resize-rail: hsl(var(--border) / 0.38);
+  --ui-resize-rail-hover: hsl(var(--foreground) / 0.42);
+  --ui-resize-surface: hsl(var(--muted) / 0.18);
+  --ui-resize-surface-hover: hsl(var(--primary) / 0.1);
+  --ui-resize-surface-active: hsl(var(--primary) / 0.14);
 
   /* Chart — brighter for readability on dark */
   --chart-1: 219 100% 65%;
@@ -758,14 +756,14 @@ input[type="checkbox"].sr-only {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* Subtle grain/noise overlay for tactile depth */
+  /* Subtle grain — must sit BELOW app UI or borders/lines read soft and “fuzzy”. */
   body::after {
     content: "";
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: 0;
     pointer-events: none;
-    opacity: 0.06;
+    opacity: 0.035;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 180px 180px;
@@ -773,6 +771,8 @@ input[type="checkbox"].sr-only {
   }
 
   #root {
+    position: relative;
+    z-index: 1;
     height: 100vh;
     width: 100vw;
     display: flex;
@@ -820,59 +820,29 @@ input[type="checkbox"].sr-only {
 
   /* Explicit glass treatment (opt-in only for branding-heavy/hero surfaces) */
   .glass-surface {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--card) / 0.72),
-      hsl(var(--card) / 0.58)
-    );
-    backdrop-filter: blur(20px) saturate(1.3);
-    -webkit-backdrop-filter: blur(20px) saturate(1.3);
-    border: 1px solid hsl(var(--foreground) / 0.06);
-    box-shadow: var(--shadow-glass);
+    background: hsl(var(--popover) / 0.96);
+    backdrop-filter: blur(6px) saturate(1.05);
+    -webkit-backdrop-filter: blur(6px) saturate(1.05);
+    border: 1px solid var(--ui-rule);
+    box-shadow: none;
     border-radius: var(--radius-lg);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     transition-property: color, background-color, border-color, box-shadow, transform, opacity;
     transition-duration: var(--motion-duration-navigation);
     transition-timing-function: var(--motion-ease-navigation);
   }
 
-  /* Glass luminous inner top line */
-  .glass-surface::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 10%;
-    right: 10%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.12), transparent);
-    z-index: 2;
-    pointer-events: none;
-  }
-
-  /* Glass subtle grain */
+  .glass-surface::before,
   .glass-surface::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    opacity: 0.025;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 180px 180px;
-    pointer-events: none;
-    border-radius: inherit;
-    z-index: 1;
+    content: none;
   }
 
-  /* Operational shell defaults (opaque by default, no backdrop blur) */
-  :is(.panel, .panel-tight, .surface, .app-header) {
-    background: linear-gradient(
-      180deg,
-      var(--ops-panel-bg-elevated),
-      var(--ops-panel-bg)
-    );
-    border: 1px solid var(--ops-panel-border);
-    box-shadow: var(--shadow-card);
+  /* Operational surfaces — continuous sheets (no box stroke). Header uses `.app-titlebar` for the bottom rule. */
+  :is(.panel, .panel-tight, .surface) {
+    background: var(--ops-panel-bg);
+    border: none;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     position: relative;
     transition-property: color, background-color, border-color, box-shadow, transform, opacity;
@@ -882,51 +852,40 @@ input[type="checkbox"].sr-only {
     -webkit-backdrop-filter: none;
   }
 
-  :is(.panel, .panel-tight, .surface, .app-header)::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 8%;
-    right: 8%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--ops-panel-edge), transparent);
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  :is(.panel, .panel-tight, .surface, .app-header)::after {
+  :is(.panel, .panel-tight, .surface)::before,
+  :is(.panel, .panel-tight, .surface)::after {
     content: none;
   }
 
-  /* Card component — luminous edge + noise (opaque surfaces get G + H) */
+  .app-header {
+    background: var(--ops-panel-bg);
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    position: relative;
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: var(--motion-duration-navigation);
+    transition-timing-function: var(--motion-ease-navigation);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .app-header::before,
+  .app-header::after {
+    content: none;
+  }
+
+  /* Card — flat sheet; border/typography carry hierarchy */
   [data-slot="card"] {
     position: relative;
-    overflow: hidden;
+    overflow: visible;
+    box-shadow: none;
+    border-style: solid;
   }
 
-  [data-slot="card"]::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 10%;
-    right: 10%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.08), transparent);
-    z-index: 2;
-    pointer-events: none;
-  }
-
+  [data-slot="card"]::before,
   [data-slot="card"]::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    opacity: 0.015;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 180px 180px;
-    pointer-events: none;
-    border-radius: inherit;
-    z-index: 1;
+    content: none;
   }
 }
 
@@ -947,24 +906,26 @@ input[type="checkbox"].sr-only {
     transition-timing-function: var(--motion-ease-navigation);
   }
 
-  /* Reusable operational shells */
+  /*
+   * Tool/workspace shell — no outer stroke (avoids “card on card” with the content island).
+   * Use `.ui-section-header-*`, `.ui-data-row`, `surface-flat`, and pane `border-*` for internal dividers.
+   */
   .ui-panel-shell {
-    background: hsl(var(--card) / 0.9);
-    border: 1px solid hsl(var(--border) / 0.46);
-    box-shadow: 0 6px 14px hsl(220 32% 4% / 0.24);
-    border-radius: var(--radius-lg);
+    background: hsl(var(--muted) / 0.14);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
   .ui-panel-shell::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 8%;
-    right: 8%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.08), transparent);
-    pointer-events: none;
+    content: none;
+  }
+
+  /* Registration: opaque fill, still no outer “card” line */
+  .registration-tool-shell.ui-panel-shell {
+    background: var(--ops-panel-bg);
+    border: none;
   }
 
   /* Opaque sticky headers for searchable/scrolling lists */
@@ -972,10 +933,8 @@ input[type="checkbox"].sr-only {
     position: sticky;
     top: 0;
     z-index: 10;
-    background:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.02), transparent 52%),
-      linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg));
-    border-bottom: 1px solid hsl(var(--foreground) / 0.1);
+    background: var(--ops-panel-bg-elevated);
+    border-bottom: 1px solid var(--ui-rule);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -989,45 +948,31 @@ input[type="checkbox"].sr-only {
   }
 
   .packet-graphite-stage {
-    background:
-      radial-gradient(120% 90% at 50% 0%, hsl(var(--foreground) / 0.02), transparent 58%),
-      linear-gradient(180deg, hsl(var(--card) / 0.5), hsl(var(--background) / 0.54));
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.04),
-      inset 0 -1px 0 hsl(0 0% 0% / 0.2);
+    background: hsl(var(--muted) / 0.05);
+    box-shadow: none;
   }
 
   .packet-graphite-panel {
-    background:
-      radial-gradient(180% 120% at 0% 0%, hsl(var(--foreground) / 0.05), transparent 56%),
-      linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg));
-    border: 1px solid hsl(var(--foreground) / 0.12);
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.1),
-      0 10px 24px hsl(0 0% 0% / 0.46);
+    background: var(--ops-panel-bg);
+    border: 1px solid var(--ui-rule);
+    border-style: solid;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .packet-graphite-panel::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 7%;
-    right: 7%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.18), transparent);
-    pointer-events: none;
-    z-index: 1;
+    content: none;
   }
 
   .ui-control-shell {
     background: hsl(var(--background) / 0.9);
     color: var(--ops-control-text);
     border: 1px solid hsl(var(--foreground) / 0.24);
+    border-style: solid;
     border-radius: var(--radius-md);
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.04);
+    box-shadow: none;
     transition-property: color, background-color, border-color, box-shadow, transform;
     transition-duration: var(--motion-duration-micro);
     transition-timing-function: var(--motion-ease-micro);
@@ -1035,7 +980,66 @@ input[type="checkbox"].sr-only {
   .ui-control-shell:hover {
     background: hsl(var(--background) / 0.97);
     border-color: hsl(var(--foreground) / 0.3);
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.06);
+    box-shadow: none;
+  }
+
+  /*
+   * Form fields (text inputs, textareas, native selects): premium surface aligned with
+   * secondary controls — legible stroke, chamfer, grounded shadow; generic .ui-control-shell
+   * wrappers (icon chips, toolbars) keep the flat shell above.
+   */
+  [data-slot="input"].ui-control-shell,
+  [data-slot="textarea"].ui-control-shell,
+  select.ui-control-shell {
+    background-clip: padding-box;
+    color: hsl(var(--foreground) / 0.95);
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--card) / 0.99),
+      hsl(var(--card) / 0.86) 42%,
+      hsl(var(--muted) / 0.5) 100%
+    );
+    border-color: hsl(var(--border));
+    box-shadow:
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.11),
+      0 1px 0 0 hsl(0 0% 0% / 0.24),
+      0 1px 2px -0.5px hsl(0 0% 0% / 0.3);
+    caret-color: hsl(var(--primary));
+  }
+
+  [data-slot="input"].ui-control-shell:hover:not(:disabled):not(:focus-visible),
+  [data-slot="textarea"].ui-control-shell:hover:not(:disabled):not(:focus-visible),
+  select.ui-control-shell:hover:not(:disabled):not(:focus-visible) {
+    border-color: hsl(var(--foreground) / 0.2);
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--card) / 1),
+      hsl(var(--card) / 0.92) 42%,
+      hsl(var(--muted) / 0.58) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.14),
+      0 1px 0 0 hsl(0 0% 0% / 0.2),
+      0 3px 10px -2px hsl(0 0% 0% / 0.34);
+  }
+
+  [data-slot="input"].ui-control-shell:focus-visible,
+  [data-slot="textarea"].ui-control-shell:focus-visible,
+  select.ui-control-shell:focus-visible {
+    outline: none;
+    border-color: hsl(var(--ring) / 0.5);
+    box-shadow:
+      var(--shadow-focus),
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.12);
+  }
+
+  [data-slot="input"].ui-control-shell:disabled,
+  [data-slot="textarea"].ui-control-shell:disabled,
+  select.ui-control-shell:disabled {
+    box-shadow: none;
+    background: hsl(var(--muted) / 0.22);
+    border-color: hsl(var(--foreground) / 0.12);
+    caret-color: hsl(var(--muted-foreground));
   }
 
   /* Keep button corners unified app-wide to the shared slight radius. */
@@ -1043,15 +1047,16 @@ input[type="checkbox"].sr-only {
     border-radius: var(--radius-md) !important;
   }
   /* Lock button dimensions by size tier so color variants never appear larger. */
-  [data-slot="button"][data-size="default"] {
-    height: var(--ui-control-height-sm) !important;
-    min-height: var(--ui-control-height-sm) !important;
-    padding-inline: 0.75rem !important;
+  [data-slot="button"][data-size="default"],
+  [data-slot="button"][data-size="md"] {
+    height: var(--ui-control-height-md) !important;
+    min-height: var(--ui-control-height-md) !important;
+    padding-inline: 0.875rem !important;
   }
   [data-slot="button"][data-size="sm"] {
     height: var(--ui-control-height-sm) !important;
     min-height: var(--ui-control-height-sm) !important;
-    padding-inline: 0.75rem !important;
+    padding-inline: 0.625rem !important;
   }
   [data-slot="button"][data-size="xs"] {
     height: 1.5rem !important;
@@ -1085,33 +1090,25 @@ input[type="checkbox"].sr-only {
     padding: 0 !important;
   }
   [data-slot="button"][data-size="icon-lg"] {
-    width: 2.5rem !important;
-    min-width: 2.5rem !important;
-    height: 2.5rem !important;
-    min-height: 2.5rem !important;
+    width: var(--ui-control-height-lg) !important;
+    min-width: var(--ui-control-height-lg) !important;
+    height: var(--ui-control-height-lg) !important;
+    min-height: var(--ui-control-height-lg) !important;
     padding: 0 !important;
   }
 
   .ui-floating-surface {
-    background: hsl(var(--card) / 0.97);
-    border: 1px solid hsl(var(--border) / 0.5);
+    background: hsl(var(--popover) / 0.98);
+    border: 1px solid var(--ui-rule-strong);
     border-radius: var(--radius-md);
-    box-shadow: 0 10px 22px hsl(220 34% 3% / 0.28);
+    box-shadow: var(--shadow-dropdown);
     position: relative;
     isolation: isolate;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .ui-floating-surface::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 7%;
-    right: 7%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.08), transparent);
-    pointer-events: none;
-    z-index: 1;
+    content: none;
   }
 
   .ui-floating-content {
@@ -1131,67 +1128,43 @@ input[type="checkbox"].sr-only {
       radial-gradient(120% 100% at 10% 0%, hsl(var(--primary) / 0.12), transparent 55%),
       radial-gradient(120% 100% at 90% 100%, hsl(var(--info) / 0.08), transparent 58%),
       hsl(220 20% 4% / 0.72);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .graphite-modal-content {
-    background:
-      radial-gradient(180% 120% at 0% 0%, hsl(var(--foreground) / 0.055), transparent 58%),
-      linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg));
-    border: 1px solid hsl(var(--foreground) / 0.14);
+    background: var(--ops-panel-bg-elevated);
+    border: 1px solid var(--ui-rule-strong);
+    border-style: solid;
     border-radius: var(--radius-lg);
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.11),
-      0 18px 44px hsl(0 0% 0% / 0.58);
+    box-shadow: var(--shadow-surface);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
 
-  .graphite-modal-content::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 7%;
-    right: 7%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.2), transparent);
-    pointer-events: none;
-    z-index: 1;
-  }
-
+  .graphite-modal-content::before,
   .graphite-modal-content::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    opacity: 0.012;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 180px 180px;
-    z-index: 0;
+    content: none;
   }
 
   .surface-subtle {
-    background:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.014), transparent 56%),
-      linear-gradient(180deg, var(--ops-panel-bg-subtle), hsl(var(--ops-panel-bg-subtle) / 0.84));
-    border: 1px solid var(--ops-panel-border-subtle);
-    box-shadow: inset 0 1px 0 hsl(var(--ops-panel-edge-subtle));
+    background: hsl(var(--muted) / 0.08);
+    border: none;
+    box-shadow: none;
   }
 
   .surface-flat {
-    border: 1px solid hsl(var(--border) / 0.4);
-    background: hsl(var(--card) / 0.5);
+    border: 1px solid var(--ui-rule);
+    border-style: solid;
+    background: hsl(var(--muted) / 0.1);
     border-radius: var(--radius-md);
     box-shadow: none;
   }
 
-  /* Shared data/list rows: clearer separation + readable hover */
+  /* Shared data/list rows — hairline separators + hover */
   .ui-data-row {
     position: relative;
-    border-bottom: 1px solid hsl(var(--border) / 0.3);
+    border-bottom: 1px solid var(--ui-rule-list);
     transition:
       background-color var(--motion-duration-micro) var(--motion-ease-micro),
       border-color var(--motion-duration-micro) var(--motion-ease-micro);
@@ -1211,8 +1184,8 @@ input[type="checkbox"].sr-only {
   }
   .ui-data-row:hover {
     background: hsl(var(--muted) / 0.2);
-    border-color: hsl(var(--border) / 0.48);
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.03);
+    border-bottom-color: var(--ui-rule);
+    box-shadow: none;
   }
   .ui-data-row:hover::before {
     opacity: 0.62;
@@ -1220,7 +1193,7 @@ input[type="checkbox"].sr-only {
 
   /* Table rows inherit the same distinction app-wide. */
   tbody tr {
-    border-bottom: 1px solid hsl(var(--border) / 0.3);
+    border-bottom: 1px solid var(--ui-rule-list);
     transition:
       background-color var(--motion-duration-micro) var(--motion-ease-micro),
       border-color var(--motion-duration-micro) var(--motion-ease-micro);
@@ -1233,7 +1206,7 @@ input[type="checkbox"].sr-only {
   .ui-choice-tile {
     position: relative;
     overflow: hidden;
-    border: 1px solid hsl(var(--border) / 0.36);
+    border: 1px solid var(--ui-rule);
     background: hsl(var(--background) / 0.24);
     border-radius: var(--radius-md);
     transition:
@@ -1331,9 +1304,9 @@ input[type="checkbox"].sr-only {
     transition-timing-function: var(--motion-ease-overlay);
   }
   .hover-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-card-hover);
-    border-color: hsl(var(--foreground) / 0.1);
+    transform: translateY(-1px);
+    box-shadow: none;
+    border-color: var(--ui-rule-strong);
   }
 
   /* View/content entrance — use on panels and main content */
@@ -1365,17 +1338,6 @@ input[type="checkbox"].sr-only {
     color: hsl(var(--foreground));
     position: relative;
   }
-  .nav-item-active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 2px;
-    height: 60%;
-    border-radius: 1px;
-    background: hsl(var(--primary));
-  }
   .nav-item-inactive {
     @apply text-muted-foreground hover:bg-accent hover:text-foreground;
   }
@@ -1399,20 +1361,25 @@ input[type="checkbox"].sr-only {
     animation: fade-in var(--motion-duration-navigation) var(--motion-ease-navigation) both;
   }
 
+  /* Do not set display:flex here — Header uses CSS-module grid (`.headerRoot`) for layout. */
   .app-header {
-    @apply flex-shrink-0 h-9 flex items-center pl-0 pr-0 gap-2;
+    @apply flex-shrink-0 h-9 pl-0 pr-0;
   }
 
   /* Header-only icon actions: intentionally isolated from ui-control-shell. */
   .header-icon-button {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground;
-    background: transparent;
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground;
     border: none;
+    background: transparent;
     box-shadow: none;
     transition:
       color var(--motion-duration-micro) var(--motion-ease-micro),
       background-color var(--motion-duration-micro) var(--motion-ease-micro),
       transform var(--motion-duration-micro) var(--motion-ease-micro);
+  }
+  .header-icon-button svg {
+    width: 1rem;
+    height: 1rem;
   }
   .header-icon-button:hover {
     @apply text-foreground;
@@ -1425,13 +1392,22 @@ input[type="checkbox"].sr-only {
 
   /* Header control shell (search, registrar pickers, execution selector). */
   .ui-header-picker {
-    @apply inline-flex items-center rounded-md border text-xs font-semibold;
+    @apply inline-flex items-center rounded-md border border-solid text-xs font-semibold;
     min-height: 1.75rem;
     gap: 0.375rem;
     padding-inline: 0.625rem;
-    border-color: hsl(var(--border) / 0.55);
-    background: hsl(var(--card));
-    color: hsl(var(--foreground) / 0.8);
+    background-clip: padding-box;
+    border-color: hsl(var(--border));
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--card) / 0.99),
+      hsl(var(--card) / 0.86) 42%,
+      hsl(var(--muted) / 0.44) 100%
+    );
+    color: hsl(var(--foreground) / 0.82);
+    box-shadow:
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.1),
+      0 1px 0 0 hsl(0 0% 0% / 0.2);
     transition:
       color var(--motion-duration-micro) var(--motion-ease-micro),
       border-color var(--motion-duration-micro) var(--motion-ease-micro),
@@ -1439,13 +1415,25 @@ input[type="checkbox"].sr-only {
       box-shadow var(--motion-duration-micro) var(--motion-ease-micro);
   }
   .ui-header-picker:hover {
-    background: hsl(var(--accent));
+    border-color: hsl(var(--foreground) / 0.2);
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--card) / 1),
+      hsl(var(--card) / 0.9) 42%,
+      hsl(var(--muted) / 0.52) 100%
+    );
     color: hsl(var(--foreground) / 0.95);
+    box-shadow:
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.12),
+      0 1px 0 0 hsl(0 0% 0% / 0.16),
+      0 2px 8px -2px hsl(0 0% 0% / 0.28);
   }
   .ui-header-picker.is-open {
-    border-color: hsl(var(--border) / 0.65);
-    color: hsl(var(--foreground) / 0.92);
-    box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.15);
+    border-color: hsl(var(--ring) / 0.48);
+    color: hsl(var(--foreground) / 0.94);
+    box-shadow:
+      var(--shadow-focus),
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.11);
   }
   .ui-header-picker.is-muted {
     color: hsl(var(--muted-foreground) / 0.74);
@@ -1471,35 +1459,59 @@ input[type="checkbox"].sr-only {
     line-height: 1;
   }
 
-  /* Reusable section/header rows used across popovers, cards, and side panes. */
+  /* Section/header rows — bottom hairline + tonal band (stacked rows collapse to a single seam). */
   .ui-section-header-sm {
-    @apply surface-subtle border-b border-border/35;
+    background: hsl(var(--muted) / 0.06);
+    border: none;
+    border-bottom: 1px solid var(--ui-rule);
     padding: 0.5rem 0.75rem;
   }
   .ui-section-header-md {
-    @apply surface-subtle border-b border-border/50;
+    background: hsl(var(--muted) / 0.075);
+    border: none;
+    border-bottom: 1px solid var(--ui-rule-strong);
     padding: 0.625rem 1rem;
   }
+
+  .ui-section-header-md + .ui-section-header-sm,
+  .ui-section-header-md + .ui-section-header-md,
+  .ui-section-header-sm + .ui-section-header-sm,
+  .ui-section-header-sm + .ui-section-header-md {
+    border-top: 1px solid var(--ui-rule);
+    border-top-style: solid;
+  }
+  .ui-section-header-md:has(+ .ui-section-header-sm),
+  .ui-section-header-md:has(+ .ui-section-header-md),
+  .ui-section-header-sm:has(+ .ui-section-header-sm),
+  .ui-section-header-sm:has(+ .ui-section-header-md) {
+    border-bottom: none !important;
+  }
+
   .ui-floating-header-sm {
-    @apply sticky top-0 z-20 border-b border-border/40 bg-popover;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border: none;
+    border-bottom: 1px solid var(--ui-rule);
+    background: hsl(var(--popover));
     padding: 0.5rem 0.625rem;
   }
 
   /* Reusable flat card shell for list panes and grouped content. */
   .ui-surface-card {
-    @apply surface-flat rounded-md border border-border/35;
+    @apply surface-flat rounded-md;
   }
 
   /* Hero surfaces/metrics: unified shell for high-signal summary areas. */
   .ui-hero-surface {
     @apply rounded-md border;
-    border-color: hsl(var(--border) / 0.4);
-    background: linear-gradient(180deg, hsl(var(--card) / 0.9), hsl(var(--card) / 0.84));
-    box-shadow: 0 8px 20px hsl(220 30% 4% / 0.2);
+    border-color: var(--ui-rule);
+    background: hsl(var(--muted) / 0.1);
+    box-shadow: none;
   }
   .ui-hero-metric {
     @apply rounded-[var(--radius-md)] border;
-    border-color: hsl(var(--border) / 0.28);
+    border-color: var(--ui-rule);
     background: hsl(var(--muted) / 0.16);
   }
 
@@ -1511,7 +1523,7 @@ input[type="checkbox"].sr-only {
     box-shadow: none !important;
     border-radius: 0 !important;
     border: none !important;
-    border-bottom: 1px solid hsl(var(--border) / 0.5) !important;
+    border-bottom: 1px solid var(--ui-rule-strong) !important;
     z-index: 20;
   }
 
@@ -1545,36 +1557,39 @@ input[type="checkbox"].sr-only {
     right: 0;
     bottom: 0;
     width: 1px;
-    background: hsl(var(--border) / 0.5);
+    background: var(--ui-rule-strong);
     pointer-events: none;
   }
 
-  /* ========== Surfaces — glass properties inherited via :is() selector above ========== */
+  /* ========== Surfaces — flat operational sheets ========== */
   .panel {
     @apply p-6;
-    background: linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg));
+    background: var(--ops-panel-bg);
     border: 1px solid var(--ops-panel-border);
-    box-shadow: var(--shadow-card);
+    border-style: solid;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
   .panel-tight {
     @apply p-3;
-    background: linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg));
+    background: var(--ops-panel-bg);
     border: 1px solid var(--ops-panel-border);
-    box-shadow: var(--shadow-card);
+    border-style: solid;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
   .surface {
-    background: linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg));
+    background: var(--ops-panel-bg);
     border: 1px solid var(--ops-panel-border);
-    box-shadow: var(--shadow-card);
+    border-style: solid;
+    box-shadow: none;
     border-radius: var(--radius-lg);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
   .list-row {
     @apply px-4 py-3 rounded-lg transition-smooth;
@@ -1598,10 +1613,12 @@ input[type="checkbox"].sr-only {
     @apply inline-flex items-center justify-start;
     width: fit-content;
     gap: 0.2rem;
-    padding: 2px;
-    border-radius: var(--radius-md);
-    background: hsl(var(--muted) / 0.38);
-    border: 1px solid hsl(var(--border) / 0.7);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid hsl(var(--border) / 0.55);
+    box-shadow: none;
     min-height: 2.15rem;
   }
 
@@ -1616,7 +1633,7 @@ input[type="checkbox"].sr-only {
   .settings-nav-tab,
   .notification-nav-tab {
     @apply relative inline-flex items-center justify-center whitespace-nowrap outline-none select-none cursor-pointer;
-    border-radius: var(--radius-md);
+    border-radius: calc(var(--radius-sm) + 1px);
     border: 1px solid transparent;
     background: transparent;
     color: hsl(var(--muted-foreground) / 0.76);
@@ -1625,6 +1642,30 @@ input[type="checkbox"].sr-only {
       color var(--motion-duration-micro) var(--motion-ease-micro),
       border-color var(--motion-duration-micro) var(--motion-ease-micro),
       background-color var(--motion-duration-micro) var(--motion-ease-micro);
+  }
+
+  .subview-tab::after,
+  .subview-tab-inner::after,
+  .subview-tab-compact::after,
+  .monitor-side-tab::after,
+  .settings-nav-tab::after,
+  .notification-nav-tab::after {
+    content: "";
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.18rem;
+    height: 2px;
+    border-radius: 999px;
+    background: transparent;
+    opacity: 0;
+    transform: scaleX(0.5);
+    transform-origin: center;
+    transition:
+      transform var(--motion-duration-overlay) var(--motion-ease-overlay),
+      background-color var(--motion-duration-navigation) var(--motion-ease-navigation),
+      box-shadow var(--motion-duration-navigation) var(--motion-ease-navigation),
+      opacity var(--motion-duration-navigation) var(--motion-ease-navigation);
   }
 
   .subview-tab {
@@ -1683,9 +1724,9 @@ input[type="checkbox"].sr-only {
   .monitor-side-tab:hover,
   .settings-nav-tab:hover,
   .notification-nav-tab:hover {
-    color: hsl(var(--foreground) / 0.96);
-    border-color: hsl(var(--border) / 0.74);
-    background: hsl(var(--muted) / 0.56);
+    color: hsl(var(--foreground));
+    border-color: transparent;
+    background: hsl(var(--card) / 0.28);
   }
 
   .subview-tab[data-state="active"],
@@ -1696,9 +1737,20 @@ input[type="checkbox"].sr-only {
   .notification-nav-tab[data-state="active"] {
     color: hsl(var(--foreground));
     font-weight: 650;
-    border-color: hsl(var(--primary) / 0.55);
-    background: hsl(var(--card) / 0.98);
-    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2);
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .subview-tab[data-state="active"]::after,
+  .subview-tab-inner[data-state="active"]::after,
+  .subview-tab-compact[data-state="active"]::after,
+  .monitor-side-tab[data-state="active"]::after,
+  .settings-nav-tab[data-state="active"]::after,
+  .notification-nav-tab[data-state="active"]::after {
+    background: hsl(var(--primary) / 0.92);
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.32);
+    opacity: 1;
+    transform: scaleX(1);
   }
 
   .subview-tab svg:first-child {
@@ -1775,6 +1827,7 @@ input[type="checkbox"].sr-only {
 }
 
 .softphone-view-chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1782,9 +1835,9 @@ input[type="checkbox"].sr-only {
   min-height: 2.15rem;
   padding: 0 0.9rem;
   flex: 1 1 0;
-  border-radius: var(--radius-md);
-  border: 1px solid hsl(var(--border) / 0.7);
-  background: hsl(var(--muted) / 0.38);
+  border-radius: calc(var(--radius-sm) + 1px);
+  border: 1px solid transparent;
+  background: transparent;
   color: hsl(var(--muted-foreground) / 0.78);
   font-size: 0.74rem;
   font-weight: 600;
@@ -1801,15 +1854,39 @@ input[type="checkbox"].sr-only {
 
 .softphone-view-chip:hover {
   color: hsl(var(--foreground) / 0.96);
-  border-color: hsl(var(--border) / 0.76);
-  background: hsl(var(--muted) / 0.56);
+  background: hsl(var(--card) / 0.28);
 }
 
 .softphone-view-chip.is-active {
   color: hsl(var(--foreground));
-  border-color: hsl(var(--primary) / 0.55);
-  background: hsl(var(--card) / 0.98);
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2);
+  border-color: transparent;
+  background: transparent;
+}
+
+.softphone-view-chip::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.18rem;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  opacity: 0;
+  transform: scaleX(0.5);
+  transform-origin: center;
+  transition:
+    transform var(--motion-duration-overlay) var(--motion-ease-overlay),
+    background-color var(--motion-duration-navigation) var(--motion-ease-navigation),
+    box-shadow var(--motion-duration-navigation) var(--motion-ease-navigation),
+    opacity var(--motion-duration-navigation) var(--motion-ease-navigation);
+}
+
+.softphone-view-chip.is-active::after {
+  background: hsl(var(--primary) / 0.92);
+  box-shadow: 0 0 10px hsl(var(--primary) / 0.32);
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .softphone-view-chip.is-disabled {
@@ -1878,7 +1955,9 @@ input[type="checkbox"].sr-only {
 }
 .softphone-keypad-key {
   @apply rounded-lg min-h-[52px] sm:min-h-[60px] touch-manipulation select-none flex flex-col items-center justify-center bg-secondary hover:bg-accent;
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--ui-rule);
+  border-style: solid;
+  box-shadow: none;
   @apply focus-visible:outline-hidden;
   transition: transform var(--motion-duration-micro) var(--motion-ease-micro), background-color var(--motion-duration-micro) var(--motion-ease-micro), box-shadow var(--motion-duration-micro) var(--motion-ease-micro);
 }
@@ -1889,14 +1968,18 @@ input[type="checkbox"].sr-only {
   transform: scale(0.97);
 }
 .softphone-cta-call {
-  @apply rounded-lg py-4 px-6 font-semibold text-lg text-foreground bg-accent shadow-card;
+  @apply rounded-lg py-4 px-6 font-semibold text-lg text-foreground bg-accent;
+  border: 1px solid hsl(var(--foreground) / 0.12);
+  border-style: solid;
+  box-shadow: none;
   @apply hover:bg-accent/80;
   @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none;
   transition: transform var(--motion-duration-navigation) var(--motion-ease-navigation), box-shadow var(--motion-duration-navigation) var(--motion-ease-navigation), filter var(--motion-duration-navigation) var(--motion-ease-navigation);
 }
 .softphone-cta-call:hover:not(:disabled) {
-  box-shadow: var(--shadow-card-hover);
+  box-shadow: none;
+  border-color: hsl(var(--foreground) / 0.18);
 }
 .softphone-cta-call:not(:disabled):active {
   transform: scale(0.99);
@@ -2408,27 +2491,18 @@ input[type="checkbox"].sr-only {
   animation: run-tests-pulse 2s var(--motion-ease-emphasis) var(--motion-attention-iteration);
 }
 
-/* ========== Tooltips — central system (Tippy.js) ========== */
-.tippy-box[data-theme~="sipalyzer"] {
-  background: hsl(var(--popover));
-  color: hsl(var(--popover-foreground));
-  border-radius: var(--radius-lg);
-  box-shadow:
-    0 12px 32px hsl(0 0% 0% / 0.72),
-    0 4px 8px hsl(0 0% 0% / 0.45);
+/* ========== Tooltips — central system (Floating UI) ========== */
+[data-floating-tooltip] {
   will-change: transform, opacity;
+  backdrop-filter: saturate(1.06);
+  -webkit-backdrop-filter: saturate(1.06);
+  transition-timing-function: var(--motion-ease-overlay);
 }
-.tippy-box[data-theme~="sipalyzer"] > .tippy-content {
-  padding: 8px 12px;
-  line-height: 1.35;
-}
-.tippy-box[data-theme~="sipalyzer"] > .tippy-arrow {
-  color: hsl(var(--popover));
-}
-.tippy-box[data-theme~="sipalyzer"][data-inertia][data-state="visible"] {
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-.tippy-box[data-theme~="sipalyzer"] [data-slot="tooltip-content"] {
+[data-floating-tooltip][data-side="top"] { transform-origin: bottom center; }
+[data-floating-tooltip][data-side="bottom"] { transform-origin: top center; }
+[data-floating-tooltip][data-side="left"] { transform-origin: center right; }
+[data-floating-tooltip][data-side="right"] { transform-origin: center left; }
+[data-floating-tooltip] [data-slot="tooltip-content"] {
   max-width: min(420px, calc(100vw - 16px));
 }
 
@@ -2472,7 +2546,7 @@ input[type="checkbox"].sr-only {
   .status-warning {
     animation: none !important;
   }
-  .tippy-box[data-theme~="sipalyzer"] {
+  [data-floating-tooltip] {
     transition-duration: 1ms !important;
   }
 }
@@ -2551,7 +2625,8 @@ input[type="checkbox"].sr-only {
 .dark {
   --background: 218 21% 7%;
   --foreground: 230 15% 98%;
-  --card: 216 18% 11%;
+  /* Closer to background — less disjoint “card” lift */
+  --card: 218 20% 9.5%;
   --card-foreground: 230 15% 98%;
   --popover: 216 18% 11%;
   --popover-foreground: 230 15% 98%;
@@ -2602,7 +2677,7 @@ input[type="checkbox"].sr-only {
   background: hsl(var(--popover)) !important;
   border: 1px solid hsl(var(--border)) !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.25), 0 2px 8px hsl(0 0% 0% / 0.15) !important;
+  box-shadow: var(--shadow-surface) !important;
   padding: 0.875rem 1rem !important;
   gap: 0.75rem !important;
   min-width: 280px;
@@ -3107,6 +3182,271 @@ input[type="checkbox"].sr-only {
   margin: 1.35rem 0;
 }
 
+/* ========== Panel chrome — resize rails & static dividers ========== */
+.ui-app-divider {
+  background-color: hsl(var(--border) / 0.38);
+  box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.04);
+}
+
+.ui-resize-handle {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: var(--ui-resize-surface);
+  box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.32);
+  color: hsl(var(--muted-foreground) / 0.85);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  outline: none;
+  transition:
+    background-color var(--motion-duration-micro) var(--motion-ease-micro),
+    box-shadow var(--motion-duration-micro) var(--motion-ease-micro),
+    opacity var(--motion-duration-micro) var(--motion-ease-micro);
+}
+
+.ui-resize-handle:focus-visible {
+  box-shadow: var(--shadow-focus), inset 0 0 0 1px hsl(var(--border) / 0.35);
+}
+
+.ui-resize-handle:hover {
+  background: var(--ui-resize-surface-hover);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.22);
+  color: hsl(var(--foreground) / 0.85);
+}
+
+.ui-resize-handle:active {
+  background: var(--ui-resize-surface-active);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.28);
+}
+
+.ui-resize-handle.ui-resize-handle--vertical {
+  cursor: col-resize;
+}
+
+.ui-resize-handle.ui-resize-handle--horizontal {
+  cursor: row-resize;
+}
+
+.ui-resize-handle.ui-resize-handle--vertical.ui-resize-handle--density-minimal {
+  width: 4px;
+  min-width: 4px;
+}
+
+.ui-resize-handle.ui-resize-handle--vertical.ui-resize-handle--density-compact {
+  width: 8px;
+  min-width: 8px;
+}
+
+.ui-resize-handle.ui-resize-handle--vertical.ui-resize-handle--density-comfortable {
+  width: 10px;
+  min-width: 10px;
+}
+
+.ui-resize-handle.ui-resize-handle--horizontal.ui-resize-handle--density-minimal {
+  height: 4px;
+  min-height: 4px;
+}
+
+.ui-resize-handle.ui-resize-handle--horizontal.ui-resize-handle--density-compact {
+  height: 8px;
+  min-height: 8px;
+}
+
+.ui-resize-handle.ui-resize-handle--horizontal.ui-resize-handle--density-comfortable {
+  height: 10px;
+  min-height: 10px;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-resize-handle__rail {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 3rem;
+  max-height: 70%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--ui-resize-rail);
+  transition: background-color var(--motion-duration-micro) var(--motion-ease-micro);
+  pointer-events: none;
+}
+
+.ui-resize-handle.ui-resize-handle--horizontal .ui-resize-handle__rail {
+  width: 3rem;
+  max-width: 70%;
+  height: 2px;
+  max-height: none;
+}
+
+.ui-resize-handle:hover .ui-resize-handle__rail {
+  background: var(--ui-resize-rail-hover);
+}
+
+.ui-resize-handle__dots {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  line-height: 0.55;
+  font-size: 10px;
+  text-align: center;
+  color: hsl(var(--muted-foreground) / 0.88);
+  transition: color var(--motion-duration-micro) var(--motion-ease-micro);
+}
+
+.ui-resize-handle:hover .ui-resize-handle__dots {
+  color: hsl(var(--foreground) / 0.85);
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-resize-handle__icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  opacity: 0.72;
+  transition: opacity var(--motion-duration-micro) var(--motion-ease-micro);
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-grip:hover .ui-resize-handle__icon {
+  opacity: 0.95;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-minimal {
+  border-radius: 0;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-edge {
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0.72;
+  border-radius: 0;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-edge:hover {
+  opacity: 1;
+  background: hsl(var(--primary) / 0.07) !important;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-edge::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--ui-resize-rail);
+  transition: background-color var(--motion-duration-micro) var(--motion-ease-micro);
+  pointer-events: none;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-edge:hover::after {
+  background: var(--ui-resize-rail-hover);
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-table-edge {
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0.88;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-table-edge:hover {
+  opacity: 1;
+  background: hsl(var(--primary) / 0.12) !important;
+}
+
+.ui-resize-handle.ui-resize-handle--appearance-table-edge:active {
+  background: hsl(var(--primary) / 0.18) !important;
+}
+
+/*
+ * Packet list column resize — base .ui-resize-handle uses position:relative which
+ * defeats Tailwind absolute; later grid cells paint over earlier ones, hiding handles.
+ * Force absolute + wide hit target + always-visible grip (::before).
+ */
+.packet-list__col-head {
+  position: relative;
+  overflow: visible;
+}
+
+.packet-list__col-resize.ui-resize-handle {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  right: -3px !important;
+  width: 6px !important;
+  min-width: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 25 !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  touch-action: none !important;
+}
+
+.packet-list__col-resize.ui-resize-handle:hover,
+.packet-list__col-resize.ui-resize-handle:focus-visible {
+  background: hsl(var(--primary) / 0.12) !important;
+}
+
+.packet-list__col-resize.ui-resize-handle:active,
+.packet-list__col-resize.ui-resize-handle.is-resizing {
+  background: hsl(var(--primary) / 0.2) !important;
+}
+
+/* Visible column boundary / resize affordance (always on; rail optional) */
+.packet-list__col-resize.ui-resize-handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: hsl(var(--border) / 0.95);
+  box-shadow:
+    0 0 0 1px hsl(var(--foreground) / 0.08),
+    inset 0 0 0 1px hsl(var(--foreground) / 0.06);
+  pointer-events: none;
+  z-index: 1;
+  transition:
+    background-color var(--motion-duration-micro) var(--motion-ease-micro),
+    width var(--motion-duration-micro) var(--motion-ease-micro),
+    margin-left var(--motion-duration-micro) var(--motion-ease-micro);
+}
+
+.packet-list__col-head:hover .packet-list__col-resize:not(.is-resizing)::before,
+.packet-list__col-resize.ui-resize-handle:hover::before {
+  background: hsl(var(--primary) / 0.55);
+  width: 3px;
+  margin-left: -1.5px;
+}
+
+.packet-list__col-resize.is-resizing::before {
+  background: hsl(var(--primary) / 0.85) !important;
+  width: 3px;
+  margin-left: -1.5px;
+  box-shadow: 0 0 12px hsl(var(--primary) / 0.35);
+}
+
 /* ── react-grid-layout overrides ── */
 .react-grid-placeholder {
   background: hsl(var(--primary) / 0.12) !important;
@@ -3119,9 +3459,14 @@ input[type="checkbox"].sr-only {
   background: none !important;
 }
 .react-resizable-handle::after {
-  border-color: hsl(var(--foreground) / 0.15) !important;
-  width: 6px !important;
-  height: 6px !important;
+  border-color: hsl(var(--primary) / 0.38) !important;
+  border-width: 1.5px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 2px !important;
+  box-shadow:
+    0 0 0 1px hsl(var(--foreground) / 0.08),
+    inset 0 1px 0 0 hsl(var(--foreground) / 0.12) !important;
 }
 
 /* ========== High-visibility mode (bright / glare environments) ========== */
@@ -3140,7 +3485,7 @@ input[type="checkbox"].sr-only {
   --ops-control-bg-hover: hsl(218 24% 17% / 1);
   --ops-control-border: hsl(var(--foreground) / 0.5);
   --ops-control-border-hover: hsl(var(--foreground) / 0.62);
-  --shadow-focus: 0 0 0 3px hsl(var(--ring) / 0.7);
+  --shadow-focus: 0 0 0 2px hsl(var(--ring) / 0.85);
 }
 
 [data-visibility="high"] .glass-surface {
@@ -3148,12 +3493,13 @@ input[type="checkbox"].sr-only {
   -webkit-backdrop-filter: none !important;
   background: hsl(var(--card) / 0.99) !important;
   border-color: hsl(var(--foreground) / 0.28) !important;
+  box-shadow: none !important;
 }
 
 [data-visibility="high"] .ui-panel-shell {
-  background: linear-gradient(180deg, var(--ops-panel-bg-elevated), var(--ops-panel-bg)) !important;
-  border-color: var(--ops-panel-border) !important;
-  box-shadow: 0 8px 18px hsl(220 32% 4% / 0.34) !important;
+  background: var(--ops-panel-bg-elevated) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 [data-visibility="high"] .ui-surface-card,
@@ -3162,21 +3508,36 @@ input[type="checkbox"].sr-only {
   border-color: hsl(var(--border) / 0.95) !important;
 }
 
-[data-visibility="high"] .surface-subtle,
+[data-visibility="high"] .surface-subtle {
+  background: var(--ops-panel-bg-subtle) !important;
+  border: none !important;
+}
+
 [data-visibility="high"] .ui-section-header-sm,
 [data-visibility="high"] .ui-section-header-md {
   background: var(--ops-panel-bg-subtle) !important;
-  border-color: var(--ops-panel-border-subtle) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ops-panel-border-subtle) !important;
+}
+
+[data-visibility="high"] .ui-section-header-md + .ui-section-header-sm,
+[data-visibility="high"] .ui-section-header-md + .ui-section-header-md,
+[data-visibility="high"] .ui-section-header-sm + .ui-section-header-sm,
+[data-visibility="high"] .ui-section-header-sm + .ui-section-header-md {
+  border-top: 1px solid var(--ops-panel-border-subtle) !important;
+}
+
+[data-visibility="high"] .ui-section-header-md:has(+ .ui-section-header-sm),
+[data-visibility="high"] .ui-section-header-md:has(+ .ui-section-header-md),
+[data-visibility="high"] .ui-section-header-sm:has(+ .ui-section-header-sm),
+[data-visibility="high"] .ui-section-header-sm:has(+ .ui-section-header-md) {
+  border-bottom: none !important;
 }
 
 [data-visibility="high"] .ui-hero-surface {
-  border-color: hsl(var(--foreground) / 0.3) !important;
-  background: linear-gradient(
-    180deg,
-    hsl(var(--card) / 0.98),
-    hsl(217 23% 12% / 0.98)
-  ) !important;
-  box-shadow: 0 10px 24px hsl(220 32% 4% / 0.35) !important;
+  border-color: hsl(var(--foreground) / 0.28) !important;
+  background: hsl(var(--muted) / 0.14) !important;
+  box-shadow: none !important;
 }
 
 [data-visibility="high"] .ui-control-shell {
@@ -3190,6 +3551,41 @@ input[type="checkbox"].sr-only {
   border-color: var(--ops-control-border-hover) !important;
 }
 
+[data-visibility="high"] [data-slot="input"].ui-control-shell,
+[data-visibility="high"] [data-slot="textarea"].ui-control-shell,
+[data-visibility="high"] select.ui-control-shell {
+  color: hsl(var(--foreground) / 0.98) !important;
+  background: var(--ops-control-bg) !important;
+  border-color: var(--ops-control-border) !important;
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.08) !important;
+  caret-color: hsl(var(--foreground)) !important;
+}
+
+[data-visibility="high"] [data-slot="input"].ui-control-shell:hover:not(:disabled):not(:focus-visible),
+[data-visibility="high"] [data-slot="textarea"].ui-control-shell:hover:not(:disabled):not(:focus-visible),
+[data-visibility="high"] select.ui-control-shell:hover:not(:disabled):not(:focus-visible) {
+  background: var(--ops-control-bg-hover) !important;
+  border-color: var(--ops-control-border-hover) !important;
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.1) !important;
+}
+
+[data-visibility="high"] [data-slot="input"].ui-control-shell:focus-visible,
+[data-visibility="high"] [data-slot="textarea"].ui-control-shell:focus-visible,
+[data-visibility="high"] select.ui-control-shell:focus-visible {
+  border-color: var(--ops-control-border-hover) !important;
+  box-shadow:
+    var(--shadow-focus),
+    inset 0 1px 0 hsl(var(--foreground) / 0.08) !important;
+}
+
+[data-visibility="high"] [data-slot="input"].ui-control-shell:disabled,
+[data-visibility="high"] [data-slot="textarea"].ui-control-shell:disabled,
+[data-visibility="high"] select.ui-control-shell:disabled {
+  background: hsl(var(--muted) / 0.2) !important;
+  border-color: hsl(var(--foreground) / 0.18) !important;
+  box-shadow: none !important;
+}
+
 [data-visibility="high"] .text-caption,
 [data-visibility="high"] .ui-text-meta,
 [data-visibility="high"] .section-label,
@@ -3200,9 +3596,16 @@ input[type="checkbox"].sr-only {
 [data-visibility="high"] .subview-tab-compact[data-state="active"],
 [data-visibility="high"] .settings-nav-tab[data-state="active"],
 [data-visibility="high"] .notification-nav-tab[data-state="active"] {
-  border-color: hsl(var(--foreground) / 0.5) !important;
-  background: var(--ops-control-bg-hover) !important;
-  box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.14) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+[data-visibility="high"] .subview-tab-compact[data-state="active"]::after,
+[data-visibility="high"] .settings-nav-tab[data-state="active"]::after,
+[data-visibility="high"] .notification-nav-tab[data-state="active"]::after {
+  background: hsl(var(--foreground) / 0.96) !important;
+  box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.3) !important;
 }
 
 [data-visibility="high"] .ui-data-row {
@@ -3226,5 +3629,123 @@ input[type="checkbox"].sr-only {
 [data-visibility="high"] select:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus) !important;
+}
+
+[data-visibility="high"] .ui-app-divider {
+  background-color: hsl(var(--foreground) / 0.22);
+  box-shadow: 0 0 0 1px hsl(var(--foreground) / 0.12);
+}
+
+[data-visibility="high"] .ui-resize-handle {
+  background: hsl(var(--muted) / 0.34);
+  box-shadow:
+    inset 0 0 0 1px hsl(var(--foreground) / 0.2),
+    inset 0 1px 0 0 hsl(var(--foreground) / 0.08);
+}
+
+[data-visibility="high"] .ui-resize-handle.ui-resize-handle--appearance-edge::after {
+  background: hsl(var(--foreground) / 0.38);
+}
+
+[data-visibility="high"] .ui-resize-handle.ui-resize-handle--appearance-table-edge:hover {
+  background: hsl(var(--primary) / 0.18) !important;
+}
+
+/* ========== Premium control micro-interactions ========== */
+@keyframes control-switch-thumb-bounce {
+  0% {
+    scale: 0.96;
+  }
+  32% {
+    scale: 1.2;
+  }
+  62% {
+    scale: 0.94;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes control-checkmark-overshoot {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+    translate: -24% -28%;
+    rotate: -16deg;
+  }
+  54% {
+    opacity: 1;
+    scale: 1.14;
+    translate: 14% 18%;
+    rotate: 8deg;
+  }
+  76% {
+    scale: 0.94;
+    translate: -5% -6%;
+    rotate: -4deg;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+    rotate: 0deg;
+  }
+}
+
+@keyframes control-radio-indicator-pop {
+  0% {
+    opacity: 0;
+    scale: 0.38;
+    rotate: -24deg;
+    filter: blur(1.2px);
+  }
+  48% {
+    opacity: 1;
+    scale: 1.2;
+    rotate: 8deg;
+    filter: blur(0);
+  }
+  72% {
+    scale: 0.92;
+    rotate: -4deg;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+    rotate: 0deg;
+    filter: blur(0);
+  }
+}
+
+@keyframes control-radio-ring {
+  0% {
+    opacity: 0.52;
+    scale: 0.58;
+  }
+  70% {
+    opacity: 0.16;
+    scale: 1.32;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.46;
+  }
+}
+
+.animate-control-switch-thumb-bounce {
+  animation: control-switch-thumb-bounce 520ms cubic-bezier(0.2, 0.88, 0.24, 1.28) both;
+}
+
+.animate-control-checkmark-overshoot {
+  animation: control-checkmark-overshoot 560ms cubic-bezier(0.18, 0.92, 0.24, 1.24) both;
+}
+
+.animate-control-radio-indicator-pop {
+  animation: control-radio-indicator-pop 520ms cubic-bezier(0.18, 0.9, 0.24, 1.2) both;
+}
+
+.animate-control-radio-ring {
+  animation: control-radio-ring 640ms cubic-bezier(0.2, 0.82, 0.22, 1) both;
 }
 

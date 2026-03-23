@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown, type AppDropdownOption } from "@/components/ui/app-dropdown";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
@@ -273,19 +273,21 @@ export function NoteDetailPanel({ note, onBack, onDeleted, initialEditMode, onCo
                     label="Category"
                     value={category || "__none__"}
                     onChange={(v) => setCategory(v === "__none__" ? "" : v)}
-                  >
-                    <SelectItem value="__none__">None</SelectItem>
-                    {allCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </MetaSelect>
+                    options={[
+                      { value: "__none__", label: "None" },
+                      ...allCategories.map((c) => ({ value: c, label: c })),
+                    ]}
+                  />
 
                   <MetaSelect
                     label="Registrar"
                     value={linkedRegistrarId || "__none__"}
                     onChange={(v) => setLinkedRegistrarId(v === "__none__" ? undefined : v)}
-                  >
-                    <SelectItem value="__none__">None</SelectItem>
-                    {registrars.map((r) => <SelectItem key={r.id!} value={r.id!}>{r.name}</SelectItem>)}
-                  </MetaSelect>
+                    options={[
+                      { value: "__none__", label: "None" },
+                      ...registrars.map((r) => ({ value: r.id!, label: r.name })),
+                    ]}
+                  />
                 </div>
 
                 <DropdownMenuSeparator />
@@ -368,15 +370,18 @@ export function NoteDetailPanel({ note, onBack, onDeleted, initialEditMode, onCo
             <div className="notes-meta-strip-scroll flex items-center gap-1.5 min-w-0 overflow-x-auto whitespace-nowrap">
               <div className="inline-flex items-center gap-1.5 min-w-0 shrink-0">
                 <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                <Select value="__add__" onValueChange={(v) => { if (v && v !== "__add__" && !tags.includes(v)) setTags([...tags, v]); }}>
-                  <SelectTrigger className="h-7 w-[130px] text-xs">
-                    <SelectValue placeholder="Add tag" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__add__">Add tag</SelectItem>
-                    {availableTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value="__add__"
+                  onValueChange={(v) => {
+                    if (v && v !== "__add__" && !tags.includes(v)) setTags([...tags, v]);
+                  }}
+                  placeholder="Add tag"
+                  className="h-7 w-[130px] text-xs"
+                  options={[
+                    { value: "__add__", label: "Add tag" },
+                    ...availableTags.map((t) => ({ value: t, label: t })),
+                  ]}
+                />
               </div>
               <Popover>
                 <PopoverTrigger asChild>
@@ -419,11 +424,11 @@ export function NoteDetailPanel({ note, onBack, onDeleted, initialEditMode, onCo
                 </Badge>
               ))}
 
-              <Badge variant="outline" className="h-6 text-[11px] shrink-0">
+              <Badge variant="secondary" className="h-6 text-[11px] shrink-0">
                 {tags.length} tag{tags.length === 1 ? "" : "s"}
               </Badge>
-              {category && <Badge variant="outline" className="h-6 text-[11px] shrink-0 hidden xl:inline-flex">{category}</Badge>}
-              {registrarName && <Badge variant="outline" className="h-6 text-[11px] shrink-0 hidden xl:inline-flex">{registrarName}</Badge>}
+              {category && <Badge variant="secondary" className="h-6 text-[11px] shrink-0 hidden xl:inline-flex">{category}</Badge>}
+              {registrarName && <Badge variant="secondary" className="h-6 text-[11px] shrink-0 hidden xl:inline-flex">{registrarName}</Badge>}
               <span className="ml-auto text-[11px] text-muted-foreground tabular-nums shrink-0 pl-2">
                 Edited {formatRelativeDate(note.updatedAt)}
               </span>
@@ -504,19 +509,19 @@ interface MetaSelectProps {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  children: React.ReactNode;
+  options: AppDropdownOption[];
 }
 
-function MetaSelect({ label, value, onChange, children }: MetaSelectProps) {
+function MetaSelect({ label, value, onChange, options }: MetaSelectProps) {
   return (
     <div className="space-y-1.5">
       <span className="text-[11px] text-muted-foreground font-medium">{label}</span>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 w-full text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>{children}</SelectContent>
-      </Select>
+      <AppDropdown
+        value={value}
+        onValueChange={onChange}
+        className="h-8 w-full text-xs"
+        options={options}
+      />
     </div>
   );
 }

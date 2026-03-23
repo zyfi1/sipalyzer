@@ -1,4 +1,10 @@
-export type ProvisionSubviewId = "provision" | "contacts" | "device" | "diff" | "designer";
+export type ProvisionSubviewId =
+  | "provision"
+  | "firmware"
+  | "contacts"
+  | "device"
+  | "diff"
+  | "designer";
 
 export interface ProvisionNavItem {
   id: ProvisionSubviewId;
@@ -7,6 +13,7 @@ export interface ProvisionNavItem {
 
 const PROVISION_VIEWER_NAV_ITEMS: ProvisionNavItem[] = [
   { id: "provision", label: "Provision" },
+  { id: "firmware", label: "Firmware" },
   { id: "contacts", label: "Contacts" },
   { id: "device", label: "Device" },
   { id: "diff", label: "Diff" },

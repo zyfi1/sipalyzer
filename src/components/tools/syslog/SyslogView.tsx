@@ -11,13 +11,7 @@ import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { CopyTextButton } from "@/components/ui/copy-text-button";
 import { MetricCard } from "@/components/network-test/components/MetricCard";
 import { tooltips } from "@/lib/tooltips";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Activity,
   Play,
@@ -321,18 +315,16 @@ export function SyslogView() {
         {/* Row 2: Filters */}
         <div className="flex items-center gap-2">
           <TooltipWrapper entry={tooltips.syslogSeverity}>
-            <Select value={severityFilter} onValueChange={setSeverityFilter}>
-              <SelectTrigger className="w-[140px] h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SEVERITY_LEVELS.map((s) => (
-                  <SelectItem key={s.value} value={s.value} className="text-xs">
-                    <span className={s.color}>{s.label}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AppDropdown
+              value={severityFilter}
+              onValueChange={setSeverityFilter}
+              className="w-[140px] h-7 text-xs"
+              size="sm"
+              options={SEVERITY_LEVELS.map((s) => ({
+                value: s.value,
+                label: <span className={s.color}>{s.label}</span>,
+              }))}
+            />
           </TooltipWrapper>
           <div className="relative flex-1">
             <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
@@ -343,7 +335,7 @@ export function SyslogView() {
               className="h-8 text-xs pl-8 ui-control-shell"
             />
           </div>
-          <Badge variant="outline" className="text-2xs h-6 px-2 shrink-0 tabular-nums">
+          <Badge variant="secondary" className="text-2xs h-6 px-2 shrink-0 tabular-nums">
             {filteredEntries.length === entries.length
               ? `${entries.length}`
               : `${filteredEntries.length} / ${entries.length}`}

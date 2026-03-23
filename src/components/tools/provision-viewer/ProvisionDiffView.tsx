@@ -25,6 +25,7 @@ import {
   Eye, EyeOff, Loader2,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import type { FetchProvisionResult } from "@/types/provision";
 
@@ -138,7 +139,7 @@ function SourceActions({ label, accent, lineCount, hasProvision, onProvision, on
           <span className="text-2xs text-muted-foreground tabular-nums ml-0.5">{lineCount} lines</span>
         )}
       </div>
-      <div className="h-4 w-px bg-border" />
+      <AppDivider orientation="vertical" size="md" className="mx-0" />
       <div className="flex items-center gap-1">
         <TooltipWrapper title="Load provision" description="Use the current provision file as this diff source.">
           <Button variant="neutral" size="sm" className="h-7 px-2 text-2xs gap-1.5" disabled={!hasProvision} onClick={onProvision}>
@@ -339,7 +340,7 @@ export function ProvisionDiffView({ result }: { result: FetchProvisionResult | n
               <ArrowRightLeft className="h-3 w-3" />
             </button>
           </TooltipWrapper>
-          <div className="h-4 w-px bg-border" />
+          <AppDivider orientation="vertical" size="md" className="mx-0" />
           <TooltipWrapper title={changesOnly ? "Show all lines" : "Hide unchanged"} description={changesOnly ? "Show all lines including unchanged ones." : "Collapse unchanged regions to focus on changes."}>
             <button type="button" onClick={() => setChangesOnly(v => !v)}
               className={cn(
@@ -354,7 +355,7 @@ export function ProvisionDiffView({ result }: { result: FetchProvisionResult | n
           </TooltipWrapper>
           {hasBoth && (
             <>
-              <div className="h-4 w-px bg-border" />
+              <AppDivider orientation="vertical" size="md" className="mx-0" />
               <div className="flex items-center gap-2.5 text-2xs font-medium tabular-nums">
                 <span className="text-success">+{stats.added}</span>
                 <span className="text-destructive">-{stats.removed}</span>

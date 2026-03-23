@@ -10,23 +10,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown, type AppDropdownOption } from "@/components/ui/app-dropdown";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Settings, HelpCircle, AlertTriangle } from "@/lib/icons";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Settings, HelpCircle } from "@/lib/icons";
 import type { TestType } from "@/types/registration";
 import { TEST_TYPES } from "@/types/registration";
+
+const FORCE_TRANSPORT_OPTIONS: AppDropdownOption[] = [
+  { value: "default", label: "Default" },
+  { value: "udp", label: "UDP" },
+  { value: "tcp", label: "TCP" },
+  { value: "tls", label: "TLS" },
+  { value: "wss", label: "WSS" },
+];
+
+const BOOL_YES_NO_OPTIONS: AppDropdownOption[] = [
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" },
+];
+
+const TLS_VERSION_OPTIONS: AppDropdownOption[] = [
+  { value: "1.2", label: "TLS 1.2" },
+  { value: "1.3", label: "TLS 1.3" },
+];
 
 export interface TestConfig {
   timeout_seconds?: number;
@@ -279,21 +288,14 @@ export function TestConfigDialog({
               <LabelWithTooltip htmlFor="force_transport" tooltip="Override the transport protocol for this test. Default uses the registrar's configured transport" className="text-xs">
                 Transport
               </LabelWithTooltip>
-              <Select
+              <AppDropdown
                 value={(config.force_transport as string) || "default"}
                 onValueChange={(value) => updateConfig("force_transport", value === "default" ? undefined : value)}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="udp">UDP</SelectItem>
-                  <SelectItem value="tcp">TCP</SelectItem>
-                  <SelectItem value="tls">TLS</SelectItem>
-                  <SelectItem value="wss">WSS</SelectItem>
-                </SelectContent>
-              </Select>
+                options={FORCE_TRANSPORT_OPTIONS}
+                placeholder="Default"
+                className="h-8 text-sm"
+                size="sm"
+              />
             </div>
           </div>
         );
@@ -349,21 +351,14 @@ export function TestConfigDialog({
               <LabelWithTooltip htmlFor="force_transport" tooltip="Transport protocol to test. This overrides the registrar's default transport for this test" className="text-xs">
                 Transport
               </LabelWithTooltip>
-              <Select
+              <AppDropdown
                 value={(config.force_transport as string) || "default"}
                 onValueChange={(value) => updateConfig("force_transport", value === "default" ? undefined : value)}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="udp">UDP</SelectItem>
-                  <SelectItem value="tcp">TCP</SelectItem>
-                  <SelectItem value="tls">TLS</SelectItem>
-                  <SelectItem value="wss">WSS</SelectItem>
-                </SelectContent>
-              </Select>
+                options={FORCE_TRANSPORT_OPTIONS}
+                placeholder="Default"
+                className="h-8 text-sm"
+                size="sm"
+              />
             </div>
           </div>
         );
@@ -819,21 +814,14 @@ export function TestConfigDialog({
               <LabelWithTooltip htmlFor="force_transport" tooltip="Primary transport to test. The test will also attempt fallback transports (e.g., UDP if TCP fails)" className="text-xs">
                 Primary Transport
               </LabelWithTooltip>
-              <Select
+              <AppDropdown
                 value={(config.force_transport as string) || "default"}
                 onValueChange={(value) => updateConfig("force_transport", value === "default" ? undefined : value)}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="udp">UDP</SelectItem>
-                  <SelectItem value="tcp">TCP</SelectItem>
-                  <SelectItem value="tls">TLS</SelectItem>
-                  <SelectItem value="wss">WSS</SelectItem>
-                </SelectContent>
-              </Select>
+                options={FORCE_TRANSPORT_OPTIONS}
+                placeholder="Default"
+                className="h-8 text-sm"
+                size="sm"
+              />
             </div>
           </div>
         );
@@ -1124,53 +1112,38 @@ export function TestConfigDialog({
               <LabelWithTooltip htmlFor="tls_verify_certificate" tooltip="Verify the TLS certificate chain. Disable only for testing with self-signed certificates" className="text-xs">
                 Verify Cert
               </LabelWithTooltip>
-              <Select
+              <AppDropdown
                 value={config.tls_verify_certificate === false ? "false" : "true"}
                 onValueChange={(value) => updateConfig("tls_verify_certificate", value === "true")}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+                options={BOOL_YES_NO_OPTIONS}
+                className="h-8 text-sm"
+                size="sm"
+              />
             </div>
             <div className="space-y-1.5">
               <LabelWithTooltip htmlFor="tls_verify_hostname" tooltip="Verify that the certificate's hostname matches the registrar hostname. Disable only for testing" className="text-xs">
                 Verify Hostname
               </LabelWithTooltip>
-              <Select
+              <AppDropdown
                 value={config.tls_verify_hostname === false ? "false" : "true"}
                 onValueChange={(value) => updateConfig("tls_verify_hostname", value === "true")}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+                options={BOOL_YES_NO_OPTIONS}
+                className="h-8 text-sm"
+                size="sm"
+              />
             </div>
           </div>
           <div className="space-y-1.5">
             <LabelWithTooltip htmlFor="tls_min_version" tooltip="Minimum TLS version to accept. TLS 1.3 is more secure but may not be supported by all registrars" className="text-xs">
               TLS Version
             </LabelWithTooltip>
-            <Select
+            <AppDropdown
               value={(config.tls_min_version as string) || "1.2"}
               onValueChange={(value) => updateConfig("tls_min_version", value)}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1.2">TLS 1.2</SelectItem>
-                <SelectItem value="1.3">TLS 1.3</SelectItem>
-              </SelectContent>
-            </Select>
+              options={TLS_VERSION_OPTIONS}
+              className="h-8 text-sm"
+              size="sm"
+            />
           </div>
         </>
       )}
@@ -1269,33 +1242,22 @@ export function TestConfigDialog({
             </TabsContent>
           </Tabs>
         </div>
-        <AlertDialog open={showAdvancedWarning} onOpenChange={(open) => {
-          if (!open) {
-            handleAdvancedWarningCancel();
-          }
-        }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <AlertDialogTitle>Advanced Configuration Warning</AlertDialogTitle>
-              </div>
-              <AlertDialogDescription className="pt-2">
-                Advanced options allow you to modify low-level SIP protocol settings, network parameters, and test behavior. 
-                Incorrect configuration may cause test failures or unexpected behavior. Only modify these settings if you 
-                understand their impact on SIP registration.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleAdvancedWarningCancel}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={handleAdvancedWarningConfirm}>
-                Continue
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={showAdvancedWarning}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleAdvancedWarningCancel();
+            } else {
+              setShowAdvancedWarning(true);
+            }
+          }}
+          title="Advanced Configuration Warning"
+          description="Advanced options allow you to modify low-level SIP protocol settings, network parameters, and test behavior. Incorrect configuration may cause test failures or unexpected behavior. Only modify these settings if you understand their impact on SIP registration."
+          confirmText="Continue"
+          cancelText="Cancel"
+          variant="neutral"
+          onConfirm={handleAdvancedWarningConfirm}
+        />
         <DialogFooter className="surface-subtle sticky bottom-0 z-10 pt-3 border-t border-border px-5 pb-3">
           <TooltipWrapper title="Cancel" description="Close without saving test configuration.">
             <Button variant="neutral" onClick={onClose} size="sm">

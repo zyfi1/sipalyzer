@@ -3,7 +3,7 @@ import { useNoteStore } from "@/stores/noteStore";
 import { useRegistrationStore } from "@/stores/registrationStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
@@ -146,13 +146,16 @@ export function NoteEditorModal({
                 </Button>
               </TooltipWrapper>
               {templates.length > 0 && (
-                <Select value={templateId || "__none__"} onValueChange={(v) => setTemplateId(v === "__none__" ? undefined : v)}>
-                  <SelectTrigger className="h-7 w-[120px] text-2xs"><SelectValue placeholder="Template" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No Template</SelectItem>
-                    {templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={templateId || "__none__"}
+                  onValueChange={(v) => setTemplateId(v === "__none__" ? undefined : v)}
+                  placeholder="Template"
+                  className="h-7 w-[120px] text-2xs"
+                  options={[
+                    { value: "__none__", label: "No Template" },
+                    ...templates.map((t) => ({ value: t.id, label: t.name })),
+                  ]}
+                />
               )}
               <TooltipWrapper title="AI suggestions" description="Get tag/category suggestions (Ctrl+/).">
                 <Button variant="ghost" size="sm" onClick={() => setShowAISuggestions(!showAISuggestions)} className={cn("h-7 gap-1 text-2xs", showAISuggestions && "bg-accent")}>
@@ -197,23 +200,29 @@ export function NoteEditorModal({
             <div className="w-72 border-l border-border/55 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <SidebarSection label="Folder">
-                  <Select value={folderId || "__none__"} onValueChange={(v) => setFolderId(v === "__none__" ? undefined : v)}>
-                    <SelectTrigger className="h-7 text-2xs"><SelectValue placeholder="No folder" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">No folder</SelectItem>
-                      {folders.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <AppDropdown
+                    value={folderId || "__none__"}
+                    onValueChange={(v) => setFolderId(v === "__none__" ? undefined : v)}
+                    placeholder="No folder"
+                    className="h-7 text-2xs"
+                    options={[
+                      { value: "__none__", label: "No folder" },
+                      ...folders.map((f) => ({ value: f.id, label: f.name })),
+                    ]}
+                  />
                 </SidebarSection>
 
               <SidebarSection label="Category">
-                <Select value={category || "__none__"} onValueChange={(v) => setCategory(v === "__none__" ? "" : v)}>
-                  <SelectTrigger className="h-7 text-2xs"><SelectValue placeholder="No category" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No category</SelectItem>
-                    {allCategories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={category || "__none__"}
+                  onValueChange={(v) => setCategory(v === "__none__" ? "" : v)}
+                  placeholder="No category"
+                  className="h-7 text-2xs"
+                  options={[
+                    { value: "__none__", label: "No category" },
+                    ...allCategories.map((cat) => ({ value: cat, label: cat })),
+                  ]}
+                />
               </SidebarSection>
 
               <SidebarSection label="Tags">
@@ -227,22 +236,33 @@ export function NoteEditorModal({
                     </Badge>
                   ))}
                 </div>
-                <Select value="__placeholder__" onValueChange={(tag) => { if (tag && tag !== "__placeholder__" && !tags.includes(tag)) setTags([...tags, tag]); }}>
-                  <SelectTrigger className="h-7 text-2xs"><SelectValue placeholder="Add tag..." /></SelectTrigger>
-                  <SelectContent>
-                    {(allTags || []).filter((tag) => !tags.includes(tag)).map((tag) => <SelectItem key={tag} value={tag}>{tag}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value="__placeholder__"
+                  onValueChange={(tag) => {
+                    if (tag && tag !== "__placeholder__" && !tags.includes(tag)) setTags([...tags, tag]);
+                  }}
+                  placeholder="Add tag..."
+                  className="h-7 text-2xs"
+                  options={[
+                    { value: "__placeholder__", label: "Add tag..." },
+                    ...(allTags || [])
+                      .filter((tag) => !tags.includes(tag))
+                      .map((tag) => ({ value: tag, label: tag })),
+                  ]}
+                />
               </SidebarSection>
 
               <SidebarSection label="Linked Registrar">
-                <Select value={linkedRegistrarId || "__none__"} onValueChange={(v) => setLinkedRegistrarId(v === "__none__" ? undefined : v)}>
-                  <SelectTrigger className="h-7 text-2xs"><SelectValue placeholder="None" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {registrars.map((reg) => <SelectItem key={reg.id} value={reg.id!}>{reg.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={linkedRegistrarId || "__none__"}
+                  onValueChange={(v) => setLinkedRegistrarId(v === "__none__" ? undefined : v)}
+                  placeholder="None"
+                  className="h-7 text-2xs"
+                  options={[
+                    { value: "__none__", label: "None" },
+                    ...registrars.map((reg) => ({ value: reg.id!, label: reg.name })),
+                  ]}
+                />
               </SidebarSection>
 
               {/* AI Suggestions */}
@@ -256,7 +276,7 @@ export function NoteEditorModal({
                         {aiSuggestions.suggested_tags.map((tag: string) => (
                           <Badge
                             key={tag}
-                            variant="outline"
+                            variant="secondary"
                             className="text-2xs h-5 cursor-pointer hover:bg-accent"
                             onClick={() => { if (!tags.includes(tag)) setTags([...tags, tag]); }}
                           >
@@ -269,7 +289,7 @@ export function NoteEditorModal({
                   {aiSuggestions.suggested_category && (
                     <div className="mb-3">
                       <div className="text-2xs text-muted-foreground mb-1.5">Suggested Category</div>
-                      <Badge variant="outline" className="text-2xs h-5 cursor-pointer hover:bg-accent" onClick={() => setCategory(aiSuggestions.suggested_category)}>
+                      <Badge variant="secondary" className="text-2xs h-5 cursor-pointer hover:bg-accent" onClick={() => setCategory(aiSuggestions.suggested_category)}>
                         {aiSuggestions.suggested_category}
                       </Badge>
                     </div>

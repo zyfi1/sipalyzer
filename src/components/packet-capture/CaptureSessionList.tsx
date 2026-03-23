@@ -80,9 +80,9 @@ export function CaptureSessionList({ onSelectSession }: CaptureSessionListProps)
       case "imported":
         return <Badge variant="secondary">Imported</Badge>;
       case "paused":
-        return <Badge variant="outline">Paused</Badge>;
+        return <Badge variant="secondary">Paused</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 

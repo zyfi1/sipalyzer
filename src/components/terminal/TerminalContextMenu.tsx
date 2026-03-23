@@ -168,7 +168,7 @@ export function TerminalContextMenu({
         align="start"
         sideOffset={4}
         collisionPadding={EDGE_PAD}
-        className="z-[10002] w-64 max-h-[480px]"
+        className="w-64 max-h-[480px]"
       >
         <ContextMenuRenderer sections={sections} onAction={onClose} edgePadding={EDGE_PAD} />
       </DropdownMenuContent>

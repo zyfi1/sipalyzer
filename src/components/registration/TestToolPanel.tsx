@@ -135,7 +135,7 @@ export function TestToolPanel({
                   </Badge>
                 )}
                 {isRunning && (
-                  <Badge variant="outline" className="animate-live-breathe motion-reduce:animate-none text-xs h-5">
+                  <Badge variant="secondary" className="animate-live-breathe motion-reduce:animate-none text-xs h-5">
                     Running
                   </Badge>
                 )}

@@ -161,7 +161,7 @@ export function TagCategoryManager({
               </TooltipWrapper>
               <Folder className="h-4 w-4 text-muted-foreground" />
               <h4 className="text-xs font-semibold">Categories</h4>
-              <Badge variant="outline" className="text-2xs h-4 px-1.5">
+              <Badge variant="secondary" className="text-2xs h-4 px-1.5">
                 {allCategories.length}
               </Badge>
             </div>
@@ -227,7 +227,7 @@ export function TagCategoryManager({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <Folder className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          <Badge variant="outline" className="text-xs flex-1 truncate font-medium">
+                          <Badge variant="secondary" className="text-xs flex-1 truncate font-medium">
                             {category}
                           </Badge>
                           <span className="text-2xs text-muted-foreground flex-shrink-0 font-medium">
@@ -298,7 +298,7 @@ export function TagCategoryManager({
             </TooltipWrapper>
               <Tag className="h-4 w-4 text-muted-foreground" />
               <h4 className="text-xs font-semibold">Tags</h4>
-              <Badge variant="outline" className="text-2xs h-4 px-1.5">
+              <Badge variant="secondary" className="text-2xs h-4 px-1.5">
                 {allTags.length}
               </Badge>
             </div>

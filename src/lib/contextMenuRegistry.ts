@@ -75,7 +75,8 @@ import type {
 interface ToolSectionContributions {
   views?: ContextMenuEntry[];
   actions?: ContextMenuEntry[];
-  danger?: ContextMenuEntry[];
+  /** Flat destructive actions (trailing "Danger zone" group after App Actions). */
+  danger?: ContextMenuItemAction[];
 }
 
 /* ================================================================== */
@@ -154,15 +155,6 @@ function toolViewsSubmenu(ctx: ContextMenuContext, toolId: string): ContextMenuS
       active: ctx.subviewId === sv.id,
       onClick: () => navigateTo(toolId, sv.id),
     })),
-  };
-}
-
-function dangerSubmenu(id: string, children: ContextMenuItemAction[]): ContextMenuSubmenu {
-  return {
-    id,
-    label: "Danger Zone",
-    icon: Trash2,
-    children,
   };
 }
 
@@ -289,18 +281,23 @@ function homeSection(ctx: ContextMenuContext): ToolSectionContributions | null {
       { id: "hd-trace", label: "Clear Trace / Findings", icon: Eraser, onClick: () => ts.clearTrace() },
     ],
   };
-  const danger = dangerSubmenu("home-danger", [
+  const danger: ContextMenuItemAction[] = [
     {
       id: "hd-all",
       label: "Clear Everything",
       icon: Trash2,
       destructive: true,
       shortcut: shortcutLabel(SHORTCUTS.clearAllViews),
-      onClick: () => { ts.clearTrace(); ts.clearTimeline(); ts.setCaptureSessions([]); sp.clearCalls(); },
+      onClick: () => {
+        ts.clearTrace();
+        ts.clearTimeline();
+        ts.setCaptureSessions([]);
+        sp.clearCalls();
+      },
     },
-  ]);
+  ];
 
-  return { views: [viewsSubmenu], actions: [actionsSubmenu], danger: [danger] };
+  return { views: [viewsSubmenu], actions: [actionsSubmenu], danger };
 }
 
 /* ================================================================== */
@@ -342,7 +339,7 @@ function packetSection(ctx: ContextMenuContext): ToolSectionContributions | null
       },
     ],
   };
-  const danger = dangerSubmenu("packet-danger", [
+  const danger: ContextMenuItemAction[] = [
     {
       id: "pcc-delete-all",
       label: "Delete All Sessions",
@@ -350,12 +347,12 @@ function packetSection(ctx: ContextMenuContext): ToolSectionContributions | null
       destructive: true,
       onClick: () => pc.deleteAllSessions(),
     },
-  ]);
+  ];
 
   return {
     views: viewsSubmenu ? [viewsSubmenu] : [],
     actions: [actionsSubmenu],
-    danger: [danger],
+    danger,
   };
 }
 
@@ -434,14 +431,16 @@ function softPhoneSection(ctx: ContextMenuContext): ToolSectionContributions | n
       },
     ],
   };
-  const danger = dangerSubmenu("softphone-danger", [
+  const danger: ContextMenuItemAction[] = [
     {
       id: "sp-end",
       label: "End Call",
       icon: PhoneOff,
       disabled: !hasActiveCall && !isOnHold,
       destructive: true,
-      onClick: () => { if (activeCall) sp.endCall(activeCall.id); },
+      onClick: () => {
+        if (activeCall) sp.endCall(activeCall.id);
+      },
     },
     {
       id: "sp-reject",
@@ -455,12 +454,12 @@ function softPhoneSection(ctx: ContextMenuContext): ToolSectionContributions | n
       },
     },
     { id: "sp-clear-calls", label: "Clear Call History", icon: Trash2, destructive: true, onClick: () => sp.clearCalls() },
-  ]);
+  ];
 
   return {
     views: viewsSubmenu ? [viewsSubmenu] : [],
     actions: [callActions],
-    danger: [danger],
+    danger,
   };
 }
 
@@ -549,9 +548,9 @@ function networkSection(ctx: ContextMenuContext): ToolSectionContributions | nul
       { id: "net-clear-results", label: "Clear Results", icon: Eraser, onClick: () => nd.clearResults() },
     ],
   };
-  const danger = dangerSubmenu("network-danger", [
+  const danger: ContextMenuItemAction[] = [
     { id: "net-clear-history", label: "Clear History", icon: Trash2, destructive: true, onClick: () => nd.clearHistory() },
-  ]);
+  ];
 
   // Contextual: show different action groups based on the active subview
   const actions: ContextMenuEntry[] = [];
@@ -569,7 +568,7 @@ function networkSection(ctx: ContextMenuContext): ToolSectionContributions | nul
   return {
     views: viewsSubmenu ? [viewsSubmenu] : [],
     actions,
-    danger: [danger],
+    danger,
   };
 }
 
@@ -590,14 +589,20 @@ function remoteAgentSection(ctx: ContextMenuContext): ToolSectionContributions |
       { id: "ra-clear-log", label: "Clear Activity Log", icon: Eraser, onClick: () => ra.clearActivityLog() },
     ],
   };
-  const danger = dangerSubmenu("remote-danger", [
-    { id: "ra-clear-configs", label: "Clear Generated Configs", icon: Trash2, destructive: true, onClick: () => ra.clearGeneratedConfigs() },
-  ]);
+  const danger: ContextMenuItemAction[] = [
+    {
+      id: "ra-clear-configs",
+      label: "Clear Generated Configs",
+      icon: Trash2,
+      destructive: true,
+      onClick: () => ra.clearGeneratedConfigs(),
+    },
+  ];
 
   return {
     views: viewsSubmenu ? [viewsSubmenu] : [],
     actions: [actionsSubmenu],
-    danger: [danger],
+    danger,
   };
 }
 
@@ -618,14 +623,14 @@ function composerSection(ctx: ContextMenuContext): ToolSectionContributions | nu
       { id: "cs-reset-http", label: "Reset HTTP Draft", icon: Eraser, onClick: () => cs.resetHttpDraft() },
     ],
   };
-  const danger = dangerSubmenu("composer-danger", [
+  const danger: ContextMenuItemAction[] = [
     { id: "cs-clear-history", label: "Clear History", icon: Trash2, destructive: true, onClick: () => cs.clearHistory() },
-  ]);
+  ];
 
   return {
     views: viewsSubmenu ? [viewsSubmenu] : [],
     actions: [actionsSubmenu],
-    danger: [danger],
+    danger,
   };
 }
 
@@ -712,10 +717,20 @@ export function getContextMenuSections(ctx: ContextMenuContext): ContextMenuSect
     sections.push(app);
   }
 
-  const dangerEntries = keepUsefulEntries(merged.danger);
+  const dangerEntries = merged.danger.flatMap((e) => (Array.isArray(e) ? e : [e])).filter(
+    (e): e is ContextMenuItemAction =>
+      Boolean(e) &&
+      typeof e === "object" &&
+      "onClick" in e &&
+      typeof (e as ContextMenuItemAction).id === "string" &&
+      typeof (e as ContextMenuItemAction).label === "string" &&
+      (e as ContextMenuItemAction).label.trim().length > 0 &&
+      !(e as ContextMenuItemAction).disabled &&
+      (e as ContextMenuItemAction).destructive === true,
+  );
   if (dangerEntries.length > 0) {
-    sections.push({ id: "danger", label: "Danger Zone", entries: dangerEntries });
+    sections.push({ id: "danger", label: "Danger zone", entries: dangerEntries });
   }
 
-  return sections;
+  return sections.filter((s) => s.entries.length > 0);
 }

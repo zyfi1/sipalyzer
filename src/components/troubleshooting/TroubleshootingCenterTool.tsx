@@ -68,6 +68,10 @@ const FINDING_LINK_CONFIG: Record<FindingLinkType, { actionText: string; descrip
     actionText: "Open fax center",
     description: "Open Fax Center to inspect related fax activity.",
   },
+  network: {
+    actionText: "Open network tests",
+    description: "Open Network Test to re-run VoIP assessment, ping, DNS, and path checks.",
+  },
 };
 
 function formatTime(iso: string): string {
@@ -192,6 +196,9 @@ export function TroubleshootingCenterTool({ onSwitchToTab }: TroubleshootingCent
         return;
       case "fax":
         navigateTo("fax-center", "faxes");
+        return;
+      case "network":
+        navigateTo("network-test", link.id);
         return;
       default: {
         const _exhaustive: never = link.type;
@@ -383,7 +390,7 @@ export function TroubleshootingCenterTool({ onSwitchToTab }: TroubleshootingCent
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">{timeline.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Events (registration, calls, and fax)</p>
+            <p className="text-xs text-muted-foreground mt-1">Events (registration, calls, fax, network)</p>
           </CardContent>
         </Card>
       </div>
@@ -407,7 +414,12 @@ export function TroubleshootingCenterTool({ onSwitchToTab }: TroubleshootingCent
           </CardHeader>
           <CardContent className="flex-1 min-h-0 flex flex-col">
             {recentTimeline.length === 0 ? (
-              <EmptyState compact variant="inline" title="No events yet" description="Run registration tests or place calls." />
+              <EmptyState
+                compact
+                variant="inline"
+                title="No events yet"
+                description="Run registration tests, network checks, or place calls."
+              />
             ) : (
               <ul className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                 {recentTimeline.map((entry: ForensicsTimelineEntry) => (
@@ -455,7 +467,7 @@ export function TroubleshootingCenterTool({ onSwitchToTab }: TroubleshootingCent
                 variant="inline"
                 compact
                 title="No findings"
-                description="Registration and calls look healthy."
+                description="Registration, calls, and recent network checks look healthy."
                 className="items-start py-4 pt-4 text-left"
               />
             ) : (

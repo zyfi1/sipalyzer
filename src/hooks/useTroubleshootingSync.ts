@@ -18,7 +18,9 @@ import {
 import { useSoftphoneStore } from "@/stores/softphoneStore";
 import { useRegistrationStore } from "@/stores/registrationStore";
 import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
+import { useNetworkTestStore } from "@/stores/networkTestStore";
 import { useToolVisible } from "@/hooks/useToolVisible";
+import { buildNetworkSyncPayload, networkStoreSignature } from "@/lib/troubleshooting/networkInsights";
 
 const SYNC_DEBOUNCE_MS = 100;
 
@@ -37,6 +39,7 @@ function mergePayloads(): TroubleshootingSyncPayload {
         remote_port: r.remote_port,
       })),
     sessions: usePacketCaptureStore.getState().sessions,
+    network: buildNetworkSyncPayload(useNetworkTestStore.getState()),
   };
   return merged;
 }
@@ -58,6 +61,8 @@ function useTroubleshootingSync() {
       syncFromStores(mergePayloads());
     }, SYNC_DEBOUNCE_MS);
   };
+  const runSyncRef = useRef(runSync);
+  runSyncRef.current = runSync;
 
   // Always refresh registration health on mount — softphone and fax areas need it
   // regardless of whether the troubleshooting tool is visible.
@@ -154,6 +159,18 @@ function useTroubleshootingSync() {
       unsubPacketCapture();
     };
   }, [syncFromStores, isVisible]);
+
+  // Network Test / VoIP assessment → troubleshooting (signature ignores monitor packet spam)
+  useEffect(() => {
+    let prevSig = networkStoreSignature(useNetworkTestStore.getState());
+    const unsub = useNetworkTestStore.subscribe((state) => {
+      const next = networkStoreSignature(state);
+      if (next === prevSig) return;
+      prevSig = next;
+      runSyncRef.current();
+    });
+    return () => unsub();
+  }, []);
 }
 
 export function useTroubleshootingSyncMount() {

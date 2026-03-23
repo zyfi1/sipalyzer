@@ -19,6 +19,7 @@ import { AuditLogView } from "./AuditLogView";
 import { DatabaseInspectorView } from "./DatabaseInspectorView";
 import { FeatureFlagsView } from "./FeatureFlagsView";
 import { AdminInventoryView } from "./AdminInventoryView";
+import { AppDivider } from "@/components/ui/panel-chrome";
 
 type AdminTab =
   | "tasks"
@@ -48,7 +49,7 @@ export function AdminCenter() {
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back
         </Button>
-        <div className="h-4 w-px bg-border/50" />
+        <AppDivider orientation="vertical" size="md" className="mx-0" />
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Admin Center</span>

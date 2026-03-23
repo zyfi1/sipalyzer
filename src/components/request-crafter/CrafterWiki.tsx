@@ -213,7 +213,7 @@ export function CrafterWiki() {
                 <div className="px-4 py-3 border-b border-border/20">
                   <div className="flex items-center gap-2">
                     <Badge
-                      variant="outline"
+                      variant="secondary"
                       className={cn(
                         "text-3xs border-border/30",
                         selectedSection.protocol === "sip"
@@ -327,7 +327,7 @@ function EntryRow({
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-semibold text-foreground">{entry.text}</p>
             {hasTemplate ? (
-              <Badge variant="outline" className="text-3xs border-border/30 text-muted-foreground">
+              <Badge variant="secondary" className="text-3xs border-border/30 text-muted-foreground">
                 Template
               </Badge>
             ) : null}

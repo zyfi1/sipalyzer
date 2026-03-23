@@ -4,7 +4,6 @@
  */
 
 import { lazy, Suspense, useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
-import SunCalc from "suncalc";
 import { motion } from "framer-motion";
 import { useSettingsStore } from "@/stores/settingsStore";
 import type { DateFormatSetting, TemperatureUnit } from "@/stores/settingsStore";
@@ -12,7 +11,6 @@ import { useHomeStore, DEFAULT_HERO, type HomePreset } from "@/stores/homeStore"
 import { useToolStore } from "@/stores/toolStore";
 import { HOME_TOOL_ID } from "@/lib/toolRegistry";
 import {
-  Activity,
   Wind,
   Loader2,
   Drop,
@@ -25,11 +23,15 @@ import { fetchUrl } from "@/api/provision";
 import { importPcap, importPcapFromBase64, importPcapFromPath } from "@/api/packetCapture";
 import { useNotifications } from "@/hooks/useNotifications";
 import { navigateTo } from "@/lib/navigation";
+import {
+  computeMoonRenderModel,
+  moonIconShadowSide,
+  type MoonObserverCoords,
+} from "@/lib/moonGeometry";
 import { useNoteStore } from "@/stores/noteStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer } from "@/components/layout/ViewFooter";
 
 const WeatherEffects = lazy(() =>
   import("./WeatherEffects").then((m) => ({ default: m.WeatherEffects }))
@@ -214,39 +216,6 @@ async function fetchWeather(
   }
 }
 
-// ── Astronomical moon phase ──────────────────────────────────────
-
-const SYNODIC_MONTH = 29.53058770576;
-
-interface MoonInfo {
-  phase: string;
-  illumination: number;
-  age: number;
-  phaseValue: number;
-}
-
-function computeMoonPhase(date: Date): MoonInfo {
-  // Use SunCalc's astronomical model for accurate live illumination/phase.
-  const illum = SunCalc.getMoonIllumination(date);
-  const phase = ((illum.phase % 1) + 1) % 1; // 0=new, 0.5=full, ~1=new
-  const age = phase * SYNODIC_MONTH;
-  const illumination = Math.round(illum.fraction * 100);
-
-  // Calendar-style phase naming: split lunation into 8 equal octants.
-  // This aligns better with standard lunar calendars.
-  let phaseName: string;
-  if (phase < 0.0625 || phase >= 0.9375) phaseName = "New Moon";
-  else if (phase < 0.1875) phaseName = "Waxing Crescent";
-  else if (phase < 0.3125) phaseName = "First Quarter";
-  else if (phase < 0.4375) phaseName = "Waxing Gibbous";
-  else if (phase < 0.5625) phaseName = "Full Moon";
-  else if (phase < 0.6875) phaseName = "Waning Gibbous";
-  else if (phase < 0.8125) phaseName = "Last Quarter";
-  else phaseName = "Waning Crescent";
-
-  return { phase: phaseName, illumination, age, phaseValue: phase };
-}
-
 // ── Clock & date formatting ──────────────────────────────────────
 
 function useCurrentTime(enabled: boolean, showSeconds: boolean) {
@@ -289,25 +258,6 @@ function formatDate(date: Date, format: DateFormatSetting) {
     case "DD.MM.YYYY": return `${weekday}, ${d}.${m}.${y}`;
     default: return date.toLocaleDateString();
   }
-}
-
-function formatTimestampShort(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatRecency(ms: number, nowMs: number): string {
-  const deltaSeconds = Math.max(0, Math.floor((nowMs - ms) / 1000));
-  if (deltaSeconds < 15) return "just now";
-  if (deltaSeconds < 60) return `${deltaSeconds}s ago`;
-  const minutes = Math.floor(deltaSeconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 function getGreeting(hour: number): string {
@@ -413,11 +363,20 @@ function AnimatedWeatherIcon({
   isNight = false,
   size = 24,
   moonPhaseValue = 0.5,
+  /** Degrees — same limb rotation as hero canvas (`MoonRenderModel.svgRotationDeg`) */
+  moonSvgRotationDeg = 0,
+  /** 0–100 illuminated (from `MoonRenderModel.illuminationPercent`) */
+  moonIlluminationPct,
+  /** Wax/wane for two-disc icon overlay */
+  moonWaxing = true,
 }: {
   code: number;
   isNight?: boolean;
   size?: number;
   moonPhaseValue?: number;
+  moonSvgRotationDeg?: number;
+  moonIlluminationPct?: number;
+  moonWaxing?: boolean;
 }) {
   const cloudMaskId = useId().replace(/:/g, "");
   const moonClipId = `${cloudMaskId}-moonclip`;
@@ -453,9 +412,23 @@ function AnimatedWeatherIcon({
   const moonStroke = "rgba(204,214,255,1)";
   const precipStroke = "rgba(156,232,255,1)";
   const phase = ((moonPhaseValue % 1) + 1) % 1;
-  const illumination = 0.5 * (1 - Math.cos(2 * Math.PI * phase)); // 0=new, 1=full
-  const iconIllumination = Math.min(1, 0.24 + illumination * 0.76);
-  const waxing = phase < 0.5;
+  const illuminationFromPhase = 0.5 * (1 - Math.cos(2 * Math.PI * phase)); // fallback if % missing
+  const litFraction = Math.max(
+    0,
+    Math.min(
+      1,
+      moonIlluminationPct != null
+        ? moonIlluminationPct / 100
+        : illuminationFromPhase,
+    ),
+  );
+  const moonShadowSide = moonIconShadowSide(litFraction, moonWaxing);
+  // Two-disc model: separation scales with lit fraction (0=new coincident, 1=full tangent).
+  const shadowOffset = litFraction * moonR * 2;
+  const shadowCx = moonShadowSide === "left"
+    ? moonCx - shadowOffset
+    : moonCx + shadowOffset;
+  const moonRotateDeg = Number.isFinite(moonSvgRotationDeg) ? moonSvgRotationDeg : 0;
 
   return (
     <span className="relative inline-flex items-center justify-center overflow-visible" style={{ width: box, height: box }}>
@@ -484,17 +457,20 @@ function AnimatedWeatherIcon({
         </defs>
         {!isNight && (clear || partlyCloud || overcast || fog || rain || thunder) && (
           <g mask={hasCloudOccluder ? `url(#${cloudMaskId})` : undefined}>
-            <motion.circle
-              cx={sunCx}
-              cy={sunCy}
-              r={sunR}
-              fill="rgba(255,194,96,0.42)"
-              stroke={sunStroke}
-              strokeWidth={stroke}
+            <motion.g
               animate={{ rotate: [0, 360] }}
               transition={{ duration: 42, repeat: Infinity, ease: "linear" }}
               style={{ transformOrigin: `${sunCx}px ${sunCy}px` }}
-            />
+            >
+              <circle
+                cx={sunCx}
+                cy={sunCy}
+                r={sunR}
+                fill="rgba(255,194,96,0.42)"
+                stroke={sunStroke}
+                strokeWidth={stroke}
+              />
+            </motion.g>
             {!rain && !thunder && clearDay && (
               <motion.g
                 animate={{ rotate: [0, 360] }}
@@ -530,17 +506,21 @@ function AnimatedWeatherIcon({
             mask={hasCloudOccluder ? `url(#${cloudMaskId})` : undefined}
             animate={{ y: [0, -0.8, 0] }}
             transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-            style={{ transformOrigin: `${moonCx}px ${moonCy}px` }}
           >
-            <circle cx={moonCx} cy={moonCy} r={moonR} fill="rgba(120,135,175,0.62)" stroke={moonStroke} strokeWidth={stroke} />
-            <g clipPath={`url(#${moonClipId})`}>
-              <ellipse
-                cx={moonCx + (waxing ? moonR - (Math.max(0.08, iconIllumination) * (moonR * 2)) / 2 : -moonR + (Math.max(0.08, iconIllumination) * (moonR * 2)) / 2)}
-                cy={moonCy}
-                rx={Math.max(0.08, iconIllumination) * moonR}
-                ry={moonR}
-                fill="rgba(208,219,255,0.95)"
-              />
+            {/* Native SVG rotate — degrees from `computeMoonRenderModel` (matches canvas). */}
+            <g transform={`rotate(${moonRotateDeg} ${moonCx} ${moonCy})`}>
+              <circle cx={moonCx} cy={moonCy} r={moonR} fill="rgba(120,135,175,0.62)" stroke={moonStroke} strokeWidth={stroke} />
+              <g clipPath={`url(#${moonClipId})`}>
+                <circle cx={moonCx} cy={moonCy} r={moonR} fill="rgba(208,219,255,0.95)" />
+                {moonShadowSide !== "none" && (
+                  <circle
+                    cx={shadowCx}
+                    cy={moonCy}
+                    r={moonR}
+                    fill="rgba(120,135,175,0.82)"
+                  />
+                )}
+              </g>
             </g>
           </motion.g>
         )}
@@ -855,12 +835,12 @@ export function HomeView() {
   const [quickNoteDirty, setQuickNoteDirty] = useState(false);
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
   const [quickNoteError, setQuickNoteError] = useState<string | null>(null);
-  const [lastQuickNoteSavedAt, setLastQuickNoteSavedAt] = useState<number | null>(null);
-  const [lastImportEvent, setLastImportEvent] = useState<{
+  const [, setLastQuickNoteSavedAt] = useState<number | null>(null);
+  const [, setLastImportEvent] = useState<{
     outcome: "success" | "failure";
     at: number;
   } | null>(null);
-  const [footerNowMs, setFooterNowMs] = useState(() => Date.now());
+  const [, setFooterNowMs] = useState(() => Date.now());
   const [deferredSectionsReady, setDeferredSectionsReady] = useState(false);
 
   useEffect(() => {
@@ -978,17 +958,17 @@ export function HomeView() {
     setNotesCenterOpen(true);
   }, [quickNote?.id, setNotesCenterOpen, setSelectedNoteId]);
 
-  const moon = computeMoonPhase(now);
-  const moonTilt = useMemo(() => {
+  const moonObserver = useMemo((): MoonObserverCoords | null => {
     const lat = weatherLat ?? weather?.lat ?? null;
     const lon = weatherLon ?? weather?.lon ?? null;
-    if (lat == null || lon == null) return 0;
-    const moonPos = SunCalc.getMoonPosition(now, lat, lon);
-    const illum = SunCalc.getMoonIllumination(now);
-    // Bright-limb bearing (north=0, east=+PI/2), corrected for observer orientation.
-    // WeatherEffects maps this bearing into canvas coordinates.
-    return illum.angle - moonPos.parallacticAngle;
-  }, [now, weatherLat, weatherLon, weather?.lat, weather?.lon]);
+    if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  }, [weatherLat, weatherLon, weather?.lat, weather?.lon]);
+
+  const moonModel = useMemo(
+    () => computeMoonRenderModel(now, moonObserver),
+    [now, moonObserver],
+  );
 
   const rise = weather?.astronomy ? parseLocalIsoMinutes(weather.astronomy.sunrise) : null;
   const set_ = weather?.astronomy ? parseLocalIsoMinutes(weather.astronomy.sunset) : null;
@@ -1123,6 +1103,7 @@ export function HomeView() {
   }, [celestialProgress, mergedHero.showWeatherEffects, isNight, playMoonEasterEgg, weather, weatherLoading]);
 
   useEffect(() => {
+    if (!deferredSectionsReady) return;
     const node = weatherCardFrameRef.current;
     if (!node) return;
     const update = () => {
@@ -1133,7 +1114,7 @@ export function HomeView() {
     const ro = new ResizeObserver(update);
     ro.observe(node);
     return () => ro.disconnect();
-  }, []);
+  }, [deferredSectionsReady]);
 
   const moonTooltipPosition = useMemo(() => {
     if (weatherCardSize.width <= 0 || weatherCardSize.height <= 0) return null;
@@ -1249,40 +1230,6 @@ export function HomeView() {
     }
   }, [notify, openImportedCapture]);
 
-  const footerStatusTone = useMemo(() => {
-    if (heroImporting || quickNoteSaving) return "text-warning";
-    if (quickNoteError || lastImportEvent?.outcome === "failure") return "text-rose-300";
-    if (quickNoteDirty) return "text-warning";
-    return "text-muted-foreground";
-  }, [heroImporting, lastImportEvent?.outcome, quickNoteDirty, quickNoteError, quickNoteSaving]);
-  const footerDataReady = useMemo(
-    () => !heroImporting && !quickNoteSaving,
-    [heroImporting, quickNoteSaving],
-  );
-  const quickNoteFooterContext = useMemo(() => {
-    if (quickNoteError) return "quick note save failed";
-    if (quickNoteSaving) return "quick note saving";
-    if (quickNoteDirty) return "quick note has unsaved changes";
-    if (lastQuickNoteSavedAt != null) {
-      return `quick note saved ${formatRecency(lastQuickNoteSavedAt, footerNowMs)} (last saved ${formatTimestampShort(lastQuickNoteSavedAt)})`;
-    }
-    return "quick note ready";
-  }, [footerNowMs, lastQuickNoteSavedAt, quickNoteDirty, quickNoteError, quickNoteSaving]);
-  const importFooterContext = useMemo(() => {
-    if (heroImporting) return "capture import in progress";
-    if (!lastImportEvent) return null;
-    const stateLabel = lastImportEvent.outcome === "success" ? "import succeeded" : "import failed";
-    return `${stateLabel} ${formatRecency(lastImportEvent.at, footerNowMs)} (at ${formatTimestampShort(lastImportEvent.at)})`;
-  }, [footerNowMs, heroImporting, lastImportEvent]);
-  const footerStatusLine = useMemo(() => {
-    const details = [quickNoteFooterContext, importFooterContext].filter(Boolean).join(" • ");
-    if (heroImporting) return `Status: importing packet capture... • ${details}`;
-    if (quickNoteSaving) return `Status: saving quick note... • ${details}`;
-    if (quickNoteError) return `Status: quick note save failed • ${details}`;
-    if (quickNoteDirty) return `Status: quick note has unsaved changes • ${details}`;
-    if (!footerDataReady) return `Status: preparing activity feed... • ${details}`;
-    return details ? `Status: home hub ready • ${details}` : "Status: home hub ready";
-  }, [footerDataReady, heroImporting, importFooterContext, quickNoteDirty, quickNoteError, quickNoteFooterContext, quickNoteSaving]);
   const topSectionPadClassByPreset: Record<HomePreset, string> = {
     focus: "pt-4",
     operations: "pt-3.5",
@@ -1322,11 +1269,9 @@ export function HomeView() {
                       <WeatherEffects
                         weatherCode={weather.weatherCode}
                         isNight={isNight}
-                        moonPhase={moon.phase}
-                        moonIllumination={moon.illumination}
-                        moonAge={moon.age}
-                        moonPhaseValue={moon.phaseValue}
-                        moonTilt={moonTilt}
+                        moonPhase={moonModel.phaseLabel}
+                        moonLitFraction={moonModel.litFraction}
+                        moonLimbZenithRad={moonModel.limbZenithRad}
                         celestialProgress={celestialProgress}
                         className="rounded-md"
                       />
@@ -1400,9 +1345,25 @@ export function HomeView() {
                                       <div className="grid grid-cols-[40px_auto] items-center justify-end gap-x-3">
                                         <span className="inline-flex h-10 w-10 translate-y-[3px] items-center justify-center">
                                           {weather ? (
-                                            <AnimatedWeatherIcon code={weather.weatherCode} isNight={isNight} size={40} moonPhaseValue={moon.phaseValue} />
+                                            <AnimatedWeatherIcon
+                                              code={weather.weatherCode}
+                                              isNight={isNight}
+                                              size={40}
+                                              moonPhaseValue={moonModel.phaseValue}
+                                              moonSvgRotationDeg={moonModel.svgRotationDeg}
+                                              moonIlluminationPct={moonModel.illuminationPercent}
+                                              moonWaxing={moonModel.waxing}
+                                            />
                                           ) : (
-                                            <AnimatedWeatherIcon code={2} isNight={isNight} size={40} moonPhaseValue={moon.phaseValue} />
+                                            <AnimatedWeatherIcon
+                                              code={2}
+                                              isNight={isNight}
+                                              size={40}
+                                              moonPhaseValue={moonModel.phaseValue}
+                                              moonSvgRotationDeg={moonModel.svgRotationDeg}
+                                              moonIlluminationPct={moonModel.illuminationPercent}
+                                              moonWaxing={moonModel.waxing}
+                                            />
                                           )}
                                         </span>
                                         <span className="font-bold text-foreground tabular-nums text-[36px] leading-[0.95] tracking-tight transition-transform duration-300 group-hover:scale-[1.03]">
@@ -1520,7 +1481,14 @@ export function HomeView() {
                                             {forecastDayLabel(day.date)}
                                           </span>
                                           <span className="transition-transform duration-300 group-hover/day:scale-110">
-                                            <AnimatedWeatherIcon code={day.weatherCode} size={30} moonPhaseValue={moon.phaseValue} />
+                                            <AnimatedWeatherIcon
+                                              code={day.weatherCode}
+                                              size={30}
+                                              moonPhaseValue={moonModel.phaseValue}
+                                              moonSvgRotationDeg={moonModel.svgRotationDeg}
+                                              moonIlluminationPct={moonModel.illuminationPercent}
+                                              moonWaxing={moonModel.waxing}
+                                            />
                                           </span>
                                           <div className="flex items-baseline gap-1 leading-none">
                                             <span className="text-sm font-semibold text-foreground/84 tabular-nums">{hi}</span>
@@ -1579,21 +1547,30 @@ export function HomeView() {
                 </SpotlightCard>
                 {isNight && mergedHero.showWeatherEffects && weather && !weatherLoading && moonTooltipPosition && (
                   <div
-                    className="absolute z-20"
+                    className="pointer-events-none absolute z-20"
                     style={{
                       left: moonTooltipPosition.x,
                       top: moonTooltipPosition.y,
-                      width: moonTooltipRadius * 2.2,
-                      height: moonTooltipRadius * 2.2,
+                      width: moonTooltipRadius * 2.4,
+                      height: moonTooltipRadius * 2.4,
                       transform: "translate(-50%, -50%)",
                     }}
                   >
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="block w-full h-full pointer-events-auto cursor-help" />
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          aria-label={`Moon: ${moonModel.phaseLabel}, ${moonModel.illuminationPercent} percent illuminated`}
+                          className="pointer-events-auto flex h-full w-full cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        />
                       </TooltipTrigger>
-                      <TooltipContent side="top">
-                        {moon.phase} · {moon.illumination}%
+                      <TooltipContent side="top" sideOffset={10} className="max-w-[220px]">
+                        <div className="space-y-1 text-xs">
+                          <p className="font-semibold text-foreground">Moon</p>
+                          <p className="text-muted-foreground">{moonModel.phaseLabel}</p>
+                          <p className="tabular-nums text-foreground">{moonModel.illuminationPercent}% illuminated</p>
+                        </div>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -1726,17 +1703,6 @@ export function HomeView() {
           </aside>
         </div>
       </div>
-      <ViewFooter>
-        <ViewFooterItem className={cn("min-w-0", footerStatusTone)}>
-          {heroImporting || quickNoteSaving ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Activity className="h-3 w-3" />
-          )}
-          <span className="truncate">{footerStatusLine}</span>
-        </ViewFooterItem>
-        <ViewFooterSpacer />
-      </ViewFooter>
     </div>
   );
 }

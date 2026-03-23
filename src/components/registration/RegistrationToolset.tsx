@@ -5,19 +5,25 @@ import { useToolStore } from "@/stores/toolStore";
 import { RegistrarList } from "./RegistrarList";
 import { RegistrarEditor } from "./RegistrarEditor";
 import { RegistrarDetailPanel } from "./RegistrarDetailPanel";
-import { Server, Check, CheckCircle2, ChevronDown, ChevronUp, Edit, Layers, Loader2, Phone, Plus, RefreshCw, Trash2, X, XCircle, FileText, Folder, FolderOpen } from "@/lib/icons";
+import { Server, Check, ChevronDown, ChevronUp, Edit, Layers, Loader2, Plus, RefreshCw, Trash2, X, Folder, FolderOpen } from "@/lib/icons";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterDivider } from "@/components/layout/ViewFooter";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { AppDivider, PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { cn } from "@/lib/utils";
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDroppable, useSensor, useSensors, type DragStartEvent, type DragOverEvent, type DragEndEvent, type DragCancelEvent } from "@dnd-kit/core";
 
 type StatusFilter = "registered" | "failed" | "unregistered" | "unknown";
+
+const REG_MASTER_LIBRARY_MIN_PX = 132;
+const REG_MASTER_REGISTRARS_MIN_PX = 148;
+const REG_MASTER_LIBRARY_DEFAULT_PX = 268;
+/** Match `PanelResizeHandle` horizontal `density="compact"` (see `.ui-resize-handle--horizontal.ui-resize-handle--density-compact`). */
+const REG_MASTER_SPLIT_HANDLE_PX = 8;
 
 export function RegistrationToolset() {
   const fetchRegistrars = useRegistrationStore((s) => s.fetchRegistrars);
@@ -57,7 +63,102 @@ export function RegistrationToolset() {
   const [draggedRegistrarId, setDraggedRegistrarId] = useState<string | null>(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
   const [isRegistrarDragActive, setIsRegistrarDragActive] = useState(false);
+  const [libraryPaneHeightPx, setLibraryPaneHeightPx] = useState(REG_MASTER_LIBRARY_DEFAULT_PX);
+  const [isLibraryRegistrarsResizing, setIsLibraryRegistrarsResizing] = useState(false);
+  const libraryRegistrarsSplitRef = useRef<HTMLDivElement>(null);
+  const libraryPaneHeightRef = useRef(libraryPaneHeightPx);
+  const libraryResizeDragRef = useRef<{ startClientY: number; startHeight: number; pointerId: number } | null>(null);
+  const libraryResizeCleanupRef = useRef<(() => void) | null>(null);
   const busy = useRef(false);
+
+  libraryPaneHeightRef.current = libraryPaneHeightPx;
+
+  const endLibraryRegistrarsResize = useCallback(() => {
+    libraryResizeDragRef.current = null;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    setIsLibraryRegistrarsResizing(false);
+  }, []);
+
+  const handleLibraryRegistrarsResizePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      libraryResizeCleanupRef.current?.();
+
+      const target = e.currentTarget;
+      const pointerId = e.pointerId;
+      target.setPointerCapture(pointerId);
+      libraryResizeDragRef.current = {
+        startClientY: e.clientY,
+        startHeight: libraryPaneHeightRef.current,
+        pointerId,
+      };
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+      setIsLibraryRegistrarsResizing(true);
+
+      const onMove = (ev: PointerEvent) => {
+        const session = libraryResizeDragRef.current;
+        if (!session || ev.pointerId !== session.pointerId) return;
+        const el = libraryRegistrarsSplitRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const minH = REG_MASTER_LIBRARY_MIN_PX;
+        const maxH = Math.max(
+          minH,
+          rect.height - REG_MASTER_SPLIT_HANDLE_PX - REG_MASTER_REGISTRARS_MIN_PX,
+        );
+        const deltaY = ev.clientY - session.startClientY;
+        const next = Math.min(maxH, Math.max(minH, session.startHeight + deltaY));
+        libraryPaneHeightRef.current = next;
+        setLibraryPaneHeightPx(next);
+      };
+
+      const cleanup = () => {
+        if (!libraryResizeCleanupRef.current) return;
+        libraryResizeCleanupRef.current = null;
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUpOrCancel);
+        document.removeEventListener("pointercancel", onUpOrCancel);
+        target.removeEventListener("lostpointercapture", onLostCapture);
+        try {
+          target.releasePointerCapture(pointerId);
+        } catch {
+          /* already released */
+        }
+        endLibraryRegistrarsResize();
+      };
+
+      const onUpOrCancel = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        cleanup();
+      };
+
+      const onLostCapture = () => {
+        cleanup();
+      };
+
+      libraryResizeCleanupRef.current = cleanup;
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUpOrCancel);
+      document.addEventListener("pointercancel", onUpOrCancel);
+      target.addEventListener("lostpointercapture", onLostCapture);
+    },
+    [endLibraryRegistrarsResize],
+  );
+
+  useEffect(() => {
+    const onBlur = () => {
+      libraryResizeCleanupRef.current?.();
+    };
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      libraryResizeCleanupRef.current?.();
+    };
+  }, []);
 
   const handleRefresh = async () => {
     if (busy.current) return;
@@ -106,9 +207,6 @@ export function RegistrationToolset() {
   }, [registrars, folders]);
 
   const ungroupedCount = useMemo(() => registrars.filter((r) => !r.group).length, [registrars]);
-
-  const hasUseCase = (r: { use_case?: string | null }, uc: string) =>
-    r.use_case?.split(",").map((s) => s.trim()).includes(uc) ?? false;
 
   useEffect(() => { handleRefresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -283,43 +381,6 @@ export function RegistrationToolset() {
     return filtered;
   }, [registrars, folderFilter, statusFilter, deriveStatus]);
   const filteredCount = filteredRegistrars.length;
-  const scopedRegisteredCount = useMemo(
-    () => filteredRegistrars.filter((r) => r.id && deriveStatus(r.id) === "registered").length,
-    [filteredRegistrars, deriveStatus],
-  );
-  const scopedFailedCount = useMemo(
-    () => filteredRegistrars.filter((r) => r.id && deriveStatus(r.id) === "failed").length,
-    [filteredRegistrars, deriveStatus],
-  );
-  const scopedCallingRegistrars = useMemo(
-    () => filteredRegistrars.filter((r) => hasUseCase(r, "calling")),
-    [filteredRegistrars],
-  );
-  const scopedCallingActiveCount = useMemo(
-    () => scopedCallingRegistrars.filter((r) => {
-      if (!r.id) return false;
-      const result = testResults[r.id];
-      return Boolean(result?.success && !result.unregistered);
-    }).length,
-    [scopedCallingRegistrars, testResults],
-  );
-  const scopedFaxingRegistrars = useMemo(
-    () => filteredRegistrars.filter((r) => hasUseCase(r, "faxing")),
-    [filteredRegistrars],
-  );
-  const scopedFaxingActiveCount = useMemo(
-    () => scopedFaxingRegistrars.filter((r) => {
-      if (!r.id) return false;
-      const result = testResults[r.id];
-      return Boolean(result?.success && !result.unregistered);
-    }).length,
-    [scopedFaxingRegistrars, testResults],
-  );
-  const selectedRegistrarRecord = useMemo(
-    () => (selectedRegistrarId ? registrars.find((r) => r.id === selectedRegistrarId) ?? null : null),
-    [registrars, selectedRegistrarId],
-  );
-
   const draggedRegistrar = useMemo(
     () => (draggedRegistrarId ? registrars.find((r) => r.id === draggedRegistrarId) : undefined),
     [draggedRegistrarId, registrars],
@@ -335,20 +396,22 @@ export function RegistrationToolset() {
         onValueChange={() => {}}
       />
 
-      <div className="flex-1 min-h-0 app-view-gutter">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={pointerWithin}
-          onDragStart={handleRegistrarDragStart}
-          onDragOver={handleRegistrarDragOver}
-          onDragEnd={handleRegistrarDragEnd}
-          onDragCancel={handleRegistrarDragCancel}
-        >
-        <div className="h-full overflow-hidden ui-panel-shell flex rounded-lg">
-          {/* ── Left sidebar ── */}
-          <aside className="w-[280px] shrink-0 border-r border-border flex flex-col overflow-hidden">
+      {/* Match packet monitor: tight inset, single shell, full-width split (no nested “card on card”). */}
+      <div className="flex min-h-0 flex-1 flex-col px-2 pb-2 pt-1">
+        <div className="ui-panel-shell registration-tool-shell flex min-h-0 flex-1 flex-col overflow-hidden">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={pointerWithin}
+            onDragStart={handleRegistrarDragStart}
+            onDragOver={handleRegistrarDragOver}
+            onDragEnd={handleRegistrarDragEnd}
+            onDragCancel={handleRegistrarDragCancel}
+          >
+        <div className="flex min-h-0 flex-1 overflow-hidden bg-transparent">
+          {/* ── Unified master column: filters + folders + registrars ── */}
+          <aside className="flex min-w-0 w-[min(20rem,36vw)] max-w-[320px] shrink-0 flex-col overflow-hidden border-r border-[var(--ui-rule)] bg-[var(--ops-panel-bg)]">
             {/* Action bar */}
-            <div className="h-13 px-3 flex items-center gap-2 border-b border-border">
+            <div className="flex h-13 shrink-0 items-center gap-2 border-b border-[var(--ui-rule)] bg-[var(--ops-panel-bg-elevated)] px-3">
               <TooltipWrapper entry={tooltips.regAddRegistrar}>
                 <Button size="sm" onClick={handleCreate} className="gap-1.5 h-8">
                   <Plus className="h-3.5 w-3.5" />
@@ -375,8 +438,27 @@ export function RegistrationToolset() {
               </div>
             )}
 
+            <div
+              ref={libraryRegistrarsSplitRef}
+              className={cn(
+                "flex min-h-0 flex-1 flex-col overflow-hidden",
+                isLibraryRegistrarsResizing && "select-none",
+              )}
+            >
+              <div
+                className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden"
+                style={{ height: libraryPaneHeightPx }}
+              >
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+                <div className="px-2 pt-2">
+                  <div className="flex items-center gap-2 px-1 pb-1.5">
+                    <span className="text-2xs font-medium uppercase tracking-wider text-muted-foreground">Library</span>
+                    <AppDivider orientation="horizontal" className="min-w-0 flex-1" />
+                  </div>
+                </div>
+
             {/* Status filters */}
-            <div className="p-2 space-y-0.5 border-b border-border">
+            <div className="space-y-0.5 px-2 pb-2">
               <button
                 type="button"
                 onClick={() => { setStatusFilter(null); setFolderFilter(null); }}
@@ -440,9 +522,13 @@ export function RegistrationToolset() {
               )}
             </div>
 
+                <div className="px-2 py-2">
+                  <AppDivider orientation="horizontal" />
+                </div>
+
             {/* Folders */}
-            <div className="flex-1 overflow-y-auto p-2">
-              <div className="flex items-center gap-2 px-3 mb-1.5">
+            <div className="px-2 pb-2">
+              <div className="flex items-center gap-2 px-1 mb-1.5">
                 <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider flex-1">Folders</span>
                 {!isAddingFolder && (
                   <TooltipWrapper title="Add folder">
@@ -460,7 +546,7 @@ export function RegistrationToolset() {
 
               {isAddingFolder && (
                 <form
-                  className="mb-1.5 flex items-center gap-1.5 rounded-md border border-border/40 bg-card/40 px-2 py-1.5"
+                  className="mb-1.5 flex items-center gap-1.5 rounded-md bg-[var(--ops-panel-bg-subtle)] px-2 py-1.5"
                   onSubmit={(e) => {
                     e.preventDefault();
                     void handleCreateFolder();
@@ -520,7 +606,7 @@ export function RegistrationToolset() {
                       editingFolderId === f.id ? (
                         <form
                           key={f.id}
-                          className="flex items-center gap-1.5 rounded-md border border-border/40 bg-card/40 px-2 py-1.5"
+                          className="flex items-center gap-1.5 rounded-md bg-[var(--ops-panel-bg-subtle)] px-2 py-1.5"
                           onSubmit={(e) => {
                             e.preventDefault();
                             void handleRenameFolder(f.id);
@@ -639,23 +725,38 @@ export function RegistrationToolset() {
                 )}
               </div>
             </div>
+                </div>
+              </div>
+              <TooltipWrapper
+                title="Resize panes"
+                description="Drag to split library and registrars. Double-click to reset height."
+              >
+                <PanelResizeHandle
+                  orientation="horizontal"
+                  density="compact"
+                  appearance="rail"
+                  label="Resize library section and registrar list height"
+                  className="w-full shrink-0 rounded-none"
+                  onPointerDown={handleLibraryRegistrarsResizePointerDown}
+                  onDoubleClick={() => setLibraryPaneHeightPx(REG_MASTER_LIBRARY_DEFAULT_PX)}
+                />
+              </TooltipWrapper>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--ui-rule)] bg-[var(--ops-panel-bg-elevated)] px-3">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{activeFilterLabel}</span>
+                  <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">{filteredCount}</span>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--ops-panel-bg-subtle)]">
+                  <RegistrarList
+                    selectedId={selectedRegistrarId}
+                    onSelectId={setSelectedRegistrarId}
+                    folderFilter={folderFilter}
+                    statusFilter={statusFilter}
+                  />
+                </div>
+              </div>
+            </div>
           </aside>
-
-          {/* ── Middle pane — registrar list ── */}
-          <div className="w-[280px] shrink-0 border-r border-border flex flex-col overflow-hidden min-w-0">
-            <div className="h-13 flex items-center gap-2 px-4 border-b border-border shrink-0">
-              <span className="text-sm font-medium text-foreground truncate flex-1">{activeFilterLabel}</span>
-              <span className="text-2xs tabular-nums text-muted-foreground">{filteredCount}</span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <RegistrarList
-                selectedId={selectedRegistrarId}
-                onSelectId={setSelectedRegistrarId}
-                folderFilter={folderFilter}
-                statusFilter={statusFilter}
-              />
-            </div>
-          </div>
 
           {/* ── Right pane — detail ── */}
           <div className="flex-1 min-w-0 overflow-hidden">
@@ -672,65 +773,16 @@ export function RegistrationToolset() {
         <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
           {draggedRegistrar ? (
             <div className="w-[260px] rounded-md border border-border/50 bg-card/95 px-3 py-2 shadow-xl backdrop-blur-sm">
-              <div className="text-[13px] font-medium text-foreground truncate">{draggedRegistrar.name}</div>
-              <div className="text-[10px] font-mono text-muted-foreground/70 truncate">
+              <div className="truncate text-[13px] font-medium text-foreground">{draggedRegistrar.name}</div>
+              <div className="truncate font-mono text-[10px] text-muted-foreground/70">
                 {draggedRegistrar.username}@{draggedRegistrar.domain}
               </div>
             </div>
           ) : null}
         </DragOverlay>
-        </DndContext>
+          </DndContext>
+        </div>
       </div>
-
-      <ViewFooter>
-        <ViewFooterItem>
-          {scopedRegisteredCount === filteredCount && filteredCount > 0 ? (
-            <CheckCircle2 className="h-3 w-3 text-success" />
-          ) : scopedFailedCount > 0 ? (
-            <XCircle className="h-3 w-3 text-destructive" />
-          ) : (
-            <Server className="h-3 w-3" />
-          )}
-          <span className="font-medium tabular-nums text-foreground">{scopedRegisteredCount}/{filteredCount}</span>
-          <span>{statusFilter || folderFilter ? "registered (filtered)" : "registered"}</span>
-        </ViewFooterItem>
-        {scopedFailedCount > 0 && (
-          <ViewFooterItem className="text-destructive">
-            <span className="tabular-nums">{scopedFailedCount}</span>
-            <span>failed</span>
-          </ViewFooterItem>
-        )}
-        {(scopedCallingRegistrars.length > 0 || scopedFaxingRegistrars.length > 0) && (
-          <>
-            <ViewFooterDivider />
-            {scopedCallingRegistrars.length > 0 && (
-              <TooltipWrapper entry={{ title: "Calling Registrars", description: `${scopedCallingActiveCount} active of ${scopedCallingRegistrars.length} assigned in current filter` }}>
-                <ViewFooterItem className={cn("cursor-help", scopedCallingActiveCount === scopedCallingRegistrars.length ? "text-success" : scopedCallingActiveCount > 0 ? "text-warning" : "text-destructive")}>
-                  <Phone className="h-3 w-3" />
-                  <span className="tabular-nums font-medium">{scopedCallingActiveCount}/{scopedCallingRegistrars.length}</span>
-                </ViewFooterItem>
-              </TooltipWrapper>
-            )}
-            {scopedFaxingRegistrars.length > 0 && (
-              <TooltipWrapper entry={{ title: "Faxing Registrars", description: `${scopedFaxingActiveCount} active of ${scopedFaxingRegistrars.length} assigned in current filter` }}>
-                <ViewFooterItem className={cn("cursor-help", scopedFaxingActiveCount === scopedFaxingRegistrars.length ? "text-success" : scopedFaxingActiveCount > 0 ? "text-warning" : "text-destructive")}>
-                  <FileText className="h-3 w-3" />
-                  <span className="tabular-nums font-medium">{scopedFaxingActiveCount}/{scopedFaxingRegistrars.length}</span>
-                </ViewFooterItem>
-              </TooltipWrapper>
-            )}
-          </>
-        )}
-        {selectedRegistrarRecord ? (
-          <>
-            <ViewFooterDivider />
-            <ViewFooterItem>
-              <span>Selected:</span>
-              <span className="truncate max-w-[220px]">{selectedRegistrarRecord.name}</span>
-            </ViewFooterItem>
-          </>
-        ) : null}
-      </ViewFooter>
 
       {isEditorOpen && <RegistrarEditor registrarId={editingId} onClose={handleEditorClose} />}
       <ConfirmDialog

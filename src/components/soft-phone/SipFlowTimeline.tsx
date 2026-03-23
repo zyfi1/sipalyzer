@@ -19,7 +19,7 @@ import {
 } from "./softphone-utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━ Unified Timeline Entry ━━━━━━━━━━━━━━━━━━━━━━━ */
 
@@ -358,18 +358,16 @@ export function SipFlowTimeline({
 
         {/* Filter selector */}
         {(hasDtmf || entries.length > 3) && (
-          <Select value={filter} onValueChange={(value) => setFilter(value as FilterMode)}>
-            <SelectTrigger className="h-7 w-[128px] text-2xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FILTERS.filter((f) => f.value !== "dtmf" || hasDtmf).map((f) => (
-                <SelectItem key={f.value} value={f.value}>
-                  {f.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={filter}
+            onValueChange={(value) => setFilter(value as FilterMode)}
+            size="sm"
+            className="h-7 min-h-7 w-[128px] text-2xs"
+            options={FILTERS.filter((f) => f.value !== "dtmf" || hasDtmf).map((f) => ({
+              value: f.value,
+              label: f.label,
+            }))}
+          />
         )}
       </div>
 

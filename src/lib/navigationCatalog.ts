@@ -1,5 +1,5 @@
 import { Activity, type IconComponent, Clock, FileSearch, Globe, Hash, Network, Package, Radio, Scan, Search, Server, Settings, Shield, SquareTerminal, Terminal, TestTube, Wrench } from "@/lib/icons";
-import { FEATURE_FLAG_MCP_UI } from "@/lib/featureFlags";
+import { FEATURE_FLAG_MCP_UI, FEATURE_FLAG_TOOLS_MOCKUP_UI } from "@/lib/featureFlags";
 import { isFeatureFlagEnabled } from "@/lib/featureFlagCache";
 import { toolRegistry, type ToolDefinition, type ToolSubView } from "@/lib/toolRegistry";
 import { isProvisionViewerSubviewAvailable } from "@/lib/provisionNav";
@@ -11,6 +11,7 @@ interface SubviewVisibilityOptions {
 const TOOL_FEATURE_FLAGS: Partial<Record<string, string>> = {};
 
 const SUBVIEW_FEATURE_FLAGS: Partial<Record<string, string>> = {
+  "tools:mockup": FEATURE_FLAG_TOOLS_MOCKUP_UI,
   "tools:mcp": FEATURE_FLAG_MCP_UI,
 };
 
@@ -28,6 +29,7 @@ const SUBVIEW_ICON_MAP: Partial<Record<string, IconComponent>> = {
   "fax-center:send": Wrench,
   "fax-center:faxes": FileSearch,
   "provision-viewer:provision": Wrench,
+  "provision-viewer:firmware": Package,
   "provision-viewer:contacts": Server,
   "provision-viewer:device": Shield,
   "provision-viewer:diff": Hash,
@@ -46,7 +48,6 @@ const SUBVIEW_ICON_MAP: Partial<Record<string, IconComponent>> = {
   "tools:syslog": Radio,
   "tools:logs": FileSearch,
   "tools:file-server": Server,
-  "tools:firmware": Package,
   "tools:password-gen": Shield,
   "tools:text-forge": Wrench,
   "tools:mockup": Search,
@@ -57,7 +58,8 @@ function subviewKey(toolId: string, subviewId: string): string {
   return `${toolId}:${subviewId}`;
 }
 
-function isToolVisibleByFeatureFlags(toolId: string): boolean {
+/** When false, the tool is hidden from nav / home quick actions (see `TOOL_FEATURE_FLAGS`). */
+export function isNavigationToolFeatureVisible(toolId: string): boolean {
   const featureFlag = TOOL_FEATURE_FLAGS[toolId];
   if (!featureFlag) return true;
   return isFeatureFlagEnabled(featureFlag, false);
@@ -72,7 +74,7 @@ export function isNavigationSubviewVisible(toolId: string, subviewId: string): b
 export function getVisibleNavigationTools(): ToolDefinition[] {
   return toolRegistry
     .getAll()
-    .filter((tool) => !tool.hidden && isToolVisibleByFeatureFlags(tool.id));
+    .filter((tool) => !tool.hidden && isNavigationToolFeatureVisible(tool.id));
 }
 
 export function getVisibleToolSubviews(

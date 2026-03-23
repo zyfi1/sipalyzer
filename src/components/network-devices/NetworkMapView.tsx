@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Network, Search, X } from "@/lib/icons";
 import { WolButton } from "./WolButton";
 import type { DiscoveredDevice } from "@/types/networkDevices";
+import { AppDivider } from "@/components/ui/panel-chrome";
 
 const TYPE_COLOR: Record<string, string> = {
   phone: "#5B8DEF",
@@ -301,7 +302,7 @@ export function NetworkMapView() {
             </button>
           )}
         </div>
-        <div className="h-4 w-px bg-border/40 mx-0.5" />
+        <AppDivider orientation="vertical" size="md" className="mx-0.5" />
         <div className="subview-tabs-compact">
           {GROUP_OPTIONS.map((o) => (
             <button
@@ -315,7 +316,7 @@ export function NetworkMapView() {
             </button>
           ))}
         </div>
-        <div className="h-4 w-px bg-border/40 mx-0.5" />
+        <AppDivider orientation="vertical" size="md" className="mx-0.5" />
         <div className="subview-tabs-compact">
           {(["compact", "expanded"] as const).map((mode) => (
             <button

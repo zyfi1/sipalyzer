@@ -360,7 +360,7 @@ export function EnvironmentEditor({ open, onOpenChange }: EnvironmentEditorProps
                           <AlertTriangle className="h-3.5 w-3.5 text-warning/80" />
                           Variable guidance
                         </div>
-                        <Badge variant="outline" className="rounded-lg text-muted-foreground">
+                        <Badge variant="secondary" className="rounded-lg text-muted-foreground">
                           {diagnostics.length}
                         </Badge>
                       </div>
@@ -410,7 +410,7 @@ export function EnvironmentEditor({ open, onOpenChange }: EnvironmentEditorProps
                         {unresolvedPlaceholders.map((k) => (
                           <Badge
                             key={k}
-                            variant="outline"
+                            variant="secondary"
                             className="rounded-lg text-muted-foreground border-border/30 bg-muted/30"
                           >
                             {toToken(k)}

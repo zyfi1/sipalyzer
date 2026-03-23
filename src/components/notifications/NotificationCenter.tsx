@@ -5,7 +5,7 @@ import { NotificationItem } from "./NotificationItem";
 import { NotificationSettings } from "./NotificationSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -204,25 +204,17 @@ export function NotificationCenter({ isOpen = true, onClose, mode = "overlay" }:
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <div className="w-[180px]" title="Severity filter">
-                <Select
+                <AppDropdown
+                  className="h-8 w-full"
                   value={activeFilter}
                   onValueChange={(value) => setActiveFilter(value as TypeFilter)}
-                >
-                  <SelectTrigger size="sm" className="h-8 w-full">
-                    <div className="inline-flex items-center gap-1.5">
-                      <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                      <SelectValue aria-label="Filter by severity" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TYPE_FILTER_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                        {opt.value !== "all" ? ` (${unreadByType[opt.value] || 0})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  triggerPrefix={<Filter className="h-3.5 w-3.5 text-muted-foreground" />}
+                  placeholder="Filter by severity"
+                  options={TYPE_FILTER_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: `${opt.label}${opt.value !== "all" ? ` (${unreadByType[opt.value] || 0})` : ""}`,
+                  }))}
+                />
               </div>
               <TooltipWrapper
                 title={viewMode === "settings" ? "Back to notifications" : "Notification settings"}

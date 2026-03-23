@@ -350,9 +350,9 @@ export function IpBadge() {
         aria-label="Connection and IP information"
       >
         {linkKind === "wifi" ? (
-          <WifiIcon className={cn("h-4.5 w-4.5 shrink-0", qualityClass)} strokeWidth={1.9} />
+          <WifiIcon className={cn("h-4 w-4 shrink-0", qualityClass)} strokeWidth={1.9} />
         ) : (
-          <Icon className={cn("h-4.5 w-4.5", qualityClass)} strokeWidth={1.9} />
+          <Icon className={cn("h-4 w-4", qualityClass)} strokeWidth={1.9} />
         )}
       </div>
     </TooltipWrapper>

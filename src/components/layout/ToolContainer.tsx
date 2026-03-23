@@ -1,72 +1,13 @@
-import React, { Component, memo, useCallback, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import React, { Component, memo, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { useToolStore } from "@/stores/toolStore";
 import { toolRegistry, type ToolDefinition } from "@/lib/toolRegistry";
 import { HOME_TOOL_ID } from "@/lib/toolRegistry";
-import { useContextMenuStore } from "@/stores/contextMenuStore";
-import { createDefaultContextMenuContext, type ContextMenuContext } from "@/types/contextMenu";
-import { trackContextMenuOpen } from "@/lib/contextMenuTelemetry";
 import { AlertTriangle, RefreshCw } from "@/lib/icons";
 
-const HAS_CONTEXT_MENU_ATTR = "data-has-context-menu";
+/** Re-export for call sites that tag custom context menus. */
+export { DATA_HAS_CONTEXT_MENU } from "@/hooks/useGlobalContextMenuHandler";
+
 export const ActiveToolPanelContext = React.createContext<{ toolId: string; isActive: boolean } | null>(null);
-
-/**
- * Right-click on this area opens the app-wide contextual menu, unless the target
- * is inside an element with data-has-context-menu (e.g. packet row with its own menu).
- */
-function useGlobalContextMenuHandler() {
-  const openAt = useContextMenuStore((s) => s.openAt);
-  const activeToolId = useToolStore((s) => s.activeToolId);
-  const lastViewedSubviews = useToolStore((s) => s.lastViewedSubviews);
-
-  const buildMenuContext = useCallback((target: HTMLElement): ContextMenuContext => {
-    const subviewId = activeToolId ? lastViewedSubviews[activeToolId] ?? null : null;
-    const base = createDefaultContextMenuContext({
-      toolId: activeToolId ?? null,
-      subviewId,
-      target,
-    });
-    const tag = target.tagName.toLowerCase();
-    const editable =
-      target.isContentEditable ||
-      tag === "input" ||
-      tag === "textarea" ||
-      target.getAttribute("role") === "textbox";
-    const inTableRow = !!target.closest("[role='row'], tr, [data-packet-row='true']");
-    const inTerminal = !!target.closest("[data-terminal='true'], [data-xterm='true'], .xterm");
-    const inTab = !!target.closest("[role='tab'], [data-terminal-tab='true']");
-
-    return {
-      ...base,
-      surface: inTerminal ? "terminal" : inTab ? "tab" : inTableRow ? "tableRow" : editable ? "editor" : "toolPanel",
-      entity: inTableRow ? "packet" : inTerminal ? "session" : inTab ? "terminalTab" : editable ? "editor" : "generic",
-      capabilities: {
-        canEdit: editable,
-        canCut: editable,
-        canCopy: true,
-        canPaste: editable,
-        canSelectAll: editable || inTerminal || inTableRow,
-        canDelete: true,
-        canExport: !!inTableRow,
-      },
-    };
-  }, [activeToolId, lastViewedSubviews]);
-
-  return useCallback(
-    (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest(`[${HAS_CONTEXT_MENU_ATTR}]`)) {
-        e.preventDefault();
-        return;
-      }
-      e.preventDefault();
-      const menuContext = buildMenuContext(target);
-      trackContextMenuOpen(menuContext);
-      openAt(e.clientX, e.clientY, menuContext);
-    },
-    [buildMenuContext, openAt],
-  );
-}
 
 /**
  * Per-tool error boundary — catches errors within a single tool so one
@@ -119,11 +60,9 @@ class ToolErrorBoundary extends Component<
 const ToolPanel = memo(function ToolPanel({
   tool,
   isActive,
-  onContextMenu,
 }: {
   tool: ToolDefinition;
   isActive: boolean;
-  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const ToolComponent = tool.component;
   const shouldUseUnifiedWidth = tool.id !== HOME_TOOL_ID;
@@ -132,7 +71,6 @@ const ToolPanel = memo(function ToolPanel({
     <div
       style={{ display: isActive ? "flex" : "none" }}
       className="flex-1 min-h-0 w-full flex flex-col"
-      onContextMenu={onContextMenu}
     >
       <ActiveToolPanelContext.Provider value={{ toolId: tool.id, isActive }}>
         <ToolErrorBoundary toolName={tool.name}>
@@ -152,6 +90,9 @@ const ToolPanel = memo(function ToolPanel({
 /**
  * Renders all tools and shows only the active one (display toggle).
  * All tools stay mounted so switching views is instant—no unmount/mount.
+ *
+ * Global right-click menu is handled on the app shell (`App.tsx`), not here,
+ * so the sidebar and header are included.
  */
 export function ToolContainer() {
   const activeToolId = useToolStore((s) => s.activeToolId);
@@ -159,7 +100,6 @@ export function ToolContainer() {
     ? (toolRegistry.get(activeToolId) ?? toolRegistry.get(HOME_TOOL_ID))
     : toolRegistry.get(HOME_TOOL_ID);
   const [mountedToolIds, setMountedToolIds] = useState<string[]>([HOME_TOOL_ID]);
-  const onContextMenu = useGlobalContextMenuHandler();
 
   useEffect(() => {
     if (!activeTool) return;
@@ -180,16 +120,8 @@ export function ToolContainer() {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {mountedTools.map((tool) => (
-        <ToolPanel
-          key={tool.id}
-          tool={tool}
-          isActive={tool.id === resolvedActiveToolId}
-          onContextMenu={onContextMenu}
-        />
+        <ToolPanel key={tool.id} tool={tool} isActive={tool.id === resolvedActiveToolId} />
       ))}
     </div>
   );
 }
-
-/** Attribute to set on elements that have their own context menu (e.g. packet row). Right-clicks there will not open the global menu. */
-export const DATA_HAS_CONTEXT_MENU = HAS_CONTEXT_MENU_ATTR;

@@ -27,7 +27,7 @@ export function LoadingOverlay() {
   return (
     <>
       {/* Top progress bar */}
-      <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none">
+      <div className="fixed top-0 left-0 right-0 z-[10201] pointer-events-none">
         <div className="relative h-1.5 bg-muted/30 overflow-hidden">
           <div
             className="absolute top-0 left-0 h-full w-[40%] bg-primary shadow-lg shadow-primary/50 animate-loading-slide"
@@ -37,7 +37,7 @@ export function LoadingOverlay() {
       
       {/* Full-screen overlay with spinner - blocks all interactions */}
       <div 
-        className="fixed inset-0 z-[9998] bg-background/90 flex items-center justify-center"
+        className="fixed inset-0 z-[10200] bg-background/90 flex items-center justify-center"
         style={{ pointerEvents: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >

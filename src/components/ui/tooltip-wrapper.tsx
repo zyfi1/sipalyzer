@@ -27,8 +27,21 @@ interface TooltipWrapperProps {
 function inferAdaptiveOffset(children: ReactNode): number {
   if (!React.isValidElement(children)) return 12;
   const className = String((children.props as { className?: string }).className ?? "");
+  const isHeaderOrTopNavTrigger =
+    /\b(header-icon-button|settings-nav-tab|notification-nav-tab|subview-tab-compact)\b/.test(className);
+  if (isHeaderOrTopNavTrigger) return 10;
   const isDenseIconTrigger = /\b(h-(5|6|7)|w-(5|6|7)|size-(5|6|7)|p-0)\b/.test(className);
   return isDenseIconTrigger ? 8 : 12;
+}
+
+function inferAdaptiveSide(children: ReactNode): "top" | "right" | "bottom" | "left" {
+  if (!React.isValidElement(children)) return "top";
+  const className = String((children.props as { className?: string }).className ?? "");
+  // Header and top-tab triggers read better with downward tooltip reveal.
+  if (/\b(header-icon-button|settings-nav-tab|notification-nav-tab|subview-tab-compact)\b/.test(className)) {
+    return "bottom";
+  }
+  return "top";
 }
 
 function resolveContent(props: Omit<TooltipWrapperProps, "children">): ReactNode {
@@ -54,7 +67,7 @@ export function TooltipWrapper({
   description,
   content,
   entry,
-  side = "top",
+  side,
   sideOffset,
   disabled = false,
   delayDuration,
@@ -63,6 +76,7 @@ export function TooltipWrapper({
   followCursor = false,
 }: TooltipWrapperProps) {
   const resolved = resolveContent({ title, description, content, entry });
+  const resolvedSide = side ?? inferAdaptiveSide(children);
   const resolvedSideOffset = sideOffset ?? inferAdaptiveOffset(children);
   if (disabled || resolved == null) {
     return <>{children}</>;
@@ -77,7 +91,7 @@ export function TooltipWrapper({
       <TooltipTrigger asChild>
         {trigger}
       </TooltipTrigger>
-      <TooltipContent side={side} sideOffset={resolvedSideOffset} showArrow={showArrow}>
+      <TooltipContent side={resolvedSide} sideOffset={resolvedSideOffset} showArrow={showArrow}>
         {resolved}
       </TooltipContent>
     </Tooltip>

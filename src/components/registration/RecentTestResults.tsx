@@ -111,7 +111,7 @@ export function RecentTestResults({ results, onResultClick, maxResults = 20 }: R
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-sm font-semibold truncate">{result.registrar_name}</span>
                     <Badge
-                      variant="outline"
+                      variant="secondary"
                       className={cn(
                         "text-2xs font-semibold",
                         result.status === "pass"
@@ -122,7 +122,7 @@ export function RecentTestResults({ results, onResultClick, maxResults = 20 }: R
                       {result.status === "pass" ? "Passed" : "Failed"}
                     </Badge>
                     <Badge 
-                      variant="outline"
+                      variant="secondary"
                       className="text-xs font-medium bg-muted/40 text-foreground/80 border-border/50"
                     >
                       {getTestTypeLabel(result.test_type)}

@@ -55,9 +55,11 @@ import {
   type PersistedSessionSlice,
 } from "./lib/sessionState";
 import { useAppShortcuts } from "./hooks/useAppShortcuts";
+import { useGlobalContextMenuHandler } from "./hooks/useGlobalContextMenuHandler";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ShortcutsPanel } from "./components/shortcuts/ShortcutsPanel";
 import { GlobalContextMenu } from "./components/context-menu";
+import { AppContextMenu, AppContextMenuTrigger } from "./components/ui/app-context-menu";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { ConfirmDialog } from "./components/ui/confirm-dialog";
 import { useNetworkSync } from "./hooks/useNetworkSync";
@@ -150,7 +152,6 @@ function AppContent() {
   const highVisibility = useSettingsStore((s) => s.highVisibility);
   const reducedMotion = useSettingsStore((s) => s.reducedMotion);
   const updatePrefs = useSettingsStore((s) => s.updates);
-  const availableUpdate = useUpdaterStore((s) => s.availableUpdate);
   const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
   const layout = useLayoutStore(
     useShallow((s) => ({
@@ -173,6 +174,7 @@ function AppContent() {
     }))
   );
   const packetViewerSessionId = useOpenCaptureStore((s) => s.modalSessionId);
+  const onGlobalContextMenu = useGlobalContextMenuHandler();
   const activeRegistrarId = useSoftphoneStore((s) => s.activeRegistrarId);
   const setInboundListenerStatus = useSoftphoneStore((s) => s.setInboundListenerStatus);
   const registrars = useRegistrationStore((s) => s.registrars);
@@ -1175,20 +1177,33 @@ function AppContent() {
   }
 
   return (
-    <div
-      className={styles.appShell}
-      data-visibility={highVisibility ? "high" : "default"}
-      data-motion={reducedMotion ? "reduced" : "default"}
-      style={{ height: "100vh", width: "100vw" }}
+    <AppContextMenu
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) {
+          const { invoker } = useContextMenuStore.getState();
+          useContextMenuStore.getState().resetShellMenu();
+          if (invoker && typeof invoker.focus === "function") {
+            queueMicrotask(() => invoker.focus());
+          }
+        }
+      }}
     >
-      <GlobalContextMenu />
+      <AppContextMenuTrigger asChild>
+        <div
+          className={styles.appShell}
+          data-app-context-menu-root=""
+          data-visibility={highVisibility ? "high" : "default"}
+          data-motion={reducedMotion ? "reduced" : "default"}
+          style={{ height: "100vh", width: "100vw" }}
+          onContextMenu={onGlobalContextMenu}
+        >
       <LoadingOverlay />
       <Header
         onNotificationClick={handleToggleNotifications}
         onNotesClick={handleToggleNotes}
         onKnowledgeBaseClick={handleToggleKnowledgeBase}
         onSettingsClick={handleToggleSettings}
-        hasUpdateAvailable={Boolean(availableUpdate)}
       />
       <div className={styles.mainRow}>
         {/*
@@ -1205,10 +1220,6 @@ function AppContent() {
           </div>
         </div>
       </div>
-      <div
-        id="app-global-footer-layer"
-        className={`${styles.footerLayer} app-chrome-surface`}
-      />
       {settings.showToasts && <Toaster position={settings.position} />}
       {layout.notesCenterOpen && (
         <Suspense fallback={null}>
@@ -1274,7 +1285,10 @@ function AppContent() {
         variant="destructive"
         onConfirm={handleConfirmClose}
       />
-    </div>
+        </div>
+      </AppContextMenuTrigger>
+      <GlobalContextMenu />
+    </AppContextMenu>
   );
 }
 

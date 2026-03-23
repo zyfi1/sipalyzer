@@ -135,7 +135,7 @@ export function useAppShortcuts() {
         [SHORTCUTS.viewToolsSyslog]: () => navigateTo("tools", "syslog"),
         [SHORTCUTS.viewToolsLogs]: () => navigateTo("tools", "logs"),
         [SHORTCUTS.viewToolsFileServer]: () => navigateTo("tools", "file-server"),
-        [SHORTCUTS.viewToolsFirmware]: () => navigateTo("tools", "firmware"),
+        [SHORTCUTS.viewToolsFirmware]: () => navigateTo("provision-viewer", "firmware"),
         [SHORTCUTS.viewToolsPasswordGen]: () => navigateTo("tools", "password-gen"),
         [SHORTCUTS.viewToolsMcp]: () => navigateTo("tools", "mcp"),
       };

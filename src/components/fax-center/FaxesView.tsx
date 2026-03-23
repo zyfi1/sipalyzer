@@ -17,13 +17,7 @@ import type { RtpStreamInfo } from "@/types/packetCapture";
 import type { FaxSendProgress, FaxReceiveProgress } from "./FaxShared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Loader2,
   ArrowUpDown,
@@ -46,6 +40,7 @@ import {
 import { navigateTo } from "@/lib/navigation";
 import { formatRelativeTime } from "@/lib/dateTime";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import {
   TransportBadge,
@@ -620,32 +615,29 @@ export function FaxesView({ sendingProgress, receivingProgress }: FaxesViewProps
 
           {!selectionMode ? (
             <div className="rounded-md border border-border/35 bg-background/70 p-2 flex items-center gap-2">
-              <Select value={historySort} onValueChange={(v) => setHistorySort(v as HistorySort)}>
-                <SelectTrigger className="ui-control-shell h-8 w-[118px] px-2 text-xs shrink-0">
-                  <ArrowUpDown className="h-3 w-3 text-muted-foreground mr-1" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="oldest">Oldest</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                  <SelectItem value="pages">Pages</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={registrarFilter} onValueChange={setRegistrarFilter}>
-                <SelectTrigger className="ui-control-shell h-8 w-[170px] px-2 text-xs shrink-0">
-                  <SelectValue placeholder="All registrars" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All registrars</SelectItem>
-                  {registrarOptions.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="h-6 w-px bg-border/40 shrink-0" />
+              <AppDropdown
+                value={historySort}
+                onValueChange={(v) => setHistorySort(v as HistorySort)}
+                className="ui-control-shell h-8 w-[118px] px-2 text-xs shrink-0"
+                triggerPrefix={<ArrowUpDown className="h-3 w-3 text-muted-foreground mr-1" />}
+                options={[
+                  { value: "newest", label: "Newest" },
+                  { value: "oldest", label: "Oldest" },
+                  { value: "status", label: "Status" },
+                  { value: "pages", label: "Pages" },
+                ]}
+              />
+              <AppDropdown
+                value={registrarFilter}
+                onValueChange={setRegistrarFilter}
+                className="ui-control-shell h-8 w-[170px] px-2 text-xs shrink-0"
+                placeholder="All registrars"
+                options={[
+                  { value: "all", label: "All registrars" },
+                  ...registrarOptions.map((r) => ({ value: r.id, label: r.name })),
+                ]}
+              />
+              <AppDivider orientation="vertical" size="lg" className="mx-0 h-6 shrink-0" />
               <button
                 type="button"
                 onClick={() => setFolderFilter("all")}
@@ -745,7 +737,7 @@ export function FaxesView({ sendingProgress, receivingProgress }: FaxesViewProps
             </div>
           ) : (
             <div className="flex items-center gap-1.5 rounded-md border border-border/45 bg-background/60 p-1.5">
-              <Badge variant="outline" className="h-6 px-2 text-2xs border-border/45">
+              <Badge variant="secondary" className="h-6 px-2 text-2xs border-border/45">
                 {selectedHistoryKeys.size} selected
               </Badge>
               <Button variant="ghost" size="sm" className="h-7 px-2 text-2xs" onClick={selectAllVisibleHistory} disabled={visibleHistoryItems.length === 0}>
@@ -907,7 +899,7 @@ export function FaxesView({ sendingProgress, receivingProgress }: FaxesViewProps
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-mono font-medium text-foreground block truncate">{j.target}</span>
                             <Badge
-                              variant="outline"
+                              variant="secondary"
                               className={cn(
                                 "text-3xs px-1.5 py-0 h-4",
                                 ok ? "border-success/30 text-success/90" : "border-destructive/30 text-destructive/90"
@@ -921,28 +913,31 @@ export function FaxesView({ sendingProgress, receivingProgress }: FaxesViewProps
                             {j.pageCount > 0 && <span>{j.pageCount}pg</span>}
                             {j.registrarName && <span>{j.registrarName}</span>}
                             {j.agentName && <span>via {j.agentName}</span>}
-                            <Badge variant="outline" className="text-3xs px-1.5 py-0 h-4 border-border/40 text-muted-foreground">
+                            <Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4 border-border/40 text-muted-foreground">
                               {faxFolders.find((f) => f.id === folderForItem(item))?.name ?? "No folder"}
                             </Badge>
                           </div>
                         </div>
                         {!selectionMode && (
-                          <Select value={folderForItem(item)} onValueChange={(v) => setFolderForItem(item, v)}>
-                            <SelectTrigger
-                              className="ui-control-shell h-7 w-[108px] px-2 text-2xs shrink-0"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={NO_FOLDER_VALUE}>No folder</SelectItem>
-                              {faxFolders.map((folder) => (
-                                <SelectItem key={folder.id} value={folder.id}>
-                                  {folder.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div
+                            className="shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <AppDropdown
+                              value={folderForItem(item)}
+                              onValueChange={(v) => setFolderForItem(item, v)}
+                              size="sm"
+                              className="ui-control-shell h-7 min-h-7 w-[108px] px-2 text-2xs shrink-0"
+                              options={[
+                                { value: NO_FOLDER_VALUE, label: "No folder" },
+                                ...faxFolders.map((folder) => ({
+                                  value: folder.id,
+                                  label: folder.name,
+                                })),
+                              ]}
+                            />
+                          </div>
                         )}
                         {!selectionMode && (
                           <TooltipWrapper title="Delete fax" description="Remove this sent fax from history.">
@@ -1014,7 +1009,7 @@ export function FaxesView({ sendingProgress, receivingProgress }: FaxesViewProps
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-mono font-medium text-foreground block truncate">{f.sender}</span>
                             <Badge
-                              variant="outline"
+                              variant="secondary"
                               className={cn(
                                 "text-3xs px-1.5 py-0 h-4",
                                 ok ? "border-primary/30 text-primary/80" : "border-destructive/30 text-destructive/80",
@@ -1028,28 +1023,31 @@ export function FaxesView({ sendingProgress, receivingProgress }: FaxesViewProps
                             <span>{f.pageCount}pg</span>
                             {f.documentFormat && <span className="uppercase">{f.documentFormat}</span>}
                             {f.session.registrarName && <span>{f.session.registrarName}</span>}
-                            <Badge variant="outline" className="text-3xs px-1.5 py-0 h-4 border-border/40 text-muted-foreground">
+                            <Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4 border-border/40 text-muted-foreground">
                               {faxFolders.find((folder) => folder.id === folderForItem(item))?.name ?? "No folder"}
                             </Badge>
                           </div>
                         </div>
                         {!selectionMode && (
-                          <Select value={folderForItem(item)} onValueChange={(v) => setFolderForItem(item, v)}>
-                            <SelectTrigger
-                              className="ui-control-shell h-7 w-[108px] px-2 text-2xs shrink-0"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={NO_FOLDER_VALUE}>No folder</SelectItem>
-                              {faxFolders.map((folder) => (
-                                <SelectItem key={folder.id} value={folder.id}>
-                                  {folder.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div
+                            className="shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <AppDropdown
+                              value={folderForItem(item)}
+                              onValueChange={(v) => setFolderForItem(item, v)}
+                              size="sm"
+                              className="ui-control-shell h-7 min-h-7 w-[108px] px-2 text-2xs shrink-0"
+                              options={[
+                                { value: NO_FOLDER_VALUE, label: "No folder" },
+                                ...faxFolders.map((folder) => ({
+                                  value: folder.id,
+                                  label: folder.name,
+                                })),
+                              ]}
+                            />
+                          </div>
                         )}
                         {!selectionMode && (
                           <TooltipWrapper title="Delete fax" description="Remove this received fax from history.">
@@ -1183,7 +1181,7 @@ function ActiveReceiveDetail({ progress }: { progress: FaxReceiveProgress }) {
         </span>
         <span className="text-xs font-medium text-foreground">Receiving from {progress.sender ?? "Unknown"}</span>
         {progress.transport && (
-          <Badge variant="outline" className="text-2xs px-1.5 py-0 h-4 border-primary/40 text-primary ml-auto">{progress.transport}</Badge>
+          <Badge variant="secondary" className="text-2xs px-1.5 py-0 h-4 border-primary/40 text-primary ml-auto">{progress.transport}</Badge>
         )}
       </div>
       <div className="flex-1 min-h-0 overflow-auto p-6 space-y-4">
@@ -1303,7 +1301,7 @@ function SentFaxDetail({
         {ok ? <CheckCircle2 className="h-4 w-4 text-success" /> : <XCircle className="h-4 w-4 text-destructive" />}
         <span className="text-xs font-medium text-foreground font-mono">{job.target}</span>
         <Badge
-          variant="outline"
+          variant="secondary"
           className={cn(
             "text-3xs px-1.5 py-0 h-4",
             ok ? "border-success/30 text-success/90" : "border-destructive/30 text-destructive/90",
@@ -1445,18 +1443,17 @@ function SentFaxDetail({
 
           {reviewTotalPages > 0 ? (
             <>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              <div className="subview-tabs-compact overflow-x-auto pb-1">
                 {Array.from({ length: reviewTotalPages }).map((_, index) => (
-                  <Button
+                  <button
                     key={index}
                     type="button"
-                    variant={index === safeReviewPage ? "secondary" : "outline"}
-                    size="sm"
-                    className="h-7 px-2 text-2xs shrink-0"
+                    data-state={index === safeReviewPage ? "active" : "inactive"}
+                    className="subview-tab-compact ui-hover-press motion-reduce:transform-none focus-visible:shadow-focus shrink-0"
                     onClick={() => setReviewPage(index)}
                   >
                     Page {index + 1}
-                  </Button>
+                  </button>
                 ))}
               </div>
               <div className="ui-panel-shell min-h-[360px] flex items-center justify-center rounded-lg overflow-hidden">

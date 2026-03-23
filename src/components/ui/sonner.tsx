@@ -20,11 +20,11 @@ const Toaster = ({ duration = TOAST_DURATION, ...props }: ToasterProps) => {
       closeButton
       duration={duration}
       icons={{
-        success: <CheckCircle2 className="size-5 text-success drop-shadow-[0_0_6px_hsl(var(--success)/0.6)]" />,
-        info: <Info className="size-5 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.5)]" />,
-        warning: <AlertTriangle className="size-5 text-warning drop-shadow-[0_0_6px_hsl(var(--warning)/0.6)]" />,
-        error: <XCircle className="size-5 text-destructive drop-shadow-[0_0_6px_hsl(var(--destructive)/0.6)]" />,
-        loading: <Loader2 className="size-5 animate-spin text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.5)]" />,
+        success: <CheckCircle2 className="size-5 text-success" />,
+        info: <Info className="size-5 text-primary" />,
+        warning: <AlertTriangle className="size-5 text-warning" />,
+        error: <XCircle className="size-5 text-destructive" />,
+        loading: <Loader2 className="size-5 animate-spin text-primary" />,
       }}
       style={
         {

@@ -75,18 +75,15 @@ export function useBreadcrumb(
   onChangeRef.current = onChange;
   const stableCallback = useCallback((id: string) => onChangeRef.current(id), []);
 
-  const itemsRef = useRef(items);
-  itemsRef.current = items;
-
   useEffect(() => {
-    if (isToolActive && itemsRef.current.length > 0) {
+    if (isToolActive && items.length > 0) {
       setSegment(toolId, level, {
-        items: itemsRef.current,
+        items,
         value,
         onChange: stableCallback,
       });
     }
-  }, [isToolActive, toolId, level, value, stableCallback, setSegment]);
+  }, [isToolActive, toolId, level, value, items, stableCallback, setSegment]);
 
   useEffect(() => () => clearSegment(toolId, level), [toolId, level, clearSegment]);
 }

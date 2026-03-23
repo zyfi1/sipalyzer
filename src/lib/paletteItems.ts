@@ -16,17 +16,14 @@ import { useTroubleshootingStore } from "@/stores/troubleshootingStore";
 import { useSoftphoneStore } from "@/stores/softphoneStore";
 import { useMcpStore } from "@/stores/mcpStore";
 import { navigateTo } from "@/lib/navigation";
+import { getSubviewIcon } from "@/lib/navigationCatalog";
 import { toolRegistry, HOME_TOOL_ID } from "@/lib/toolRegistry";
-import { FEATURE_FLAG_MCP_UI } from "@/lib/featureFlags";
+import { FEATURE_FLAG_MCP_UI, FEATURE_FLAG_TOOLS_MOCKUP_UI } from "@/lib/featureFlags";
 import { isFeatureFlagEnabled } from "@/lib/featureFlagCache";
 import { SHORTCUTS } from "@/lib/shortcuts";
 import {
-  Home,
   Network,
-  Server,
-  PhoneCall,
   Printer,
-  FileSearch,
   StickyNote,
   Bell,
   Settings,
@@ -71,17 +68,7 @@ export function saveRecentId(id: string) {
   useUiPrefsStore.getState().addCmdPaletteRecent(id);
 }
 
-// ─── Tool icon & shortcut maps ────────────────────────────────────────────
-
-export const TOOL_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  [HOME_TOOL_ID]: Home,
-  "packet-capture": Network,
-  registration: Server,
-  "soft-phone": PhoneCall,
-  "fax-center": Printer,
-  "provision-viewer": FileSearch,
-  "network": Activity,
-};
+// ─── Tool shortcuts (icons come from toolRegistry + getSubviewIcon) ─────
 
 export const TOOL_SHORTCUT: Record<string, string> = {
   [HOME_TOOL_ID]: SHORTCUTS.goHome,
@@ -110,10 +97,11 @@ export const FUSE_OPTS: IFuseOptions<PaletteItem> = {
 export function buildCommands(): PaletteItem[] {
   const cmds: PaletteItem[] = [];
   const mcpEnabled = isFeatureFlagEnabled(FEATURE_FLAG_MCP_UI, false);
+  const mockupEnabled = isFeatureFlagEnabled(FEATURE_FLAG_TOOLS_MOCKUP_UI, false);
 
-  // Navigation: tools + subviews
+  // Navigation: tools + subviews (subview icons from navigationCatalog, e.g. Captures → Package)
   for (const tool of toolRegistry.getAll()) {
-    const Icon = TOOL_ICON[tool.id] ?? Activity;
+    const Icon = tool.icon ?? Activity;
 
     cmds.push({
       id: `nav:${tool.id}`,
@@ -131,17 +119,22 @@ export function buildCommands(): PaletteItem[] {
 
     if (tool.subviews) {
       const visibleSubviews =
-        tool.id === "tools" && !mcpEnabled
-          ? tool.subviews.filter((sv) => sv.id !== "mcp")
+        tool.id === "tools"
+          ? tool.subviews.filter((sv) => {
+              if (sv.id === "mcp" && !mcpEnabled) return false;
+              if (sv.id === "mockup" && !mockupEnabled) return false;
+              return true;
+            })
           : tool.subviews;
       for (const sv of visibleSubviews) {
+        const subIcon = getSubviewIcon(tool.id, sv.id) ?? Icon;
         cmds.push({
           id: `nav:${tool.id}:${sv.id}`,
           category: "navigation",
           name: `${tool.name} \u203A ${sv.label}`,
           subtitle: sv.label,
           keywords: [tool.name, sv.label, sv.id, tool.id, "navigate", "go", "tab"],
-          icon: Icon,
+          icon: subIcon,
           primary: false,
           run: () => navigateTo(tool.id, sv.id),
         });

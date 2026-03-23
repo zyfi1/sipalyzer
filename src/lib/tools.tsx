@@ -155,6 +155,7 @@ export function registerTools() {
     route: "/provision-viewer",
     subviews: [
       { id: "provision", label: "Provision" },
+      { id: "firmware", label: "Firmware" },
       { id: "contacts", label: "Contacts" },
       { id: "device", label: "Device" },
       { id: "diff", label: "Diff" },
@@ -233,7 +234,6 @@ export function registerTools() {
       { id: "logs", label: "Log Viewer" },
       { id: "file-server", label: "File Server" },
       { id: "password-gen", label: "Password Generator" },
-      { id: "firmware", label: "Firmware" },
       { id: "text-forge", label: "Text Forge" },
       { id: "mockup", label: "Mockup" },
       { id: "mcp", label: "MCP" },

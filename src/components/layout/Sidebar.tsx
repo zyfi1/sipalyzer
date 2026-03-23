@@ -6,15 +6,13 @@ import { useBreadcrumbStore } from "@/stores/breadcrumbStore";
 import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
 import { toolRegistry, HOME_TOOL_ID, type ToolDefinition } from "@/lib/toolRegistry";
 import { navigateTo } from "@/lib/navigation";
+import { getVisibleToolSubviews } from "@/lib/navigationCatalog";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Terminal } from "@/lib/icons";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { liveRingClass } from "@/components/ui/live-indicator";
 import { preloadToolById } from "@/lib/preloadTools";
 import { isProvisionViewerSubviewAvailable } from "@/lib/provisionNav";
-import { FEATURE_FLAG_MCP_UI } from "@/lib/featureFlags";
-import { isFeatureFlagEnabled } from "@/lib/featureFlagCache";
-
 /** Tool IDs that are rendered in their own dedicated sidebar section (not in the main nav list). */
 const BOTTOM_TOOL_IDS = new Set(["remote-agent", "composer", "tools"]);
 
@@ -103,8 +101,8 @@ export function Sidebar() {
 
   const visibleSubviews = (tool: ToolDefinition) => {
     const subviews = tool.subviews ?? [];
-    if (tool.id === "tools" && !isFeatureFlagEnabled(FEATURE_FLAG_MCP_UI, false)) {
-      return subviews.filter((sub) => sub.id !== "mcp");
+    if (tool.id === "tools") {
+      return getVisibleToolSubviews(tool);
     }
     if (tool.id !== "provision-viewer") return subviews;
     return subviews.filter((sub) => isProvisionViewerSubviewAvailable(sub.id, provisionResultLoaded));
@@ -156,7 +154,7 @@ export function Sidebar() {
                         onClick={() => handleToolClick(tool.id, sub.id)}
                         onMouseEnter={() => prefetchTool(tool.id)}
                         onPointerDown={() => prefetchTool(tool.id)}
-                        className="flex-1 h-full text-left text-sm flex items-center"
+                        className="flex flex-1 h-full items-center text-left text-sm"
                       >
                         <span className="truncate block leading-none">{sub.label}</span>
                       </button>

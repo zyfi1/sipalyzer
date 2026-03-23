@@ -73,7 +73,7 @@ export default function SipResolutionPanel() {
           <div className="space-y-1">
             {result.steps.map((step, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
-                <Badge variant="outline" className="text-3xs px-1.5 py-0 h-4 shrink-0 mt-0.5">
+                <Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4 shrink-0 mt-0.5">
                   {step.step_type}
                 </Badge>
                 <div className="min-w-0 flex-1">

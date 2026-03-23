@@ -225,7 +225,7 @@ export function TracerouteView() {
             <span className="text-2xs text-muted-foreground/60 block">Compare network paths to two targets</span>
           </div>
           {rA && rB && analysis?.divergenceHop && (
-            <Badge variant="outline" className="text-2xs bg-primary/10 text-primary border-primary/30 shrink-0">
+            <Badge variant="secondary" className="text-2xs bg-primary/10 text-primary border-primary/30 shrink-0">
               Diverge at hop {analysis.divergenceHop}
             </Badge>
           )}
@@ -272,17 +272,17 @@ export function TracerouteView() {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-1.5">
                   {analysis.divergenceHop != null && (
-                    <Badge variant="outline" className="text-2xs bg-primary/10 text-primary border-primary/30">
+                    <Badge variant="secondary" className="text-2xs bg-primary/10 text-primary border-primary/30">
                       Diverge at hop {analysis.divergenceHop}
                     </Badge>
                   )}
                   {analysis.commonIps.size > 0 && (
-                    <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30">
+                    <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30">
                       {analysis.commonIps.size} shared hops
                     </Badge>
                   )}
                   {analysis.latencyDelta != null && (
-                    <Badge variant="outline" className="text-2xs">
+                    <Badge variant="secondary" className="text-2xs">
                       {Math.abs(analysis.latencyDelta).toFixed(1)} ms delta
                     </Badge>
                   )}

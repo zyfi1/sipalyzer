@@ -17,18 +17,20 @@ import React, {
   memo,
 } from "react";
 import { cn } from "@/lib/utils";
+import { formatIpPortEndpoint } from "@/lib/networkUtils";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { IpAddress } from "@/components/ui/IpAddress";
-import { ArrowUp, ArrowDown, Palette, X, Bookmark, Settings2, Link2, ArrowRightLeft, Phone, Scan, ChevronUp, ChevronDown, GripVertical, Tick } from "@/lib/icons";
+import { ArrowUp, ArrowDown, Palette, X, Bookmark, Settings2, Link2, ArrowRightLeft, Phone, Scan, ChevronUp, ChevronDown, GripVertical, RotateCcw } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -50,6 +52,7 @@ import {
   loadColumnOrder,
   saveColumnOrder,
   reorderVisibleColumns,
+  resetPacketColumnsToDefaults,
 } from "./packetColumns";
 import {
   type PacketAnnotation,
@@ -165,8 +168,8 @@ const PacketRow = memo(function PacketRow({
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       className={cn(
-        "grid cursor-pointer select-none items-center gap-1.5 font-mono text-xs",
-        "border-b border-border/30 transition-smooth duration-[var(--motion-duration-micro)]",
+        "grid cursor-pointer select-none items-center gap-0 font-mono text-xs",
+        "border-b border-[color:var(--ui-rule-list)] transition-smooth duration-[var(--motion-duration-micro)]",
         isSelected
           ? "border-l-2 border-l-primary bg-accent/55 text-accent-foreground"
           : colorDef
@@ -193,8 +196,14 @@ const PacketRow = memo(function PacketRow({
           aria-label="Marked"
         />
       )}
-      {visibleColumns.map(col => (
-        <div key={col.id} className="min-w-0 truncate">
+      {visibleColumns.map((col, colIdx) => (
+        <div
+          key={col.id}
+          className={cn(
+            "min-w-0 truncate px-1",
+            colIdx > 0 && "border-l border-border/70",
+          )}
+        >
           {renderCell(packet, col.id, index)}
         </div>
       ))}
@@ -239,13 +248,19 @@ export function WarperPacketList({
   const [columnOrder, setColumnOrder] = useState<ColumnId[]>(
     () => loadColumnOrder(),
   );
+  const columnConfigsRef = useRef(columnConfigs);
+  columnConfigsRef.current = columnConfigs;
+  const packetListRootRef = useRef<HTMLDivElement | null>(null);
   const [resizingColumn, setResizingColumn] = useState<ColumnId | null>(null);
   const [sortColumn, setSortColumn] = useState<SortColumn>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [draggedColumn, setDraggedColumn] = useState<ColumnId | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ColumnId | null>(null);
   const draggedColumnRef = useRef<ColumnId | null>(null);
-  const dragPreviewTargetRef = useRef<ColumnId | null>(null);
+  /** Synced on pointermove for reliable drop target on pointerup (React state may lag). */
+  const dragOverColumnRef = useRef<ColumnId | null>(null);
+  /** Resize guide X relative to packet list root (not viewport — avoids offset with layout chrome). */
+  const [resizeGuideLeft, setResizeGuideLeft] = useState<number | null>(null);
   const headerGridRef = useRef<HTMLDivElement | null>(null);
   const headerCellRefs = useRef<Partial<Record<ColumnId, HTMLDivElement | null>>>({});
   const previousHeaderPositionsRef = useRef<Partial<Record<ColumnId, DOMRect>>>({});
@@ -264,6 +279,8 @@ export function WarperPacketList({
     () => getVisibleColumns(columnConfigs, columnOrder),
     [columnConfigs, columnOrder],
   );
+  const visibleColumnsRef = useRef(visibleColumns);
+  visibleColumnsRef.current = visibleColumns;
 
   const gridTemplate = useMemo(
     () => getGridTemplateColumns(visibleColumns, columnConfigs),
@@ -272,17 +289,22 @@ export function WarperPacketList({
 
   // ── Column actions ────────────────────────────────────────────────
 
-  const toggleColumnVisibility = useCallback((colId: ColumnId) => {
+  const setColumnVisible = useCallback((colId: ColumnId, visible: boolean) => {
     if (colId === "frameNumber") return;
-    setColumnConfigs(prev => {
-      const wasVisible = prev[colId].visible;
-      if (wasVisible) {
-        setColumnOrder(order => order.filter(id => id !== colId));
-      } else {
-        setColumnOrder(order => order.includes(colId) ? order : [...order, colId]);
-      }
-      return { ...prev, [colId]: { ...prev[colId], visible: !wasVisible } };
+    setColumnConfigs(prev => ({
+      ...prev,
+      [colId]: { ...prev[colId], visible },
+    }));
+    setColumnOrder(prev => {
+      if (!visible) return prev.filter(id => id !== colId);
+      return prev.includes(colId) ? prev : [...prev, colId];
     });
+  }, []);
+
+  const resetColumnsToDefaults = useCallback(() => {
+    const { configs, order } = resetPacketColumnsToDefaults();
+    setColumnConfigs(configs);
+    setColumnOrder(order);
   }, []);
 
   const handleSort = useCallback((colId: ColumnId) => {
@@ -331,6 +353,7 @@ export function WarperPacketList({
   const handlePointerDragStart = useCallback((colId: ColumnId) => {
     if (colId === "frameNumber") return;
     draggedColumnRef.current = colId;
+    dragOverColumnRef.current = null;
     setDraggedColumn(colId);
     setDragOverColumn(null);
   }, []);
@@ -342,12 +365,15 @@ export function WarperPacketList({
       const headerRect = headerGridRef.current?.getBoundingClientRect();
       if (!headerRect) return;
       if (e.clientY < headerRect.top - 8 || e.clientY > headerRect.bottom + 8) {
+        dragOverColumnRef.current = null;
         setDragOverColumn(null);
         return;
       }
 
+      const dragId = draggedColumnRef.current;
       let hovered: ColumnId | null = null;
-      for (const col of visibleColumns) {
+      const cols = visibleColumnsRef.current;
+      for (const col of cols) {
         if (col.id === "frameNumber") continue;
         const rect = headerCellRefs.current[col.id]?.getBoundingClientRect();
         if (!rect) continue;
@@ -356,37 +382,40 @@ export function WarperPacketList({
           break;
         }
       }
-      if (!hovered || hovered === draggedColumn) {
+      if (!hovered || hovered === dragId) {
+        dragOverColumnRef.current = null;
         setDragOverColumn(null);
-        dragPreviewTargetRef.current = null;
         return;
       }
-      const dragId = draggedColumnRef.current;
-      if (dragId && dragPreviewTargetRef.current !== hovered) {
-        setColumnOrder((prev) =>
-          reorderVisibleColumns(prev, visibleColumns.map((col) => col.id), dragId, hovered as ColumnId),
-        );
-        dragPreviewTargetRef.current = hovered;
-      }
+      dragOverColumnRef.current = hovered;
       setDragOverColumn(hovered);
     };
 
-    const onPointerUp = () => {
-      dragPreviewTargetRef.current = null;
+    const endDrag = () => {
+      const dragId = draggedColumnRef.current;
+      const dropTarget = dragOverColumnRef.current;
+      if (dragId && dropTarget && dragId !== dropTarget) {
+        const vis = visibleColumnsRef.current.map((c) => c.id);
+        setColumnOrder((prev) => reorderVisibleColumns(prev, vis, dragId, dropTarget));
+      }
+      dragOverColumnRef.current = null;
       draggedColumnRef.current = null;
       setDraggedColumn(null);
       setDragOverColumn(null);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", endDrag);
+      document.removeEventListener("pointercancel", endDrag);
     };
 
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", endDrag);
+    document.addEventListener("pointercancel", endDrag);
     return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", endDrag);
+      document.removeEventListener("pointercancel", endDrag);
     };
-  }, [draggedColumn, visibleColumns]);
+  }, [draggedColumn]);
 
   useLayoutEffect(() => {
     if (resizingColumn) {
@@ -445,16 +474,22 @@ export function WarperPacketList({
     rightId: ColumnId | null;
     rightWidth: number | null;
   } | null>(null);
-  const columnConfigsRef = useRef(columnConfigs);
-  columnConfigsRef.current = columnConfigs;
-  const visibleColumnsRef = useRef(visibleColumns);
-  visibleColumnsRef.current = visibleColumns;
+  const syncResizeGuideToClientX = useCallback((clientX: number) => {
+    const root = packetListRootRef.current;
+    if (!root) {
+      setResizeGuideLeft(null);
+      return;
+    }
+    const r = root.getBoundingClientRect();
+    setResizeGuideLeft(clientX - r.left);
+  }, []);
 
   useEffect(() => {
     if (!resizingColumn) return;
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       const resizeStart = resizeStartRef.current;
       if (!resizeStart) return;
+      syncResizeGuideToClientX(e.clientX);
       const deltaX = e.clientX - resizeStart.x;
       const MIN_W = 50;
       if (resizeStart.rightId && resizeStart.rightWidth != null) {
@@ -492,7 +527,8 @@ export function WarperPacketList({
         });
       }
     };
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
+      setResizeGuideLeft(null);
       if (resizeRafRef.current != null) {
         cancelAnimationFrame(resizeRafRef.current);
         resizeRafRef.current = null;
@@ -511,14 +547,18 @@ export function WarperPacketList({
       resizeStartRef.current = null;
       setResizingColumn(null);
     };
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    const cap = { capture: true };
+    document.addEventListener("pointermove", handlePointerMove, cap);
+    document.addEventListener("pointerup", handlePointerUp, cap);
+    document.addEventListener("pointercancel", handlePointerUp, cap);
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      setResizeGuideLeft(null);
+      document.removeEventListener("pointermove", handlePointerMove, cap);
+      document.removeEventListener("pointerup", handlePointerUp, cap);
+      document.removeEventListener("pointercancel", handlePointerUp, cap);
       if (resizeRafRef.current != null) cancelAnimationFrame(resizeRafRef.current);
     };
-  }, [resizingColumn]);
+  }, [resizingColumn, syncResizeGuideToClientX]);
 
   // ── Sort packets ──────────────────────────────────────────────────
 
@@ -568,16 +608,28 @@ export function WarperPacketList({
         return <span className={cn("text-muted-foreground tabular-nums", alignClass)}>{formatTimestampCompact(packet.timestamp)}</span>;
       case "source":
         return (
-          <span className={cn("truncate", alignClass)}>
-            <IpAddress ip={packet.srcIp} size="sm" showCopyOnHover showIpInfo={false} />
-            <span className="text-muted-foreground">:{packet.srcPort}</span>
+          <span className={cn("min-w-0 block", alignClass)}>
+            <IpAddress
+              ip={formatIpPortEndpoint(packet.srcIp, packet.srcPort)}
+              variant="mono"
+              size="sm"
+              showCopyOnHover
+              showIpInfo={false}
+              truncate
+            />
           </span>
         );
       case "destination":
         return (
-          <span className={cn("truncate", alignClass)}>
-            <IpAddress ip={packet.dstIp} size="sm" showCopyOnHover showIpInfo={false} />
-            <span className="text-muted-foreground">:{packet.dstPort}</span>
+          <span className={cn("min-w-0 block", alignClass)}>
+            <IpAddress
+              ip={formatIpPortEndpoint(packet.dstIp, packet.dstPort)}
+              variant="mono"
+              size="sm"
+              showCopyOnHover
+              showIpInfo={false}
+              truncate
+            />
           </span>
         );
       case "protocol":
@@ -810,24 +862,32 @@ export function WarperPacketList({
 
   return (
     <div
-      className={cn("flex flex-col overflow-hidden", className)}
+      ref={packetListRootRef}
+      className={cn("relative flex flex-col overflow-hidden", className)}
       style={{ height: "100%", minHeight: 0 }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="grid"
       aria-rowcount={displayCount}
     >
+      {resizeGuideLeft != null && resizingColumn != null ? (
+        <div
+          className="pointer-events-none absolute top-0 bottom-0 z-[10050] w-px bg-primary/80 shadow-none"
+          style={{ left: resizeGuideLeft }}
+          aria-hidden
+        />
+      ) : null}
       {/* ── Column headers ── */}
-      <div className="ui-section-header-sm group/header flex-none h-8 box-border select-none p-0">
+      <div className="ui-section-header-sm group/header flex-none h-10 box-border select-none p-0">
         <div
           ref={headerGridRef}
           className={cn(
-            "relative grid h-full items-center gap-0 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80",
+            "relative grid h-full items-center gap-0 overflow-visible text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80",
             draggedColumn && "cursor-grabbing",
           )}
           style={{ paddingLeft: 8, paddingRight: 32, gridTemplateColumns: gridTemplate }}
         >
-          {visibleColumns.map((col) => {
+          {visibleColumns.map((col, colIdx) => {
             const isSorted = sortColumn === col.id;
             const isFrameNumber = col.id === "frameNumber";
 
@@ -838,11 +898,18 @@ export function WarperPacketList({
                   headerCellRefs.current[col.id] = node;
                 }}
                 className={cn(
-                  "relative flex items-center h-full group/col min-w-0 px-1",
+                  "packet-list__col-head relative flex items-center h-full group/col min-w-0 px-1",
+                  colIdx > 0 && "border-l border-border/70",
                   !resizingColumn && "transition-smooth",
                   draggedColumn === col.id && "z-20 rounded-sm bg-accent/45 opacity-65 scale-[0.985]",
                   dragOverColumn === col.id && "rounded-sm bg-accent/35",
                 )}
+                style={{
+                  zIndex:
+                    draggedColumn === col.id || dragOverColumn === col.id
+                      ? 80 + (visibleColumns.length - colIdx)
+                      : visibleColumns.length - colIdx,
+                }}
               >
                 {dragOverColumn === col.id && (
                   <div className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full bg-foreground/45" />
@@ -851,7 +918,7 @@ export function WarperPacketList({
                   <button
                     type="button"
                     className={cn(
-                      "mr-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground/65 transition-smooth",
+                      "mr-0.5 inline-flex h-3 w-3 shrink-0 items-center justify-center rounded text-muted-foreground/65 transition-smooth",
                       "cursor-grab active:cursor-grabbing hover:text-foreground/85 hover:bg-accent/50",
                       draggedColumn === col.id && "cursor-grabbing text-foreground",
                       draggedColumn && draggedColumn !== col.id && "opacity-90",
@@ -863,7 +930,7 @@ export function WarperPacketList({
                     }}
                     aria-label={`Drag ${col.label} column`}
                   >
-                    <GripVertical className="h-3 w-3" />
+                    <GripVertical className="h-2.5 w-2.5" />
                   </button>
                 )}
                 {col.sortable ? (
@@ -897,25 +964,31 @@ export function WarperPacketList({
                   )
                 )}
                 {/* Resize handle — only visible on hover */}
-                <div
+                <PanelResizeHandle
+                  as="div"
+                  orientation="vertical"
+                  density="compact"
+                  appearance="minimal"
+                  label={`Resize ${col.label} column`}
                   className={cn(
-                    "absolute -right-1 top-0 bottom-0 z-30 w-2 cursor-col-resize",
-                    "after:absolute after:left-1/2 after:top-1 after:bottom-1 after:w-px after:-translate-x-1/2 after:rounded-full",
-                    "after:bg-border/70 hover:after:bg-foreground/45",
-                    "opacity-70 hover:opacity-100",
+                    "packet-list__col-resize",
+                    resizingColumn === col.id && "is-resizing",
                   )}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
+                    if (e.button !== 0 && e.button !== -1) return;
                     e.preventDefault();
                     e.stopPropagation();
+                    syncResizeGuideToClientX(e.clientX);
                     const cols = visibleColumnsRef.current;
                     const idx = cols.findIndex((c) => c.id === col.id);
                     const next = idx >= 0 ? cols[idx + 1] : undefined;
+                    const cfg = columnConfigsRef.current;
                     resizeStartRef.current = {
                       x: e.clientX,
                       leftId: col.id,
-                      leftWidth: columnConfigs[col.id].width,
+                      leftWidth: cfg[col.id].width,
                       rightId: next?.id ?? null,
-                      rightWidth: next ? columnConfigs[next.id].width : null,
+                      rightWidth: next ? cfg[next.id].width : null,
                     };
                     setResizingColumn(col.id);
                   }}
@@ -937,46 +1010,42 @@ export function WarperPacketList({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64" sideOffset={6}>
-                <DropdownMenuLabel className="text-xs">Columns</DropdownMenuLabel>
-                <div className="px-2 pb-1 text-2xs text-muted-foreground">Toggle visibility and move visible columns</div>
+                <DropdownMenuItem className="gap-2 text-xs" onSelect={() => resetColumnsToDefaults()}>
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                  Reset to default columns
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {orderedColumns.map((col) => {
                   const visibleIndex = visibleColumns.findIndex((v) => v.id === col.id);
                   const canMoveUp = col.visible && col.id !== "frameNumber" && visibleIndex > 1;
                   const canMoveDown = col.visible && col.id !== "frameNumber" && visibleIndex >= 1 && visibleIndex < visibleColumns.length - 1;
                   return (
-                  <DropdownMenuItem
+                  <DropdownMenuCheckboxItem
                     key={col.id}
+                    checked={col.visible}
+                    disabled={col.id === "frameNumber"}
+                    onCheckedChange={(checked) => {
+                      if (col.id === "frameNumber") return;
+                      const next = checked === true;
+                      if (next === col.visible) return;
+                      setColumnVisible(col.id, next);
+                    }}
                     onSelect={(e) => e.preventDefault()}
-                    className="px-2 py-1.5"
+                    className="gap-0 py-1.5 pr-1.5 text-xs"
                   >
-                    <div className="flex w-full items-center gap-2">
-                      <button
-                        type="button"
-                        className={cn(
-                          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-smooth",
-                          col.visible
-                            ? "border-primary/45 bg-primary/15 text-primary"
-                            : "border-border/60 bg-background/40 text-transparent hover:border-border hover:text-muted-foreground/30",
-                        )}
-                        disabled={col.id === "frameNumber"}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleColumnVisibility(col.id);
-                        }}
-                        aria-label={`${col.visible ? "Hide" : "Show"} ${col.label} column`}
-                      >
-                        {col.visible && <Tick className="h-3 w-3" strokeWidth={2.6} />}
-                      </button>
-                      <span className={cn("min-w-0 flex-1 truncate text-xs", !col.visible && "text-muted-foreground")}>
+                    <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className={cn("min-w-0 flex-1 truncate", !col.visible && "text-muted-foreground")}>
                         {col.label}
                       </span>
                       {col.id === "frameNumber" && (
-                        <span className="text-2xs text-muted-foreground">(locked)</span>
+                        <span className="shrink-0 text-2xs text-muted-foreground">(locked)</span>
                       )}
                       {col.visible && col.id !== "frameNumber" && (
-                        <span className="inline-flex items-center gap-0.5">
+                        <span
+                          className="inline-flex shrink-0 items-center gap-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
                             className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent disabled:opacity-35"
@@ -1005,8 +1074,8 @@ export function WarperPacketList({
                           </button>
                         </span>
                       )}
-                    </div>
-                  </DropdownMenuItem>
+                    </span>
+                  </DropdownMenuCheckboxItem>
                   );
                 })}
               </DropdownMenuContent>

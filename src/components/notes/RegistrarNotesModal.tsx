@@ -136,7 +136,7 @@ export function RegistrarNotesModal({ isOpen, onClose, registrarId }: RegistrarN
                 </Badge>
               )}
               {viewingNote.category && (
-                <Badge variant="outline" className={cn("text-2xs h-5", getCategoryColor(viewingNote.category))}>{viewingNote.category}</Badge>
+                <Badge variant="secondary" className={cn("text-2xs h-5", getCategoryColor(viewingNote.category))}>{viewingNote.category}</Badge>
               )}
               {viewingNote.tags.map((tag) => (
                 <Badge key={tag} variant="secondary" className="text-2xs h-5">{tag}</Badge>
@@ -307,7 +307,7 @@ function RegistrarNoteRow({ note, onClick, onEdit, onDelete }: RegistrarNoteRowP
           {note.isPinned && <Star className="h-3 w-3 text-warning fill-current shrink-0" />}
           <span className="text-sm font-medium truncate">{note.title || "Untitled"}</span>
           {note.category && (
-            <Badge variant="outline" className={cn("text-2xs h-4 px-1.5 shrink-0", getCategoryColor(note.category))}>{note.category}</Badge>
+            <Badge variant="secondary" className={cn("text-2xs h-4 px-1.5 shrink-0", getCategoryColor(note.category))}>{note.category}</Badge>
           )}
         </div>
         {preview && (

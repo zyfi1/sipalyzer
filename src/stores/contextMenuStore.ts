@@ -1,39 +1,37 @@
 /**
- * Store for the app-wide contextual right-click menu.
- * Opens at cursor position when right-clicking on areas that don't have their own context menu.
- * editTarget: element that had focus when the menu opened (used for Cut/Copy/Paste/Select All).
+ * Store for the app-wide contextual right-click menu (Radix Context Menu).
+ * `context` is set on right-click before Radix opens; cleared when the menu closes.
+ * editTarget: element captured on contextmenu (see App.tsx) for Cut/Copy/Paste/Select All.
  */
 
 import { create } from "zustand";
 import type { ContextMenuContext } from "@/types/contextMenu";
 
 interface ContextMenuState {
-  open: boolean;
-  x: number;
-  y: number;
   context: ContextMenuContext | null;
   invoker: HTMLElement | null;
-  /** Element that had focus when context menu opened; used for standard edit actions. */
+  /** Bumps on each `setShellMenuContext` so menu content remounts (fresh sections / multi right-click). */
+  menuGeneration: number;
+  /** Element focused / editable under cursor when context menu opened. */
   editTarget: HTMLElement | null;
-  openAt: (x: number, y: number, context?: ContextMenuContext | null) => void;
-  close: () => void;
+  /** Called from the shell handler before Radix opens the menu (do not preventDefault there). */
+  setShellMenuContext: (context: ContextMenuContext) => void;
+  /** Clear menu-specific state when Radix closes the menu. */
+  resetShellMenu: () => void;
   setEditTarget: (el: HTMLElement | null) => void;
 }
 
 export const useContextMenuStore = create<ContextMenuState>()((set) => ({
-  open: false,
-  x: 0,
-  y: 0,
   context: null,
   invoker: null,
+  menuGeneration: 0,
   editTarget: null,
-  openAt: (x, y, context = null) => set({
-    open: true,
-    x,
-    y,
-    context,
-    invoker: document.activeElement instanceof HTMLElement ? document.activeElement : null,
-  }),
-  close: () => set({ open: false }),
+  setShellMenuContext: (context) =>
+    set((s) => ({
+      context,
+      menuGeneration: s.menuGeneration + 1,
+      invoker: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+    })),
+  resetShellMenu: () => set({ context: null, invoker: null }),
   setEditTarget: (el) => set({ editTarget: el }),
 }));

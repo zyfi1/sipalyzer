@@ -324,7 +324,7 @@ export function PasswordGeneratorView() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className={cn("h-5 text-2xs border-current/20", strength.tone)}>
+              <Badge variant="secondary" className={cn("h-5 text-2xs border-current/20", strength.tone)}>
                 {strength.label}
               </Badge>
               <span className="text-2xs text-muted-foreground">{entropy.toFixed(0)} bits entropy</span>
@@ -340,7 +340,7 @@ export function PasswordGeneratorView() {
           <div className="rounded-xl border border-border/30 bg-background/15 p-4 space-y-3 min-w-0">
             <div className="flex items-center justify-between">
               <span className="section-label-sm">Quick Presets</span>
-              <Badge variant="outline" className="h-5 text-2xs">3 options</Badge>
+              <Badge variant="secondary" className="h-5 text-2xs">3 options</Badge>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 min-w-0">
               {PRESETS.map((preset) => (
@@ -367,7 +367,7 @@ export function PasswordGeneratorView() {
       <div className="ui-surface-card p-4 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <span className="section-label-sm">Rules</span>
-          <Badge variant="outline" className="h-5 text-2xs">Charset {charset.length}</Badge>
+          <Badge variant="secondary" className="h-5 text-2xs">Charset {charset.length}</Badge>
         </div>
 
         <div className="flex items-center gap-3">
@@ -530,7 +530,7 @@ export function PasswordGeneratorView() {
             {history.map((entry) => (
               <div key={entry.id} className="ui-data-row flex items-center gap-2 px-5 py-1.5">
                 <span className="w-14 shrink-0 text-2xs font-mono text-muted-foreground/60">{entry.time}</span>
-                <Badge variant="outline" className="h-[18px] px-1.5 text-3xs shrink-0">{entry.preset}</Badge>
+                <Badge variant="secondary" className="h-[18px] px-1.5 text-3xs shrink-0">{entry.preset}</Badge>
                 <span className="flex-1 min-w-0 truncate text-xs font-mono text-foreground/70">{entry.password}</span>
                 <CopyTextButton text={entry.password} size="icon" className="h-5 w-5 shrink-0" />
               </div>

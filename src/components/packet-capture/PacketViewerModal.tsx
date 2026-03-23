@@ -219,7 +219,7 @@ export function PacketViewerModal({
               </DialogTitle>
               {session && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="outline" className="h-5 ui-control-shell">
+                  <Badge variant="secondary" className="h-5 ui-control-shell">
                     {session.status}
                   </Badge>
                   <span>{session.packetCount.toLocaleString()} packets</span>

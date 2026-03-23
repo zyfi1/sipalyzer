@@ -17,6 +17,7 @@ import {
   PhoneCall, BarChart3, Square, Info,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { tooltips } from "@/lib/tooltips";
 import { resolveWifiQualityPct, wifiIconFromQualityPct } from "@/lib/wifiSignal";
 import type {
@@ -548,7 +549,7 @@ function TracerouteTile({ target, expanded, onToggle }: { target: string; expand
               {r.hops.length} hops to <span className="font-mono">{r.resolved_ip}</span>
             </p>
             {r.reached_destination && (
-              <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30">Reached</Badge>
+              <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30">Reached</Badge>
             )}
           </div>
           <TracerouteTable hops={r.hops} />
@@ -677,13 +678,13 @@ function RouteComparisonTile({ expanded, onToggle, fullWidth }: { expanded: bool
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {analysis.divergenceHop != null && (
-              <Badge variant="outline" className="text-2xs bg-primary/10 text-primary border-primary/30">Diverge at hop {analysis.divergenceHop}</Badge>
+              <Badge variant="secondary" className="text-2xs bg-primary/10 text-primary border-primary/30">Diverge at hop {analysis.divergenceHop}</Badge>
             )}
             {analysis.commonIps.size > 0 && (
-              <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30">{analysis.commonIps.size} shared</Badge>
+              <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30">{analysis.commonIps.size} shared</Badge>
             )}
             {analysis.latencyDelta != null && (
-              <Badge variant="outline" className="text-2xs">{Math.abs(analysis.latencyDelta).toFixed(1)} ms delta</Badge>
+              <Badge variant="secondary" className="text-2xs">{Math.abs(analysis.latencyDelta).toFixed(1)} ms delta</Badge>
             )}
           </div>
           <div className="ui-hero-surface overflow-hidden">
@@ -824,7 +825,7 @@ function SpeedThroughputTile({ target, expanded, onToggle }: { target: string; e
         <div className="ui-hero-metric flex items-center gap-2 ml-auto px-3 py-1.5">
           <span className="text-2xs text-muted-foreground/60 whitespace-nowrap">UDP Port</span>
           <Input value={bwPort} onChange={(e) => setBwPort(e.target.value)} placeholder="auto" className="h-7 w-20 text-xs text-center" type="number" disabled={bwRunning} />
-          <div className="w-px h-4 bg-border/20" />
+          <AppDivider orientation="vertical" size="md" className="mx-0" />
           <span className="text-2xs text-muted-foreground/60 whitespace-nowrap">Duration</span>
           <Input value={bwDuration} onChange={(e) => setBwDuration(e.target.value)} className="h-7 w-16 text-xs text-center" type="number" disabled={bwRunning} />
           <span className="text-2xs text-muted-foreground/60">sec</span>
@@ -1040,7 +1041,7 @@ function MonitorTile({ target, expanded, onToggle }: { target: string; expanded:
 
       {/* Live badge */}
       {monitorRunning && (
-        <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30 w-fit">
+        <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30 w-fit">
           <span className="h-1.5 w-1.5 rounded-full bg-success status-online mr-1 inline-block" />Live
         </Badge>
       )}

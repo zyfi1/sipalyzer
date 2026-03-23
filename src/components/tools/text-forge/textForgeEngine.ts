@@ -23,6 +23,7 @@ export type TextForgeRule =
   | { type: "keepAlphaNumeric" }
   | { type: "removePunctuation" }
   | { type: "findReplace"; find: string; replaceWith: string; caseSensitive: boolean }
+  | { type: "regexReplace"; pattern: string; replacement: string; flags: string }
   | { type: "addPrefixSuffixLines"; prefix: string; suffix: string }
   | { type: "wrapLines"; prefix: string; suffix: string }
   | { type: "lineNumbering"; startAt: number }
@@ -144,6 +145,8 @@ function applyRule(input: string, rule: TextForgeRule): string {
       return input.replace(/[^A-Za-z0-9\s]+/g, "");
     case "findReplace":
       return findReplace(input, rule.find, rule.replaceWith, rule.caseSensitive);
+    case "regexReplace":
+      return regexReplace(input, rule.pattern, rule.replacement, rule.flags);
     case "addPrefixSuffixLines":
       return decorateLines(input, rule.prefix, rule.suffix);
     case "wrapLines":
@@ -399,6 +402,35 @@ function findReplace(input: string, find: string, replaceWith: string, caseSensi
 
   const flags = caseSensitive ? "g" : "gi";
   return input.replace(new RegExp(escapeRegExp(find), flags), replaceWith);
+}
+
+const REGEX_FLAG_ALLOW = new Set(["g", "i", "m", "s", "u", "y", "d"]);
+
+function normalizeRegexFlags(flags: string): string {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const ch of flags) {
+    if (!REGEX_FLAG_ALLOW.has(ch) || seen.has(ch)) continue;
+    seen.add(ch);
+    ordered.push(ch);
+  }
+  if (!seen.has("g")) {
+    ordered.unshift("g");
+  }
+  return ordered.join("");
+}
+
+function regexReplace(input: string, pattern: string, replacement: string, flags: string): string {
+  if (pattern.length === 0) {
+    return input;
+  }
+
+  try {
+    const re = new RegExp(pattern, normalizeRegexFlags(flags));
+    return input.replace(re, replacement);
+  } catch {
+    return input;
+  }
 }
 
 function decorateLines(text: string, prefix: string, suffix: string): string {

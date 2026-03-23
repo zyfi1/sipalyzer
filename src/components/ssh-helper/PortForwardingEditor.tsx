@@ -3,13 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Plus, Trash2 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -24,7 +18,7 @@ interface PortForwardingEditorProps {
 
 const TYPE_META: Record<
   PortForwardRule["type"],
-  { label: string; flag: string; variant: "default" | "secondary" | "outline"; desc: string }
+  { label: string; flag: string; variant: "default" | "secondary"; desc: string }
 > = {
   local: {
     label: "Local",
@@ -41,7 +35,7 @@ const TYPE_META: Record<
   dynamic: {
     label: "Dynamic",
     flag: "-D",
-    variant: "outline",
+    variant: "secondary",
     desc: "SOCKS proxy via the SSH tunnel",
   },
 };
@@ -111,28 +105,24 @@ export function PortForwardingEditor({ rules, onChange }: PortForwardingEditorPr
               <div className="flex items-start gap-3">
                 {/* Type selector */}
                 <div className="w-[120px] flex-shrink-0">
-                  <Select
+                  <AppDropdown
+                    className="h-8 text-xs w-full"
                     value={rule.type}
                     onValueChange={(v) =>
                       updateRule(rule.id, { type: v as PortForwardRule["type"] })
                     }
-                  >
-                    <SelectTrigger className="h-8 text-xs w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(TYPE_META) as PortForwardRule["type"][]).map((t) => (
-                        <SelectItem key={t} value={t}>
-                          <span className="flex items-center gap-2">
-                            <Badge variant={TYPE_META[t].variant} className="text-2xs px-1.5 py-0">
-                              {TYPE_META[t].flag}
-                            </Badge>
-                            {TYPE_META[t].label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={(Object.keys(TYPE_META) as PortForwardRule["type"][]).map((t) => ({
+                      value: t,
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <Badge variant={TYPE_META[t].variant} className="text-2xs px-1.5 py-0">
+                            {TYPE_META[t].flag}
+                          </Badge>
+                          {TYPE_META[t].label}
+                        </span>
+                      ),
+                    }))}
+                  />
                   <p className="mt-1 text-2xs text-muted-foreground leading-tight">
                     {meta.desc}
                   </p>

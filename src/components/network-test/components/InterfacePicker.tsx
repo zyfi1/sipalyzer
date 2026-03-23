@@ -200,7 +200,7 @@ export function InterfacePicker({ value, onChange, disabled, className }: Interf
                       </span>
                       {iface.isDefault && (
                         <TooltipWrapper entry={tooltips.netIfaceDefault}>
-                          <Badge variant="outline" className="text-3xs h-4 px-1.5 py-0 bg-success/10 text-success border-success/30 cursor-help">
+                          <Badge variant="secondary" className="text-3xs h-4 px-1.5 py-0 bg-success/10 text-success border-success/30 cursor-help">
                             Default
                           </Badge>
                         </TooltipWrapper>
@@ -213,7 +213,7 @@ export function InterfacePicker({ value, onChange, disabled, className }: Interf
                         </TooltipWrapper>
                       )}
                       {typeInfo && !hasLocalIp && (
-                        <Badge variant="outline" className={cn("text-3xs h-4 px-1.5 py-0", typeInfo.className)}>
+                        <Badge variant="secondary" className={cn("text-3xs h-4 px-1.5 py-0", typeInfo.className)}>
                           {typeInfo.label}
                         </Badge>
                       )}

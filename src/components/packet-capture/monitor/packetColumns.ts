@@ -166,11 +166,34 @@ export function loadColumnOrder(): ColumnId[] {
   return (useUiPrefsStore.getState().packetColumnOrder ?? []) as ColumnId[];
 }
 
-/** Save column order to uiPrefsStore. */
+/** Save column order to uiPrefsStore (including [] so visibility toggles persist). */
 export function saveColumnOrder(order: ColumnId[]): void {
-  if (order.length > 0) {
-    useUiPrefsStore.getState().setPacketColumnOrder(order);
-  }
+  useUiPrefsStore.getState().setPacketColumnOrder(order as string[]);
+}
+
+/** Fresh copy of default column configs (visibility + widths). */
+export function cloneDefaultColumnConfigs(): Record<ColumnId, ColumnConfig> {
+  return (Object.keys(DEFAULT_COLUMN_CONFIGS) as ColumnId[]).reduce((acc, id) => {
+    acc[id] = { ...DEFAULT_COLUMN_CONFIGS[id] };
+    return acc;
+  }, {} as Record<ColumnId, ColumnConfig>);
+}
+
+/** Default column order persisted in prefs: `#` first, then logical order (no duplicate frameNumber). */
+export function getDefaultPacketColumnOrder(): ColumnId[] {
+  return ["frameNumber", ...DEFAULT_COLUMN_ORDER];
+}
+
+/** Reset saved prefs and return state to apply in React (configs + order). */
+export function resetPacketColumnsToDefaults(): {
+  configs: Record<ColumnId, ColumnConfig>;
+  order: ColumnId[];
+} {
+  const configs = cloneDefaultColumnConfigs();
+  const order = getDefaultPacketColumnOrder();
+  saveColumnConfigs(configs);
+  saveColumnOrder(order);
+  return { configs, order };
 }
 
 /**

@@ -7,7 +7,7 @@ import { buildHtmlTableReport } from "@/lib/exportHtml";
 import { navigateTo } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   AreaChart,
   Area,
@@ -966,18 +966,18 @@ function VisualizerPicker({
   onChange: (v: VisualizerId) => void;
 }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as VisualizerId)}>
-      <SelectTrigger className="h-6 w-[140px] px-2 text-2xs font-medium [&>svg]:h-3 [&>svg]:w-3">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent align="end">
-        {VISUALIZER_OPTIONS.map((opt) => (
-          <SelectItem key={opt.id} value={opt.id} className="text-xs">
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <AppDropdown
+      value={value}
+      onValueChange={(v) => onChange(v as VisualizerId)}
+      size="sm"
+      className="h-6 min-h-6 w-[140px] px-2 text-2xs font-medium [&>svg]:h-3 [&>svg]:w-3"
+      contentAlign="end"
+      options={VISUALIZER_OPTIONS.map((opt) => ({
+        value: opt.id,
+        label: opt.label,
+        itemClassName: "text-xs",
+      }))}
+    />
   );
 }
 

@@ -1,7 +1,23 @@
 import * as React from "react";
-import Tippy from "@tippyjs/react";
-import { followCursor } from "tippy.js";
-import type { Placement } from "tippy.js";
+import {
+  arrow,
+  autoUpdate,
+  flip,
+  FloatingArrow,
+  FloatingPortal,
+  offset,
+  safePolygon,
+  shift,
+  useClientPoint,
+  useDismiss,
+  useFocus,
+  useFloating,
+  useHover,
+  useInteractions,
+  useRole,
+  useTransitionStyles,
+  type Placement,
+} from "@floating-ui/react";
 import { cn } from "@/lib/utils";
 
 type TooltipSide = "top" | "right" | "bottom" | "left";
@@ -67,10 +83,21 @@ function Tooltip({
 }: TooltipRootProps) {
   const providerDelay = React.useContext(TooltipDelayContext);
   const resolvedDelay = delayDuration ?? providerDelay;
+  const isControlled = open !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
+  const isOpen = isControlled ? open : uncontrolledOpen;
+  const arrowRef = React.useRef<SVGSVGElement | null>(null);
   const prefersReducedMotion = React.useMemo(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }, []);
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (!isControlled) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
 
   let triggerElement: React.ReactElement | null = null;
   let contentElement: React.ReactNode = null;
@@ -115,55 +142,121 @@ function Tooltip({
     }
   });
 
-  if (!triggerElement || !contentElement) return null;
+  const {
+    refs,
+    context,
+    placement,
+    floatingStyles,
+  } = useFloating({
+    open: isOpen,
+    onOpenChange: setOpen,
+    strategy: "fixed",
+    transform: false,
+    placement: sideToPlacement(side, align),
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset(sideOffset + (showArrow ? 4 : 0)),
+      flip({ padding: collisionPadding }),
+      shift({ padding: collisionPadding }),
+      ...(showArrow ? [arrow({ element: arrowRef })] : []),
+    ],
+  });
+
+  const hover = useHover(context, {
+    delay: { open: resolvedDelay, close: 0 },
+    move: followCursorEnabled,
+    enabled: !disabled,
+    handleClose: interactive ? safePolygon() : undefined,
+  });
+  const focus = useFocus(context, { enabled: !disabled });
+  const dismiss = useDismiss(context, { enabled: !disabled });
+  const role = useRole(context, { role: "tooltip" });
+  const clientPoint = useClientPoint(context, { enabled: followCursorEnabled });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    hover,
+    focus,
+    dismiss,
+    role,
+    clientPoint,
+  ]);
+
+  const { isMounted, styles: transitionStyles } = useTransitionStyles(context, {
+    duration: prefersReducedMotion ? 0 : { open: 180, close: 140 },
+    initial: prefersReducedMotion
+      ? { opacity: 1 }
+      : { opacity: 0, transform: "translateY(2px) scale(0.985)" },
+  });
+
+  const setTriggerRef = (node: Element | null) => {
+    refs.setReference(node);
+    if (!triggerElement) return;
+    const maybeRef = (triggerElement as unknown as { ref?: React.Ref<Element> }).ref;
+    if (typeof maybeRef === "function") maybeRef(node);
+    else if (maybeRef && typeof maybeRef === "object") {
+      (maybeRef as React.MutableRefObject<Element | null>).current = node;
+    }
+  };
+
+  const trigger = triggerElement as React.ReactElement<any> | null;
+  const referenceTrigger =
+    trigger && typeof trigger.type !== "string"
+      ? React.createElement(
+          "span",
+          {
+            className: "inline-flex",
+            "data-slot": "tooltip-reference",
+          },
+          trigger,
+        )
+      : trigger;
+  const enhancedTrigger = referenceTrigger
+    ? React.cloneElement(
+        referenceTrigger,
+        getReferenceProps({
+          ...referenceTrigger.props,
+          ref: setTriggerRef,
+        }),
+      )
+    : null;
+
+  if (!referenceTrigger || !contentElement || !enhancedTrigger) return null;
+
+  if (disabled) return enhancedTrigger;
 
   return (
-    <Tippy
-      content={
-        <div
-          data-slot="tooltip-content"
-          className={cn(
-            "z-[9999] w-fit max-w-[min(420px,calc(100vw-16px))] text-sm",
-            contentClassName,
-          )}
-        >
-          {contentElement}
-        </div>
-      }
-      theme="sipalyzer"
-      placement={sideToPlacement(side, align)}
-      arrow={showArrow}
-      animation={prefersReducedMotion ? false : "shift-away-subtle"}
-      duration={prefersReducedMotion ? [0, 0] : [180, 140]}
-      moveTransition={prefersReducedMotion ? "" : "transform var(--motion-duration-navigation) var(--motion-ease-navigation)"}
-      inertia={!prefersReducedMotion}
-      plugins={followCursorEnabled ? [followCursor] : undefined}
-      followCursor={followCursorEnabled ? "initial" : false}
-      delay={[resolvedDelay, 0]}
-      offset={[0, sideOffset]}
-      appendTo={() => document.body}
-      interactive={interactive}
-      zIndex={9999}
-      popperOptions={{
-        modifiers: [
-          {
-            name: "preventOverflow",
-            options: { padding: collisionPadding },
-          },
-          {
-            name: "flip",
-            options: { padding: collisionPadding },
-          },
-        ],
-      }}
-      onClickOutside={() => onOpenChange?.(false)}
-      onShow={() => onOpenChange?.(true)}
-      onHide={() => onOpenChange?.(false)}
-      disabled={disabled}
-      {...(open !== undefined ? { visible: open } : {})}
-    >
-      {triggerElement}
-    </Tippy>
+    <>
+      {enhancedTrigger}
+      {isMounted && (
+        <FloatingPortal>
+          <div
+            ref={refs.setFloating}
+            style={{ ...floatingStyles, ...transitionStyles, zIndex: 9999 }}
+            data-floating-tooltip
+            data-side={placement.split("-")[0]}
+            className={cn(
+              "w-fit max-w-[min(420px,calc(100vw-16px))] text-sm",
+              "rounded-[var(--radius-lg)] border border-border/35 bg-popover text-popover-foreground shadow-tooltip",
+              interactive ? "pointer-events-auto" : "pointer-events-none",
+              contentClassName,
+            )}
+            {...getFloatingProps()}
+          >
+            <div data-slot="tooltip-content" className="px-3 py-2 leading-snug">
+              {contentElement}
+            </div>
+            {showArrow && (
+              <FloatingArrow
+                ref={arrowRef}
+                context={context}
+                fill="hsl(var(--popover))"
+                stroke="hsl(var(--border) / 0.4)"
+                strokeWidth={1}
+              />
+            )}
+          </div>
+        </FloatingPortal>
+      )}
+    </>
   );
 }
 

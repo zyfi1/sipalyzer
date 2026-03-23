@@ -36,7 +36,7 @@ const AlertDialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="alert-dialog-overlay"
     className={cn(
-      "graphite-modal-overlay data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-[var(--motion-duration-overlay)] fixed inset-0 z-[10000]",
+      "graphite-modal-overlay data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-[var(--motion-duration-overlay)] fixed inset-0 z-[10100]",
       className
     )}
     {...props}
@@ -48,17 +48,19 @@ const AlertDialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & {
     size?: "default" | "sm"
     overlayClassName?: string
+    tone?: "neutral" | "success" | "destructive"
   }
->(({ className, overlayClassName, size = "default", style, ...props }, ref) => (
+>(({ className, overlayClassName, size = "default", tone = "neutral", style, ...props }, ref) => (
   <AlertDialogPortal>
     <AlertDialogOverlay className={overlayClassName} />
-    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 pointer-events-none">
+    <div className="fixed inset-0 z-[10101] flex items-center justify-center p-4 pointer-events-none">
       <AlertDialogPrimitive.Content
         ref={ref}
         data-slot="alert-dialog-content"
         data-size={size}
+        data-tone={tone}
         className={cn(
-          "graphite-modal-content text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 group/alert-dialog-content relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(min(100vh,100dvh)-2rem)] gap-4 overflow-y-auto p-5 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)] pointer-events-auto data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-lg",
+          "graphite-modal-content text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 group/alert-dialog-content relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(min(100vh,100dvh)-2rem)] gap-4 overflow-y-auto p-5 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)] pointer-events-auto data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-lg border data-[tone=neutral]:border-border/60 data-[tone=success]:border-success/45 data-[tone=destructive]:border-destructive/45",
           className
         )}
         {...props}
@@ -144,7 +146,7 @@ function AlertDialogMedia({
     <div
       data-slot="alert-dialog-media"
       className={cn(
-        "bg-muted mb-2 inline-flex size-16 items-center justify-center rounded-md sm:group-data-[size=default]/alert-dialog-content:row-span-2 *:[svg:not([class*='size-'])]:size-8",
+        "mb-2 inline-flex size-16 items-center justify-center rounded-md bg-muted sm:group-data-[size=default]/alert-dialog-content:row-span-2 group-data-[tone=success]/alert-dialog-content:bg-success/12 group-data-[tone=success]/alert-dialog-content:text-success group-data-[tone=destructive]/alert-dialog-content:bg-destructive/12 group-data-[tone=destructive]/alert-dialog-content:text-destructive *:[svg:not([class*='size-'])]:size-8",
         className
       )}
       {...props}

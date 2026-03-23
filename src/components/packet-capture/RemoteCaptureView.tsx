@@ -23,7 +23,6 @@ import {
   Network,
   Wifi,
   Server,
-  AlertCircle,
 } from "@/lib/icons";
 import { formatDateTime } from "@/lib/dateTime";
 import type { CaptureSession, RemoteCaptureConfig, CaptureCapabilityReport } from "@/types/packetCapture";
@@ -133,37 +132,6 @@ export function RemoteCaptureView({ onViewCapture }: RemoteCaptureViewProps) {
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto p-3 app-view-stack">
-            {capabilities && (
-              <div className="ui-surface-card p-3 mb-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                  <div className="space-y-1 min-w-0">
-                    <p className="text-xs font-medium">
-                      Capture capability summary ({capabilities.platform})
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Local capture:{" "}
-                      <span className={capabilities.localCaptureSupported ? "text-success" : "text-warning"}>
-                        {capabilities.localCaptureSupported ? "available" : "degraded"}
-                      </span>
-                      {capabilities.localCaptureReason ? ` — ${capabilities.localCaptureReason}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Remote SSH capture:{" "}
-                      <span className={capabilities.remoteCaptureSupported ? "text-success" : "text-warning"}>
-                        {capabilities.remoteCaptureSupported ? "available" : "unavailable"}
-                      </span>
-                      {capabilities.remoteCaptureReason ? ` — ${capabilities.remoteCaptureReason}` : ""}
-                    </p>
-                    {capabilities.remoteCaptureNotes.length > 0 && (
-                      <p className="text-2xs text-muted-foreground">
-                        {capabilities.remoteCaptureNotes.join(" ")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
             {isEmpty ? (
               <EmptyState
                 variant="inline"
@@ -290,7 +258,7 @@ function RemoteSessionCard({
           {isRunning && (
             <LiveIndicator variant="badge" label="LIVE" size="xs" />
           )}
-          <Badge variant="outline" className="text-2xs px-1.5 py-0 h-4">
+          <Badge variant="secondary" className="text-2xs px-1.5 py-0 h-4">
             Remote
           </Badge>
         </div>

@@ -1,17 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useToolStore } from "@/stores/toolStore";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import {
-  ViewFooter,
-  ViewFooterItem,
-  ViewFooterSpacer,
-  ViewFooterDivider,
-} from "@/components/layout/ViewFooter";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import { cn } from "@/lib/utils";
-import { Satellite, Globe } from "@/lib/icons";
-import { useRemoteAgentStore } from "@/stores/remoteAgentStore";
 
 const OverviewTab = lazy(() =>
   import("./OverviewTab").then((m) => ({ default: m.OverviewTab }))
@@ -65,16 +57,6 @@ export function RemoteAgentTool() {
   const setLastViewedSubview = useToolStore((s) => s.setLastViewedSubview);
   const [activeTab, setActiveTab] = useState<string>(SUBVIEW_OVERVIEW);
 
-  const connections = useRemoteAgentStore((s) => s.connections);
-  const pendingCommands = useRemoteAgentStore((s) => s.pendingCommands);
-  const generatedConfigs = useRemoteAgentStore((s) => s.generatedConfigs);
-  const activeRelaySessions = useRemoteAgentStore((s) => s.activeRelaySessions);
-
-  const relayActive = activeRelaySessions.size > 0;
-  const onlineCount = connections.filter((c) => c.status === "connected").length;
-  const activeCommandCount = pendingCommands.filter(
-    (c) => c.status === "running" || c.status === "pending"
-  ).length;
 
   // Sync external navigation (e.g. from notifications or widgets)
   useEffect(() => {
@@ -162,85 +144,6 @@ export function RemoteAgentTool() {
 
         </div>
 
-        <ViewFooter>
-          {activeTab === SUBVIEW_OVERVIEW ? (
-            <>
-              <ViewFooterItem>
-                <Globe className="h-3 w-3" />
-                <span
-                  className={cn(
-                    "inline-block w-2 h-2 rounded-full",
-                    relayActive ? "bg-success" : "bg-muted-foreground/40"
-                  )}
-                />
-                <span>{relayActive ? "Relay active" : "Relay idle"}</span>
-              </ViewFooterItem>
-              <ViewFooterDivider />
-              <ViewFooterItem>
-                <Satellite className="h-3 w-3" />
-                <span className="tabular-nums">{onlineCount}</span>
-                <span>online</span>
-              </ViewFooterItem>
-              {activeCommandCount > 0 && (
-                <>
-                  <ViewFooterDivider />
-                  <ViewFooterItem>
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-live-breathe motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-                    </span>
-                    <span className="tabular-nums">{activeCommandCount}</span>
-                    <span>active</span>
-                  </ViewFooterItem>
-                </>
-              )}
-              <ViewFooterSpacer />
-              <ViewFooterItem>
-                <span className="tabular-nums">{generatedConfigs.length}</span>
-                <span>deployed</span>
-              </ViewFooterItem>
-            </>
-          ) : null}
-
-          {activeTab === SUBVIEW_REGISTRY ? (
-            <>
-              <ViewFooterItem>
-                <Satellite className="h-3 w-3" />
-                <span className="tabular-nums">{connections.length}</span>
-                <span>agents</span>
-              </ViewFooterItem>
-              <ViewFooterDivider />
-              <ViewFooterItem>
-                <span className="tabular-nums">{onlineCount}</span>
-                <span>online</span>
-              </ViewFooterItem>
-              <ViewFooterSpacer />
-              <ViewFooterItem>
-                <span className="tabular-nums">{generatedConfigs.length}</span>
-                <span>deployed</span>
-              </ViewFooterItem>
-            </>
-          ) : null}
-
-          {activeTab === SUBVIEW_ACTIVITY ? (
-            <>
-              <ViewFooterItem>
-                <span className="tabular-nums">{activeCommandCount}</span>
-                <span>active command{activeCommandCount === 1 ? "" : "s"}</span>
-              </ViewFooterItem>
-              <ViewFooterDivider />
-              <ViewFooterItem>
-                <span className="tabular-nums">{pendingCommands.length}</span>
-                <span>queued</span>
-              </ViewFooterItem>
-              <ViewFooterSpacer />
-              <ViewFooterItem>
-                <Globe className="h-3 w-3" />
-                <span>{relayActive ? "Relay active" : "Relay idle"}</span>
-              </ViewFooterItem>
-            </>
-          ) : null}
-        </ViewFooter>
       </Tabs>
     </div>
   );

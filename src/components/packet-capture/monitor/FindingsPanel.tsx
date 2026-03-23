@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
   RefreshCw,
   XCircle,
   AlertTriangle,
@@ -118,46 +117,47 @@ export function FindingsPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="ui-section-header-sm flex items-center gap-2 shrink-0">
-        <Activity className="h-3.5 w-3.5 text-primary shrink-0" />
-        <span className="text-xs font-medium">Diagnostics</span>
-        {livePollingActive && <LiveIndicator variant="badge" size="xs" />}
-        <div className="flex-1" />
-        {onRefresh && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onRefresh}
-            disabled={loading}
+      {/* Category strip + status (matches monitor small tabs) */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--ui-rule)] px-2 py-0">
+        <div
+          className="monitor-side-tabs !h-7 !min-h-7 min-w-0 flex-1 py-1"
+          role="tablist"
+          aria-label="Finding categories"
+        >
+          <button
+            type="button"
+            role="tab"
+            data-state={activeCategory === "all" ? "active" : "inactive"}
+            className="monitor-side-tab !h-7 !min-h-7 shrink-0 px-2.5 text-xs"
+            onClick={() => setActiveCategory("all")}
           >
+            All
+          </button>
+          {(Object.entries(categoryCounts) as [Category, number][]).map(([cat, count]) => (
+            <button
+              key={cat}
+              type="button"
+              role="tab"
+              data-state={activeCategory === cat ? "active" : "inactive"}
+              className="monitor-side-tab !h-7 !min-h-7 inline-flex shrink-0 items-center gap-1 px-2.5 text-xs"
+              onClick={() => setActiveCategory(cat)}
+            >
+              <span>{CATEGORY_LABELS[cat]}</span>
+              <Badge
+                variant="secondary"
+                className="h-3.5 min-w-[14px] px-1 py-0 text-3xs tabular-nums"
+              >
+                {count}
+              </Badge>
+            </button>
+          ))}
+        </div>
+        {livePollingActive ? <LiveIndicator variant="badge" size="xs" /> : null}
+        {onRefresh ? (
+          <Button variant="ghost" size="icon-sm" onClick={onRefresh} disabled={loading}>
             <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
           </Button>
-        )}
-      </div>
-
-      {/* Category filter chips */}
-      <div className="ui-section-header-sm flex items-center gap-1 py-1.5 shrink-0 overflow-x-auto">
-        <Button
-          variant={activeCategory === "all" ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() => setActiveCategory("all")}
-        >
-          All
-        </Button>
-        {(Object.entries(categoryCounts) as [Category, number][]).map(([cat, count]) => (
-          <Button
-            key={cat}
-            variant={activeCategory === cat ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveCategory(cat)}
-          >
-            {CATEGORY_LABELS[cat]}
-            <Badge variant="outline" className="text-3xs ml-1 px-1 py-0 h-3.5 min-w-[14px]">
-              {count}
-            </Badge>
-          </Button>
-        ))}
+        ) : null}
       </div>
 
       {/* Call-ID filter bar */}
@@ -210,7 +210,7 @@ export function FindingsPanel({
                 )}
                 <SevIcon className={cn("h-3.5 w-3.5", config.color)} />
                 <span className={cn("text-xs font-medium", config.color)}>{config.label}</span>
-                <Badge variant="outline" className="text-3xs px-1 py-0 h-3.5 min-w-[14px] ml-auto">
+                <Badge variant="secondary" className="text-3xs px-1 py-0 h-3.5 min-w-[14px] ml-auto">
                   {items.length}
                 </Badge>
               </button>

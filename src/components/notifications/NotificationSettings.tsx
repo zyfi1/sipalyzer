@@ -4,7 +4,7 @@ import type { NotificationSource, NotificationType } from "@/stores/notification
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -81,18 +81,18 @@ export function NotificationSettings() {
             </p>
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="w-full sm:w-44">
-                <Select value={testType} onValueChange={(value: NotificationType) => setTestType(value)}>
-                  <SelectTrigger id="test-notification-type" size="sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="info">Info</SelectItem>
-                    <SelectItem value="success">Success</SelectItem>
-                    <SelectItem value="warning">Warning</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  id="test-notification-type"
+                  value={testType}
+                  onValueChange={(value) => setTestType(value as NotificationType)}
+                  options={[
+                    { value: "info", label: "Info" },
+                    { value: "success", label: "Success" },
+                    { value: "warning", label: "Warning" },
+                    { value: "error", label: "Error" },
+                    { value: "system", label: "System" },
+                  ]}
+                />
               </div>
               <Button
                 variant="positive"
@@ -170,20 +170,22 @@ export function NotificationSettings() {
             </div>
             <div className="px-3 py-2.5 space-y-2">
               <Label htmlFor="position">Toast position</Label>
-              <Select
+              <AppDropdown
+                id="position"
+                className="w-full sm:w-48"
                 value={settings.position}
-                onValueChange={(value: any) => updateSettings({ position: value })}
-              >
-                <SelectTrigger id="position" size="sm" className="w-full sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top-right">Top Right</SelectItem>
-                  <SelectItem value="top-left">Top Left</SelectItem>
-                  <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                  <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                </SelectContent>
-              </Select>
+                onValueChange={(value) =>
+                  updateSettings({
+                    position: value as "top-right" | "top-left" | "bottom-right" | "bottom-left",
+                  })
+                }
+                options={[
+                  { value: "top-right", label: "Top Right" },
+                  { value: "top-left", label: "Top Left" },
+                  { value: "bottom-right", label: "Bottom Right" },
+                  { value: "bottom-left", label: "Bottom Left" },
+                ]}
+              />
             </div>
           </div>
         )}

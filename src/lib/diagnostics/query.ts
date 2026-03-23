@@ -1,19 +1,21 @@
-import { getCaptureSession, getRtpStreams, getSipDialogs } from "@/api/packetCapture";
-import { diagnosticsFindingToExpertFinding } from "@/lib/diagnostics/adapter";
-import { buildDiagnosticsReport } from "@/lib/diagnostics/engine";
 import type { ExpertFinding } from "@/types/packetCapture";
+import {
+  getAnalysisDiagnosticsWithMeta,
+  type CaptureDiagnosticsRunMeta,
+} from "@/lib/diagnostics/captureAnalysisPipeline";
 
+export type { CaptureDiagnosticsRunMeta };
+
+/** Merged TS + Rust capture diagnostics (see `captureAnalysisPipeline.ts`). */
 export async function getAnalysisDiagnostics(sessionId: string): Promise<ExpertFinding[]> {
-  const [session, dialogs, rtpStreams] = await Promise.all([
-    getCaptureSession(sessionId),
-    getSipDialogs(sessionId),
-    getRtpStreams(sessionId),
-  ]);
-  const report = buildDiagnosticsReport({
-    session,
-    dialogs: dialogs ?? [],
-    rtpStreams: rtpStreams ?? [],
-  });
-  return report.findings.map(diagnosticsFindingToExpertFinding);
+  const { findings } = await getAnalysisDiagnosticsWithMeta(sessionId);
+  return findings;
+}
+
+/** Same as {@link getAnalysisDiagnostics} plus per-engine counts and partial-run errors. */
+export async function getAnalysisDiagnosticsDetailed(
+  sessionId: string,
+): Promise<{ findings: ExpertFinding[]; meta: CaptureDiagnosticsRunMeta }> {
+  return getAnalysisDiagnosticsWithMeta(sessionId);
 }
 

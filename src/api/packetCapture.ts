@@ -171,9 +171,14 @@ export async function getCapturePacketsRange(
 
 export async function getCapturePackets(
   sessionId: string,
-  limit?: number
+  limit?: number,
+  options?: { compactForDiff?: boolean },
 ): Promise<PacketInfo[]> {
-  return invokeTauri<PacketInfo[]>("get_capture_packets", { sessionId, limit: limit ?? DEFAULT_PACKET_LIMIT });
+  return invokeTauri<PacketInfo[]>("get_capture_packets", {
+    sessionId,
+    limit: limit ?? DEFAULT_PACKET_LIMIT,
+    compactForDiff: options?.compactForDiff ?? false,
+  });
 }
 
 export async function loadCaptureSession(
@@ -326,6 +331,11 @@ export async function exportPcap(
     sessionId,
     outputPath: outputPath ?? null,
   });
+}
+
+/** Copy session PCAP into the captures library as a new session (splice / working copy). */
+export async function duplicateCaptureToLibrary(sessionId: string): Promise<string> {
+  return invokeTauri<string>("duplicate_capture_to_library", { sessionId });
 }
 
 /** Import an external PCAP file. Opens a native file picker, copies into app storage, returns session ID. */

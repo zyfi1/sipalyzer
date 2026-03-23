@@ -75,11 +75,11 @@ export function MediaAnalysisWorkspace({
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Media Investigation</p>
           <span className="text-2xs text-muted-foreground">{qualityStatement}</span>
-          <Badge variant="outline" className={cn("ml-auto h-5 px-2 text-3xs", mediaHealth.tone)}>
+          <Badge variant="secondary" className={cn("ml-auto h-5 px-2 text-3xs", mediaHealth.tone)}>
             {mediaHealth.label}
           </Badge>
-          <Badge variant="outline" className="h-5 px-2 text-3xs">{prioritizedStreams.length} Streams</Badge>
-          <Badge variant="outline" className="h-5 px-2 text-3xs">{mediaSummary.degradedStreams} Degraded</Badge>
+          <Badge variant="secondary" className="h-5 px-2 text-3xs">{prioritizedStreams.length} Streams</Badge>
+          <Badge variant="secondary" className="h-5 px-2 text-3xs">{mediaSummary.degradedStreams} Degraded</Badge>
           <Button variant="neutral" size="sm" className="h-7 px-2.5 text-2xs" onClick={onClearSelection}>
             Reset
           </Button>
@@ -104,7 +104,7 @@ export function MediaAnalysisWorkspace({
           <div className="min-h-0 overflow-hidden ui-surface-card flex flex-col">
             <div className="ui-section-header-sm shrink-0 flex items-center gap-1.5">
               <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Incident Queue</p>
-              <Badge variant="outline" className="ml-auto h-5 px-2 text-3xs">{prioritizedStreams.length}</Badge>
+              <Badge variant="secondary" className="ml-auto h-5 px-2 text-3xs">{prioritizedStreams.length}</Badge>
             </div>
             <div className="flex-1 min-h-0 overflow-auto px-1.5 py-1.5 space-y-1">
               {prioritizedStreams.map((stream, index) => {
@@ -131,7 +131,7 @@ export function MediaAnalysisWorkspace({
                       )}
                       <span className="text-2xs font-medium truncate">{streamLabel(stream)}</span>
                       <Badge
-                        variant="outline"
+                        variant="secondary"
                         className={cn(
                           "ml-auto h-4 px-1.5 text-3xs",
                           degraded ? "border-warning/35 text-warning" : "border-success/35 text-success",

@@ -10,8 +10,7 @@ export type SettingsCenterTab =
   | "packet-monitor"
   | "fax"
   | "terminal"
-  | "soft-phone"
-  | "inventory";
+  | "soft-phone";
 
 interface LayoutState {
   notificationsCenterOpen: boolean;

@@ -18,13 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Play,
   Copy,
@@ -260,7 +254,7 @@ export function SshConnectionEditor({ item }: Props) {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1">Auth Method</Label>
-              <Select
+              <AppDropdown
                 value={ssh.authMethod}
                 onValueChange={(v) => {
                   const next = v as SshConnectionData["authMethod"];
@@ -272,16 +266,14 @@ export function SshConnectionEditor({ item }: Props) {
                     void deleteSshConnectionPassword(item.id);
                   }
                 }}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="agent">SSH Agent</SelectItem>
-                  <SelectItem value="key">Key File</SelectItem>
-                  <SelectItem value="password">Password</SelectItem>
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "agent", label: "SSH Agent" },
+                  { value: "key", label: "Key File" },
+                  { value: "password", label: "Password" },
+                ]}
+                className="h-8 text-xs"
+                size="sm"
+              />
             </div>
             {ssh.authMethod === "key" && (
               <div className="col-span-2">
@@ -404,19 +396,17 @@ export function SshConnectionEditor({ item }: Props) {
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground mb-1">StrictHostKeyChecking</Label>
-                <Select
+                <AppDropdown
                   value={ssh.advancedOptions.strictHostKeyChecking}
                   onValueChange={(v) => setAdvanced({ strictHostKeyChecking: v as "yes" | "no" | "ask" })}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ask">Ask</SelectItem>
-                    <SelectItem value="yes">Yes</SelectItem>
-                    <SelectItem value="no">No</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "ask", label: "Ask" },
+                    { value: "yes", label: "Yes" },
+                    { value: "no", label: "No" },
+                  ]}
+                  className="h-8 text-xs"
+                  size="sm"
+                />
               </div>
             </div>
             <div>

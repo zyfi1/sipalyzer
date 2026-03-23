@@ -679,6 +679,7 @@ fn main() {
             packet_capture_commands::list_capture_sessions,
             packet_capture_commands::get_capture_session,
             packet_capture_commands::export_pcap,
+            packet_capture_commands::duplicate_capture_to_library,
             packet_capture_commands::import_pcap,
             packet_capture_commands::delete_capture_session,
             packet_capture_commands::update_capture_session,

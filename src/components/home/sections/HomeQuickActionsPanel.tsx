@@ -4,6 +4,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { navigateTo } from "@/lib/navigation";
+import {
+  isNavigationSubviewVisible,
+  isNavigationToolFeatureVisible,
+} from "@/lib/navigationCatalog";
 import { toolRegistry } from "@/lib/toolRegistry";
 import { cn } from "@/lib/utils";
 import { useHomeStore, type HomeQuickActionItem } from "@/stores/homeStore";
@@ -52,10 +56,14 @@ export function HomeQuickActionsPanel({ className, editMode: _editMode = false }
     return homeQuickActions.flatMap((action) => {
       const tool = toolsById.get(action.toolId);
       if (!tool) return [];
+      if (!isNavigationToolFeatureVisible(action.toolId)) return [];
       const subview = action.subviewId
         ? (tool.subviews ?? []).find((candidate) => candidate.id === action.subviewId)
         : undefined;
       if (action.subviewId && !subview) return [];
+      if (action.subviewId && !isNavigationSubviewVisible(action.toolId, action.subviewId)) {
+        return [];
+      }
       return [
         {
           ...action,

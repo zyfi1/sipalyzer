@@ -118,7 +118,7 @@ export function TabContextMenu({
         align="start"
         sideOffset={4}
         collisionPadding={EDGE_PAD}
-        className="z-[10002] w-[220px] max-h-[360px]"
+        className="w-[220px] max-h-[360px]"
       >
         <ContextMenuRenderer sections={sections} onAction={onClose} edgePadding={EDGE_PAD} />
       </DropdownMenuContent>

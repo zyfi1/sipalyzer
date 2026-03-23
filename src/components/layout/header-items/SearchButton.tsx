@@ -1,7 +1,7 @@
 /**
  * SearchButton — header search with two variants:
  *
- * "icon"  → compact button that opens the full GlobalSearchDialog.
+ * "icon"  → compact button that opens GlobalSearchDialog.
  * "field" → real text input with an inline command-palette dropdown.
  */
 
@@ -11,6 +11,9 @@ import {
   useRef,
   useCallback,
   useMemo,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import Fuse from "fuse.js";
 import { Button } from "@/components/ui/button";
@@ -59,6 +62,22 @@ interface SearchButtonProps {
   variant?: "icon" | "field";
 }
 
+export type HeaderInlineSearchProps = {
+  /** Wrapper around the anchor (width constraints, flex). */
+  anchorClassName?: string;
+  /** Focus target for global ⌘K shortcut. */
+  inputId?: string;
+  /** Dropdown alignment under the field. */
+  popoverAlign?: "start" | "center" | "end";
+  /** Sit inside HeaderUnifiedOmniBar — no nested chrome border. */
+  embedded?: boolean;
+};
+
+/** Command palette field for the unified header omni bar (or standalone). */
+export function HeaderInlineCommandSearch(props: HeaderInlineSearchProps) {
+  return <InlineSearchField {...props} />;
+}
+
 /** Self-contained search button / bar for the header. */
 export function SearchButton({ variant = "icon" }: SearchButtonProps) {
   const setSearchOpen = useLayoutStore((s) => s.setSearchOpen);
@@ -85,7 +104,13 @@ export function SearchButton({ variant = "icon" }: SearchButtonProps) {
 //  InlineSearchField — real input + dropdown command palette
 // ═══════════════════════════════════════════════════════════════════════════
 
-function InlineSearchField() {
+function InlineSearchField(props: HeaderInlineSearchProps = {}) {
+  const {
+    anchorClassName,
+    inputId = "header-omni-search-input",
+    popoverAlign = "start",
+    embedded = false,
+  } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -281,7 +306,7 @@ function InlineSearchField() {
 
   // Close when focus leaves both input and dropdown
   const handleBlur = useCallback(
-    (e: React.FocusEvent) => {
+    (e: FocusEvent) => {
       const related = e.relatedTarget as HTMLElement | null;
       // If focus moved to something inside our container or the popover content, stay open
       if (related && (containerRef.current?.contains(related) || related.closest("[data-slot='popover-content']"))) {
@@ -304,7 +329,7 @@ function InlineSearchField() {
 
   // ── Keyboard: Escape to close ──────────────────────────────────────
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
         handleClose();
@@ -322,24 +347,36 @@ function InlineSearchField() {
   return (
     <Popover open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
       <PopoverAnchor asChild>
-        <div ref={containerRef} className="relative w-full min-w-[140px] max-w-[320px]" onBlur={handleBlur}>
+        <div
+          ref={containerRef}
+          className={cn("relative w-full min-w-[140px]", !embedded && "max-w-[320px]", anchorClassName)}
+          onBlur={handleBlur}
+        >
           {/* ── Input field ── */}
           <div
             className={cn(
-              "ui-header-picker w-full max-w-[320px] shadow-none",
-              open && "is-open",
+              "inline-flex w-full items-center gap-1.5 rounded-md border text-xs font-medium",
+              "transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)]",
+              "h-7 shadow-none",
+              embedded
+                ? "border-0 bg-transparent px-0.5 ring-0 shadow-none"
+                : "ui-header-picker max-w-[320px]",
+              !embedded && open && "is-open",
+              embedded && open && "rounded-sm bg-muted/15",
             )}
           >
-            <Search className="h-3.5 w-3.5 flex-shrink-0" />
+            <Search className={cn("h-3.5 w-3.5 flex-shrink-0", embedded && "text-muted-foreground/70")} />
             <input
+              id={inputId}
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={handleOpen}
               onKeyDown={handleKeyDown}
-              placeholder="Search…"
+              placeholder="Search or jump…"
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/70 text-xs min-w-0"
+              data-no-window-drag="true"
             />
             <kbd className="hidden sm:inline text-2xs font-mono text-muted-foreground/65 flex-shrink-0">
               ⌘K
@@ -349,7 +386,7 @@ function InlineSearchField() {
       </PopoverAnchor>
 
       <PopoverContent
-        align="start"
+        align={popoverAlign}
         side="bottom"
         sideOffset={4}
         onOpenAutoFocus={(e) => e.preventDefault()}
@@ -369,7 +406,7 @@ function InlineSearchField() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Search…"
+                  placeholder="Search or jump…"
                   className="h-8 w-full rounded-md bg-transparent pl-8 pr-2 text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
                 />
               </div>
@@ -526,7 +563,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 interface DropdownRowProps {
   item: PaletteItem;
   onSelect: (item: PaletteItem) => void;
-  trailing?: React.ReactNode;
+  trailing?: ReactNode;
 }
 
 function DropdownRow({ item, onSelect, trailing }: DropdownRowProps) {

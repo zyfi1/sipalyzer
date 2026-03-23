@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { exportAuditLog } from "@/api/remoteAgent";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -224,8 +225,7 @@ export function ActivityView() {
             />
           </div>
 
-          {/* Separator */}
-          <div className="w-px h-5 bg-border/20 shrink-0" />
+          <AppDivider orientation="vertical" size="lg" className="mx-0 shrink-0" />
 
           {/* Stats pills */}
           {activityLog.length > 0 && (
@@ -267,8 +267,7 @@ export function ActivityView() {
             </div>
           )}
 
-          {/* Separator */}
-          <div className="w-px h-5 bg-border/20 shrink-0" />
+          <AppDivider orientation="vertical" size="lg" className="mx-0 shrink-0" />
 
           {/* Export dropdown */}
           <Popover open={exportOpen} onOpenChange={setExportOpen}>
@@ -377,7 +376,11 @@ export function ActivityView() {
       </div>
 
       {/* ── Log Entries ── */}
-      <div className="ui-surface-card flex-1 overflow-auto relative" ref={scrollRef} onScroll={handleScroll}>
+      <div
+        className="ui-surface-card relative flex min-h-0 flex-1 flex-col overflow-auto"
+        ref={scrollRef}
+        onScroll={handleScroll}
+      >
         {filteredLog.length === 0 ? (
           <EmptyState
             variant="inline"

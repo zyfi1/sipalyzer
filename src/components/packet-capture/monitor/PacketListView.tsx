@@ -5,14 +5,15 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { Settings2, ArrowUp, ArrowDown, ArrowUpDown, GripVertical, ChevronLeft, ChevronRight, Tick } from "@/lib/icons";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
+import { Settings2, ArrowUp, ArrowDown, ArrowUpDown, GripVertical, ChevronLeft, ChevronRight, RotateCcw } from "@/lib/icons";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { IpAddress } from "@/components/ui/IpAddress";
@@ -20,6 +21,7 @@ import type { PacketInfo } from "@/types/packetCapture";
 import { PacketContextMenu } from "./PacketContextMenu";
 import { ScrollFloatingButtons } from "./ScrollFloatingButtons";
 import { formatTimestampCompact } from "@/lib/dateTime";
+import { formatIpPortEndpoint } from "@/lib/networkUtils";
 import { useUnifiedTable } from "@/lib/table/useUnifiedTable";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -60,6 +62,7 @@ import {
   loadColumnOrder,
   saveColumnOrder,
   reorderVisibleColumns,
+  resetPacketColumnsToDefaults,
 } from "./packetColumns";
 import { getPacketRowTint, getProtocolLabelColor } from "./packetProtocolStyles";
 
@@ -222,7 +225,9 @@ function PacketListViewInner({
   const [draggedColumn, setDraggedColumn] = useState<ColumnId | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ColumnId | null>(null);
   const draggedColumnRef = useRef<ColumnId | null>(null);
-  const dragPreviewTargetRef = useRef<ColumnId | null>(null);
+  const dragOverColumnRef = useRef<ColumnId | null>(null);
+  const packetListRootRef = useRef<HTMLDivElement | null>(null);
+  const [resizeGuideLeft, setResizeGuideLeft] = useState<number | null>(null);
   const headerGridRef = useRef<HTMLDivElement | null>(null);
   const headerCellRefs = useRef<Partial<Record<ColumnId, HTMLDivElement | null>>>({});
   const previousHeaderPositionsRef = useRef<Partial<Record<ColumnId, DOMRect>>>({});
@@ -393,12 +398,23 @@ function PacketListViewInner({
   const visibleColumnsRef = useRef(visibleColumns);
   visibleColumnsRef.current = visibleColumns;
 
+  const syncResizeGuideToClientX = useCallback((clientX: number) => {
+    const root = packetListRootRef.current;
+    if (!root) {
+      setResizeGuideLeft(null);
+      return;
+    }
+    const r = root.getBoundingClientRect();
+    setResizeGuideLeft(clientX - r.left);
+  }, []);
+
   useEffect(() => {
     if (!resizingColumn) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       const resizeStart = resizeStartRef.current;
       if (!resizeStart) return;
+      syncResizeGuideToClientX(e.clientX);
       const deltaX = e.clientX - resizeStart.x;
       const MIN_W = 50;
       if (resizeStart.rightId && resizeStart.rightWidth != null) {
@@ -437,7 +453,8 @@ function PacketListViewInner({
       }
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
+      setResizeGuideLeft(null);
       if (resizeRafRef.current != null) {
         cancelAnimationFrame(resizeRafRef.current);
         resizeRafRef.current = null;
@@ -457,14 +474,18 @@ function PacketListViewInner({
       setResizingColumn(null);
     };
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    const cap = { capture: true };
+    document.addEventListener("pointermove", handlePointerMove, cap);
+    document.addEventListener("pointerup", handlePointerUp, cap);
+    document.addEventListener("pointercancel", handlePointerUp, cap);
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      setResizeGuideLeft(null);
+      document.removeEventListener("pointermove", handlePointerMove, cap);
+      document.removeEventListener("pointerup", handlePointerUp, cap);
+      document.removeEventListener("pointercancel", handlePointerUp, cap);
       if (resizeRafRef.current != null) cancelAnimationFrame(resizeRafRef.current);
     };
-  }, [resizingColumn]);
+  }, [resizingColumn, syncResizeGuideToClientX]);
 
   const handleSort = useCallback((columnId: ColumnId) => {
     startTransition(() => {
@@ -481,26 +502,22 @@ function PacketListViewInner({
     });
   }, [table]);
 
-  const toggleColumnVisibility = (columnId: ColumnId) => {
-    // Prevent hiding frameNumber
+  const setColumnVisible = (columnId: ColumnId, visible: boolean) => {
     if (columnId === "frameNumber") return;
-    
     setColumnConfigs(prev => ({
       ...prev,
-      [columnId]: { ...prev[columnId], visible: !prev[columnId].visible },
+      [columnId]: { ...prev[columnId], visible },
     }));
-    
-    // Update column order when visibility changes
-    if (columnConfigs[columnId].visible) {
-      // Column is being hidden - remove from order
-      setColumnOrder(prev => prev.filter(id => id !== columnId));
-    } else {
-      // Column is being shown - add to end of order (but frameNumber will be moved to first)
-      setColumnOrder(prev => {
-        if (prev.includes(columnId)) return prev;
-        return [...prev, columnId];
-      });
-    }
+    setColumnOrder(prev => {
+      if (!visible) return prev.filter(id => id !== columnId);
+      return prev.includes(columnId) ? prev : [...prev, columnId];
+    });
+  };
+
+  const resetColumnsToDefaults = () => {
+    const { configs, order } = resetPacketColumnsToDefaults();
+    setColumnConfigs(configs);
+    setColumnOrder(order);
   };
 
   const moveColumn = (columnId: ColumnId, direction: "left" | "right") => {
@@ -538,6 +555,7 @@ function PacketListViewInner({
   const handlePointerDragStart = useCallback((columnId: ColumnId) => {
     if (columnId === "frameNumber") return;
     draggedColumnRef.current = columnId;
+    dragOverColumnRef.current = null;
     setDraggedColumn(columnId);
     setDragOverColumn(null);
   }, []);
@@ -549,12 +567,15 @@ function PacketListViewInner({
       const headerRect = headerGridRef.current?.getBoundingClientRect();
       if (!headerRect) return;
       if (e.clientY < headerRect.top - 8 || e.clientY > headerRect.bottom + 8) {
+        dragOverColumnRef.current = null;
         setDragOverColumn(null);
         return;
       }
 
+      const dragId = draggedColumnRef.current;
       let hovered: ColumnId | null = null;
-      for (const col of visibleColumns) {
+      const cols = visibleColumnsRef.current;
+      for (const col of cols) {
         if (col.id === "frameNumber") continue;
         const rect = headerCellRefs.current[col.id]?.getBoundingClientRect();
         if (!rect) continue;
@@ -564,37 +585,40 @@ function PacketListViewInner({
         }
       }
 
-      if (!hovered || hovered === draggedColumn) {
+      if (!hovered || hovered === dragId) {
+        dragOverColumnRef.current = null;
         setDragOverColumn(null);
-        dragPreviewTargetRef.current = null;
         return;
       }
-      const dragId = draggedColumnRef.current;
-      if (dragId && dragPreviewTargetRef.current !== hovered) {
-        setColumnOrder((prev) =>
-          reorderVisibleColumns(prev, visibleColumns.map((col) => col.id), dragId, hovered as ColumnId),
-        );
-        dragPreviewTargetRef.current = hovered;
-      }
+      dragOverColumnRef.current = hovered;
       setDragOverColumn(hovered);
     };
 
-    const onPointerUp = () => {
-      dragPreviewTargetRef.current = null;
+    const endDrag = () => {
+      const dragId = draggedColumnRef.current;
+      const dropTarget = dragOverColumnRef.current;
+      if (dragId && dropTarget && dragId !== dropTarget) {
+        const vis = visibleColumnsRef.current.map((c) => c.id);
+        setColumnOrder((prev) => reorderVisibleColumns(prev, vis, dragId, dropTarget));
+      }
+      dragOverColumnRef.current = null;
       draggedColumnRef.current = null;
       setDraggedColumn(null);
       setDragOverColumn(null);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", endDrag);
+      document.removeEventListener("pointercancel", endDrag);
     };
 
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", endDrag);
+    document.addEventListener("pointercancel", endDrag);
     return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", endDrag);
+      document.removeEventListener("pointercancel", endDrag);
     };
-  }, [draggedColumn, visibleColumns]);
+  }, [draggedColumn]);
 
   useLayoutEffect(() => {
     if (resizingColumn) {
@@ -837,19 +861,27 @@ function PacketListViewInner({
       case "source":
         return (
           <div className={cn("min-w-0", alignClass)}>
-            <div className="truncate">
-              <IpAddress ip={packet.srcIp} variant="mono" size="sm" className="text-xs" showIpInfo={false} />
-            </div>
-            <div className="text-muted-foreground text-2xs">{packet.srcPort}</div>
+            <IpAddress
+              ip={formatIpPortEndpoint(packet.srcIp, packet.srcPort)}
+              variant="mono"
+              size="sm"
+              className="text-xs"
+              showIpInfo={false}
+              truncate
+            />
           </div>
         );
       case "destination":
         return (
           <div className={cn("min-w-0", alignClass)}>
-            <div className="truncate">
-              <IpAddress ip={packet.dstIp} variant="mono" size="sm" className="text-xs" showIpInfo={false} />
-            </div>
-            <div className="text-muted-foreground text-2xs">{packet.dstPort}</div>
+            <IpAddress
+              ip={formatIpPortEndpoint(packet.dstIp, packet.dstPort)}
+              variant="mono"
+              size="sm"
+              className="text-xs"
+              showIpInfo={false}
+              truncate
+            />
           </div>
         );
       case "protocol":
@@ -978,7 +1010,17 @@ function PacketListViewInner({
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <div
+      ref={packetListRootRef}
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      {resizeGuideLeft != null && resizingColumn != null ? (
+        <div
+          className="pointer-events-none absolute top-0 bottom-0 z-[10050] w-px bg-primary/80 shadow-none"
+          style={{ left: resizeGuideLeft }}
+          aria-hidden
+        />
+      ) : null}
       {/* Windowed mode: show "Packets X–Y of Z" and load prev/next on scroll */}
       {isWindowed && totalPacketCount != null && (
         <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-muted/10 text-xs text-muted-foreground">
@@ -1014,7 +1056,7 @@ function PacketListViewInner({
         <div
           ref={headerGridRef}
           className={cn(
-            "grid gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground relative select-none",
+            "grid gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground relative select-none overflow-visible",
             draggedColumn && "cursor-grabbing",
             resizingColumn && "cursor-col-resize",
           )}
@@ -1037,11 +1079,17 @@ function PacketListViewInner({
                   headerCellRefs.current[col.id] = node;
                 }}
                 className={cn(
-                  "relative flex items-center gap-1 group",
+                  "packet-list__col-head relative flex items-center gap-1 group",
                   !resizingColumn && "transition-smooth",
                   draggedColumn === col.id && "z-20 rounded-sm bg-accent/45 opacity-65 scale-[0.985]",
                   dragOverColumn === col.id && "rounded-sm bg-accent/35",
                 )}
+                style={{
+                  zIndex:
+                    draggedColumn === col.id || dragOverColumn === col.id
+                      ? 80 + (visibleColumns.length - index)
+                      : visibleColumns.length - index,
+                }}
               >
                 {dragOverColumn === col.id && (
                   <div className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full bg-foreground/45" />
@@ -1050,7 +1098,7 @@ function PacketListViewInner({
                   <button
                     type="button"
                     className={cn(
-                      "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground/65 transition-smooth",
+                      "mr-0.5 inline-flex h-3 w-3 shrink-0 items-center justify-center rounded text-muted-foreground/65 transition-smooth",
                       "cursor-grab active:cursor-grabbing hover:text-foreground/85 hover:bg-accent/50",
                       draggedColumn === col.id && "cursor-grabbing text-foreground",
                       draggedColumn && draggedColumn !== col.id && "opacity-90",
@@ -1062,7 +1110,7 @@ function PacketListViewInner({
                     }}
                     aria-label={`Drag ${config.label} column`}
                   >
-                    <GripVertical className="h-3 w-3" />
+                    <GripVertical className="h-2.5 w-2.5" />
                   </button>
                 )}
                 <div className="flex items-center gap-1 flex-1">
@@ -1121,25 +1169,31 @@ function PacketListViewInner({
                     </TooltipWrapper>
                   </div>
                 )}
-                <div
+                <PanelResizeHandle
+                  as="div"
+                  orientation="vertical"
+                  density="compact"
+                  appearance="minimal"
+                  label={`Resize ${config.label} column`}
                   className={cn(
-                    "absolute -right-1 top-0 bottom-0 z-30 w-2 cursor-col-resize",
-                    "after:absolute after:left-1/2 after:top-1 after:bottom-1 after:w-px after:-translate-x-1/2 after:rounded-full",
-                    "after:bg-border/70 hover:after:bg-foreground/45",
-                    "opacity-70 hover:opacity-100",
+                    "packet-list__col-resize",
+                    resizingColumn === col.id && "is-resizing",
                   )}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
+                    if (e.button !== 0 && e.button !== -1) return;
                     e.preventDefault();
                     e.stopPropagation();
+                    syncResizeGuideToClientX(e.clientX);
                     const cols = visibleColumnsRef.current;
                     const idx = cols.findIndex((c) => c.id === col.id);
                     const next = idx >= 0 ? cols[idx + 1] : undefined;
+                    const cfg = columnConfigsRef.current;
                     resizeStartRef.current = {
                       x: e.clientX,
                       leftId: col.id,
-                      leftWidth: columnConfigs[col.id].width,
+                      leftWidth: cfg[col.id].width,
                       rightId: next?.id ?? null,
-                      rightWidth: next ? columnConfigs[next.id].width : null,
+                      rightWidth: next ? cfg[next.id].width : null,
                     };
                     setResizingColumn(col.id);
                   }}
@@ -1158,46 +1212,42 @@ function PacketListViewInner({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>Columns</DropdownMenuLabel>
-              <div className="px-2 pb-1 text-2xs text-muted-foreground">Toggle visibility and move visible columns</div>
+              <DropdownMenuItem className="gap-2 text-xs" onSelect={() => resetColumnsToDefaults()}>
+                <RotateCcw className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                Reset to default columns
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {orderedColumns.map((col) => {
                 const visibleIndex = visibleColumns.findIndex((v) => v.id === col.id);
                 const canMoveLeft = col.visible && col.id !== "frameNumber" && visibleIndex > 1;
                 const canMoveRight = col.visible && col.id !== "frameNumber" && visibleIndex >= 1 && visibleIndex < visibleColumns.length - 1;
                 return (
-                <DropdownMenuItem
+                <DropdownMenuCheckboxItem
                   key={col.id}
+                  checked={col.visible}
+                  disabled={col.id === "frameNumber"}
+                  onCheckedChange={(checked) => {
+                    if (col.id === "frameNumber") return;
+                    const next = checked === true;
+                    if (next === col.visible) return;
+                    setColumnVisible(col.id, next);
+                  }}
                   onSelect={(e) => e.preventDefault()}
-                  className="px-2 py-1.5"
+                  className="gap-0 py-1.5 pr-1.5 text-xs"
                 >
-                  <div className="flex w-full items-center gap-2">
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-smooth",
-                        col.visible
-                          ? "border-primary/45 bg-primary/15 text-primary"
-                          : "border-border/60 bg-background/40 text-transparent hover:border-border hover:text-muted-foreground/30",
-                      )}
-                      disabled={col.id === "frameNumber"}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleColumnVisibility(col.id);
-                      }}
-                      aria-label={`${col.visible ? "Hide" : "Show"} ${col.label} column`}
-                    >
-                      {col.visible && <Tick className="h-3 w-3" strokeWidth={2.6} />}
-                    </button>
-                    <span className={cn("min-w-0 flex-1 truncate text-xs", !col.visible && "text-muted-foreground")}>
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className={cn("min-w-0 flex-1 truncate", !col.visible && "text-muted-foreground")}>
                       {col.label}
                     </span>
                     {col.id === "frameNumber" && (
-                      <span className="text-2xs text-muted-foreground">(locked)</span>
+                      <span className="shrink-0 text-2xs text-muted-foreground">(locked)</span>
                     )}
                     {col.visible && col.id !== "frameNumber" && (
-                      <span className="inline-flex items-center gap-0.5">
+                      <span
+                        className="inline-flex shrink-0 items-center gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
                           className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent disabled:opacity-35"
@@ -1226,8 +1276,8 @@ function PacketListViewInner({
                         </button>
                       </span>
                     )}
-                  </div>
-                </DropdownMenuItem>
+                  </span>
+                </DropdownMenuCheckboxItem>
                 );
               })}
             </DropdownMenuContent>

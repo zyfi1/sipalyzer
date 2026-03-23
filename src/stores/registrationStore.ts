@@ -22,6 +22,29 @@ function refreshHealthAfterRegistration() {
   }, 300);
 }
 
+/** Safety net: Tauri IPC cannot be cancelled; Rust work may continue, but the UI clears loading. */
+const REGISTRAR_SINGLE_TEST_MAX_MS = 2 * 60 * 1000;
+const REGISTRAR_TEST_SUITE_MAX_MS = 4 * 60 * 1000;
+const REGISTRAR_BULK_TEST_MAX_MS = 12 * 60 * 1000;
+
+function promiseWithTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      reject(new Error(`${label} exceeded ${Math.round(ms / 1000)}s`));
+    }, ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 export interface Registrar {
   id?: string;
   name: string;
@@ -435,19 +458,27 @@ export const useRegistrationStore = create<RegistrationState>((set, get) => ({
         }))
       : () => registrationApi.testRegistrationWithCapture(id);
     try {
-      const res = ctx
-        ? await dispatchRegistrationTest(ctx, localFn, {
-            registrar: registrar.domain,
-            username: registrar.username,
-            password: await getRegistrarPassword(id),
-            port: registrar.remote_port,
-            transport: registrar.transport,
-            domain: registrar.domain,
-            expires: registrar.register_interval_seconds,
-            timeout_secs: registrar.timeout_seconds,
-            unregister: opts?.unregister,
-          })
-        : { source: "local" as const, result: await localFn(), agentId: undefined };
+      const password = await getRegistrarPassword(id);
+      const res = await promiseWithTimeout(
+        (async () => {
+          if (ctx) {
+            return dispatchRegistrationTest(ctx, localFn, {
+              registrar: registrar.domain,
+              username: registrar.username,
+              password,
+              port: registrar.remote_port,
+              transport: registrar.transport,
+              domain: registrar.domain,
+              expires: registrar.register_interval_seconds,
+              timeout_secs: registrar.timeout_seconds,
+              unregister: opts?.unregister,
+            });
+          }
+          return { source: "local" as const, result: await localFn(), agentId: undefined };
+        })(),
+        REGISTRAR_SINGLE_TEST_MAX_MS,
+        "Registration test",
+      );
 
       const result: RegistrationResult =
         res.source === "local"
@@ -525,7 +556,11 @@ export const useRegistrationStore = create<RegistrationState>((set, get) => ({
     });
     
     try {
-      const result = await registrationApi.runTestSuite(registrarId, testTypes, testConfigs);
+      const result = await promiseWithTimeout(
+        registrationApi.runTestSuite(registrarId, testTypes, testConfigs),
+        REGISTRAR_TEST_SUITE_MAX_MS,
+        "Registrar test suite",
+      );
       
       // Atomically update both testSuites AND testResults so the UI status is immediately correct.
       // Sync registration-affecting tests into testResults so deriveStatus picks up the
@@ -596,7 +631,11 @@ export const useRegistrationStore = create<RegistrationState>((set, get) => ({
     
     set({ bulkOperationInProgress: true, bulkResults: [], error: null });
     try {
-      const results = await registrationApi.bulkTestRegistrars(registrarIds, testTypes);
+      const results = await promiseWithTimeout(
+        registrationApi.bulkTestRegistrars(registrarIds, testTypes),
+        REGISTRAR_BULK_TEST_MAX_MS,
+        "Bulk registrar tests",
+      );
       
       // Validate results before setting state
       const validResults = Array.isArray(results) ? results : [];

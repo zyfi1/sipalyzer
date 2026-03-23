@@ -11,13 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown, SelectItem } from "@/components/ui/app-dropdown";
 import {
   HardDrive,
   Download,
@@ -36,6 +30,7 @@ import {
 import { CopyTextButton } from "@/components/ui/copy-text-button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 
 const TOOL_ID = "toolsFirmware";
 
@@ -125,7 +120,7 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
         <code className="text-xs font-mono bg-muted/20 px-2 py-0.5 rounded-lg">{baseUrl}</code>
         <CopyTextButton text={baseUrl} />
         {servedEntries.map((e) => (
-          <Badge key={e.id} variant="outline" className="text-2xs py-0">{e.series} v{e.version}</Badge>
+          <Badge key={e.id} variant="secondary" className="text-2xs py-0">{e.series} v{e.version}</Badge>
         ))}
         <div className="flex-1" />
         <button
@@ -136,7 +131,7 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
           Setup
           {showGuide ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
-        <span className="w-px h-4 bg-border/20" />
+        <AppDivider orientation="vertical" size="md" className="mx-0" />
         <Button size="sm" variant="destructive" className="h-6 text-2xs px-2 gap-1" onClick={onStop}>
           <StopIcon className="h-3 w-3" />Stop
         </Button>
@@ -150,7 +145,7 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/20 bg-muted/10">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span className="text-xs font-semibold text-foreground">Poly VVX</span>
-                  <Badge variant="outline" className="text-2xs py-0 px-1.5">UCS 5.x / 6.x</Badge>
+                  <Badge variant="secondary" className="text-2xs py-0 px-1.5">UCS 5.x / 6.x</Badge>
                   <span className="text-2xs text-muted-foreground ml-auto">pw: 456</span>
                 </div>
                 <div className="p-2.5 space-y-2">
@@ -207,7 +202,7 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/20 bg-muted/10">
                   <div className="w-1.5 h-1.5 rounded-full bg-success" />
                   <span className="text-xs font-semibold text-foreground">Yealink</span>
-                  <Badge variant="outline" className="text-2xs py-0 px-1.5">T2/T3/T4/T5</Badge>
+                  <Badge variant="secondary" className="text-2xs py-0 px-1.5">T2/T3/T4/T5</Badge>
                   <span className="text-2xs text-muted-foreground ml-auto">pw: admin</span>
                 </div>
                 <div className="p-2.5 space-y-2">
@@ -306,7 +301,7 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
                 {group.vendor === "yealink" ? "Yealink" : "Poly"} {group.series}
               </span>
               {readyCount > 0 && (
-                <Badge variant="outline" className="text-2xs text-success py-0 px-1 gap-0.5 shrink-0">
+                <Badge variant="secondary" className="text-2xs text-success py-0 px-1 gap-0.5 shrink-0">
                   <Check className="h-2.5 w-2.5" />{readyCount}
                 </Badge>
               )}
@@ -316,35 +311,36 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
         </div>
 
         {/* Version dropdown */}
-        <Select value={selectedId} onValueChange={setSelectedId}>
-          <SelectTrigger size="sm" className="w-44 h-7 text-xs font-mono tabular-nums shrink-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="max-h-64">
-            {group.entries.map((e, i) => {
-              const eCached = cachedForGroup(e.id);
-              const eDl = downloads.get(e.id);
-              const eReady = eCached || eDl?.status === "done";
-              return (
-                <TooltipWrapper
-                  key={e.id}
-                  title={e.notes || `v${e.version}`}
-                  description={e.notes ? `${formatBytes(e.size_bytes)}` : undefined}
-                  side="right"
-                >
-                  <SelectItem value={e.id}>
-                    <span className="flex items-center gap-2 w-full">
-                      {eReady && <Check className="h-3 w-3 text-success shrink-0" />}
-                      <span className="font-mono tabular-nums">v{e.version}</span>
-                      {i === 0 && <span className="text-2xs text-success font-medium">latest</span>}
-                      <span className="text-2xs text-muted-foreground ml-auto tabular-nums">{e.size_bytes > 0 ? formatBytes(e.size_bytes) : ""}</span>
-                    </span>
-                  </SelectItem>
-                </TooltipWrapper>
-              );
-            })}
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={selectedId}
+          onValueChange={setSelectedId}
+          className="w-44 h-7 text-xs font-mono tabular-nums shrink-0"
+          size="sm"
+          contentPosition="popper"
+          contentClassName="max-h-64"
+          contentChildren={group.entries.map((e, i) => {
+            const eCached = cachedForGroup(e.id);
+            const eDl = downloads.get(e.id);
+            const eReady = eCached || eDl?.status === "done";
+            return (
+              <TooltipWrapper
+                key={e.id}
+                title={e.notes || `v${e.version}`}
+                description={e.notes ? `${formatBytes(e.size_bytes)}` : undefined}
+                side="right"
+              >
+                <SelectItem value={e.id}>
+                  <span className="flex items-center gap-2 w-full">
+                    {eReady && <Check className="h-3 w-3 text-success shrink-0" />}
+                    <span className="font-mono tabular-nums">v{e.version}</span>
+                    {i === 0 && <span className="text-2xs text-success font-medium">latest</span>}
+                    <span className="text-2xs text-muted-foreground ml-auto tabular-nums">{e.size_bytes > 0 ? formatBytes(e.size_bytes) : ""}</span>
+                  </span>
+                </SelectItem>
+              </TooltipWrapper>
+            );
+          })}
+        />
 
         {/* Size */}
         <div className="w-20 shrink-0 text-right">
@@ -385,7 +381,7 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
             </div>
           ) : isReady ? (
             <>
-              <Badge variant="outline" className="text-2xs text-success py-0 px-1.5 gap-0.5">
+              <Badge variant="secondary" className="text-2xs text-success py-0 px-1.5 gap-0.5">
                 <Check className="h-2.5 w-2.5" />Cached
               </Badge>
               <Button size="sm" variant="positive" className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]" onClick={() => onServe(entry)}>
@@ -407,7 +403,7 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
           ) : isErr ? (
             <>
               <TooltipWrapper title={dl?.error ?? "Download failed"}>
-                <Badge variant="outline" className="text-2xs text-destructive py-0 px-1.5 cursor-help">Error</Badge>
+                <Badge variant="secondary" className="text-2xs text-destructive py-0 px-1.5 cursor-help">Error</Badge>
               </TooltipWrapper>
               <Button size="sm" variant="neutral" className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]" onClick={() => onDownload(entry)}>
                 <Download className="h-3 w-3" />Retry
@@ -595,7 +591,7 @@ export function FirmwareCatalogView() {
 
             {!isRemote && cachedCount > 0 && (
               <>
-                <span className="w-px h-4 bg-border/20" />
+                <AppDivider orientation="vertical" size="md" className="mx-0" />
                 <span className="text-xs text-muted-foreground tabular-nums">
                   <span className="font-semibold text-success">{cachedCount}</span> cached · {formatBytes(cachedSize)}
                 </span>
@@ -606,7 +602,7 @@ export function FirmwareCatalogView() {
             )}
             {isRemote && (
               <>
-                <span className="w-px h-4 bg-border/20" />
+                <AppDivider orientation="vertical" size="md" className="mx-0" />
                 <span className="text-xs text-muted-foreground tabular-nums">
                   <span className="font-semibold text-success">{remotePaths.size}</span> on agent
                 </span>
@@ -614,7 +610,7 @@ export function FirmwareCatalogView() {
             )}
             {activeDl > 0 && (
               <>
-                <span className="w-px h-4 bg-border/20" />
+                <AppDivider orientation="vertical" size="md" className="mx-0" />
                 <span className="text-xs text-muted-foreground tabular-nums flex items-center gap-1.5">
                   <span className="relative flex h-1.5 w-1.5">
                     <span className="animate-live-ripple motion-reduce:animate-none absolute h-full w-full rounded-full bg-primary opacity-75" />
@@ -626,7 +622,7 @@ export function FirmwareCatalogView() {
             )}
           </div>
 
-          <span className="w-px h-4 bg-border/20" />
+          <AppDivider orientation="vertical" size="md" className="mx-0" />
 
           <TooltipWrapper title="Check mirrors for new firmware versions">
             <Button size="sm" variant="neutral" className="h-8 text-xs px-3 gap-1.5 active:scale-[0.97]" disabled={checkingUpdates} onClick={checkForUpdates}>

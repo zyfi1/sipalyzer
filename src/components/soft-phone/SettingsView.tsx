@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Mic, Volume2, RotateCcw, RefreshCw, Radio, Play, StopIcon } from "@/lib/icons";
 import {
   ParticleNebula,
@@ -157,22 +157,19 @@ export function SettingsView() {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <Mic className="h-4 w-4 text-muted-foreground" />
-              <Select
+              <AppDropdown
+                id="audio-input"
                 value={audioInputDeviceId ?? "default"}
                 onValueChange={(value) => setAudioInputDevice(value === "default" ? null : value)}
-              >
-                <SelectTrigger id="audio-input" className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">System default</SelectItem>
-                  {audioInputDevices.map((device) => (
-                    <SelectItem key={device.id} value={device.id}>
-                      {device.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                className="w-[200px]"
+                options={[
+                  { value: "default", label: "System default" },
+                  ...audioInputDevices.map((device) => ({
+                    value: device.id,
+                    label: device.name,
+                  })),
+                ]}
+              />
             </div>
           </div>
           <div className="flex items-center justify-between p-4">
@@ -184,22 +181,19 @@ export function SettingsView() {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <Volume2 className="h-4 w-4 text-muted-foreground" />
-              <Select
+              <AppDropdown
+                id="audio-output"
                 value={audioOutputDeviceId ?? "default"}
                 onValueChange={(value) => setAudioOutputDevice(value === "default" ? null : value)}
-              >
-                <SelectTrigger id="audio-output" className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">System default</SelectItem>
-                  {audioOutputDevices.map((device) => (
-                    <SelectItem key={device.id} value={device.id}>
-                      {device.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                className="w-[200px]"
+                options={[
+                  { value: "default", label: "System default" },
+                  ...audioOutputDevices.map((device) => ({
+                    value: device.id,
+                    label: device.name,
+                  })),
+                ]}
+              />
             </div>
           </div>
           <div className="flex items-center justify-between p-4">
@@ -322,17 +316,18 @@ export function SettingsView() {
             </div>
             <div className="flex items-center gap-2">
               <RingtonePreview preset={ringtonePreset} />
-              <Select value={ringtonePreset} onValueChange={(v) => updateSettings({ ringtonePreset: v })}>
-                <SelectTrigger id="ringtone" className="w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="classic">Classic</SelectItem>
-                  <SelectItem value="soft">Soft</SelectItem>
-                  <SelectItem value="silent">Silent</SelectItem>
-                </SelectContent>
-              </Select>
+              <AppDropdown
+                id="ringtone"
+                value={ringtonePreset}
+                onValueChange={(v) => updateSettings({ ringtonePreset: v })}
+                className="w-[160px]"
+                options={[
+                  { value: "default", label: "Default" },
+                  { value: "classic", label: "Classic" },
+                  { value: "soft", label: "Soft" },
+                  { value: "silent", label: "Silent" },
+                ]}
+              />
             </div>
           </div>
           <div className="flex items-center justify-between p-4">
@@ -355,15 +350,16 @@ export function SettingsView() {
               </Label>
               <p className="text-xs text-muted-foreground">Hold music source</p>
             </div>
-            <Select value={mohPreset} onValueChange={(v) => updateSettings({ mohPreset: v })}>
-              <SelectTrigger id="moh" className="w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="system">System</SelectItem>
-                <SelectItem value="silent">Silent</SelectItem>
-              </SelectContent>
-            </Select>
+            <AppDropdown
+              id="moh"
+              value={mohPreset}
+              onValueChange={(v) => updateSettings({ mohPreset: v })}
+              className="w-[160px]"
+              options={[
+                { value: "system", label: "System" },
+                { value: "silent", label: "Silent" },
+              ]}
+            />
           </div>
           <div className="flex items-center justify-between p-4">
             <div className="space-y-0.5">
@@ -385,20 +381,18 @@ export function SettingsView() {
               </Label>
               <p className="text-xs text-muted-foreground">Maximum concurrent active calls</p>
             </div>
-            <Select
+            <AppDropdown
+              id="max-calls"
               value={String(maxSimultaneousCalls)}
-              onValueChange={(v) => updateSettings({ maxSimultaneousCalls: parseInt(v) })}
-            >
-              <SelectTrigger id="max-calls" className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1</SelectItem>
-                <SelectItem value="2">2</SelectItem>
-                <SelectItem value="3">3</SelectItem>
-                <SelectItem value="4">4</SelectItem>
-              </SelectContent>
-            </Select>
+              onValueChange={(v) => updateSettings({ maxSimultaneousCalls: parseInt(v, 10) })}
+              className="w-[120px]"
+              options={[
+                { value: "1", label: "1" },
+                { value: "2", label: "2" },
+                { value: "3", label: "3" },
+                { value: "4", label: "4" },
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -483,18 +477,16 @@ export function SettingsView() {
               </Label>
               <p className="text-xs text-muted-foreground">DTMF transmission method</p>
             </div>
-            <Select
+            <AppDropdown
+              id="dtmf-mode"
               value={dtmfMode}
               onValueChange={(v) => updateSettings({ dtmfMode: v as "rfc2833" | "sip-info" })}
-            >
-              <SelectTrigger id="dtmf-mode" className="w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="rfc2833">RFC 2833</SelectItem>
-                <SelectItem value="sip-info">SIP INFO</SelectItem>
-              </SelectContent>
-            </Select>
+              className="w-[160px]"
+              options={[
+                { value: "rfc2833", label: "RFC 2833" },
+                { value: "sip-info", label: "SIP INFO" },
+              ]}
+            />
           </div>
           <div className="flex items-center justify-between p-4">
             <div className="space-y-0.5 flex-1 min-w-0">
@@ -542,17 +534,13 @@ export function SettingsView() {
               </Label>
               <p className="text-xs text-muted-foreground">Audio file format</p>
             </div>
-            <Select
+            <AppDropdown
+              id="recording-format"
               value={recordingFormat}
               onValueChange={(v) => updateSettings({ recordingFormat: v as "wav" })}
-            >
-              <SelectTrigger id="recording-format" className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="wav">WAV</SelectItem>
-              </SelectContent>
-            </Select>
+              className="w-[120px]"
+              options={[{ value: "wav", label: "WAV" }]}
+            />
           </div>
           <div className="flex items-center justify-between p-4">
             <div className="space-y-0.5">
@@ -782,18 +770,16 @@ export function SettingsView() {
                 </Label>
                 <p className="text-xs text-muted-foreground">How SRTP is negotiated with the remote party</p>
               </div>
-              <Select
+              <AppDropdown
+                id="srtp-mode"
                 value={srtpMode}
                 onValueChange={(v) => updateSettings({ srtpMode: v as "disabled" | "optional" | "mandatory" })}
-              >
-                <SelectTrigger id="srtp-mode" className="w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="optional">Optional</SelectItem>
-                  <SelectItem value="mandatory">Mandatory</SelectItem>
-                </SelectContent>
-              </Select>
+                className="w-[160px]"
+                options={[
+                  { value: "optional", label: "Optional" },
+                  { value: "mandatory", label: "Mandatory" },
+                ]}
+              />
             </div>
           )}
         </div>
@@ -1005,16 +991,16 @@ function VisualizerPreviewSection({
               Live preview with simulated audio
             </p>
           </div>
-          <Select value={value} onValueChange={(v) => onChange(v as VisualizerId)}>
-            <SelectTrigger id="viz-select" className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {VISUALIZER_OPTIONS.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            id="viz-select"
+            value={value}
+            onValueChange={(v) => onChange(v as VisualizerId)}
+            className="w-[180px]"
+            options={VISUALIZER_OPTIONS.map((opt) => ({
+              value: opt.id,
+              label: opt.label,
+            }))}
+          />
         </div>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
           <div className="space-y-0.5">

@@ -457,7 +457,7 @@ export function RegistrarStatusView({ registrarId }: RegistrarStatusViewProps) {
                             <div key={`warn-${idx}`} className="text-xs">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Badge
-                                  variant="outline"
+                                  variant="secondary"
                                   className="text-2xs px-1.5 py-0.5 border-warning/50 text-warning-foreground"
                                 >
                                   {testLabel(t.test_type || "unknown")}

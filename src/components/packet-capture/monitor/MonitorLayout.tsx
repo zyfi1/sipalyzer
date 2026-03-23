@@ -3,6 +3,7 @@ import { WarperPacketList } from "./WarperPacketList";
 import { PacketDetailsView } from "./PacketDetailsView";
 import type { PacketInfo } from "@/types/packetCapture";
 import { Spinner } from "@/components/ui/spinner";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 
 interface MonitorLayoutProps {
   packets: PacketInfo[];
@@ -114,8 +115,13 @@ export const MonitorLayout = memo(function MonitorLayout({
                 <PacketDetailsView packet={selectedPacket ?? null} />
               </div>
             </div>
-            <div
-              className="w-1 border-x border-border/20 bg-muted/30 cursor-col-resize hover:bg-foreground/25 transition-smooth flex-shrink-0"
+            <PanelResizeHandle
+              as="div"
+              orientation="vertical"
+              density="minimal"
+              appearance="minimal"
+              label="Resize details and packet list panels"
+              className="flex-shrink-0 rounded-none"
               onMouseDown={() => {
                 setResizeDirection("horizontal");
                 setIsResizing(true);
@@ -133,8 +139,13 @@ export const MonitorLayout = memo(function MonitorLayout({
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col" style={{ width: `${leftWidth}%` }}>
               {renderPacketList()}
             </div>
-            <div
-              className="w-1 border-x border-border/20 bg-muted/30 cursor-col-resize hover:bg-foreground/25 transition-smooth flex-shrink-0"
+            <PanelResizeHandle
+              as="div"
+              orientation="vertical"
+              density="minimal"
+              appearance="minimal"
+              label="Resize details and packet list panels"
+              className="flex-shrink-0 rounded-none"
               onMouseDown={() => {
                 setResizeDirection("horizontal");
                 setIsResizing(true);
@@ -162,8 +173,13 @@ export const MonitorLayout = memo(function MonitorLayout({
             <div className="min-h-0 overflow-hidden flex flex-col flex-1" style={{ minHeight: "300px" }}>
               {renderPacketList()}
             </div>
-            <div
-              className="h-1 border-y border-border/20 bg-muted/30 cursor-row-resize hover:bg-foreground/25 transition-smooth flex-shrink-0"
+            <PanelResizeHandle
+              as="div"
+              orientation="horizontal"
+              density="minimal"
+              appearance="minimal"
+              label="Resize packet list and details panel height"
+              className="flex-shrink-0 rounded-none"
               onMouseDown={() => {
                 setResizeDirection("vertical");
                 setIsResizing(true);
@@ -199,8 +215,13 @@ export const MonitorLayout = memo(function MonitorLayout({
                 <PacketDetailsView packet={selectedPacket ?? null} />
               </div>
             </div>
-            <div
-              className="h-1 border-y border-border/20 bg-muted/30 cursor-row-resize hover:bg-foreground/25 transition-smooth flex-shrink-0"
+            <PanelResizeHandle
+              as="div"
+              orientation="horizontal"
+              density="minimal"
+              appearance="minimal"
+              label="Resize packet list and details panel height"
+              className="flex-shrink-0 rounded-none"
               onMouseDown={() => {
                 setResizeDirection("vertical");
                 setIsResizing(true);

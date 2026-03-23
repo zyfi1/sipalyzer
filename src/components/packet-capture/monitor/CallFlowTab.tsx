@@ -16,6 +16,7 @@ import { tooltips } from "@/lib/tooltips";
 import { IpAddress } from "@/components/ui/IpAddress";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import type { PacketInfo, ExpertFinding } from "@/types/packetCapture";
 
 /** Extract SIP info from a packet's decoded application layer */
@@ -229,8 +230,8 @@ export function CallFlowTab({ packets, onSelectPacket, findings, onOpenTabbedPop
     return (
       <EmptyState
         variant="inline"
-        title="No SIP calls detected"
-        description="SIP packets will appear here during capture."
+        title="No SIP signaling detected"
+        description="INVITE, REGISTER, and other SIP dialogs will appear here when present in the capture."
         className="h-full p-6"
       />
     );
@@ -246,13 +247,13 @@ export function CallFlowTab({ packets, onSelectPacket, findings, onOpenTabbedPop
             <Input
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search calls..."
+              placeholder="Search SIP dialogs by Call-ID, party, method…"
               className="ui-control-shell h-8 pl-8 text-xs"
             />
           </div>
         </TooltipWrapper>
         <Badge variant="secondary" className="h-5 px-1.5 text-2xs text-muted-foreground">
-          {filteredCalls.length} calls
+          {filteredCalls.length} {filteredCalls.length === 1 ? "dialog" : "dialogs"}
         </Badge>
         <TooltipWrapper content="Open selected call flow in a popout panel">
           <button
@@ -308,25 +309,19 @@ export function CallFlowTab({ packets, onSelectPacket, findings, onOpenTabbedPop
         </div>
 
         <TooltipWrapper content="Drag this divider to resize panes">
-          <button
-            type="button"
-            aria-label="Resize call list and flow panes"
+          <PanelResizeHandle
+            orientation="vertical"
+            density="compact"
+            appearance="rail"
+            decor="dots"
+            label="Resize call list and flow panes"
+            className="surface-subtle shrink-0 rounded-none"
             onPointerDown={(e) => {
               e.preventDefault();
               setResizing(true);
             }}
             onDoubleClick={() => setSplitPercent(42)}
-            className="group surface-subtle relative w-2 shrink-0 border-x border-border/35 cursor-col-resize hover:bg-accent/35"
-          >
-            <span className="pointer-events-none absolute inset-y-1/2 left-1/2 h-12 w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-border/70 group-hover:bg-foreground/70" />
-            <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] leading-[7px] text-muted-foreground/85 group-hover:text-foreground/85">
-              •
-              <br />
-              •
-              <br />
-              •
-            </span>
-          </button>
+          />
         </TooltipWrapper>
 
         {/* Ladder Diagram */}
@@ -462,7 +457,7 @@ export function CallFlowTab({ packets, onSelectPacket, findings, onOpenTabbedPop
                           <Icon className={cn("h-3 w-3 shrink-0", color)} />
                           <span className="truncate">{f.title}</span>
                           {f.count > 1 && (
-                            <Badge variant="outline" className="text-3xs ml-auto shrink-0">{f.count}</Badge>
+                            <Badge variant="secondary" className="text-3xs ml-auto shrink-0">{f.count}</Badge>
                           )}
                         </div>
                       );
@@ -474,7 +469,7 @@ export function CallFlowTab({ packets, onSelectPacket, findings, onOpenTabbedPop
           ) : (
             <EmptyState
               variant="inline"
-              title="Select a call to view flow"
+              title="Select a SIP dialog to view flow"
               className="h-full p-6"
             />
           )}
@@ -583,7 +578,7 @@ export function CallFlowTab({ packets, onSelectPacket, findings, onOpenTabbedPop
             ) : (
               <EmptyState
                 variant="inline"
-                title="Select a call in the main panel"
+                title="Select a dialog in the list"
                 description="Then pop out to expand it."
                 className="h-full p-6"
               />

@@ -273,9 +273,9 @@ export function McpView() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <Badge variant="outline">{profiles.length} profiles</Badge>
-            <Badge variant="outline">{connectedServers.length} connected</Badge>
-            <Badge variant={setupStatus === "ready" ? "default" : "outline"}>
+            <Badge variant="secondary">{profiles.length} profiles</Badge>
+            <Badge variant="secondary">{connectedServers.length} connected</Badge>
+            <Badge variant={setupStatus === "ready" ? "default" : "secondary"}>
               Setup: {setupStatus}
             </Badge>
           </div>
@@ -390,7 +390,7 @@ export function McpView() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium">{profile.name}</span>
-                    <Badge variant="outline">{profile.transport}</Badge>
+                    <Badge variant="secondary">{profile.transport}</Badge>
                   </div>
                   <div className="text-2xs text-muted-foreground mt-1">
                     {status?.connected ? "Connected" : "Disconnected"}
@@ -560,7 +560,7 @@ export function McpView() {
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Activity</p>
           <div className="flex items-center gap-2">
-            <Badge variant="outline">{activity.length}</Badge>
+            <Badge variant="secondary">{activity.length}</Badge>
             <select
               value={activityFilter}
               onChange={(e) => setActivityFilter(isActivityFilter(e.target.value) ? e.target.value : "all")}

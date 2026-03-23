@@ -40,7 +40,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "graphite-modal-overlay data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-[var(--motion-duration-overlay)] fixed inset-0 z-[10000]",
+        "graphite-modal-overlay data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-[var(--motion-duration-overlay)] fixed inset-0 z-[10100]",
         className
       )}
       {...props}
@@ -53,11 +53,13 @@ function DialogContent({
   children,
   showCloseButton = true,
   layout = "center",
+  tone = "neutral",
   style,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
   layout?: "center" | "left-sheet"
+  tone?: "neutral" | "success" | "destructive"
 }) {
   const isLeftSheet = layout === "left-sheet"
 
@@ -67,8 +69,9 @@ function DialogContent({
       {isLeftSheet ? (
         <DialogPrimitive.Content
           data-slot="dialog-content"
+          data-tone={tone}
           className={cn(
-            "graphite-modal-content text-card-foreground fixed z-[10001] grid gap-4 overflow-y-auto p-5 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)] outline-none left-2 inset-y-2 translate-x-0 w-[min(760px,calc(100vw-1rem))] max-w-[min(760px,calc(100vw-1rem))] max-h-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-left-6 data-[state=open]:slide-in-from-left-6",
+            "graphite-modal-content text-card-foreground fixed z-[10101] grid gap-4 overflow-y-auto p-5 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)] outline-none left-2 inset-y-2 translate-x-0 w-[min(760px,calc(100vw-1rem))] max-w-[min(760px,calc(100vw-1rem))] max-h-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-left-6 data-[state=open]:slide-in-from-left-6 border data-[tone=neutral]:border-border/60 data-[tone=success]:border-success/45 data-[tone=destructive]:border-destructive/45",
             className
           )}
           {...props}
@@ -86,11 +89,12 @@ function DialogContent({
           )}
         </DialogPrimitive.Content>
       ) : (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 pointer-events-none">
+        <div className="fixed inset-0 z-[10101] flex items-center justify-center p-4 pointer-events-none">
           <DialogPrimitive.Content
             data-slot="dialog-content"
+            data-tone={tone}
             className={cn(
-              "graphite-modal-content text-card-foreground relative grid w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[calc(min(100vh,100dvh)-2rem)] gap-4 overflow-y-auto p-5 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)] outline-none pointer-events-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "graphite-modal-content text-card-foreground relative grid w-full max-w-[calc(100%-2rem)] sm:max-w-lg max-h-[calc(min(100vh,100dvh)-2rem)] gap-4 overflow-y-auto p-5 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)] outline-none pointer-events-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border data-[tone=neutral]:border-border/60 data-[tone=success]:border-success/45 data-[tone=destructive]:border-destructive/45",
               className
             )}
             {...props}

@@ -449,7 +449,7 @@ function TracerouteSection() {
             <p className="text-xs text-muted-foreground">Map the network path hop-by-hop</p>
           </div>
           {traceroute.result?.reached_destination && (
-            <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30 ml-2">Reached</Badge>
+            <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30 ml-2">Reached</Badge>
           )}
         </div>
         {running && <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none text-muted-foreground" />}
@@ -746,17 +746,17 @@ function RouteComparisonSection() {
           {/* Summary badges */}
           <div className="flex flex-wrap gap-2">
             {analysis.divergenceHop != null && (
-              <Badge variant="outline" className="text-2xs bg-info/10 text-info border-info/30">
+              <Badge variant="secondary" className="text-2xs bg-info/10 text-info border-info/30">
                 Diverge at hop {analysis.divergenceHop}
               </Badge>
             )}
             {analysis.commonIps.size > 0 && (
-              <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30">
+              <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30">
                 {analysis.commonIps.size} shared hops
               </Badge>
             )}
             {analysis.latencyDelta != null && (
-              <Badge variant="outline" className="text-2xs">
+              <Badge variant="secondary" className="text-2xs">
                 {Math.abs(analysis.latencyDelta).toFixed(1)} ms {analysis.latencyDelta > 0 ? `slower to ${targetA}` : `slower to ${targetB}`}
               </Badge>
             )}
@@ -852,7 +852,7 @@ function MonitorSection() {
             <p className="text-xs text-muted-foreground">Real-time latency, jitter & loss over time</p>
           </div>
           {monitorRunning && (
-            <Badge variant="outline" className="text-2xs bg-success/10 text-success border-success/30 ml-2">
+            <Badge variant="secondary" className="text-2xs bg-success/10 text-success border-success/30 ml-2">
               <span className="h-1.5 w-1.5 rounded-full bg-success status-online mr-1 inline-block" />Live
             </Badge>
           )}

@@ -43,7 +43,7 @@ import { cn } from "@/lib/utils";
 // ── Types ────────────────────────────────────────────────────────
 
 type ActivityCategory =
-  | "registration" | "call" | "call_quality" | "fax"
+  | "registration" | "call" | "call_quality" | "fax" | "network"
   | "agent" | "capture" | "notification" | "discovery" | "error";
 
 interface UnifiedActivityItem {
@@ -109,6 +109,7 @@ function useUnifiedActivity(limit: number): UnifiedActivityItem[] {
         call_quality: Activity,
         fax_sent: Printer,
         fax_received: Printer,
+        network_test: Network,
       };
       const colorMap: Record<ForensicsTimelineEntry["kind"], string> = {
         registration: "text-primary/70",
@@ -116,8 +117,14 @@ function useUnifiedActivity(limit: number): UnifiedActivityItem[] {
         call_quality: "text-warning/70",
         fax_sent: "text-primary/70",
         fax_received: "text-primary/70",
+        network_test: "text-sky-500/80",
       };
-      const cat: ActivityCategory = e.kind === "fax_sent" || e.kind === "fax_received" ? "fax" : e.kind;
+      const cat: ActivityCategory =
+        e.kind === "fax_sent" || e.kind === "fax_received"
+          ? "fax"
+          : e.kind === "network_test"
+            ? "network"
+            : e.kind;
       items.push({
         id: `tl-${e.id}`,
         ts: new Date(e.timestamp).getTime(),
@@ -870,7 +877,7 @@ export function ActivityMonitorSection({ embedded = false }: { embedded?: boolea
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-hidden p-3">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
             {hasEventRows ? (
               <div className="flex h-full min-h-0 flex-col rounded-md border border-border/45 bg-[linear-gradient(180deg,hsl(var(--card)/0.44)_0%,hsl(var(--background)/0.34)_100%)] p-2">
                 <div className="mb-1.5 flex items-center justify-between">
@@ -978,7 +985,7 @@ export function ActivityMonitorSection({ embedded = false }: { embedded?: boolea
                 icon={<Activity />}
                 title={emptyTitle}
                 description={emptyDescription}
-                className="h-full rounded-md border border-border/45 bg-background/20 px-3 text-center"
+                className="rounded-md border border-border/45 bg-background/20 px-3 text-center"
                 action={(
                   <div className="flex flex-wrap items-center justify-center gap-1.5">
                     {(hasSearchQuery || hasCategoryFilter) && (

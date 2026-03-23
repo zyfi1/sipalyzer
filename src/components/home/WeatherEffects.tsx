@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, memo } from "react";
+import { moonSunUnitVector } from "@/lib/moonGeometry";
 
 type WeatherEffect = "clear" | "cloudy" | "rain" | "heavyRain" | "snow" | "thunder" | "fog" | "none";
 const TARGET_FPS = 30;
@@ -88,7 +89,11 @@ interface MilkyWayNode {
   angle: number; opacity: number;
 }
 
-const MOON_TEXTURE_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg";
+/** Same-origin (Vite `public/moon/…`) so getImageData works in Tauri/WebKit. */
+const BUNDLED_MOON_TEXTURE = `${import.meta.env.BASE_URL}moon/moon-full-reference.jpg`;
+
+/** Procedural detail map is the fallback if the photo fails to load. */
+const USE_MOON_PHOTO_TEXTURE = true;
 
 let moonTextureImage: HTMLImageElement | null = null;
 let moonTextureLoading = false;
@@ -945,12 +950,45 @@ function getMoonDetailMapCanvas(): HTMLCanvasElement {
   return c;
 }
 
+/** If pixel readback fails (tainted canvas etc.), draw a readable phase disc without getImageData. */
+function drawMoonShadingFallback(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  R: number,
+  sunX: number,
+  sunY: number,
+  _sunZ: number,
+  illum: number,
+  visibility: number,
+) {
+  void _sunZ;
+  const litX = cx + sunX * R * 1.05;
+  const litY = cy + sunY * R * 1.05;
+  const dim = `rgba(42, 52, 72, ${0.92 * visibility})`;
+  const bright = `rgba(210, 218, 238, ${0.92 * visibility})`;
+  const mid = `rgba(120, 135, 168, ${0.55 * visibility})`;
+  const g = ctx.createRadialGradient(litX, litY, 0, cx, cy, R * 1.02);
+  g.addColorStop(0, bright);
+  g.addColorStop(Math.max(0.15, 0.55 - illum * 0.35), mid);
+  g.addColorStop(1, dim);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = `rgba(200, 212, 240, ${0.35 * visibility})`;
+  ctx.lineWidth = Math.max(0.5, R * 0.04);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawMoon(
   ctx: CanvasRenderingContext2D,
   w: number, h: number, _t: number,
   moonTexture: HTMLImageElement | null,
-  moonIllumination: number, moonAge: number, moonPhaseValue: number | null,
-  moonTilt: number,
+  moonLitFraction: number,
+  moonLimbZenithRad: number,
   cloudCover: number, progress: number,
 ) {
   // Calibrated for unaided "natural eye" appearance, not telescope contrast.
@@ -959,9 +997,9 @@ function drawMoon(
     haloOuter: 0.005,
     terminatorBase: 0.038,
     terminatorRange: 0.018,
-    earthshineNew: 0.2,
-    earthshineBase: 0.085,
-    earthshineScale: 0.095,
+    earthshineNew: 0.28,
+    earthshineBase: 0.12,
+    earthshineScale: 0.12,
     surfaceGrain: 0.05,
     craterDepth: 0.04,
     shadowLift: 0.22,
@@ -997,26 +1035,13 @@ function drawMoon(
   ctx.fill();
 
   // ── Draw the lit moon disc via pixel-level phase masking ──
-  // Render into an offscreen canvas so we can mask the phase cleanly
-  const normalizedAge = ((moonAge % 29.53058770576) + 29.53058770576) % 29.53058770576;
-  const cycle = moonPhaseValue == null
-    ? normalizedAge / 29.53058770576
-    : ((moonPhaseValue % 1) + 1) % 1;
-  const shadowSide = getMoonShadowSideForPhase(cycle);
-  const phaseAngle = cycle * Math.PI * 2;
-  const illumFromPhase = (1 - Math.cos(phaseAngle)) / 2;
-  const illumFromProp = Math.max(0, Math.min(1, moonIllumination / 100));
-  // Keep phase-driven geometry primary; only tiny blending for numerical stability.
-  const illum = illumFromPhase * 0.98 + illumFromProp * 0.02;
-  const isNewMoon = illum < 0.02;
-  const isFullMoon = shadowSide === "none";
-  const safeTilt = Number.isFinite(moonTilt) ? moonTilt : 0;
-  const sunZ = Math.max(-1, Math.min(1, 2 * illum - 1));
-  const sunXY = Math.sqrt(Math.max(0, 1 - sunZ * sunZ));
-  // moonTilt comes in as bright-limb bearing (north=0, east=+PI/2),
-  // already corrected by local parallactic angle. Map to canvas axes.
-  const sunX = Math.sin(safeTilt) * sunXY;
-  const sunY = -Math.cos(safeTilt) * sunXY;
+  // Rebuild light vector from fraction + limb here so illum and (x,y,z) never desync
+  // (a desynced vector makes the disc read as “all black”).
+  const illum = Math.max(0, Math.min(1, moonLitFraction));
+  const limb = Number.isFinite(moonLimbZenithRad) ? moonLimbZenithRad : 0;
+  const { x: sunX, y: sunY, z: sunZ } = moonSunUnitVector(illum, limb);
+  const isNewMoon = illum <= 0.012;
+  const isFullMoon = illum >= 0.993;
 
   // Solid moon back-plate so stars never bleed through the dark side.
   ctx.fillStyle = "rgba(7, 10, 20, 0.98)";
@@ -1045,12 +1070,16 @@ function drawMoon(
     phaseCtx.clip();
 
     let usedTexture = false;
-    if (moonTexture && moonTexture.complete && moonTexture.naturalWidth > 0) {
+    if (
+      USE_MOON_PHOTO_TEXTURE
+      && moonTexture
+      && moonTexture.complete
+      && moonTexture.naturalWidth > 0
+    ) {
       try {
         phaseCtx.filter = "grayscale(0.06) contrast(1.14) brightness(1.02)";
         phaseCtx.drawImage(moonTexture, 0, 0, discSize, discSize);
         phaseCtx.filter = "none";
-        // Probe read access once to ensure shading pass won't fail on tainted canvas.
         phaseCtx.getImageData(0, 0, 1, 1);
         usedTexture = true;
       } catch {
@@ -1067,83 +1096,81 @@ function drawMoon(
     }
     phaseCtx.restore();
 
-    const image = phaseCtx.getImageData(0, 0, discSize, discSize);
-    const data = image.data;
-    // Keep a realistic but not razor-hard terminator.
-    const terminatorSoftness =
-      naturalEyeProfile.terminatorBase
-      + (naturalEyeProfile.terminatorRange * (1 - Math.abs(0.5 - illum) * 2))
-      + 0.012;
-    // Human-eye appearance: unlit hemisphere still receives noticeable earthshine.
-    const earthshine = isNewMoon
-      ? naturalEyeProfile.earthshineNew
-      : Math.max(naturalEyeProfile.earthshineBase, naturalEyeProfile.earthshineScale * (1 - illum));
+    try {
+      const image = phaseCtx.getImageData(0, 0, discSize, discSize);
+      const data = image.data;
+      const terminatorSoftness =
+        naturalEyeProfile.terminatorBase
+        + (naturalEyeProfile.terminatorRange * (1 - Math.abs(0.5 - illum) * 2))
+        + 0.012;
+      const earthshine = isNewMoon
+        ? naturalEyeProfile.earthshineNew
+        : Math.max(naturalEyeProfile.earthshineBase, naturalEyeProfile.earthshineScale * (1 - illum));
 
-    for (let y = 0; y < discSize; y++) {
-      for (let x = 0; x < discSize; x++) {
-        const i = (y * discSize + x) * 4;
-        const a = data[i + 3];
-        if (a === 0) continue;
+      for (let y = 0; y < discSize; y++) {
+        for (let x = 0; x < discSize; x++) {
+          const i = (y * discSize + x) * 4;
+          const a = data[i + 3];
+          if (a === 0) continue;
 
-        const nx = (x + 0.5 - localCx) / localR;
-        const ny = (y + 0.5 - localCy) / localR;
-        const rr = nx * nx + ny * ny;
-        if (rr > 1) {
-          data[i + 3] = 0;
-          continue;
+          const nx = (x + 0.5 - localCx) / localR;
+          const ny = (y + 0.5 - localCy) / localR;
+          const rr = nx * nx + ny * ny;
+          if (rr > 1) {
+            data[i + 3] = 0;
+            continue;
+          }
+
+          const nz = Math.sqrt(Math.max(0, 1 - rr));
+          const dot = nx * sunX + ny * sunY + nz * sunZ;
+          const lit = isFullMoon ? 1 : smoothstep(-terminatorSoftness, terminatorSoftness, dot);
+
+          const limbDark = 0.82 + 0.18 * nz;
+          const mariaA = Math.exp(-((nx + 0.26) ** 2 + (ny + 0.04) ** 2) / 0.085);
+          const mariaB = Math.exp(-((nx - 0.18) ** 2 + (ny + 0.2) ** 2) / 0.07);
+          const mariaC = Math.exp(-((nx + 0.02) ** 2 + (ny - 0.24) ** 2) / 0.06);
+          const maria = Math.max(0, Math.min(1, mariaA * 0.7 + mariaB * 0.6 + mariaC * 0.5));
+          const microRelief = 0.96 + 0.04 * Math.sin((nx * 16 + ny * 13) * Math.PI);
+
+          const grain = fbm2D((nx + 1.3) * 9.5, (ny + 0.9) * 9.5, 4);
+          const pits = fbm2D((nx - 0.4) * 18.0, (ny + 0.2) * 18.0, 3);
+          const microCrater = Math.max(0, 0.58 - pits) * naturalEyeProfile.craterDepth;
+          const highFreq = (grain - 0.5) * naturalEyeProfile.surfaceGrain - microCrater;
+          const detailMix = 0.3 + lit * 0.7;
+          const albedo = (1 - maria * 0.2) * microRelief * (1 + highFreq * detailMix);
+
+          const brightness = (earthshine + (1 - earthshine) * lit) * limbDark * albedo;
+          const clamped = Math.max(0, Math.min(1, brightness));
+          const coolBias = 0.96 + 0.04 * (1 - lit);
+          const warmLit = 0.97 + 0.03 * lit;
+          const shadowLift = (1 - lit) * naturalEyeProfile.shadowLift;
+          const ambientR = 104;
+          const ambientG = 116;
+          const ambientB = 140;
+          const litExposure = 1 + lit * (naturalEyeProfile.litBoost - 1);
+
+          const r = data[i] ?? 0;
+          const g = data[i + 1] ?? 0;
+          const b = data[i + 2] ?? 0;
+
+          const rOut = Math.max(0, Math.min(255, Math.round(r * clamped * coolBias * litExposure + ambientR * shadowLift)));
+          const gOut = Math.max(0, Math.min(255, Math.round(g * clamped * litExposure + ambientG * shadowLift)));
+          const bOut = Math.max(0, Math.min(255, Math.round(b * clamped * warmLit * litExposure + ambientB * shadowLift)));
+
+          const c = naturalEyeProfile.contrast;
+          data[i] = Math.max(0, Math.min(255, Math.round((((rOut / 255 - 0.5) * c + 0.5) * 255) * naturalEyeProfile.globalGain)));
+          data[i + 1] = Math.max(0, Math.min(255, Math.round((((gOut / 255 - 0.5) * c + 0.5) * 255) * naturalEyeProfile.globalGain)));
+          data[i + 2] = Math.max(0, Math.min(255, Math.round((((bOut / 255 - 0.5) * c + 0.5) * 255) * naturalEyeProfile.globalGain)));
         }
-
-        const nz = Math.sqrt(Math.max(0, 1 - rr));
-        const dot = nx * sunX + ny * sunY + nz * sunZ;
-        const lit = isFullMoon ? 1 : smoothstep(-terminatorSoftness, terminatorSoftness, dot);
-
-        // Limb darkening and subtle maria/albedo variation for realism.
-        const limb = 0.82 + 0.18 * nz;
-        const mariaA = Math.exp(-((nx + 0.26) ** 2 + (ny + 0.04) ** 2) / 0.085);
-        const mariaB = Math.exp(-((nx - 0.18) ** 2 + (ny + 0.2) ** 2) / 0.07);
-        const mariaC = Math.exp(-((nx + 0.02) ** 2 + (ny - 0.24) ** 2) / 0.06);
-        const maria = Math.max(0, Math.min(1, mariaA * 0.7 + mariaB * 0.6 + mariaC * 0.5));
-        const microRelief = 0.96 + 0.04 * Math.sin((nx * 16 + ny * 13) * Math.PI);
-
-        // Add deterministic fine detail: micro-crater field + grain.
-        const grain = fbm2D((nx + 1.3) * 9.5, (ny + 0.9) * 9.5, 4);
-        const pits = fbm2D((nx - 0.4) * 18.0, (ny + 0.2) * 18.0, 3);
-        const microCrater = Math.max(0, 0.58 - pits) * naturalEyeProfile.craterDepth;
-        const highFreq = (grain - 0.5) * naturalEyeProfile.surfaceGrain - microCrater;
-        // Keep shadowed hemisphere visually smooth: too much micro-detail there
-        // makes the phase boundary look noisy/unrealistic at app scale.
-        const detailMix = 0.3 + lit * 0.7;
-        const albedo = (1 - maria * 0.2) * microRelief * (1 + highFreq * detailMix);
-
-        const brightness = (earthshine + (1 - earthshine) * lit) * limb * albedo;
-        const clamped = Math.max(0, Math.min(1, brightness));
-        const coolBias = 0.96 + 0.04 * (1 - lit);
-        const warmLit = 0.97 + 0.03 * lit;
-        const shadowLift = (1 - lit) * naturalEyeProfile.shadowLift;
-        const ambientR = 104;
-        const ambientG = 116;
-        const ambientB = 140;
-        const litExposure = 1 + lit * (naturalEyeProfile.litBoost - 1);
-
-        const r = data[i] ?? 0;
-        const g = data[i + 1] ?? 0;
-        const b = data[i + 2] ?? 0;
-
-        const rOut = Math.max(0, Math.min(255, Math.round(r * clamped * coolBias * litExposure + ambientR * shadowLift)));
-        const gOut = Math.max(0, Math.min(255, Math.round(g * clamped * litExposure + ambientG * shadowLift)));
-        const bOut = Math.max(0, Math.min(255, Math.round(b * clamped * warmLit * litExposure + ambientB * shadowLift)));
-
-        // Mild contrast curve centered around midtones to avoid a flat/dim disc.
-        const c = naturalEyeProfile.contrast;
-        data[i] = Math.max(0, Math.min(255, Math.round((((rOut / 255 - 0.5) * c + 0.5) * 255) * naturalEyeProfile.globalGain)));
-        data[i + 1] = Math.max(0, Math.min(255, Math.round((((gOut / 255 - 0.5) * c + 0.5) * 255) * naturalEyeProfile.globalGain)));
-        data[i + 2] = Math.max(0, Math.min(255, Math.round((((bOut / 255 - 0.5) * c + 0.5) * 255) * naturalEyeProfile.globalGain)));
       }
-    }
 
-    phaseCtx.putImageData(image, 0, 0);
-    // Downsample supersampled phase canvas back to the intended moon size.
-    ctx.drawImage(phaseCanvas, cx - R, cy - R, R * 2, R * 2);
+      phaseCtx.putImageData(image, 0, 0);
+      ctx.drawImage(phaseCanvas, cx - R, cy - R, R * 2, R * 2);
+    } catch {
+      drawMoonShadingFallback(ctx, cx, cy, R, sunX, sunY, sunZ, illum, visibility);
+    }
+  } else {
+    drawMoonShadingFallback(ctx, cx, cy, R, sunX, sunY, sunZ, illum, visibility);
   }
 
   // Directional relief to make surface details readable at small size.
@@ -1183,17 +1210,6 @@ function drawMoon(
   ctx.beginPath();
   ctx.arc(cx, cy, R * 2, 0, Math.PI * 2);
   ctx.fill();
-}
-
-export function getMoonShadowSideForPhase(cycle: number): "left" | "right" | "none" {
-  const normalizedCycle = ((cycle % 1) + 1) % 1;
-  const fullMoonDistance = Math.min(
-    Math.abs(normalizedCycle - 0.5),
-    Math.abs(normalizedCycle + 0.5),
-    Math.abs(normalizedCycle - 1.5),
-  );
-  if (fullMoonDistance < 0.008) return "none";
-  return normalizedCycle < 0.5 ? "left" : "right";
 }
 
 // ── Weather draw helpers ────────────────────────────────────────
@@ -1524,10 +1540,8 @@ function tick(
   state: EffectState,
   w: number, h: number, t: number,
   isNight: boolean,
-  moonIllumination: number,
-  moonAge: number,
-  moonPhaseValue: number,
-  moonTilt: number,
+  moonLitFraction: number,
+  moonLimbZenithRad: number,
   moonTexture: HTMLImageElement | null,
   celestialProgress: number,
 ) {
@@ -1551,7 +1565,7 @@ function tick(
 
   // Layer 4: Celestial body (sun or moon) — position follows an arc
   if (isNight) {
-    drawMoon(ctx, w, h, t, moonTexture, moonIllumination, moonAge, moonPhaseValue, moonTilt, cloudCover, celestialProgress);
+    drawMoon(ctx, w, h, t, moonTexture, moonLitFraction, moonLimbZenithRad, cloudCover, celestialProgress);
   } else {
     drawSun(ctx, state, w, h, t, cloudCover, celestialProgress);
   }
@@ -1604,12 +1618,10 @@ function tick(
 interface Props {
   weatherCode: number;
   isNight: boolean;
+  /** Drives canvas re-init when phase name changes */
   moonPhase: string;
-  moonIllumination: number;
-  moonAge: number;
-  /** SunCalc phase fraction in [0, 1): 0=new, 0.25=first quarter, 0.5=full */
-  moonPhaseValue: number;
-  moonTilt: number;
+  moonLitFraction: number;
+  moonLimbZenithRad: number;
   /** 0 = just risen, 0.5 = peak (noon/midnight), 1 = about to set */
   celestialProgress: number;
   onMoonTripleClick?: () => void;
@@ -1617,7 +1629,14 @@ interface Props {
 }
 
 export const WeatherEffects = memo(function WeatherEffects({
-  weatherCode, isNight, moonPhase, moonIllumination, moonAge, moonPhaseValue, moonTilt, celestialProgress, onMoonTripleClick, className,
+  weatherCode,
+  isNight,
+  moonPhase,
+  moonLitFraction,
+  moonLimbZenithRad,
+  celestialProgress,
+  onMoonTripleClick,
+  className,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
@@ -1627,24 +1646,20 @@ export const WeatherEffects = memo(function WeatherEffects({
   );
   // Use a ref so the animation loop always reads the latest position without restarting
   const progressRef = useRef(celestialProgress);
-  const moonAgeRef = useRef(moonAge);
-  const moonPhaseValueRef = useRef(moonPhaseValue);
-  const moonIlluminationRef = useRef(moonIllumination);
-  const moonTiltRef = useRef(moonTilt);
+  const moonLitFractionRef = useRef(moonLitFraction);
+  const moonLimbZenithRadRef = useRef(moonLimbZenithRad);
   const onMoonTripleClickRef = useRef(onMoonTripleClick);
   const moonTextureRef = useRef<HTMLImageElement | null>(moonTextureImage);
   progressRef.current = celestialProgress;
-  moonAgeRef.current = moonAge;
-  moonPhaseValueRef.current = moonPhaseValue;
-  moonIlluminationRef.current = moonIllumination;
-  moonTiltRef.current = moonTilt;
+  moonLitFractionRef.current = moonLitFraction;
+  moonLimbZenithRadRef.current = moonLimbZenithRad;
   onMoonTripleClickRef.current = onMoonTripleClick;
 
   useEffect(() => {
+    if (!USE_MOON_PHOTO_TEXTURE) return;
     if (moonTextureImage || moonTextureLoading) return;
     moonTextureLoading = true;
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => {
       moonTextureImage = img;
       moonTextureRef.current = img;
@@ -1653,7 +1668,7 @@ export const WeatherEffects = memo(function WeatherEffects({
     img.onerror = () => {
       moonTextureLoading = false;
     };
-    img.src = MOON_TEXTURE_URL;
+    img.src = BUNDLED_MOON_TEXTURE;
   }, []);
 
   useEffect(() => {
@@ -1694,21 +1709,6 @@ export const WeatherEffects = memo(function WeatherEffects({
 
     let state = initState(effect, dims.w, dims.h, isNight);
 
-    const onCanvasClick = (e: MouseEvent) => {
-      if (!isNight || e.detail !== 3) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const moonPos = celestialArcPosition(currentW, currentH, progressRef.current);
-      const moonRadius = Math.max(Math.min(currentW, currentH) * 0.1, 16);
-      const dx = x - moonPos.x;
-      const dy = y - moonPos.y;
-      if (dx * dx + dy * dy <= moonRadius * moonRadius * 1.05) {
-        onMoonTripleClickRef.current?.();
-      }
-    };
-    canvas.addEventListener("click", onCanvasClick);
-
     const animate = (t: number) => {
       if (!pageVisibleRef.current) {
         animRef.current = requestAnimationFrame(animate);
@@ -1724,10 +1724,8 @@ export const WeatherEffects = memo(function WeatherEffects({
           currentH,
           t,
           isNight,
-          moonIlluminationRef.current,
-          moonAgeRef.current,
-          moonPhaseValueRef.current,
-          moonTiltRef.current,
+          moonLitFractionRef.current,
+          moonLimbZenithRadRef.current,
           moonTextureRef.current,
           progressRef.current,
         );
@@ -1744,7 +1742,6 @@ export const WeatherEffects = memo(function WeatherEffects({
     if (canvas.parentElement) ro.observe(canvas.parentElement);
 
     return () => {
-      canvas.removeEventListener("click", onCanvasClick);
       cancelAnimationFrame(animRef.current);
       ro.disconnect();
     };
@@ -1754,7 +1751,13 @@ export const WeatherEffects = memo(function WeatherEffects({
     <canvas
       ref={canvasRef}
       className={className}
-      style={{ position: "absolute", inset: 0, pointerEvents: isNight ? "auto" : "none", zIndex: 0 }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        /* Let hero overlays (moon tooltip) receive hover; triple-click uses capture on parent. */
+        pointerEvents: "none",
+        zIndex: 0,
+      }}
     />
   );
 });

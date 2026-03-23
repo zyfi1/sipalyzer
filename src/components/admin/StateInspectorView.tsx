@@ -1,11 +1,5 @@
 import { useState, useMemo } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Button } from "@/components/ui/button";
 import { Clipboard } from "@/lib/icons";
 
@@ -78,18 +72,15 @@ export function StateInspectorView() {
     <div className="flex-1 flex flex-col gap-3 p-4 overflow-auto">
       {/* Toolbar */}
       <div className="flex items-center gap-2">
-        <Select value={selected} onValueChange={setSelected}>
-          <SelectTrigger className="h-8 w-[220px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(STORE_MAP).map(([key, entry]) => (
-              <SelectItem key={key} value={key}>
-                {entry.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={selected}
+          onValueChange={setSelected}
+          className="h-8 w-[220px] text-xs"
+          options={Object.entries(STORE_MAP).map(([key, entry]) => ({
+            value: key,
+            label: entry.label,
+          }))}
+        />
         <Button
           variant="neutral"
           size="sm"

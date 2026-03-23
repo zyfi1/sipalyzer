@@ -11,28 +11,19 @@ import { listen } from "@/lib/tauriEvents";
 import { useToolStore } from "@/stores/toolStore";
 import { useTroubleshootingStore } from "@/stores/troubleshootingStore";
 import { useRegistrationStore } from "@/stores/registrationStore";
-import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { useIncomingFaxStore } from "@/stores/incomingFaxStore";
 import { faxAnswerInboundCall, faxRejectInboundCall } from "@/api/fax";
 import { Tabs, TabsContent, AnimatedTabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
+import { RegistrarContextSelector } from "@/components/ui/registrar-context-selector";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Phone, PhoneOff, CheckCircle2, XCircle, ChevronDown, Check } from "@/lib/icons";
+import { Phone, PhoneOff } from "@/lib/icons";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer } from "@/components/layout/ViewFooter";
 import { FaxSendView } from "./FaxSendView";
 import { FaxesView } from "./FaxesView";
-import { getUseCase, isRegistered } from "./FaxShared";
 import type { FaxSendProgress, FaxReceiveProgress } from "./FaxShared";
 import type { ReceivedFax } from "@/types/fax";
-import { cn } from "@/lib/utils";
 
 type FaxView = "send" | "faxes";
 
@@ -41,39 +32,14 @@ export function FaxCenterTool() {
   const activeSubviewId = useToolStore((s) => s.activeSubviewId);
   const setActiveSubview = useToolStore((s) => s.setActiveSubview);
   const setLastViewedSubview = useToolStore((s) => s.setLastViewedSubview);
-  const sentFaxJobs = useTroubleshootingStore((s) => s.sentFaxJobs);
-  const receivedFaxes: ReceivedFax[] = useTroubleshootingStore((s) => s.receivedFaxes) ?? [];
 
   // ── Registrar state (lifted from FaxSendView) ──
   const registrars = useRegistrationStore((s) => s.registrars);
   const fetchRegistrars = useRegistrationStore((s) => s.fetchRegistrars);
-  const testRegistration = useRegistrationStore((s) => s.testRegistration);
-  const testResults = useRegistrationStore((s) => s.testResults);
   const [registrarId, setRegistrarId] = useState("");
-  const [registrarPickerOpen, setRegistrarPickerOpen] = useState(false);
-  const [registeringRegistrarId, setRegisteringRegistrarId] = useState<string | null>(null);
-
-  const healthRegistrars = useTroubleshootingStore((s) => s.registrationHealth?.registrars);
-
-  /** All registrars assigned to faxing (ready + idle). */
-  const registrarsForFax = useMemo(
-    () => registrars.filter(
-      (r) => {
-        const uc = getUseCase(r);
-        const isFaxUseCase = uc?.split(",").map((s: string) => s.trim()).includes("faxing");
-        return !!isFaxUseCase;
-      }
-    ),
-    [registrars]
-  );
 
   useEffect(() => { fetchRegistrars(); }, [fetchRegistrars]);
-  useEffect(() => { if (registrarId && !registrarsForFax.some((r) => r.id === registrarId)) setRegistrarId(""); }, [registrarId, registrarsForFax]);
 
-  const selectedFaxRegistrar = registrarId ? registrars.find((r) => r.id === registrarId) : null;
-  const selectedFaxRegistrarLabel = selectedFaxRegistrar
-    ? `${selectedFaxRegistrar.name} — ${selectedFaxRegistrar.username}@${selectedFaxRegistrar.domain}`
-    : (registrarsForFax.length ? "Select registrar" : "No fax registrar");
   const registrarNameById = useMemo(
     () =>
       new Map(
@@ -83,10 +49,6 @@ export function FaxCenterTool() {
       ),
     [registrars],
   );
-
-  const sendingJobs = sentFaxJobs.filter((j) => j.status === "sending");
-  const successJobs = sentFaxJobs.filter((j) => j.status === "sent");
-  const failedJobs = sentFaxJobs.filter((j) => j.status === "failed");
 
   const [view, setView] = useState<FaxView>("send");
   const [faxActionLoading, setFaxActionLoading] = useState(false);
@@ -100,9 +62,6 @@ export function FaxCenterTool() {
 
   const updateSentFaxJob = useTroubleshootingStore((s) => s.updateSentFaxJob);
   const addReceivedFax = useTroubleshootingStore((s) => s.addReceivedFax);
-
-  const activeReceives = Object.values(receivingProgress);
-  const totalFaxes = sentFaxJobs.filter((j) => j.status !== "sending" && j.status !== "pending").length + receivedFaxes.length;
 
   // Listen for fax send progress events from backend
   useEffect(() => {
@@ -288,126 +247,15 @@ export function FaxCenterTool() {
   }, []);
 
   const headerRegistrarPicker = (
-    <div className="flex items-center gap-2 min-w-0">
-      <Popover open={registrarPickerOpen} onOpenChange={setRegistrarPickerOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "ui-header-picker w-[min(320px,30vw)] truncate",
-              registrarPickerOpen && "is-open",
-              selectedFaxRegistrar
-                ? "text-foreground/80"
-                : "is-muted",
-            )}
-          >
-            <span className={cn(
-              "h-1.5 w-1.5 rounded-full shrink-0",
-              selectedFaxRegistrar
-                ? isRegistered(selectedFaxRegistrar.id, healthRegistrars, testResults) ? "bg-success status-online" : "bg-destructive"
-                : "bg-muted-foreground/20",
-            )} />
-            <span className="truncate">{selectedFaxRegistrarLabel}</span>
-            <ChevronDown className={cn("h-3 w-3 shrink-0 text-muted-foreground/60 transition-transform", registrarPickerOpen && "rotate-180")} />
-          </button>
-        </PopoverTrigger>
-
-        <PopoverContent
-          align="start"
-          sideOffset={6}
-          className="ui-surface-card w-[380px] p-0 overflow-hidden"
-        >
-          <div className="ui-section-header-sm">
-            <p className="section-label-sm">
-              Select Fax Registrar
-            </p>
-          </div>
-
-          <div className="max-h-[240px] overflow-y-auto py-1">
-            {registrarsForFax.length === 0 ? (
-              <EmptyState
-                compact
-                variant="inline"
-                title="No fax registrars"
-                className="items-start px-3 py-3 text-left"
-              />
-            ) : (
-              registrarsForFax.map((r) => {
-                const isActive = r.id === registrarId;
-                const ready = isRegistered(r.id, healthRegistrars, testResults);
-                return (
-                  <div
-                    key={r.id ?? r.name}
-                    className={cn(
-                      "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-smooth",
-                      isActive
-                        ? "bg-accent text-foreground"
-                        : "text-foreground/70 hover:bg-muted/20 hover:text-foreground",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRegistrarId(r.id ?? "");
-                        setRegistrarPickerOpen(false);
-                      }}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                    >
-                      <span className={cn(
-                        "h-4 w-4 rounded-full shrink-0 flex items-center justify-center border transition-smooth",
-                        isActive
-                          ? "border-foreground/20 bg-muted/40"
-                          : "border-border bg-transparent",
-                      )}>
-                        {isActive && <Check className="h-2.5 w-2.5 text-foreground" />}
-                      </span>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{r.name}</p>
-                        <p className="text-2xs text-muted-foreground/60 font-mono truncate">
-                          {r.username}@{r.domain}
-                        </p>
-                      </div>
-
-                      <span className={cn(
-                        "h-1.5 w-1.5 rounded-full shrink-0",
-                        ready ? "bg-success status-online" : "bg-warning",
-                      )} />
-                      <span className="text-3xs text-muted-foreground/70 shrink-0">{ready ? "Ready" : "Idle"}</span>
-                    </button>
-                    {!ready && (
-                      <button
-                        type="button"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!r.id || registeringRegistrarId) return;
-                          setRegisteringRegistrarId(r.id);
-                          try {
-                            const ctx = useExecutionContextStore.getState().resolvedContext("registration");
-                            await testRegistration(r.id, ctx);
-                          } finally {
-                            setRegisteringRegistrarId(null);
-                          }
-                        }}
-                        disabled={!!registeringRegistrarId}
-                        className={cn(
-                          "ui-control-shell h-8 rounded-md px-2 text-2xs font-medium transition-smooth shrink-0",
-                          "hover:bg-accent hover:border-border/70",
-                          "disabled:cursor-not-allowed disabled:opacity-60",
-                        )}
-                      >
-                        {registeringRegistrarId === r.id ? "..." : "Register"}
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
-
-    </div>
+    <RegistrarContextSelector
+      selectedRegistrarId={registrarId || null}
+      onSelectRegistrar={(nextRegistrarId) => setRegistrarId(nextRegistrarId ?? "")}
+      useCase="faxing"
+      title="Select Fax Registrar"
+      emptyTitle="No fax registrars"
+      noSelectionLabel="Select registrar"
+      noRegistrarLabel="No fax registrar"
+    />
   );
 
   return (
@@ -487,63 +335,6 @@ export function FaxCenterTool() {
           </TabsContent>
         </AnimatedTabsContent>
 
-        <ViewFooter>
-          {sendingJobs.length > 0 ? (
-            <ViewFooterItem>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-live-ripple motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-foreground opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-foreground" />
-              </span>
-              <span className="text-foreground font-medium tabular-nums">{sendingJobs.length}</span>
-              <span>sending</span>
-            </ViewFooterItem>
-          ) : (
-            <ViewFooterItem>
-              <CheckCircle2 className="h-3 w-3 text-success" />
-              <span>Ready</span>
-            </ViewFooterItem>
-          )}
-
-          {successJobs.length > 0 && (
-            <TooltipWrapper title="Sent faxes" description="View list of successfully sent faxes.">
-              <ViewFooterItem onClick={() => setView("faxes")}>
-                <CheckCircle2 className="h-3 w-3 text-success" />
-                <span className="tabular-nums">{successJobs.length}</span>
-                <span>sent</span>
-              </ViewFooterItem>
-            </TooltipWrapper>
-          )}
-
-          {failedJobs.length > 0 && (
-            <TooltipWrapper title="Failed faxes" description="View list of failed fax transmissions.">
-              <ViewFooterItem onClick={() => setView("faxes")} className="text-destructive">
-                <XCircle className="h-3 w-3" />
-                <span className="tabular-nums">{failedJobs.length}</span>
-                <span>failed</span>
-              </ViewFooterItem>
-            </TooltipWrapper>
-          )}
-
-          <ViewFooterSpacer />
-
-          {activeReceives.length > 0 && (
-            <ViewFooterItem>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-live-ripple motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-              </span>
-              <span className="text-foreground font-medium tabular-nums">{activeReceives.length}</span>
-              <span>receiving</span>
-            </ViewFooterItem>
-          )}
-
-          {totalFaxes > 0 && (
-            <ViewFooterItem>
-              <span className="tabular-nums">{totalFaxes}</span>
-              <span>total</span>
-            </ViewFooterItem>
-          )}
-        </ViewFooter>
         </div>
       </Tabs>
     </div>

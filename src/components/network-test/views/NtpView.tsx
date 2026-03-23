@@ -7,13 +7,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Clock, Loader2, Play } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { tooltips } from "@/lib/tooltips";
@@ -34,6 +28,8 @@ const NTP_PRESETS: NtpPreset[] = [
   { id: "google", label: "Google", servers: ["time.google.com", "time1.google.com", "time2.google.com"] },
   { id: "nist", label: "NIST / Public", servers: ["time.nist.gov", "pool.ntp.org"] },
 ];
+
+const NTP_PRESET_OPTIONS = NTP_PRESETS.map((p) => ({ value: p.id, label: p.label }));
 
 function parseServerList(value: string): string[] {
   const list = value
@@ -138,18 +134,14 @@ export function NtpView() {
 
             <div className="flex-1 min-w-[280px]">
               {mode === "preset" ? (
-                <Select value={presetId} onValueChange={setPresetId} disabled={running}>
-                  <SelectTrigger className="h-8" size="sm">
-                    <SelectValue placeholder="Select NTP preset" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NTP_PRESETS.map((preset) => (
-                      <SelectItem key={preset.id} value={preset.id}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={presetId}
+                  onValueChange={setPresetId}
+                  options={NTP_PRESET_OPTIONS}
+                  placeholder="Select NTP preset"
+                  className="h-8"
+                  disabled={running}
+                />
               ) : (
                 <Input
                   value={manualServers}

@@ -24,6 +24,7 @@ import {
   RemoveFormatting,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { useState, useCallback, useEffect } from "react";
 import { MarkdownRenderer } from "@/components/notes/MarkdownRenderer";
 
@@ -181,7 +182,7 @@ export function RichTextEditor({
         >
           <RemoveFormatting className="h-4 w-4" />
         </ToolbarButton>
-        <div className="w-px h-5 bg-border mx-1 shrink-0" aria-hidden />
+        <AppDivider orientation="vertical" size="lg" className="mx-1" aria-hidden />
 
         {/* Headings */}
         <ToolbarButton
@@ -205,7 +206,7 @@ export function RichTextEditor({
         >
           <Heading3 className="h-4 w-4" />
         </ToolbarButton>
-        <div className="w-px h-5 bg-border mx-1 shrink-0" aria-hidden />
+        <AppDivider orientation="vertical" size="lg" className="mx-1" aria-hidden />
 
         {/* Lists & blockquote */}
         <ToolbarButton
@@ -229,7 +230,7 @@ export function RichTextEditor({
         >
           <Quote className="h-4 w-4" />
         </ToolbarButton>
-        <div className="w-px h-5 bg-border mx-1 shrink-0" aria-hidden />
+        <AppDivider orientation="vertical" size="lg" className="mx-1" aria-hidden />
 
         {/* Code block & horizontal rule */}
         <ToolbarButton
@@ -245,7 +246,7 @@ export function RichTextEditor({
         >
           <Minus className="h-4 w-4" />
         </ToolbarButton>
-        <div className="w-px h-5 bg-border mx-1 shrink-0" aria-hidden />
+        <AppDivider orientation="vertical" size="lg" className="mx-1" aria-hidden />
 
         {/* Undo / Redo */}
         <ToolbarButton

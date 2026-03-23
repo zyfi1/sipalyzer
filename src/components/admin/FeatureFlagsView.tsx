@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   FEATURE_FLAG_KNOWLEDGE_BASE_UI,
   FEATURE_FLAG_MCP_UI,
+  FEATURE_FLAG_TOOLS_MOCKUP_UI,
 } from "@/lib/featureFlags";
 import { setCachedFeatureFlag } from "@/lib/featureFlagCache";
 import { ADMIN_PANEL, ADMIN_VIEW_CONTAINER } from "./viewStyles";
@@ -31,6 +32,12 @@ const FLAG_DEFINITIONS: FlagDefinition[] = [
     key: FEATURE_FLAG_MCP_UI,
     label: "MCP Tool UI",
     description: "Enable the MCP tab in Tools (Mission Control + hosted MCP controls)",
+    section: "Tools",
+  },
+  {
+    key: FEATURE_FLAG_TOOLS_MOCKUP_UI,
+    label: "Mockup Playground UI",
+    description: "Enable the Mockup tab in Tools (UI playground / design experiments)",
     section: "Tools",
   },
 ];

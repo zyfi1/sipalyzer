@@ -135,7 +135,7 @@ function isCancelledMessage(error: string | null | undefined): boolean {
 
 // ── Store ───────────────────────────────────────────────────────
 
-interface NetworkTestState {
+export interface NetworkTestState {
   // ── Overview (auto health check) ──────────────────────────────
   healthCheck: TestState<HealthCheckResult>;
   runHealthCheck: () => Promise<void>;

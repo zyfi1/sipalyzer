@@ -21,13 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
@@ -638,21 +632,19 @@ export function ProvisionRegistrarWizard({ open, onClose, entries }: ProvisionRe
                         {/* Transport */}
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Transport</Label>
-                          <Select
+                          <AppDropdown
                             value={form.transport}
                             onValueChange={v => updateFormField(idx, "transport", v)}
                             disabled={status === "success" || status === "creating"}
-                          >
-                            <SelectTrigger className="h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="udp">UDP</SelectItem>
-                              <SelectItem value="tcp">TCP</SelectItem>
-                              <SelectItem value="tls">TLS</SelectItem>
-                              <SelectItem value="wss">WSS</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            options={[
+                              { value: "udp", label: "UDP" },
+                              { value: "tcp", label: "TCP" },
+                              { value: "tls", label: "TLS" },
+                              { value: "wss", label: "WSS" },
+                            ]}
+                            className="h-8 text-sm"
+                            size="sm"
+                          />
                         </div>
 
                         {/* Username */}

@@ -4,9 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Loader2, Play, Network, Check, X } from "@/lib/icons";
 import type { MultiSiteConfig } from "@/types/dns";
+
+const MULTI_SITE_TEST_OPTIONS = [
+  { value: "lookup", label: "DNS Lookup" },
+  { value: "sip_resolve", label: "SIP Resolve" },
+  { value: "reverse", label: "Reverse DNS" },
+  { value: "dig", label: "Dig" },
+] as const;
+
+const MULTI_SITE_RECORD_OPTIONS = ["A", "AAAA", "MX", "TXT", "NS", "SOA", "SRV", "NAPTR"].map((rt) => ({
+  value: rt,
+  label: rt,
+}));
 
 export default function MultiSitePanel() {
   const { multiSite, runMultiSite } = useDnsTestStore();
@@ -43,17 +55,13 @@ export default function MultiSitePanel() {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={testType} onValueChange={(v) => setTestType(v as any)}>
-          <SelectTrigger className="h-8 w-[120px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="lookup" className="text-xs">DNS Lookup</SelectItem>
-            <SelectItem value="sip_resolve" className="text-xs">SIP Resolve</SelectItem>
-            <SelectItem value="reverse" className="text-xs">Reverse DNS</SelectItem>
-            <SelectItem value="dig" className="text-xs">Dig</SelectItem>
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={testType}
+          onValueChange={(v) => setTestType(v as any)}
+          options={[...MULTI_SITE_TEST_OPTIONS]}
+          className="h-8 w-[120px] text-xs"
+          itemClassName="text-xs"
+        />
         <Input
           value={target}
           onChange={(e) => setTarget(e.target.value)}
@@ -63,16 +71,13 @@ export default function MultiSitePanel() {
           onKeyDown={(e) => e.key === "Enter" && !running && handleRun()}
         />
         {(testType === "lookup" || testType === "dig") && (
-          <Select value={recordType} onValueChange={setRecordType}>
-            <SelectTrigger className="h-8 w-[70px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {["A", "AAAA", "MX", "TXT", "NS", "SOA", "SRV", "NAPTR"].map((rt) => (
-                <SelectItem key={rt} value={rt} className="text-xs">{rt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={recordType}
+            onValueChange={setRecordType}
+            options={MULTI_SITE_RECORD_OPTIONS}
+            className="h-8 w-[70px] text-xs"
+            itemClassName="text-xs"
+          />
         )}
         <Input
           value={server}

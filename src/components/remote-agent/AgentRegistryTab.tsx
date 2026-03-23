@@ -13,13 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Search, Trash, Power, X, Edit, Copy, Globe, Download,
   WindowsLogo, AppleLogo, LinuxLogo, Satellite,
@@ -558,36 +552,30 @@ export function AgentRegistryTab({ pollingEnabled = true }: { pollingEnabled?: b
           </div>
 
           {/* Status filter */}
-          <Select
+          <AppDropdown
             value={statusFilter}
             onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-          >
-            <SelectTrigger size="sm" className="w-28 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All ({registry.length})</SelectItem>
-              <SelectItem value="online">Online ({onlineCount})</SelectItem>
-              <SelectItem value="offline">Offline ({offlineCount})</SelectItem>
-              <SelectItem value="expired">Expired ({expiredCount})</SelectItem>
-            </SelectContent>
-          </Select>
+            className="w-28 h-8 text-xs"
+            options={[
+              { value: "all", label: `All (${registry.length})` },
+              { value: "online", label: `Online (${onlineCount})` },
+              { value: "offline", label: `Offline (${offlineCount})` },
+              { value: "expired", label: `Expired (${expiredCount})` },
+            ]}
+          />
 
           {/* Platform filter */}
-          <Select
+          <AppDropdown
             value={platformFilter}
             onValueChange={(v) => setPlatformFilter(v as PlatformFilter)}
-          >
-            <SelectTrigger size="sm" className="w-28 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All OS</SelectItem>
-              <SelectItem value="windows">Windows</SelectItem>
-              <SelectItem value="macos">macOS</SelectItem>
-              <SelectItem value="linux">Linux</SelectItem>
-            </SelectContent>
-          </Select>
+            className="w-28 h-8 text-xs"
+            options={[
+              { value: "all", label: "All OS" },
+              { value: "windows", label: "Windows" },
+              { value: "macos", label: "macOS" },
+              { value: "linux", label: "Linux" },
+            ]}
+          />
 
           {/* Bulk Actions */}
           {someSelected ? (
@@ -965,11 +953,11 @@ function RegistryRow({
               </>
             )}
             {!agent.managed && (
-              <Badge variant="outline" className="h-4 px-1 text-3xs text-warning border-warning/35 bg-warning/10">
+              <Badge variant="secondary" className="h-4 px-1 text-3xs text-warning border-warning/35 bg-warning/10">
                 discovered
               </Badge>
             )}
-            <Badge variant="outline" className="h-4 px-1 text-3xs border-border/35 bg-background/40">
+            <Badge variant="secondary" className="h-4 px-1 text-3xs border-border/35 bg-background/40">
               {experienceLabel(config.experience)}
             </Badge>
             {!rowRenaming && running.length > 0 && (

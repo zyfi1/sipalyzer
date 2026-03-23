@@ -26,6 +26,7 @@ import {
 import type { TestType } from "@/types/registration";
 import { TEST_TYPES } from "@/types/registration";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { ReportExportDialog } from "./ReportExportDialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -540,7 +541,7 @@ export function BulkOperationsPanel() {
             </Button>
           </TooltipWrapper>
           
-          <div className="h-4 w-px bg-border" />
+          <AppDivider orientation="vertical" size="md" className="mx-0" />
           
           <TooltipWrapper title="Register" description={`Register ${selectedRegistrarIds.size} selected registrar(s) with the SIP server.`}>
             <Button

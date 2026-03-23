@@ -163,11 +163,11 @@ export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
             { title: "SIP Registration", desc: "Multi-registrar health monitoring, testing & bulk operations", Icon: Shield },
             { title: "Softphone", desc: "Built-in SIP calling with G.711/G.722 codecs & real-time MOS scoring", Icon: PhoneCall },
             { title: "Fax Center", desc: "T.38 & G.711 fax send/receive with PDF & TIFF support", Icon: Printer },
-            { title: "Device Provisioning", desc: "Config fetching, diff comparison, visual designer & device layouts", Icon: FileSearch },
+            { title: "Device Provisioning", desc: "Config fetching, firmware catalog, diff comparison, visual designer & device layouts", Icon: FileSearch },
             { title: "Network", desc: "Connectivity testing, probe, device discovery, VoIP quality & multicast analysis", Icon: Wifi },
             { title: "Remote Agent", desc: "Deploy lightweight Go capture agents to remote sites with WebSocket connectivity & scheduling", Icon: Satellite },
             { title: "Composer", desc: "HTTP/SIP request crafting, SSH terminal, collections & history", Icon: Wrench },
-            { title: "Tools", desc: "Syslog receiver, log viewer, file server, firmware tools & password generator", Icon: Toolbox },
+            { title: "Tools", desc: "Syslog receiver, log viewer, file server & password generator", Icon: Toolbox },
             { title: "Admin Center", desc: "Protected operational controls and administration workflows for advanced operators", Icon: Shield },
             { title: "Notes & Search", desc: "Markdown notes with tagging, folders & global command palette search", Icon: StickyNote },
           ] as const).map((f) => (

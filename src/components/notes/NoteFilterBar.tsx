@@ -4,13 +4,7 @@ import { useRegistrationStore } from "@/stores/registrationStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Search, Filter, X, Star, FolderOpen, Tag } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -163,22 +157,16 @@ export function NoteFilterBar({
                 Folder
               </span>
             </TooltipWrapper>
-            <Select
+            <AppDropdown
               value={folderId ?? "__all__"}
               onValueChange={(v) => onFolderChange(v === "__all__" ? null : v)}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="All Folders" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Folders</SelectItem>
-                {folders.map((folder) => (
-                  <SelectItem key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="All Folders"
+              className="h-8 text-sm"
+              options={[
+                { value: "__all__", label: "All Folders" },
+                ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+              ]}
+            />
           </div>
 
           {/* Tags filter */}
@@ -196,7 +184,7 @@ export function NoteFilterBar({
                   return (
                     <Badge
                       key={tag}
-                      variant="outline"
+                      variant="secondary"
                       className={cn(
                         "cursor-pointer text-[10px] h-5 px-1.5 transition-smooth",
                         isSelected
@@ -219,24 +207,21 @@ export function NoteFilterBar({
               <TooltipWrapper title="Filter by registrar">
                 <span className="section-label-sm cursor-help">Registrar</span>
               </TooltipWrapper>
-              <Select
+              <AppDropdown
                 value={linkedRegistrarFilter ?? "__all__"}
                 onValueChange={(v) =>
                   onRegistrarChange(v === "__all__" ? null : v)
                 }
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="All Registrars" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Registrars</SelectItem>
-                  {registrars.map((r) => (
-                    <SelectItem key={r.id ?? r.name} value={r.id ?? r.name}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="All Registrars"
+                className="h-8 text-sm"
+                options={[
+                  { value: "__all__", label: "All Registrars" },
+                  ...registrars.map((r) => ({
+                    value: r.id ?? r.name,
+                    label: r.name,
+                  })),
+                ]}
+              />
             </div>
           )}
 

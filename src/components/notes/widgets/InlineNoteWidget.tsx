@@ -131,7 +131,7 @@ export function InlineNoteWidget({
       className={cn(
         "rounded-lg border",
         isRegistration
-          ? "surface-flat border-border/45 bg-card/45"
+          ? "flex h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius-md)] border-[var(--ui-rule)] bg-[var(--ops-panel-bg-subtle)]"
           : "bg-card/30 border-border/30",
         className
       )}
@@ -139,8 +139,8 @@ export function InlineNoteWidget({
       {/* Header */}
       <div
         className={cn(
-          "flex items-center justify-between mb-1 px-3 pt-2.5",
-          isRegistration && "pb-2 border-b border-border/35"
+          "flex shrink-0 items-center justify-between px-3 pt-2.5",
+          isRegistration ? "ui-section-header-sm border-b border-[var(--ui-rule)] pb-2" : "mb-1",
         )}
       >
         <button
@@ -158,11 +158,12 @@ export function InlineNoteWidget({
               {linkedNotes.length}
             </Badge>
           )}
-          {collapsible && (
-            isCollapsed
-              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-              : <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-          )}
+          {collapsible &&
+            (isCollapsed ? (
+              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            ))}
         </button>
         <div className="flex items-center gap-1">
           {!isCreating && !editingNote && (
@@ -184,7 +185,14 @@ export function InlineNoteWidget({
 
       {/* Content */}
       {!isCollapsed && (
-        <div className={cn("space-y-2 mt-2 px-3 pb-3", isRegistration && "space-y-2.5")}>
+        <div
+          className={cn(
+            "px-3 pb-3",
+            isRegistration
+              ? "flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pt-2"
+              : "mt-2 space-y-2",
+          )}
+        >
           {/* Quick create */}
           {isCreating && (
             <div
@@ -287,12 +295,12 @@ export function InlineNoteWidget({
               icon={<StickyNote />}
               description={`No notes for ${context.displayName}`}
               action={(
-                <Button variant="ghost" size="sm" className="h-7 text-xs mt-2 gap-1" onClick={() => setIsCreating(true)}>
+                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs mt-1" onClick={() => setIsCreating(true)}>
                   <Plus className="h-3 w-3" />
                   Add first note
                 </Button>
               )}
-              className="py-4"
+              className={cn("border-0 bg-transparent shadow-none", isRegistration && "min-h-0 flex-1 py-6")}
             />
           )}
 

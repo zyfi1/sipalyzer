@@ -8,6 +8,7 @@ import type { Note } from "@/types/notes";
 import { useNoteStore } from "@/stores/noteStore";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 
 function getCategoryColor(category: string): string {
   const lower = category.toLowerCase();
@@ -60,7 +61,7 @@ export function NoteView({ note, registrarName, onBack, onEdit, onDelete }: Note
         )}
         {onEdit && (
           <>
-            <div className="w-px h-4 bg-border/30" />
+            <AppDivider orientation="vertical" size="md" className="mx-0" />
             <TooltipWrapper title="Edit" description="Open the editor for this note.">
               <Button variant="ghost" size="sm" onClick={onEdit} className="h-7 gap-1 text-xs">
                 <Edit className="h-3.5 w-3.5" />
@@ -90,7 +91,7 @@ export function NoteView({ note, registrarName, onBack, onEdit, onDelete }: Note
             </span>
           )}
           {registrarName && (
-            <Badge variant="outline" className="gap-1 text-2xs h-5 text-primary/70">
+            <Badge variant="secondary" className="gap-1 text-2xs h-5 text-primary/70">
               <Link2 className="h-3 w-3" />
               {registrarName}
             </Badge>
@@ -120,7 +121,7 @@ export function NoteView({ note, registrarName, onBack, onEdit, onDelete }: Note
               {linkedNotes.map((ln) => (
                 <Badge
                   key={ln.id}
-                  variant="outline"
+                  variant="secondary"
                   className="gap-1 text-xs cursor-pointer hover:bg-accent"
                   onClick={() => setSelectedNoteId(ln.id)}
                 >

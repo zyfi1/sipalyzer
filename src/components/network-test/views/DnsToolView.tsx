@@ -6,7 +6,7 @@ import { useDnsTestStore } from "@/stores/dnsTestStore";
 import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -33,6 +33,17 @@ const RECORD_TYPES: DnsRecordType[] = [
 ];
 
 const DNS_TOOL_ORDER: DnsToolId[] = ["lookup", "sip", "reverse", "dig", "geoip", "asn"];
+const DNS_TOOL_OPTIONS: { value: DnsToolId; label: string }[] = [
+  { value: "lookup", label: "Lookup" },
+  { value: "sip", label: "SIP Resolve" },
+  { value: "reverse", label: "Reverse DNS" },
+  { value: "dig", label: "Dig" },
+  { value: "geoip", label: "GeoIP" },
+  { value: "asn", label: "ASN" },
+];
+
+const RECORD_TYPE_OPTIONS = RECORD_TYPES.map((type) => ({ value: type, label: type }));
+
 const RECORD_TYPE_DESCRIPTIONS: Partial<Record<DnsRecordType, string>> = {
   A: tooltips.dnsTypeA.description,
   AAAA: tooltips.dnsTypeAAAA.description,
@@ -197,36 +208,20 @@ function UnifiedDnsToolbox() {
             <p className="text-2xs text-muted-foreground/75">Choose a tool, set target/options, run, inspect results.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={activeTool} onValueChange={(v) => setActiveTool(v as DnsToolId)}>
-              <TooltipWrapper
-                title="DNS Tool Selector"
-                description="Switch between standard lookup, SIP DNS chain, reverse lookup, raw dig output, geolocation metadata, and ASN ownership."
-              >
-                <SelectTrigger className="h-8 w-[170px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-              </TooltipWrapper>
-              <SelectContent>
-                <TooltipWrapper title="Lookup" description={toolHints.lookup}>
-                  <SelectItem value="lookup" className="text-xs">Lookup</SelectItem>
-                </TooltipWrapper>
-                <TooltipWrapper title="SIP Resolve" description={toolHints.sip}>
-                  <SelectItem value="sip" className="text-xs">SIP Resolve</SelectItem>
-                </TooltipWrapper>
-                <TooltipWrapper title="Reverse DNS" description={toolHints.reverse}>
-                  <SelectItem value="reverse" className="text-xs">Reverse DNS</SelectItem>
-                </TooltipWrapper>
-                <TooltipWrapper title="Dig" description={toolHints.dig}>
-                  <SelectItem value="dig" className="text-xs">Dig</SelectItem>
-                </TooltipWrapper>
-                <TooltipWrapper title="GeoIP" description={toolHints.geoip}>
-                  <SelectItem value="geoip" className="text-xs">GeoIP</SelectItem>
-                </TooltipWrapper>
-                <TooltipWrapper title="ASN" description={toolHints.asn}>
-                  <SelectItem value="asn" className="text-xs">ASN</SelectItem>
-                </TooltipWrapper>
-              </SelectContent>
-            </Select>
+            <TooltipWrapper
+              title="DNS Tool Selector"
+              description="Switch between standard lookup, SIP DNS chain, reverse lookup, raw dig output, geolocation metadata, and ASN ownership."
+            >
+              <span className="inline-flex">
+                <AppDropdown
+                  value={activeTool}
+                  onValueChange={(v) => setActiveTool(v as DnsToolId)}
+                  options={DNS_TOOL_OPTIONS}
+                  className="h-8 w-[170px] text-xs"
+                  itemClassName="text-xs"
+                />
+              </span>
+            </TooltipWrapper>
             <DnsStatusPill label={activeLabel} status={activeStatus} />
           </div>
         </div>
@@ -294,27 +289,20 @@ function UnifiedDnsToolbox() {
           </TooltipWrapper>
 
           {(activeTool === "lookup" || activeTool === "dig") && (
-            <Select value={recordType} onValueChange={(v) => setRecordType(v as DnsRecordType)}>
-              <TooltipWrapper
-                title="DNS Record Type"
-                description={selectedRecordDescription ?? "Choose which DNS record type to query."}
-              >
-                <SelectTrigger className="h-8 w-[96px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-              </TooltipWrapper>
-              <SelectContent>
-                {RECORD_TYPES.map((type) => (
-                  <TooltipWrapper
-                    key={type}
-                    title={`${type} Record`}
-                    description={RECORD_TYPE_DESCRIPTIONS[type] ?? "DNS record type used for this query."}
-                  >
-                    <SelectItem value={type} className="text-xs">{type}</SelectItem>
-                  </TooltipWrapper>
-                ))}
-              </SelectContent>
-            </Select>
+            <TooltipWrapper
+              title="DNS Record Type"
+              description={selectedRecordDescription ?? "Choose which DNS record type to query."}
+            >
+              <span className="inline-flex">
+                <AppDropdown
+                  value={recordType}
+                  onValueChange={(v) => setRecordType(v as DnsRecordType)}
+                  options={RECORD_TYPE_OPTIONS}
+                  className="h-8 w-[96px] text-xs"
+                  itemClassName="text-xs"
+                />
+              </span>
+            </TooltipWrapper>
           )}
 
           {(activeTool === "lookup" || activeTool === "dig") && (

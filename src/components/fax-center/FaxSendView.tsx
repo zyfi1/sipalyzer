@@ -19,13 +19,7 @@ import { useToastContext } from "@/contexts/ToastContext";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Send,
   Loader2,
@@ -651,25 +645,24 @@ export function FaxSendView({ sendingProgress, registrarId, onSendStarted }: Fax
                   </button>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                  <Select value={faxSettings.resolution} onValueChange={(v) => setFax({ resolution: v as "standard" | "fine" })}>
-                    <SelectTrigger className="ui-control-shell h-8 w-[158px] px-2 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard (204×98 lpi)</SelectItem>
-                      <SelectItem value="fine">Fine (204×196 lpi)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={String(faxSettings.baudRate)} onValueChange={(v) => setFax({ baudRate: Number(v) })}>
-                    <SelectTrigger className="ui-control-shell h-8 w-[104px] px-2 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FAX_BAUD_RATES.map((b) => (
-                        <SelectItem key={b} value={String(b)}>{formatBaud(b)} bps</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AppDropdown
+                    value={faxSettings.resolution}
+                    onValueChange={(v) => setFax({ resolution: v as "standard" | "fine" })}
+                    className="ui-control-shell h-8 w-[158px] px-2 text-xs"
+                    options={[
+                      { value: "standard", label: "Standard (204×98 lpi)" },
+                      { value: "fine", label: "Fine (204×196 lpi)" },
+                    ]}
+                  />
+                  <AppDropdown
+                    value={String(faxSettings.baudRate)}
+                    onValueChange={(v) => setFax({ baudRate: Number(v) })}
+                    className="ui-control-shell h-8 w-[104px] px-2 text-xs"
+                    options={FAX_BAUD_RATES.map((b) => ({
+                      value: String(b),
+                      label: `${formatBaud(b)} bps`,
+                    }))}
+                  />
                 </div>
               </div>
             </div>

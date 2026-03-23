@@ -72,7 +72,7 @@ export function FindingCard({
         <Icon className={cn("size-3.5 shrink-0", SEVERITY_ICON_COLOR[finding.severity])} />
         <span className="text-xs font-medium truncate">{finding.title}</span>
         {finding.count > 1 && (
-          <Badge variant="outline" className="ml-auto h-4 shrink-0 border-border/40 bg-muted/25 px-1 text-3xs">
+          <Badge variant="secondary" className="ml-auto h-4 shrink-0 border-border/40 bg-muted/25 px-1 text-3xs">
             {finding.count}
           </Badge>
         )}

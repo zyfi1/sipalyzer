@@ -76,19 +76,19 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.first_registration !== undefined && diagnostics.first_registration !== null && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">First Registration</span>
-                <Badge variant="outline">{String(diagnostics.first_registration)}</Badge>
+                <Badge variant="secondary">{String(diagnostics.first_registration)}</Badge>
               </div>
             )}
             {diagnostics.second_registration !== undefined && diagnostics.second_registration !== null && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Second Registration</span>
-                <Badge variant="outline">{String(diagnostics.second_registration)}</Badge>
+                <Badge variant="secondary">{String(diagnostics.second_registration)}</Badge>
               </div>
             )}
             {diagnostics.initial_registration !== undefined && diagnostics.initial_registration !== null && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Initial Registration</span>
-                <Badge variant="outline">{String(diagnostics.initial_registration)}</Badge>
+                <Badge variant="secondary">{String(diagnostics.initial_registration)}</Badge>
               </div>
             )}
             {diagnostics.delay_ms !== undefined && diagnostics.delay_ms !== null && (
@@ -119,7 +119,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.expires !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Expires</span>
-                <Badge variant="outline">{String(diagnostics.expires)}s</Badge>
+                <Badge variant="secondary">{String(diagnostics.expires)}s</Badge>
               </div>
             )}
             {diagnostics.tested_values !== undefined && Array.isArray(diagnostics.tested_values) && (
@@ -138,7 +138,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
                       Expires {String(test.requested_expires ?? "")}s
                     </span>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">Status {String(test.response_status ?? "")}</Badge>
+                      <Badge variant="secondary">Status {String(test.response_status ?? "")}</Badge>
                       {test.actual_expires !== undefined && test.actual_expires !== null && (
                         <span className="text-muted-foreground">
                           (actual: {String(test.actual_expires)}s)
@@ -163,7 +163,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             <Globe className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="pl-6">
-            <Badge variant="outline">{String(diagnostics.transport)}</Badge>
+            <Badge variant="secondary">{String(diagnostics.transport)}</Badge>
           </div>
         </div>
       );
@@ -192,7 +192,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.error_response_received !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Error Response</span>
-                <Badge variant={diagnostics.error_response_received ? "success" : "outline"}>
+                <Badge variant={diagnostics.error_response_received ? "success" : "secondary"}>
                   {diagnostics.error_response_received ? "Received" : "Not Received"}
                 </Badge>
               </div>
@@ -200,7 +200,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.used_invalid_credentials !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Used Invalid Credentials</span>
-                <Badge variant={diagnostics.used_invalid_credentials ? "destructive" : "outline"}>
+                <Badge variant={diagnostics.used_invalid_credentials ? "destructive" : "secondary"}>
                   {diagnostics.used_invalid_credentials ? "Yes" : "No"}
                 </Badge>
               </div>
@@ -221,7 +221,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.auth_required !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Auth Required</span>
-                <Badge variant={diagnostics.auth_required ? "outline" : "secondary"}>
+                <Badge variant={diagnostics.auth_required ? "secondary" : "secondary"}>
                   {diagnostics.auth_required ? "Yes" : "No"}
                 </Badge>
               </div>
@@ -259,7 +259,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.contact_header_present !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Header Present</span>
-                <Badge variant={diagnostics.contact_header_present ? "success" : "outline"}>
+                <Badge variant={diagnostics.contact_header_present ? "success" : "secondary"}>
                   {diagnostics.contact_header_present ? "Yes" : "No"}
                 </Badge>
               </div>
@@ -333,13 +333,13 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.expires !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Expires</span>
-                <Badge variant="outline">{String(diagnostics.expires)}s</Badge>
+                <Badge variant="secondary">{String(diagnostics.expires)}s</Badge>
               </div>
             )}
             {diagnostics.auth_required !== undefined && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Authentication Required</span>
-                <Badge variant={diagnostics.auth_required ? "outline" : "secondary"}>
+                <Badge variant={diagnostics.auth_required ? "secondary" : "secondary"}>
                   {diagnostics.auth_required ? "Yes" : "No"}
                 </Badge>
               </div>
@@ -355,7 +355,7 @@ export function DiagnosticsDisplay({ diagnostics }: DiagnosticsDisplayProps) {
             {diagnostics.transport !== undefined && diagnostics.transport !== null && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Transport</span>
-                <Badge variant="outline">{String(diagnostics.transport)}</Badge>
+                <Badge variant="secondary">{String(diagnostics.transport)}</Badge>
               </div>
             )}
             {diagnostics.registrar !== undefined && diagnostics.registrar !== null && (

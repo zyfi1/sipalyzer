@@ -326,26 +326,97 @@ export const tooltips = {
   captureTabRtp: { title: "RTP Streams", description: "Live RTP stream quality — jitter, packet loss, MOS scores, and codec details." },
 
   // Packet Diff (forensics)
-  packetDiffTitle: { title: "Packet Diff", description: "Direct packet-to-packet comparison between selected left and right calls." },
-  packetDiffLeftSession: { title: "Left session", description: "Capture session used as the left comparison side." },
-  packetDiffRightSession: { title: "Right session", description: "Capture session used as the right comparison side." },
-  packetDiffLeftCall: { title: "Left call", description: "Specific call selected from the left session." },
-  packetDiffRightCall: { title: "Right call", description: "Specific call selected from the right session." },
-  packetDiffAlignMode: { title: "Alignment mode", description: "Index pairs by order, timestamp by nearest time, flow by packet-flow similarity." },
+  packetDiffTitle: {
+    title: "Compare packets",
+    description: "Side-by-side rows from two reconstructed sessions: each row is one frame on A paired with the best match on B (Wireshark-style diff, not a raw byte merge).",
+  },
+  packetDiffLeftSession: {
+    title: "Left capture",
+    description: "The packet capture (recording) used as side A in the diff. One capture can hold many reconstructed sessions.",
+  },
+  packetDiffRightSession: {
+    title: "Right capture",
+    description: "The packet capture used as side B. Compare the same or a different recording against side A.",
+  },
+  packetDiffLeftCall: {
+    title: "Left session",
+    description:
+      "A reconstructed VoIP session from the left capture. Use search and quick filters (SIP, RTP, fax, etc.) to narrow the list.",
+  },
+  packetDiffRightCall: {
+    title: "Right session",
+    description:
+      "A reconstructed session from the right capture. Pick a different trace than side A when both captures are the same file.",
+  },
+  packetDiffAlignMode: {
+    title: "How packets are paired",
+    description:
+      "Chooses which frame on capture B belongs next to each frame on A. “Same message” compares stable protocol fields (not parser summary text). Timestamp mode scores candidates by protocol, 5-tuple, and time.",
+  },
+  packetDiffPairingContent: {
+    title: "Match by message",
+    description:
+      "Pairs frames that decode to the “same” SIP/RTP/RTCP/DNS event (same 5-tuple + stable fields). Closest to how Wireshark compares decoded rows — not raw byte-for-byte.",
+  },
+  packetDiffPairingTime: {
+    title: "Match by time",
+    description:
+      "Pairs each A frame with the closest B frame in time (within your window). Uses protocol and endpoints as tie-breakers. Use when clocks line up but packet order differs.",
+  },
+  packetDiffPairingIndex: {
+    title: "Same row number",
+    description: "Row 1 with row 1, row 2 with row 2. Only when both captures are already frame-aligned (same count and order).",
+  },
   packetDiffTimestampWindow: { title: "Timestamp window", description: "Maximum millisecond gap allowed when pairing packets in timestamp mode." },
-  packetDiffMismatchesOnly: { title: "Mismatches only", description: "Show only changed/missing rows for a cleaner review." },
-  packetDiffOpenLeftCall: { title: "Open left call", description: "Open the left selected call in Packet Viewer." },
-  packetDiffOpenRightCall: { title: "Open right call", description: "Open the right selected call in Packet Viewer." },
-  packetDiffExactCount: { title: "Exact rows", description: "Rows where packets are effectively equivalent." },
-  packetDiffChangedCount: { title: "Changed rows", description: "Rows with packet-level differences." },
-  packetDiffLeftOnlyCount: { title: "Left-only rows", description: "Rows where packet exists only on the left side." },
-  packetDiffRightOnlyCount: { title: "Right-only rows", description: "Rows where packet exists only on the right side." },
-  packetDiffLaneLeft: { title: "Left lane", description: "Packet rows from the left selected call." },
-  packetDiffLaneRight: { title: "Right lane", description: "Packet rows from the right selected call." },
-  packetDiffLaneStatus: { title: "Row status", description: "Legend: '=' exact, '~' changed, '-' left only, '+' right only." },
+  packetDiffMismatchesOnly: {
+    title: "Problems only",
+    description: "Hide rows where both sides match exactly — useful once pairing looks correct.",
+  },
+  packetDiffTrafficFilter: {
+    title: "Traffic types",
+    description: "Each row is kept if either side has a packet in an enabled category. At least one type must stay on.",
+  },
+  packetDiffPairingHealth: {
+    title: "Pairing sanity check",
+    description:
+      "Uses every paired row for the current “Pair frames” mode, before you hide protocols or “differences only”. Lots of “only A / only B” usually means try another pairing mode or a wider time window.",
+  },
+  packetDiffOpenLeftCall: { title: "Open left session", description: "Open the SIP Call-ID for this trace in Packet Viewer." },
+  packetDiffOpenRightCall: { title: "Open right session", description: "Open the SIP Call-ID for this trace in Packet Viewer." },
+  packetDiffExactCount: { title: "Same decode", description: "Visible rows where both sides decode the same (paired match)." },
+  packetDiffChangedCount: { title: "Different", description: "Visible rows where both sides are paired but decoded fields differ." },
+  packetDiffLeftOnlyCount: { title: "Only capture A", description: "Visible rows with a frame on A and no paired frame on B." },
+  packetDiffRightOnlyCount: { title: "Only capture B", description: "Visible rows with a frame on B and no paired frame on A." },
+  packetDiffLaneLeft: { title: "Left lane", description: "Packet rows from the left selected session." },
+  packetDiffLaneRight: { title: "Right lane", description: "Packet rows from the right selected session." },
+  packetDiffLaneStatus: {
+    title: "Match column",
+    description: "= same decode, ~ paired but different, − only on A, + only on B. RTP runs may show ≡ when collapsed.",
+  },
   packetDiffOpenLeftPacket: { title: "Open left packet", description: "Inspect this left packet in Packet Viewer." },
   packetDiffOpenRightPacket: { title: "Open right packet", description: "Inspect this right packet in Packet Viewer." },
   packetDiffToggleFields: { title: "Unchanged fields", description: "Show all fields or only changed fields for selected row." },
+  packetDiffDimExact: {
+    title: "Fade matching rows",
+    description: "Lowers contrast on same-decode rows so differences and one-sided frames stand out.",
+  },
+  packetDiffHoverCorrelate: {
+    title: "Hover correlate",
+    description: "Hover highlights rows that share SIP Call-ID / CSeq transaction keys or RTP/RTCP SSRC across both captures.",
+  },
+  packetDiffDeltaTime: {
+    title: "Gap (inter-arrival)",
+    description: "Milliseconds since the previous visible row on that capture. Spikes often flag jitter, blocking, or loss recovery.",
+  },
+  packetDiffHideTcpAck: {
+    title: "Hide idle TCP ACKs",
+    description: "Drops exact-match rows that look like pure TCP ACK churn so signaling and media diffs stay visible.",
+  },
+  packetDiffCollapseRtp: {
+    title: "Collapse identical RTP runs",
+    description:
+      "Folds stretches of 12+ exact-matching RTP/SRTP rows (same SSRC + payload type on both captures) into one banner. Use the chevron to expand a run; Collapse run tucks it back. Any changed or missing row breaks the run so drops stay visible.",
+  },
 
   // Monitor view actions
   captureSidebarToggle: (open: boolean) => ({
@@ -376,7 +447,10 @@ export const tooltips = {
   captureSavedFilterDelete: { title: "Delete filter", description: "Permanently remove this saved filter." },
 
   // Call flow
-  captureCallFlowSearch: { title: "Search calls", description: "Filter SIP calls by Call-ID, method, or URI." },
+  captureCallFlowSearch: {
+    title: "Search SIP dialogs",
+    description: "Filter by SIP Call-ID, From/To URI, method, or status code — covers voice, fax-over-SIP, and other SIP-backed flows.",
+  },
 
   // FilterDialog
   captureFilterTabBasic: { title: "Basic filters", description: "Select which protocols to capture." },

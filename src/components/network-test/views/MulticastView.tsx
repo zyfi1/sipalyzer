@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { tooltips } from "@/lib/tooltips";
 import { listen } from "@/lib/tauriEvents";
 import {
@@ -522,7 +523,7 @@ function TrafficTab() {
             disabled={joining}
             onKeyDown={(e) => e.key === "Enter" && !joining && targetGroup.trim() && handleJoin()}
           />
-          <div className="h-5 w-px bg-border/20" />
+          <AppDivider orientation="vertical" size="lg" className="mx-0" />
           <TooltipWrapper entry={tooltips.netMcastPort}>
             <Input
               type="number"
@@ -533,7 +534,7 @@ function TrafficTab() {
               disabled={joining}
             />
           </TooltipWrapper>
-          <div className="h-5 w-px bg-border/20" />
+          <AppDivider orientation="vertical" size="lg" className="mx-0" />
           <InterfacePicker
             value={selectedInterface}
             onChange={setSelectedInterface}
@@ -584,7 +585,7 @@ function TrafficTab() {
           <div className="flex items-center gap-2 px-1">
             <Layers className="h-3.5 w-3.5 text-muted-foreground/60" />
             <span className="section-label-sm">Active Groups</span>
-            <Badge variant="outline" className="text-2xs font-mono ml-1">
+            <Badge variant="secondary" className="text-2xs font-mono ml-1">
               {activeGroups.length}
             </Badge>
           </div>
@@ -678,12 +679,12 @@ function TrafficTab() {
                     )}
                     <span className="flex-1" />
                     {hasAudio && (
-                      <Badge variant="outline" className="text-3xs h-5 bg-success/10 text-success border-success/20">
+                      <Badge variant="secondary" className="text-3xs h-5 bg-success/10 text-success border-success/20">
                         <Headphones className="h-2.5 w-2.5 mr-0.5" />RX
                       </Badge>
                     )}
                     {hasGen && (
-                      <Badge variant="outline" className="text-3xs h-5 bg-primary/10 text-primary border-primary/20">
+                      <Badge variant="secondary" className="text-3xs h-5 bg-primary/10 text-primary border-primary/20">
                         <Send className="h-2.5 w-2.5 mr-0.5" />TX
                       </Badge>
                     )}
@@ -726,13 +727,13 @@ function TrafficTab() {
               </div>
               <div className="px-5 pb-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={cn("text-2xs", stats && stats.packets_per_sec > 0 ? "text-success border-success/30 bg-success/10" : "text-muted-foreground border-border/30 bg-muted/10")}>
+                  <Badge variant="secondary" className={cn("text-2xs", stats && stats.packets_per_sec > 0 ? "text-success border-success/30 bg-success/10" : "text-muted-foreground border-border/30 bg-muted/10")}>
                     {stats && stats.packets_per_sec > 0 ? "Traffic Active" : "Traffic Idle"}
                   </Badge>
-                  <Badge variant="outline" className={cn("text-2xs", audioPlaying ? "text-success border-success/30 bg-success/10" : "text-muted-foreground border-border/30 bg-muted/10")}>
+                  <Badge variant="secondary" className={cn("text-2xs", audioPlaying ? "text-success border-success/30 bg-success/10" : "text-muted-foreground border-border/30 bg-muted/10")}>
                     {audioPlaying ? "RX Listening" : "RX Stopped"}
                   </Badge>
-                  <Badge variant="outline" className={cn("text-2xs", isGenerating ? "text-primary border-primary/30 bg-primary/10" : "text-muted-foreground border-border/30 bg-muted/10")}>
+                  <Badge variant="secondary" className={cn("text-2xs", isGenerating ? "text-primary border-primary/30 bg-primary/10" : "text-muted-foreground border-border/30 bg-muted/10")}>
                     {isGenerating ? "TX Running" : "TX Stopped"}
                   </Badge>
                 </div>
@@ -853,7 +854,7 @@ function TrafficTab() {
               <div className="flex items-center gap-2 px-5 pt-4 pb-2">
                 <Send className="h-3.5 w-3.5 text-primary/60" />
                 <h3 className="section-label-sm">Transmit Studio</h3>
-                <Badge variant="outline" className={cn("ml-auto text-2xs", isGenerating ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/10 border-border/30 text-muted-foreground")}>
+                <Badge variant="secondary" className={cn("ml-auto text-2xs", isGenerating ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/10 border-border/30 text-muted-foreground")}>
                   {isGenerating ? "On Air" : "Standby"}
                 </Badge>
               </div>

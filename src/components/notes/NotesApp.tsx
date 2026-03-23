@@ -13,13 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Plus,
   StickyNote,
@@ -33,18 +27,11 @@ import {
   Star,
   Grid3x3,
   List,
-  Loader2,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import {
-  ViewFooter,
-  ViewFooterItem,
-  ViewFooterSpacer,
-  ViewFooterDivider,
-} from "@/components/layout/ViewFooter";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import {
@@ -406,7 +393,7 @@ export function NotesApp({ linkedRegistrarId: initialLinkedRegistrarId }: NotesA
                                       return (
                                         <Badge
                                           key={tag}
-                                          variant="outline"
+                                          variant="secondary"
                                           className={cn(
                                             "cursor-pointer text-[10px] h-8 px-2 transition-smooth",
                                             isSelected
@@ -475,20 +462,19 @@ export function NotesApp({ linkedRegistrarId: initialLinkedRegistrarId }: NotesA
                                   <TooltipWrapper title="Filter by registrar">
                                     <span className="text-2xs font-medium text-muted-foreground cursor-help">Registrar</span>
                                   </TooltipWrapper>
-                                  <Select
+                                  <AppDropdown
                                     value={linkedRegistrarFilter ?? "__all__"}
                                     onValueChange={(v) => setLinkedRegistrarFilter(v === "__all__" ? null : v)}
-                                  >
-                                    <SelectTrigger className="h-8 text-sm">
-                                      <SelectValue placeholder="All Registrars" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__all__">All Registrars</SelectItem>
-                                      {registrars.map((r) => (
-                                        <SelectItem key={r.id ?? r.name} value={r.id ?? r.name}>{r.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                    placeholder="All Registrars"
+                                    className="h-8 text-sm"
+                                    options={[
+                                      { value: "__all__", label: "All Registrars" },
+                                      ...registrars.map((r) => ({
+                                        value: r.id ?? r.name,
+                                        label: r.name,
+                                      })),
+                                    ]}
+                                  />
                                 </div>
                               )}
 
@@ -509,21 +495,21 @@ export function NotesApp({ linkedRegistrarId: initialLinkedRegistrarId }: NotesA
                               </PopoverContent>
                             </Popover>
                             <div className="min-w-0 flex-1">
-                              <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                                <TooltipWrapper title="Sort notes">
-                                  <span className="inline-flex w-full min-w-0">
-                                    <SelectTrigger className="h-8 w-full min-w-0 text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </span>
-                                </TooltipWrapper>
-                                <SelectContent>
-                                  <SelectItem value="updated">Recently updated</SelectItem>
-                                  <SelectItem value="created">Recently created</SelectItem>
-                                  <SelectItem value="title-asc">Title A-Z</SelectItem>
-                                  <SelectItem value="title-desc">Title Z-A</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <TooltipWrapper title="Sort notes">
+                                <span className="inline-flex w-full min-w-0">
+                                  <AppDropdown
+                                    value={sortBy}
+                                    onValueChange={(v) => setSortBy(v as typeof sortBy)}
+                                    className="h-8 w-full min-w-0 text-xs"
+                                    options={[
+                                      { value: "updated", label: "Recently updated" },
+                                      { value: "created", label: "Recently created" },
+                                      { value: "title-asc", label: "Title A-Z" },
+                                      { value: "title-desc", label: "Title Z-A" },
+                                    ]}
+                                  />
+                                </span>
+                              </TooltipWrapper>
                             </div>
 
                             <div className="inline-flex items-center rounded-md border border-border/55 overflow-hidden shrink-0">
@@ -645,59 +631,6 @@ export function NotesApp({ linkedRegistrarId: initialLinkedRegistrarId }: NotesA
           </TabsContent>
         </div>
 
-        <ViewFooter>
-          {loading ? (
-            <ViewFooterItem>
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Loading notes...</span>
-            </ViewFooterItem>
-          ) : activeTab === SUBVIEW_NOTES ? (
-            <>
-              <ViewFooterItem>
-                <StickyNote className="h-3 w-3" />
-                <span className="tabular-nums">{filteredNotes.length}</span>
-                <span>notes</span>
-              </ViewFooterItem>
-
-              {selectedNote && (
-                <>
-                  <ViewFooterDivider />
-                  <ViewFooterItem>
-                    <span className="tabular-nums">{selectedNote.content.split(/\s+/).filter(Boolean).length}</span>
-                    <span>words</span>
-                  </ViewFooterItem>
-                  {selectedNote.version && (
-                    <>
-                      <ViewFooterDivider />
-                      <ViewFooterItem>
-                        <span>v<span className="tabular-nums">{selectedNote.version}</span></span>
-                      </ViewFooterItem>
-                    </>
-                  )}
-                </>
-              )}
-            </>
-          ) : activeTab === SUBVIEW_TEMPLATES ? (
-            <ViewFooterItem>
-              <Grid3x3 className="h-3 w-3" />
-              <span>Template manager</span>
-            </ViewFooterItem>
-          ) : (
-            <ViewFooterItem>
-              <Trash2 className="h-3 w-3" />
-              <span>Trash view</span>
-            </ViewFooterItem>
-          )}
-
-          <ViewFooterSpacer />
-
-          {!loading && activeTab === SUBVIEW_NOTES ? (
-            <ViewFooterItem>
-              <span className="tabular-nums">{notes.length}</span>
-              <span>total</span>
-            </ViewFooterItem>
-          ) : null}
-        </ViewFooter>
       </Tabs>
 
       <ConfirmDialog

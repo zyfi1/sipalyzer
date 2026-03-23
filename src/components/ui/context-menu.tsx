@@ -88,7 +88,7 @@ function ContextMenuSubContent({
         sideOffset={6}
         collisionPadding={8}
         className={cn(
-          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[9997] min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden",
+          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[10050] min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden",
           className
         )}
         {...props}
@@ -107,7 +107,7 @@ function ContextMenuContent({
         data-slot="context-menu-content"
         collisionPadding={8}
         className={cn(
-          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[9997] max-h-(--radix-context-menu-content-available-height) min-w-[14rem] w-64 origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto",
+          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[10050] max-h-(--radix-context-menu-content-available-height) min-w-[14rem] w-64 origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto",
           className
         )}
         {...props}

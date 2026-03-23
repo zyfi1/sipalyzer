@@ -689,7 +689,7 @@ function CaptureRow({
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{capture.name}</span>
           <Badge 
-            variant={capture.scheduleType === "recurring" ? "outline" : "secondary"} 
+            variant={capture.scheduleType === "recurring" ? "secondary" : "secondary"} 
             className="text-2xs h-4 px-1.5"
           >
             {capture.scheduleType === "recurring" ? "Daily" : "Once"}

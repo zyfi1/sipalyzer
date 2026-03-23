@@ -8,8 +8,6 @@ import { setupWorkspace } from "./lib/workspaceSetup";
 import { useErrorStore } from "./stores/errorStore";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import "tippy.js/dist/tippy.css";
-import "tippy.js/animations/shift-away-subtle.css";
 import "./styles.css";
 
 const queryClient = new QueryClient({

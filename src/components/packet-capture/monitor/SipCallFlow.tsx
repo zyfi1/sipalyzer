@@ -112,7 +112,7 @@ export function SipCallFlow({ packets }: SipCallFlowProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TooltipWrapper entry={getSipMethodTooltip(tx.method)}>
-                    <Badge variant="outline" className="cursor-help border-border/45 bg-muted/25 text-xs">
+                    <Badge variant="secondary" className="cursor-help border-border/45 bg-muted/25 text-xs">
                       {tx.method}
                     </Badge>
                   </TooltipWrapper>

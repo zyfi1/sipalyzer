@@ -17,7 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { KeyValueEditor } from "@/components/request-crafter/KeyValueEditor";
 import { useToastContext } from "@/contexts/ToastContext";
-import { Loader2, Send, AlertCircle, X, GripVertical, Code, RefreshCw } from "@/lib/icons";
+import { Loader2, Send, AlertCircle, X, Code, RefreshCw } from "@/lib/icons";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import type { ComposerItem, GraphqlData } from "@/types/composer";
 import {
   useComposerSplitPane,
@@ -293,15 +294,13 @@ export function GraphqlEditor({ item }: Props) {
           </Tabs>
         </div>
 
-        {/* Drag handle */}
-        <div
-          className="shrink-0 flex items-center justify-center w-2 cursor-col-resize group hover:bg-primary/10 active:bg-primary/15 transition-smooth border-x border-border/40 select-none"
+        <PanelResizeHandle
+          orientation="vertical"
+          density="comfortable"
+          appearance="grip"
+          label="Resize GraphQL query and response panels"
           onMouseDown={handleDragStart}
-          role="separator"
-          aria-orientation="vertical"
-        >
-          <GripVertical className="size-4 text-muted-foreground/60 group-hover:text-muted-foreground/70 transition-smooth" />
-        </div>
+        />
 
         {/* Response pane */}
         <div className="min-h-0 overflow-hidden" style={{ width: `${100 - splitPercent}%` }}>

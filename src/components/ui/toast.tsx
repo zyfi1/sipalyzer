@@ -19,22 +19,22 @@ const typeIcons = {
 
 const typeStyles = {
   success: {
-    icon: "text-success drop-shadow-[0_0_4px_hsl(var(--success)/0.5)]",
+    icon: "text-success",
     accent: "bg-success",
     bg: "bg-success/8 border-success/25",
   },
   error: {
-    icon: "text-destructive drop-shadow-[0_0_4px_hsl(var(--destructive)/0.5)]",
+    icon: "text-destructive",
     accent: "bg-destructive",
     bg: "bg-destructive/8 border-destructive/25",
   },
   info: {
-    icon: "text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.4)]",
+    icon: "text-primary",
     accent: "bg-primary",
     bg: "bg-primary/8 border-primary/25",
   },
   warning: {
-    icon: "text-warning drop-shadow-[0_0_4px_hsl(var(--warning)/0.5)]",
+    icon: "text-warning",
     accent: "bg-warning",
     bg: "bg-warning/8 border-warning/25",
   },

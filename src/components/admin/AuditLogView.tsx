@@ -4,13 +4,7 @@ import { type ColumnDef, type OnChangeFn, type PaginationState } from "@tanstack
 import { saveExportFile, textToBase64 } from "@/api/packetCapture";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AdminPasswordDialog } from "./AdminPasswordDialog";
@@ -342,44 +336,32 @@ export function AuditLogView() {
               className="pl-8 h-8 text-xs ui-control-shell"
             />
           </div>
-          <Select
-            value={filterCategory}
+          <AppDropdown
+            value={filterCategory || "__all__"}
             onValueChange={(v) => {
               setFilterCategory(v === "__all__" ? "" : v);
               setPage(0);
             }}
-          >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {displayCategory(c)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filterAction}
+            className="h-8 w-[130px] text-xs"
+            placeholder="Category"
+            options={[
+              { value: "__all__", label: "All categories" },
+              ...categories.map((c) => ({ value: c, label: displayCategory(c) })),
+            ]}
+          />
+          <AppDropdown
+            value={filterAction || "__all__"}
             onValueChange={(v) => {
               setFilterAction(v === "__all__" ? "" : v);
               setPage(0);
             }}
-          >
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue placeholder="Action" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All actions</SelectItem>
-              {actions.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {displayAction(a)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            className="h-8 w-[130px] text-xs"
+            placeholder="Action"
+            options={[
+              { value: "__all__", label: "All actions" },
+              ...actions.map((a) => ({ value: a, label: displayAction(a) })),
+            ]}
+          />
 
           <div className="ml-auto flex items-center gap-1.5">
             <Button

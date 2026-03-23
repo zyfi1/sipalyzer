@@ -16,13 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { useToastContext } from "@/contexts/ToastContext";
 import {
   ChevronLeft,
@@ -652,19 +646,14 @@ function ConfigureStep({
 
             {/* Method + URI */}
             <div className="flex items-center gap-2">
-              <Select
+              <AppDropdown
                 value={draft.method}
                 onValueChange={(v) => updateDraft({ method: v })}
-              >
-                <SelectTrigger className="w-32 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIP_METHODS.map((m) => (
-                    <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={SIP_METHODS.map((m) => ({ value: m, label: m }))}
+                className="w-32 h-8 text-xs"
+                size="sm"
+                itemClassName="text-xs"
+              />
 
               <div className="flex-1 relative">
                 <Input
@@ -683,19 +672,18 @@ function ConfigureStep({
             {/* Transport */}
             <div className="flex items-center gap-2">
               <label className="text-xs text-muted-foreground w-20 shrink-0">Transport</label>
-              <Select
+              <AppDropdown
                 value={draft.transport}
                 onValueChange={(v) => updateDraft({ transport: v as SipTransport })}
-              >
-                <SelectTrigger className="w-24 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="UDP" className="text-xs">UDP</SelectItem>
-                  <SelectItem value="TCP" className="text-xs">TCP</SelectItem>
-                  <SelectItem value="TLS" className="text-xs">TLS</SelectItem>
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "UDP", label: "UDP" },
+                  { value: "TCP", label: "TCP" },
+                  { value: "TLS", label: "TLS" },
+                ]}
+                className="w-24 h-8 text-xs"
+                size="sm"
+                itemClassName="text-xs"
+              />
               <ContextualHelp text="UDP is most common for SIP. Use TCP for large messages (>MTU) or TLS for encrypted transport." />
             </div>
           </div>

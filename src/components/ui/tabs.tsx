@@ -24,12 +24,12 @@ function Tabs({
 }
 
 const tabsListVariants = cva(
-  "relative inline-flex w-fit items-center justify-center group/tabs-list text-muted-foreground rounded-[var(--radius-md)] border border-border/70 bg-muted/38 p-[2px] gap-[0.2rem] group-data-[orientation=horizontal]/tabs:h-fit group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col",
+  "relative inline-flex w-fit items-center justify-center group/tabs-list text-muted-foreground border-b border-border/55 bg-transparent p-0 gap-[0.1rem] group-data-[orientation=horizontal]/tabs:h-fit group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=vertical]/tabs:border-b-0 group-data-[orientation=vertical]/tabs:border-l group-data-[orientation=vertical]/tabs:border-border/55",
   {
     variants: {
       variant: {
         default: "",
-        line: "gap-1 rounded-none border-0 bg-transparent p-0 shadow-none",
+        line: "gap-1 border-b border-border/55 bg-transparent p-0 shadow-none rounded-none",
       },
     },
     defaultVariants: {
@@ -63,26 +63,17 @@ function TabsTrigger({
       data-slot="tabs-trigger"
       className={cn(
         [
-          // Base styles
-          "text-muted-foreground/78 relative inline-flex min-h-[2.15rem] min-w-0 flex-1 items-center justify-center gap-[0.45rem] rounded-[var(--radius-md)] px-[0.9rem] py-0 text-[0.74rem] leading-none font-semibold whitespace-nowrap border border-transparent bg-transparent",
-          // Transitions for smooth tab switching
+          "text-muted-foreground/80 relative inline-flex min-h-[2.15rem] min-w-0 flex-1 items-center justify-center gap-[0.45rem] rounded-[var(--radius-md)] px-[0.9rem] py-0 text-[0.74rem] leading-none font-semibold whitespace-nowrap border border-transparent bg-transparent",
           "transition-smooth",
-          // Vertical orientation
           "group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start",
-          // Disabled state
           "disabled:pointer-events-none disabled:opacity-50",
-          // SVG styles
           "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-          // Focus styles
           "focus-visible:shadow-focus outline-none",
-          // Hover state - flat contrast step up
-          "hover:text-foreground/96 hover:bg-muted/56 hover:border-border/76",
-          // Line variant keeps the same flat shell behavior (not underline-only)
-          "group-data-[variant=line]/tabs-list:hover:bg-muted/42 group-data-[variant=line]/tabs-list:hover:border-border/64",
-          // Active state — distinct but flat (no glossy shadows)
-          "data-[state=active]:bg-card/98 data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:border-primary/55",
-          "group-data-[variant=line]/tabs-list:data-[state=active]:bg-card group-data-[variant=line]/tabs-list:data-[state=active]:border-primary/42",
-          // Keep tabs steady (no jump)
+          "hover:text-foreground hover:bg-card/28",
+          "data-[state=active]:text-foreground data-[state=active]:font-semibold",
+          "after:content-[''] after:absolute after:left-[0.5rem] after:right-[0.5rem] after:bottom-[0.18rem] after:h-[2px] after:rounded-full after:bg-transparent after:opacity-0 after:scale-x-50 after:origin-center after:transition-[transform,background-color,box-shadow,opacity] after:duration-[340ms] after:[transition-timing-function:cubic-bezier(0.22,1,0.36,1)]",
+          "group-data-[orientation=vertical]/tabs:after:left-[0.22rem] group-data-[orientation=vertical]/tabs:after:right-auto group-data-[orientation=vertical]/tabs:after:top-[0.28rem] group-data-[orientation=vertical]/tabs:after:bottom-[0.28rem] group-data-[orientation=vertical]/tabs:after:h-auto group-data-[orientation=vertical]/tabs:after:w-[2px]",
+          "data-[state=active]:after:opacity-100 data-[state=active]:after:scale-x-100 data-[state=active]:after:bg-primary/90 data-[state=active]:after:shadow-none",
           "data-[state=active]:scale-100 data-[state=inactive]:scale-100",
         ],
         className

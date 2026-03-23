@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { getMoonShadowSideForPhase } from "./WeatherEffects";
+import { moonIconShadowSide } from "@/lib/moonGeometry";
 
-describe("getMoonShadowSideForPhase", () => {
-  it("keeps the dark side on the left for waxing phases", () => {
-    expect(getMoonShadowSideForPhase(0.12)).toBe("left");
-    expect(getMoonShadowSideForPhase(0.35)).toBe("left");
+describe("moonIconShadowSide (weather icon parity)", () => {
+  it("puts dark overlay on the left when waxing (lit limb on the right, N. hemisphere)", () => {
+    expect(moonIconShadowSide(0.35, true)).toBe("left");
+    expect(moonIconShadowSide(0.12, true)).toBe("left");
   });
 
-  it("keeps the dark side on the right for waning phases", () => {
-    expect(getMoonShadowSideForPhase(0.62)).toBe("right");
-    expect(getMoonShadowSideForPhase(0.86)).toBe("right");
+  it("puts dark overlay on the right when waning", () => {
+    expect(moonIconShadowSide(0.62, false)).toBe("right");
+    expect(moonIconShadowSide(0.86, false)).toBe("right");
   });
 
-  it("returns none at full moon", () => {
-    expect(getMoonShadowSideForPhase(0.5)).toBe("none");
+  it("returns none near new or full (no crescent terminator)", () => {
+    expect(moonIconShadowSide(0.995, true)).toBe("none");
+    expect(moonIconShadowSide(0.002, true)).toBe("none");
+    expect(moonIconShadowSide(0.999, false)).toBe("none");
   });
 });

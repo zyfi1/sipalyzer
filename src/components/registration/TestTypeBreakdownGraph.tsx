@@ -133,7 +133,7 @@ export function TestTypeBreakdownGraph({ testTypeStatuses, title = "Test Type St
                 </div>
 
                 <Badge
-                  variant="outline"
+                  variant="secondary"
                   className={cn(
                     "text-xs font-semibold px-2.5 py-1",
                     status === "pass" ? "bg-success/20 text-success border-success/30" :

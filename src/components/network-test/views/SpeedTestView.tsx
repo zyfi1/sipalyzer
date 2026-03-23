@@ -4,18 +4,13 @@ import { useNetworkTestStore } from "@/stores/networkTestStore";
 import { ToolViewShell } from "../components/ToolViewShell";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Zap, Loader2, Play, BarChart3, ArrowDownToLine, ArrowUpFromLine, HelpCircle,
   Globe, Timer, Activity, Network,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { tooltips } from "@/lib/tooltips";
 import type { SpeedTestProgressEvent } from "@/types/networkTest";
 
@@ -247,6 +242,11 @@ const SPEED_SOURCE_PRESETS: [SpeedSourceOption, ...SpeedSourceOption[]] = [
   },
 ];
 
+const SPEED_SOURCE_DROPDOWN_OPTIONS = SPEED_SOURCE_PRESETS.map((s) => ({
+  value: s.id,
+  label: s.name,
+}));
+
 const DEFAULT_SPEED_SOURCE: SpeedSourceOption = {
   id: "cloudflare",
   name: "Cloudflare",
@@ -328,22 +328,14 @@ export function SpeedTestView() {
             <span className="inline-flex h-8 items-center rounded-md border border-border/35 bg-muted/15 px-2 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/75">
               Source
             </span>
-            <Select
+            <AppDropdown
               value={selectedSourceId}
               onValueChange={setSelectedSourceId}
+              options={SPEED_SOURCE_DROPDOWN_OPTIONS}
+              placeholder="Select preset source"
+              className="w-[260px]"
               disabled={anyRunning}
-            >
-              <SelectTrigger className="w-[260px]" size="sm">
-                <SelectValue placeholder="Select preset source" />
-              </SelectTrigger>
-              <SelectContent>
-                {SPEED_SOURCE_PRESETS.map((source) => (
-                  <SelectItem key={source.id} value={source.id}>
-                    {source.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
           <TooltipWrapper title="Run Speed Tests" description="Runs internet speed test against the selected source and UDP throughput in parallel." side="bottom">
             <Button size="sm" className="h-8 gap-1.5 px-3 text-xs shrink-0" onClick={handleRunAll} disabled={anyRunning || !hasValidSource}>
@@ -453,7 +445,7 @@ export function SpeedTestView() {
             {sr ? (
               <>
                 {(() => { const r = speedRating(dlMbps); return <span className={cn("section-label-sm", r.color)}>↓ {r.label}</span>; })()}
-                <div className="w-px h-3 bg-border/20" />
+                <AppDivider orientation="vertical" size="xs" className="mx-0" />
                 {(() => { const r = speedRating(ulMbps); return <span className={cn("section-label-sm", r.color)}>↑ {r.label}</span>; })()}
               </>
             ) : (
@@ -549,7 +541,7 @@ export function SpeedTestView() {
             {br ? (
               <>
                 {(() => { const r = speedRating(brDlMbps); return <span className={cn("section-label-sm", r.color)}>↓ {r.label}</span>; })()}
-                <div className="w-px h-3 bg-border/20" />
+                <AppDivider orientation="vertical" size="xs" className="mx-0" />
                 {(() => { const r = speedRating(brUlMbps); return <span className={cn("section-label-sm", r.color)}>↑ {r.label}</span>; })()}
               </>
             ) : (

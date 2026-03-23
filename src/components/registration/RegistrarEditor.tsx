@@ -17,13 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Loader2 } from "@/lib/icons";
 import { Switch } from "@/components/ui/switch";
 import { getRegistrarPassword } from "@/api/registration";
@@ -418,7 +412,7 @@ export function RegistrarEditor({ registrarId, onClose }: RegistrarEditorProps) 
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-[min(72rem,calc(100vw-2rem))] max-h-[calc(min(100vh,100dvh)-2rem)] flex flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[calc(min(100vh,100dvh)-2rem)] w-full max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-[min(72rem,calc(100vw-2rem))] lg:max-w-[min(88rem,calc(100vw-2rem))]">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit Registrar" : "Add New Registrar"}</DialogTitle>
           <DialogDescription>
@@ -466,15 +460,17 @@ export function RegistrarEditor({ registrarId, onClose }: RegistrarEditorProps) 
                   <Label htmlFor="transport">Transport</Label>
                   <TooltipWrapper entry={tooltips.regEditorTransport}><HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" /></TooltipWrapper>
                 </div>
-                <Select value={formData.transport} onValueChange={(value) => setFormData({ ...formData, transport: value as RegistrarFormValues["transport"] })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="udp">UDP</SelectItem>
-                    <SelectItem value="tcp">TCP</SelectItem>
-                    <SelectItem value="tls">TLS</SelectItem>
-                    <SelectItem value="wss">WSS</SelectItem>
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={formData.transport}
+                  onValueChange={(value) => setFormData({ ...formData, transport: value as RegistrarFormValues["transport"] })}
+                  options={[
+                    { value: "udp", label: "UDP" },
+                    { value: "tcp", label: "TCP" },
+                    { value: "tls", label: "TLS" },
+                    { value: "wss", label: "WSS" },
+                  ]}
+                  className="w-full"
+                />
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
@@ -634,7 +630,7 @@ export function RegistrarEditor({ registrarId, onClose }: RegistrarEditorProps) 
             </TooltipWrapper>
           </div>
           {showAdvanced && (
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <Label htmlFor="timeout">Timeout (s)</Label>

@@ -136,7 +136,7 @@ export function OverviewTab({ pollingEnabled = true }: { pollingEnabled?: boolea
               {onlineCount}
             </Badge>
           </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
             {onlineAgents.length === 0 ? (
               <EmptyState variant="inline" title="No agents online" description="Deploy an agent to get started." />
             ) : (
@@ -160,14 +160,13 @@ export function OverviewTab({ pollingEnabled = true }: { pollingEnabled?: boolea
             {activityLog.length}
           </Badge>
         </div>
-        <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2">
           {recentActivity.length === 0 ? (
             <EmptyState
               variant="inline"
               compact
               title="No activity yet"
               description="Activity will appear here"
-              className="min-h-[100px]"
             />
           ) : (
             <div className="space-y-0.5">

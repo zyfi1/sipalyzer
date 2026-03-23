@@ -14,6 +14,8 @@ import { Network, Download, Copy, Check } from "@/lib/icons";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { IpAddress } from "@/components/ui/IpAddress";
 import { cn } from "@/lib/utils";
+import { formatIpPortEndpoint } from "@/lib/networkUtils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import type { RtpStreamInfo } from "@/types/packetCapture";
 import {
   drawDirectedBrokenLine,
@@ -189,13 +191,25 @@ function StreamPanel({ stream }: { stream: RtpStreamInfo }) {
           <Row label="MOS" value={stream.mosScore.toFixed(2)} mono />
           <div className="flex items-start gap-2">
             <span className="text-muted-foreground w-14 shrink-0 font-medium">Source</span>
-            <IpAddress ip={stream.srcIp} size="sm" variant="mono" className="text-xs" />
-            <span className="font-mono tabular-nums text-muted-foreground">:{stream.srcPort}</span>
+            <IpAddress
+              ip={formatIpPortEndpoint(stream.srcIp, stream.srcPort)}
+              size="sm"
+              variant="mono"
+              className="min-w-0 flex-1 text-xs"
+              showIpInfo={false}
+              truncate
+            />
           </div>
           <div className="flex items-start gap-2">
             <span className="text-muted-foreground w-14 shrink-0 font-medium">Dest</span>
-            <IpAddress ip={stream.dstIp} size="sm" variant="mono" className="text-xs" />
-            <span className="font-mono tabular-nums text-muted-foreground">:{stream.dstPort}</span>
+            <IpAddress
+              ip={formatIpPortEndpoint(stream.dstIp, stream.dstPort)}
+              size="sm"
+              variant="mono"
+              className="min-w-0 flex-1 text-xs"
+              showIpInfo={false}
+              truncate
+            />
           </div>
           <Row
             label="Codec"
@@ -754,7 +768,7 @@ export function RtpEndpointMap({
         >
           {streams.length} stream{streams.length !== 1 ? "s" : ""}
         </Badge>
-        <div className="w-px h-4 bg-border mx-0.5" />
+        <AppDivider orientation="vertical" size="md" className="mx-0.5" />
         <TooltipWrapper content="Zoom to fit">
           <button
             type="button"

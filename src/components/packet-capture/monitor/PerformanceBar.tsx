@@ -14,6 +14,7 @@ import {
   HardDrive,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import type { PipelineStats } from "@/api/packetCapture";
 
 interface PerformanceBarProps {
@@ -80,7 +81,7 @@ export function PerformanceBar({
         </div>
       )}
 
-      <div className="w-px h-3.5 bg-border/40" />
+      <AppDivider orientation="vertical" size="sm" className="mx-0" />
 
       {/* FPS */}
       <TooltipWrapper entry={tooltips.captureFps}>
@@ -139,7 +140,7 @@ export function PerformanceBar({
       {/* Auto-scroll badge */}
       {autoScroll && (
         <>
-          <div className="w-px h-3.5 bg-border/40" />
+          <AppDivider orientation="vertical" size="sm" className="mx-0" />
           <span className="text-success/80 text-2xs font-medium">Auto-scroll</span>
         </>
       )}
@@ -161,7 +162,7 @@ export function PerformanceBar({
         <span>Scroll lock</span>
       </span>
 
-      <div className="w-px h-3.5 bg-border/40" />
+      <AppDivider orientation="vertical" size="sm" className="mx-0" />
 
       {/* Packet count */}
       <TooltipWrapper entry={tooltips.perfPacketCount}>

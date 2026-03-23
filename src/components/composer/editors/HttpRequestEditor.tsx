@@ -15,18 +15,13 @@ import type { HttpResponseData } from "../panels/ResponseViewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { useToastContext } from "@/contexts/ToastContext";
-import { Loader2, Send, AlertCircle, X, GripVertical, RefreshCw } from "@/lib/icons";
+import { Loader2, Send, AlertCircle, X, RefreshCw } from "@/lib/icons";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { getHeaderSuggestions, getValueSuggestions } from "@/components/request-crafter/crafterSuggestions";
 import type { ComposerItem, HttpRequestDraft } from "@/types/composer";
 import {
@@ -278,16 +273,12 @@ export function HttpRequestEditor({ item }: Props) {
       {/* URL bar */}
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border/50">
         <TooltipWrapper entry={tooltips.crafterHttpMethod}>
-          <Select value={draft.method} onValueChange={(v) => setDraft({ method: v })}>
-            <SelectTrigger className="w-32 h-9 font-mono text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HTTP_METHODS.map((m) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={draft.method}
+            onValueChange={(v) => setDraft({ method: v })}
+            options={HTTP_METHODS.map((m) => ({ value: m, label: m }))}
+            className="w-32 h-9 font-mono text-sm"
+          />
         </TooltipWrapper>
         <TooltipWrapper entry={tooltips.crafterHttpUrl}>
           <Input
@@ -347,21 +338,22 @@ export function HttpRequestEditor({ item }: Props) {
                 </div>
               </TabsContent>
               <TabsContent value="body" className="mt-3 space-y-2">
-                <Select value={draft.bodyType} onValueChange={(v) => {
-                  setDraft({ bodyType: v as typeof draft.bodyType });
-                  setValue("bodyType", v, { shouldDirty: true });
-                }}>
-                  <SelectTrigger className="h-8 w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="json">JSON</SelectItem>
-                    <SelectItem value="form">Form Data</SelectItem>
-                    <SelectItem value="x-www-form-urlencoded">x-www-form-urlencoded</SelectItem>
-                    <SelectItem value="raw">Raw</SelectItem>
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={draft.bodyType}
+                  onValueChange={(v) => {
+                    setDraft({ bodyType: v as typeof draft.bodyType });
+                    setValue("bodyType", v, { shouldDirty: true });
+                  }}
+                  options={[
+                    { value: "none", label: "None" },
+                    { value: "json", label: "JSON" },
+                    { value: "form", label: "Form Data" },
+                    { value: "x-www-form-urlencoded", label: "x-www-form-urlencoded" },
+                    { value: "raw", label: "Raw" },
+                  ]}
+                  className="h-8 w-40"
+                  size="sm"
+                />
                 {draft.bodyType === "json" && (
                   <Textarea
                     value={draft.bodyJson}
@@ -392,18 +384,18 @@ export function HttpRequestEditor({ item }: Props) {
               </TabsContent>
               <TabsContent value="auth" className="mt-3 space-y-2">
                 <TooltipWrapper entry={tooltips.crafterHttpAuth}>
-                  <Select
+                  <AppDropdown
                     value={draft.auth.type}
                     onValueChange={(v) => setDraft({ auth: { ...draft.auth, type: v as typeof draft.auth.type } })}
-                  >
-                    <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="basic">Basic</SelectItem>
-                      <SelectItem value="bearer">Bearer Token</SelectItem>
-                      <SelectItem value="custom">Custom Header</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "none", label: "None" },
+                      { value: "basic", label: "Basic" },
+                      { value: "bearer", label: "Bearer Token" },
+                      { value: "custom", label: "Custom Header" },
+                    ]}
+                    className="h-8 w-40"
+                    size="sm"
+                  />
                 </TooltipWrapper>
                 {draft.auth.type === "basic" && (
                   <div className="grid grid-cols-2 gap-2">
@@ -425,16 +417,13 @@ export function HttpRequestEditor({ item }: Props) {
           </Tabs>
         </div>
 
-        {/* Drag handle */}
-        <div
-          className="shrink-0 flex items-center justify-center w-2 cursor-col-resize group hover:bg-primary/10 active:bg-primary/15 transition-smooth border-x border-border/40 select-none"
+        <PanelResizeHandle
+          orientation="vertical"
+          density="comfortable"
+          appearance="grip"
+          label="Resize request and response panels"
           onMouseDown={handleDragStart}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize request and response panels"
-        >
-          <GripVertical className="size-4 text-muted-foreground/60 group-hover:text-muted-foreground/70 transition-smooth" />
-        </div>
+        />
 
         {/* Response pane */}
         <div className="min-h-0 overflow-hidden" style={{ width: `${100 - splitPercent}%` }}>

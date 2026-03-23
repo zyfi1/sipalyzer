@@ -3,7 +3,7 @@ import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Loader2, Search, Globe } from "@/lib/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { DnsRecordType } from "@/types/dns";
@@ -11,6 +11,12 @@ import type { DnsRecordType } from "@/types/dns";
 const RECORD_TYPES: DnsRecordType[] = [
   "A", "AAAA", "SRV", "NAPTR", "MX", "TXT", "CNAME", "NS", "SOA", "PTR", "CAA", "TLSA", "SSHFP", "HTTPS", "ANY",
 ];
+
+const RECORD_TYPE_OPTIONS = RECORD_TYPES.map((rt) => ({ value: rt, label: rt }));
+const TRANSPORT_OPTIONS = [
+  { value: "udp", label: "UDP" },
+  { value: "tcp", label: "TCP" },
+] as const;
 
 export default function DnsLookupPanel() {
   const {
@@ -48,16 +54,13 @@ export default function DnsLookupPanel() {
           disabled={running}
           onKeyDown={(e) => e.key === "Enter" && !running && handleLookup()}
         />
-        <Select value={lookupRecordType} onValueChange={(v) => setLookupRecordType(v as DnsRecordType)}>
-          <SelectTrigger className="h-8 w-[90px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {RECORD_TYPES.map((rt) => (
-              <SelectItem key={rt} value={rt} className="text-xs">{rt}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={lookupRecordType}
+          onValueChange={(v) => setLookupRecordType(v as DnsRecordType)}
+          options={RECORD_TYPE_OPTIONS}
+          className="h-8 w-[90px] text-xs"
+          itemClassName="text-xs"
+        />
         <Input
           value={lookupServer}
           onChange={(e) => setLookupServer(e.target.value)}
@@ -65,15 +68,13 @@ export default function DnsLookupPanel() {
           className="h-8 text-xs w-[160px]"
           disabled={running}
         />
-        <Select value={lookupTransport} onValueChange={(v) => setLookupTransport(v as "udp" | "tcp")}>
-          <SelectTrigger className="h-8 w-[70px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="udp" className="text-xs">UDP</SelectItem>
-            <SelectItem value="tcp" className="text-xs">TCP</SelectItem>
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={lookupTransport}
+          onValueChange={(v) => setLookupTransport(v as "udp" | "tcp")}
+          options={[...TRANSPORT_OPTIONS]}
+          className="h-8 w-[70px] text-xs"
+          itemClassName="text-xs"
+        />
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={handleLookup} disabled={running || !lookupDomain.trim()}>
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />} Lookup
         </Button>

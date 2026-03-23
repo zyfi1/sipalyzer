@@ -224,7 +224,7 @@ export function TemplateManager({ onNavigateToNote }: TemplateManagerProps) {
               {formTags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {formTags.map((tag) => (
-                    <Badge key={tag} variant="outline" className="h-5 px-1.5 text-[10px]">
+                    <Badge key={tag} variant="secondary" className="h-5 px-1.5 text-[10px]">
                       <Tag className="h-2.5 w-2.5 mr-0.5" />
                       {tag}
                     </Badge>
@@ -283,7 +283,7 @@ export function TemplateManager({ onNavigateToNote }: TemplateManagerProps) {
                     </h3>
                     {template.category && (
                       <Badge
-                        variant="outline"
+                        variant="secondary"
                         className="h-5 border-border/30 bg-muted/50 px-1.5 text-[10px] text-muted-foreground"
                       >
                         {template.category}
@@ -309,7 +309,7 @@ export function TemplateManager({ onNavigateToNote }: TemplateManagerProps) {
                       {template.tags.map((tag) => (
                         <Badge
                           key={tag}
-                          variant="outline"
+                          variant="secondary"
                           className="h-5 px-1.5 text-[10px]"
                         >
                           {tag}

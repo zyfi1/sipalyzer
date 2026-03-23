@@ -8,13 +8,28 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { BarChart3, Clock, Globe, Play, Square } from "@/lib/icons";
 import { tooltips } from "@/lib/tooltips";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from "recharts";
 import type { MonitorSample, MonitorStatus } from "@/types/networkTest";
+
+const MONITOR_DURATION_OPTIONS = [
+  { value: "30", label: "30 sec" },
+  { value: "60", label: "1 min" },
+  { value: "120", label: "2 min" },
+  { value: "300", label: "5 min" },
+];
+
+const MONITOR_INTERVAL_OPTIONS = [
+  { value: "250", label: "250 ms" },
+  { value: "500", label: "500 ms" },
+  { value: "1000", label: "1 sec" },
+  { value: "2000", label: "2 sec" },
+];
 
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -200,32 +215,24 @@ export function MonitorView() {
             <TooltipWrapper entry={tooltips.netMonitorDuration}>
               <span className="text-2xs text-muted-foreground/80 whitespace-nowrap cursor-help">Duration</span>
             </TooltipWrapper>
-            <Select value={duration} onValueChange={setDuration} disabled={monitorRunning}>
-              <SelectTrigger className="h-8 w-[98px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="30">30 sec</SelectItem>
-                <SelectItem value="60">1 min</SelectItem>
-                <SelectItem value="120">2 min</SelectItem>
-                <SelectItem value="300">5 min</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="h-4 w-px bg-border/25 mx-0.5" />
+            <AppDropdown
+              value={duration}
+              onValueChange={setDuration}
+              options={MONITOR_DURATION_OPTIONS}
+              className="h-8 w-[98px] text-xs"
+              disabled={monitorRunning}
+            />
+            <AppDivider orientation="vertical" size="md" className="mx-0.5" />
             <TooltipWrapper entry={tooltips.netMonitorInterval}>
               <span className="text-2xs text-muted-foreground/80 whitespace-nowrap cursor-help">Interval</span>
             </TooltipWrapper>
-            <Select value={interval} onValueChange={setInterval_} disabled={monitorRunning}>
-              <SelectTrigger className="h-8 w-[108px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="250">250 ms</SelectItem>
-                <SelectItem value="500">500 ms</SelectItem>
-                <SelectItem value="1000">1 sec</SelectItem>
-                <SelectItem value="2000">2 sec</SelectItem>
-              </SelectContent>
-            </Select>
+            <AppDropdown
+              value={interval}
+              onValueChange={setInterval_}
+              options={MONITOR_INTERVAL_OPTIONS}
+              className="h-8 w-[108px] text-xs"
+              disabled={monitorRunning}
+            />
           </div>
           {monitorRunning ? (
             <TooltipWrapper entry={tooltips.netStopTest}>
@@ -401,23 +408,38 @@ export function MonitorView() {
               <div className="rounded-md border border-border/35 bg-background/45 p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h4 className="section-label-sm">Live Quality Timeline</h4>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="subview-tabs-compact">
                     <TooltipWrapper title="Show last 15 seconds" description="Focus on immediate behavior and short spike detection.">
-                      <span>
-                        <Button size="sm" variant={chartWindowSec === 15 ? "default" : "outline"} className="h-7 px-2 text-2xs" onClick={() => setChartWindowSec(15)}>15s</Button>
-                      </span>
+                      <button
+                        type="button"
+                        data-state={chartWindowSec === 15 ? "active" : "inactive"}
+                        className="subview-tab-compact ui-hover-press motion-reduce:transform-none focus-visible:shadow-focus"
+                        onClick={() => setChartWindowSec(15)}
+                      >
+                        15s
+                      </button>
                     </TooltipWrapper>
                     <TooltipWrapper title="Show last 30 seconds" description="Balanced window for trend analysis and near-term detail.">
-                      <span>
-                        <Button size="sm" variant={chartWindowSec === 30 ? "default" : "outline"} className="h-7 px-2 text-2xs" onClick={() => setChartWindowSec(30)}>30s</Button>
-                      </span>
+                      <button
+                        type="button"
+                        data-state={chartWindowSec === 30 ? "active" : "inactive"}
+                        className="subview-tab-compact ui-hover-press motion-reduce:transform-none focus-visible:shadow-focus"
+                        onClick={() => setChartWindowSec(30)}
+                      >
+                        30s
+                      </button>
                     </TooltipWrapper>
                     <TooltipWrapper title="Show last 60 seconds" description="Longer horizon to surface drift and recurring stability issues.">
-                      <span>
-                        <Button size="sm" variant={chartWindowSec === 60 ? "default" : "outline"} className="h-7 px-2 text-2xs" onClick={() => setChartWindowSec(60)}>60s</Button>
-                      </span>
+                      <button
+                        type="button"
+                        data-state={chartWindowSec === 60 ? "active" : "inactive"}
+                        className="subview-tab-compact ui-hover-press motion-reduce:transform-none focus-visible:shadow-focus"
+                        onClick={() => setChartWindowSec(60)}
+                      >
+                        60s
+                      </button>
                     </TooltipWrapper>
-                    <div className="h-4 w-px bg-border/30 mx-1" />
+                    <AppDivider orientation="vertical" size="md" className="mx-1" />
                     <TooltipWrapper title="Latency (ms)" description="Round-trip delay to the target. Lower and flatter is better for call quality.">
                       <label className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border/40 bg-background/55 px-2 text-2xs text-muted-foreground cursor-pointer">
                         <Checkbox checked={showLatency} onCheckedChange={(checked) => setShowLatency(Boolean(checked))} className="size-3.5" />

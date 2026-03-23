@@ -105,14 +105,18 @@ export interface ForensicFinding {
   /** When the issue occurred (ISO). */
   timestamp?: string;
   /** Link: registrar_id, call_id, or capture session_id. */
-  link?: { type: "registrar" | "call" | "capture" | "fax"; id: string; label?: string };
+  link?: {
+    type: "registrar" | "call" | "capture" | "fax" | "network";
+    id: string;
+    label?: string;
+  };
 }
 
 /** One entry in the combined forensics timeline. */
 export interface ForensicsTimelineEntry {
   id: string;
   timestamp: string;
-  kind: "registration" | "call" | "call_quality" | "fax_sent" | "fax_received";
+  kind: "registration" | "call" | "call_quality" | "fax_sent" | "fax_received" | "network_test";
   label: string;
   detail?: string;
   success?: boolean;

@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Activity, Globe, Loader2, Play, Zap } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { tooltips } from "@/lib/tooltips";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -88,7 +89,7 @@ export function PingView() {
               </TooltipWrapper>
             ))}
           </div>
-          <div className="h-5 w-px bg-border/20" />
+          <AppDivider orientation="vertical" size="lg" className="mx-0" />
           <div className="flex items-center gap-1.5">
             <Switch checked={showMtu} onCheckedChange={setShowMtu} className="scale-75" />
             <TooltipWrapper entry={tooltips.netPingMtu}>

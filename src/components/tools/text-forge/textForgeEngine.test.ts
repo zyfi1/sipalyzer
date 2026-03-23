@@ -193,6 +193,28 @@ describe("textForgeEngine", () => {
     expect(sensitive.text).toBe("Foo bar FOO");
   });
 
+  it("regex replace substitutes all matches and supports captures", () => {
+    expect(
+      runTextForge("foo123bar", [{ type: "regexReplace", pattern: "(\\d+)", replacement: "[$1]", flags: "g" }]).text,
+    ).toBe("foo[123]bar");
+    expect(runTextForge("a a a", [{ type: "regexReplace", pattern: "a", replacement: "b", flags: "" }]).text).toBe(
+      "b b b",
+    );
+    expect(
+      runTextForge("Hello", [{ type: "regexReplace", pattern: "hello", replacement: "Hi", flags: "gi" }]).text,
+    ).toBe("Hi");
+  });
+
+  it("regex replace is a no-op for empty or invalid pattern", () => {
+    const input = "abc";
+    expect(runTextForge(input, [{ type: "regexReplace", pattern: "", replacement: "x", flags: "g" }]).text).toBe(
+      input,
+    );
+    expect(
+      runTextForge(input, [{ type: "regexReplace", pattern: "(unclosed", replacement: "x", flags: "g" }]).text,
+    ).toBe(input);
+  });
+
   it("adds prefix and suffix to each line", () => {
     const result = runTextForge("a\nb", [{ type: "addPrefixSuffixLines", prefix: "[", suffix: "]" }]);
     expect(result.text).toBe("[a]\n[b]");

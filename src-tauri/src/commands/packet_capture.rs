@@ -24,6 +24,7 @@ use crate::packet_capture::pcap_reader::MmapPcapReader;
 use crate::packet_capture::rtp_analyzer::{RtpStreamTracker, resolve_codec_name, calculate_mos};
 use crate::packet_capture::sip_parser::ParsedSipMessage;
 use crate::packet_capture::protocol_decoder::ApplicationLayer;
+use crate::packet_capture::websocket_parser::WebSocketFrame;
 use crate::packet_capture::PcapWriter;
 use crate::packet_capture::wireshark_filter::WiresharkFilter;
 use pcap::Capture;
@@ -64,14 +65,7 @@ fn packet_capture_strict_mode_enabled() -> bool {
     parse_env_bool(PACKET_CAPTURE_STRICT_MODE_ENV).unwrap_or(true)
 }
 
-fn local_capture_explicitly_enabled() -> bool {
-    parse_env_bool(PACKET_CAPTURE_ENABLE_LOCAL_ENV).unwrap_or(false)
-}
-
 fn local_capture_allowed() -> bool {
-    if packet_capture_strict_mode_enabled() {
-        return local_capture_explicitly_enabled();
-    }
     true
 }
 
@@ -877,8 +871,13 @@ pub fn get_live_statistics(session_id: String) -> Result<LiveStatsSnapshot, Stri
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn get_capture_packets(session_id: String, limit: Option<usize>) -> Result<Vec<serde_json::Value>, String> {
-    let limit = limit.unwrap_or(1000);
+pub fn get_capture_packets(
+    session_id: String,
+    limit: Option<usize>,
+    compact_for_diff: Option<bool>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let limit = limit.unwrap_or(1000).min(50_000);
+    let compact = compact_for_diff.unwrap_or(false);
 
     // Try live memory first
     let (found, is_stopped, packets_json) = {
@@ -893,7 +892,11 @@ pub fn get_capture_packets(session_id: String, limit: Option<usize>) -> Result<V
             let start = buffer_size.saturating_sub(limit);
             let packet_list = session.get_packets_range(start, limit);
             tracing::info!("Retrieved {} packets from buffer (requested limit: {})", packet_list.len(), limit);
-            let json = packet_list_to_json(packet_list.iter());
+            let json: Vec<serde_json::Value> = if compact {
+                packet_list.iter().map(packet_info_to_json_for_diff).collect()
+            } else {
+                packet_list_to_json(packet_list.iter())
+            };
             (true, stopped, json)
         } else {
             (false, false, Vec::new())
@@ -909,7 +912,7 @@ pub fn get_capture_packets(session_id: String, limit: Option<usize>) -> Result<V
     if found {
         tracing::info!("Session {} stopped with empty buffer — loading from file", session_id);
     }
-    load_capture_session_range(session_id, 0, limit)
+    load_capture_session_range(session_id, 0, limit, compact)
 }
 
 /// Returns total packet count for a session (live buffer length or DB count for saved).
@@ -967,6 +970,127 @@ where
     packet_list
         .map(|p| packet_info_to_json(p))
         .collect()
+}
+
+/// SIP JSON for packet diff: drop full wire text and SDP body text (keeps structured SDP).
+fn parsed_sip_to_json_for_diff(sip: &ParsedSipMessage) -> serde_json::Value {
+    let body = sip.body.as_ref().map(|b| {
+        serde_json::json!({
+            "contentType": b.content_type,
+            "content": "",
+            "sdp": &b.sdp,
+        })
+    });
+    serde_json::json!({
+        "method": sip.method,
+        "responseCode": sip.response_code,
+        "responseText": sip.response_text,
+        "requestUri": sip.request_uri,
+        "headers": &sip.headers,
+        "body": body,
+        "callId": sip.call_id,
+        "from": sip.from,
+        "to": sip.to,
+        "cseq": sip.cseq,
+        "via": &sip.via,
+        "contact": sip.contact,
+        "contentType": sip.content_type,
+        "contentLength": sip.content_length,
+        "rawMessage": "",
+    })
+}
+
+fn websocket_frame_to_json_lite(frame: &WebSocketFrame) -> serde_json::Value {
+    serde_json::json!({
+        "fin": frame.fin,
+        "rsv1": frame.rsv1,
+        "rsv2": frame.rsv2,
+        "rsv3": frame.rsv3,
+        "opcode": frame.opcode,
+        "opcodeName": frame.opcode_name,
+        "masked": frame.masked,
+        "payloadLength": frame.payload_length,
+        "maskKey": frame.mask_key.map(|k| k.iter().copied().collect::<Vec<u8>>()),
+        "payload": Vec::<u8>::new(),
+        "headerSize": frame.header_size,
+    })
+}
+
+fn unknown_payload_lite(data: &[u8]) -> serde_json::Value {
+    const CAP: usize = 64;
+    let n = data.len().min(CAP);
+    serde_json::json!(data[..n].to_vec())
+}
+
+/// Smaller JSON for VoIP packet diff: omits rawPayload, SIP raw text, WS payloads, truncates unknown bytes.
+pub fn packet_info_to_json_for_diff(p: &PacketInfo) -> serde_json::Value {
+    let protocol_str = serde_json::to_string(&p.protocol)
+        .unwrap_or_else(|_| format!("{:?}", p.protocol))
+        .trim_matches('"')
+        .to_string();
+    let mut packet_json = serde_json::json!({
+        "timestamp": p.timestamp.to_rfc3339(),
+        "srcIp": p.src_ip.to_string(),
+        "dstIp": p.dst_ip.to_string(),
+        "srcPort": p.src_port,
+        "dstPort": p.dst_port,
+        "protocol": protocol_str,
+        "size": p.size,
+        "frameLength": p.frame_length,
+        "fidelity": p.fidelity,
+        "provenance": p.provenance,
+        "summary": p.summary(),
+    });
+    if let Some(ref decoded) = p.decoded {
+        let mut decoded_json = serde_json::json!({
+            "ethernet": &decoded.ethernet,
+            "ip": &decoded.ip,
+            "udp": &decoded.udp,
+            "tcp": &decoded.tcp,
+        });
+        match &decoded.application {
+            ApplicationLayer::Sip(sip) => {
+                decoded_json["application"] =
+                    serde_json::json!({ "type": "Sip", "data": parsed_sip_to_json_for_diff(sip) });
+            }
+            ApplicationLayer::SipOverWs { ws_frame, sip } => {
+                decoded_json["application"] = serde_json::json!({
+                    "type": "SipOverWs",
+                    "data": {
+                        "wsFrame": websocket_frame_to_json_lite(ws_frame),
+                        "sip": parsed_sip_to_json_for_diff(sip),
+                    }
+                });
+            }
+            ApplicationLayer::Rtp(rtp) => {
+                decoded_json["application"] = serde_json::json!({ "type": "Rtp", "data": rtp });
+            }
+            ApplicationLayer::Srtp(rtp) => {
+                decoded_json["application"] = serde_json::json!({ "type": "Srtp", "data": rtp });
+            }
+            ApplicationLayer::Rtcp(rtcp) => {
+                decoded_json["application"] = serde_json::json!({ "type": "Rtcp", "data": rtcp });
+            }
+            ApplicationLayer::Dns(dns) => {
+                decoded_json["application"] = serde_json::json!({ "type": "Dns", "data": dns });
+            }
+            ApplicationLayer::T38(t38) => {
+                decoded_json["application"] = serde_json::json!({ "type": "T38", "data": t38 });
+            }
+            ApplicationLayer::WebSocket(ws) => {
+                decoded_json["application"] = serde_json::json!({
+                    "type": "WebSocket",
+                    "data": websocket_frame_to_json_lite(ws),
+                });
+            }
+            ApplicationLayer::Unknown(data) => {
+                decoded_json["application"] =
+                    serde_json::json!({ "type": "Unknown", "data": unknown_payload_lite(data) });
+            }
+        }
+        packet_json["decoded"] = decoded_json;
+    }
+    packet_json
 }
 
 pub fn packet_info_to_json(p: &PacketInfo) -> serde_json::Value {
@@ -1048,6 +1172,7 @@ fn load_capture_session_range(
     session_id: String,
     offset: u64,
     limit: usize,
+    for_diff: bool,
 ) -> Result<Vec<serde_json::Value>, String> {
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
     let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn.query_row(
@@ -1077,7 +1202,11 @@ fn load_capture_session_range(
         };
         if let Some(packet_info) = parser.parse(&packet, Some(parsed_index)) {
             if parsed_index >= offset && packets.len() < limit {
-                packets.push(packet_info_to_json(&packet_info));
+                packets.push(if for_diff {
+                    packet_info_to_json_for_diff(&packet_info)
+                } else {
+                    packet_info_to_json(&packet_info)
+                });
             }
             parsed_index += 1;
             if parsed_index >= offset + limit as u64 {
@@ -1545,6 +1674,111 @@ pub async fn export_pcap(session_id: String, output_path: Option<String>) -> Res
 
     std::fs::copy(&source_path, &final_path).map_err(|e| e.to_string())?;
     Ok(final_path.to_string_lossy().to_string())
+}
+
+/// Copy an existing session's on-disk PCAP into the captures library as a **new** session (splice / working copy).
+/// Requires a persisted `file_path` (stop live captures first if still recording).
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub fn duplicate_capture_to_library(session_id: String) -> Result<String, String> {
+    let source_path: std::path::PathBuf = {
+        let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
+        if let Some(entry) = sessions.get(&session_id) {
+            let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
+            session
+                .file_path
+                .as_ref()
+                .ok_or_else(|| {
+                    "This capture has no saved file yet — stop the capture first, then add to Captures.".to_string()
+                })?
+                .into()
+        } else {
+            let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
+            let path: String = conn
+                .query_row(
+                    "SELECT file_path FROM capture_sessions WHERE id = ?1",
+                    rusqlite::params![session_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            if path.trim().is_empty() {
+                return Err("Session has no PCAP file.".to_string());
+            }
+            path.into()
+        }
+    };
+
+    if !source_path.exists() {
+        return Err(format!("PCAP file not found: {}", source_path.display()));
+    }
+
+    let info = get_capture_status(session_id.clone())?;
+    let session_name = format!("Splice · {}", info.name);
+
+    let cap = Capture::from_file(&source_path)
+        .map_err(|e| format!("Not a valid PCAP file: {}", e))?;
+    drop(cap);
+
+    let mut cap = Capture::from_file(&source_path)
+        .map_err(|e| format!("Failed to read PCAP file: {}", e))?;
+    let link_layer_type = cap.get_datalink().0 as u32;
+    let parser = PacketParser::with_rtp_port_range(link_layer_type, FilterConfig::default().rtp_port_range);
+    let mut packet_count: u64 = 0;
+    let mut parsed_packet_count: u64 = 0;
+    while let Ok(packet) = cap.next_packet() {
+        packet_count += 1;
+        if parser.parse(&packet, Some(packet_count)).is_some() {
+            parsed_packet_count += 1;
+        }
+    }
+    drop(cap);
+
+    let id = Uuid::new_v4().to_string();
+    let config_dir = config::get_config_dir().map_err(|e| e.to_string())?;
+    let captures_dir = config_dir.join("captures");
+    std::fs::create_dir_all(&captures_dir).map_err(|e| e.to_string())?;
+    let dest_path = captures_dir.join(format!("{}.pcap", id));
+
+    std::fs::copy(&source_path, &dest_path)
+        .map_err(|e| format!("Failed to copy PCAP file: {}", e))?;
+
+    let filter_config = FilterConfig::default();
+    let filter_config_json = serde_json::to_string(&filter_config).map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO capture_sessions (id, name, description, interface, filter_config, start_time, status, packet_count, file_path, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        rusqlite::params![
+            id,
+            session_name,
+            format!(
+                "Copy from session {} — {} ({} parsed / {} total packets)",
+                session_id,
+                source_path.display(),
+                parsed_packet_count,
+                packet_count
+            ),
+            "imported",
+            filter_config_json,
+            now,
+            "Imported",
+            parsed_packet_count,
+            dest_path.to_string_lossy(),
+            now,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tracing::info!(
+        "[Splice] Duplicated session {} → new session {} ({} packets)",
+        session_id,
+        id,
+        parsed_packet_count
+    );
+
+    Ok(id)
 }
 
 /// Import an external PCAP/PCAPNG file into the app as a new capture session.

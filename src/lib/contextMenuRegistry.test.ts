@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getContextMenuSections } from "@/lib/contextMenuRegistry";
 import { createDefaultContextMenuContext, isSubmenu, type ContextMenuEntry } from "@/types/contextMenu";
-import { FEATURE_FLAG_MCP_UI } from "@/lib/featureFlags";
+import { FEATURE_FLAG_MCP_UI, FEATURE_FLAG_TOOLS_MOCKUP_UI } from "@/lib/featureFlags";
 import { setCachedFeatureFlag } from "@/lib/featureFlagCache";
 import { Activity } from "@/lib/icons";
 import { registerTools } from "@/lib/tools";
@@ -151,7 +151,7 @@ describe("context menu registry", () => {
     expect(refresh && !isSubmenu(refresh) ? refresh.loading : false).toBe(true);
   });
 
-  it("shows danger submenu only for tools with relevant destructive actions", () => {
+  it("shows danger zone only for tools with relevant destructive actions", () => {
     const toolsSections = getContextMenuSections(
       createDefaultContextMenuContext({ toolId: "tools", subviewId: "syslog" }),
     );
@@ -162,12 +162,13 @@ describe("context menu registry", () => {
     );
     const dangerSection = networkSections.find((section) => section.id === "danger");
     expect(dangerSection).toBeTruthy();
-    const danger = findEntry(dangerSection?.entries ?? [], "network-danger");
-    expect(danger && isSubmenu(danger) ? danger.children.length : 0).toBeGreaterThan(0);
+    const clearHistory = findEntry(dangerSection?.entries ?? [], "net-clear-history");
+    expect(clearHistory && !isSubmenu(clearHistory)).toBe(true);
   });
 
   it("hides MCP subview from tools context menu when feature flag is off", () => {
     setCachedFeatureFlag(FEATURE_FLAG_MCP_UI, false);
+    setCachedFeatureFlag(FEATURE_FLAG_TOOLS_MOCKUP_UI, true);
     const sections = getContextMenuSections(
       createDefaultContextMenuContext({ toolId: "tools", subviewId: "syslog" }),
     );
@@ -177,6 +178,20 @@ describe("context menu registry", () => {
     const viewIds = views && isSubmenu(views) ? views.children.map((child) => child.id) : [];
     expect(viewIds).toContain("tools-view-syslog");
     expect(viewIds).not.toContain("tools-view-mcp");
+  });
+
+  it("hides mockup subview from tools context menu when feature flag is off", () => {
+    setCachedFeatureFlag(FEATURE_FLAG_MCP_UI, true);
+    setCachedFeatureFlag(FEATURE_FLAG_TOOLS_MOCKUP_UI, false);
+    const sections = getContextMenuSections(
+      createDefaultContextMenuContext({ toolId: "tools", subviewId: "syslog" }),
+    );
+    const viewsSection = sections.find((section) => section.id === "views");
+    expect(viewsSection).toBeTruthy();
+    const views = findEntry(viewsSection?.entries ?? [], "tools-views");
+    const viewIds = views && isSubmenu(views) ? views.children.map((child) => child.id) : [];
+    expect(viewIds).toContain("tools-view-syslog");
+    expect(viewIds).not.toContain("tools-view-mockup");
   });
 
   it("renders configured subview icons in views submenus", () => {

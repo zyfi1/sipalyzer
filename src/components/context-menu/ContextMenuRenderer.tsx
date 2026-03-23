@@ -4,14 +4,14 @@ import { isSubmenu, type ContextMenuEntry, type ContextMenuItemAction, type Cont
 import { useContextMenuStore } from "@/stores/contextMenuStore";
 import { trackContextMenuAction } from "@/lib/contextMenuTelemetry";
 import {
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-} from "@/components/ui/dropdown-menu";
+  AppContextMenuItem,
+  AppContextMenuLabel,
+  AppContextMenuSeparator,
+  AppContextMenuShortcut,
+  AppContextMenuSub,
+  AppContextMenuSubContent,
+  AppContextMenuSubTrigger,
+} from "@/components/ui/app-context-menu";
 
 interface ContextMenuRendererProps {
   sections: ContextMenuSection[];
@@ -21,7 +21,7 @@ interface ContextMenuRendererProps {
 
 function ActionItem({ entry, onAction }: { entry: ContextMenuItemAction; onAction: () => void }) {
   return (
-    <DropdownMenuItem
+    <AppContextMenuItem
       disabled={entry.disabled || entry.loading}
       variant={entry.destructive ? "destructive" : "default"}
       onSelect={() => {
@@ -55,14 +55,14 @@ function ActionItem({ entry, onAction }: { entry: ContextMenuItemAction; onActio
         <Tick className="ml-auto size-3.5 shrink-0 text-accent-foreground" />
       )}
       {!entry.loading && !entry.active && entry.disabled && entry.disabledReason && (
-        <DropdownMenuShortcut className="text-muted-foreground/70">
+        <AppContextMenuShortcut className="text-muted-foreground/70">
           {entry.disabledReason}
-        </DropdownMenuShortcut>
+        </AppContextMenuShortcut>
       )}
       {!entry.loading && !entry.active && (!entry.disabled || !entry.disabledReason) && entry.shortcut && (
-        <DropdownMenuShortcut>{entry.shortcut}</DropdownMenuShortcut>
+        <AppContextMenuShortcut>{entry.shortcut}</AppContextMenuShortcut>
       )}
-    </DropdownMenuItem>
+    </AppContextMenuItem>
   );
 }
 
@@ -76,25 +76,25 @@ function SubmenuItem({
   onAction: () => void;
 }) {
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={entry.disabled}>
+    <AppContextMenuSub>
+      <AppContextMenuSubTrigger disabled={entry.disabled}>
         {entry.icon && <entry.icon className="size-4 shrink-0 text-muted-foreground" />}
         <span className="flex-1 truncate">{entry.label}</span>
         {entry.disabled && entry.disabledReason && (
-          <DropdownMenuShortcut className="text-muted-foreground/70">
+          <AppContextMenuShortcut className="text-muted-foreground/70">
             {entry.disabledReason}
-          </DropdownMenuShortcut>
+          </AppContextMenuShortcut>
         )}
         {!entry.disabled && entry.shortcut && (
-          <DropdownMenuShortcut>{entry.shortcut}</DropdownMenuShortcut>
+          <AppContextMenuShortcut>{entry.shortcut}</AppContextMenuShortcut>
         )}
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="w-56 max-h-[480px]" collisionPadding={edgePadding}>
+      </AppContextMenuSubTrigger>
+      <AppContextMenuSubContent className="w-56" collisionPadding={edgePadding}>
         {entry.children.map((child) => (
           <EntryRenderer key={child.id} entry={child} edgePadding={edgePadding} onAction={onAction} />
         ))}
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+      </AppContextMenuSubContent>
+    </AppContextMenuSub>
   );
 }
 
@@ -119,15 +119,16 @@ export function ContextMenuRenderer({
   onAction,
   edgePadding = 8,
 }: ContextMenuRendererProps) {
+  const visibleSections = sections.filter((s) => s.entries.length > 0);
   return (
     <>
-      {sections.map((section, i) => (
+      {visibleSections.map((section, i) => (
         <div key={section.id}>
-          {i > 0 && <DropdownMenuSeparator />}
-          {section.label && (
-            <DropdownMenuLabel className="px-2 py-1 text-2xs font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
+          {i > 0 && <AppContextMenuSeparator />}
+          {section.label && section.entries.length > 0 && (
+            <AppContextMenuLabel className="px-2 py-1 text-2xs font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
               {section.label}
-            </DropdownMenuLabel>
+            </AppContextMenuLabel>
           )}
           {section.entries.map((entry) => (
             <EntryRenderer key={entry.id} entry={entry} edgePadding={edgePadding} onAction={onAction} />

@@ -4,7 +4,7 @@ import { ResultSourceBadge } from "../components/ResultSourceBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Shield, Globe, Loader2, Play, RefreshCw } from "@/lib/icons";
@@ -54,6 +54,11 @@ const STUN_PRESETS = [
   { id: "nextcloud", label: "Nextcloud STUN", host: "stun.nextcloud.com", port: 443 },
   { id: "sipgate", label: "Sipgate STUN", host: "stun.sipgate.net", port: 10000 },
 ] as const;
+
+const STUN_PRESET_OPTIONS = STUN_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: `${preset.label} - ${preset.host}:${preset.port}`,
+}));
 
 function asRecord(value: unknown): Record<string, unknown> {
   return (value ?? {}) as Record<string, unknown>;
@@ -310,18 +315,14 @@ export default function NatAlgPanel() {
           </div>
 
           {mode === "preset" ? (
-            <Select value={presetId} onValueChange={(v) => setPresetId(v as (typeof STUN_PRESETS)[number]["id"])} disabled={runningAny}>
-              <SelectTrigger className="h-8 min-w-[420px] w-[min(64vw,560px)] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STUN_PRESETS.map((preset) => (
-                  <SelectItem key={preset.id} value={preset.id} className="text-xs">
-                    {preset.label} - {preset.host}:{preset.port}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AppDropdown
+              value={presetId}
+              onValueChange={(v) => setPresetId(v as (typeof STUN_PRESETS)[number]["id"])}
+              options={[...STUN_PRESET_OPTIONS]}
+              className="h-8 min-w-[420px] w-[min(64vw,560px)] text-xs"
+              itemClassName="text-xs"
+              disabled={runningAny}
+            />
           ) : (
             <>
               <div className="relative min-w-[220px] flex-1">
@@ -375,7 +376,7 @@ export default function NatAlgPanel() {
 
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-2xs text-muted-foreground/70">Endpoint</span>
-          <Badge variant="outline" className="h-5 px-1.5 text-3xs font-mono">
+          <Badge variant="secondary" className="h-5 px-1.5 text-3xs font-mono">
             {effectiveServer.host ? `${effectiveServer.host}:${effectiveServer.port}` : "not configured"}
           </Badge>
           {error && (
@@ -415,7 +416,7 @@ export default function NatAlgPanel() {
           {lastServerLabel && (
             <div className="flex items-center gap-2 text-2xs text-muted-foreground">
               <span>Server</span>
-              <Badge variant="outline" className="h-5 px-1.5 text-3xs">
+              <Badge variant="secondary" className="h-5 px-1.5 text-3xs">
                 {lastServerLabel}
               </Badge>
             </div>
@@ -556,7 +557,7 @@ export default function NatAlgPanel() {
               <p className="section-label-sm mb-1">Modified SIP Headers</p>
               <div className="flex flex-wrap gap-1.5">
                 {modifiedHeaders.map((header) => (
-                  <Badge key={header} variant="outline" className="h-5 px-1.5 text-3xs">
+                  <Badge key={header} variant="secondary" className="h-5 px-1.5 text-3xs">
                     {header}
                   </Badge>
                 ))}

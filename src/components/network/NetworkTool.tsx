@@ -1,16 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToolStore } from "@/stores/toolStore";
-import { useNetworkTestStore } from "@/stores/networkTestStore";
 import { useNetworkDevicesStore } from "@/stores/networkDevicesStore";
-import { useMulticastStore } from "@/stores/multicastStore";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer, ViewFooterDivider } from "@/components/layout/ViewFooter";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import { cn } from "@/lib/utils";
-import { Activity, Clock, Globe, Network, Radio, Scan } from "@/lib/icons";
-import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { LiveIndicator } from "@/components/ui/live-indicator";
 import { listen } from "@/lib/tauriEvents";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { ScanProgressEvent } from "@/types/networkDevices";
@@ -88,27 +82,12 @@ export function NetworkTool() {
   const [activeTab, setActiveTab] = useState<string>(SUBVIEW_PATH_PERFORMANCE);
 
   // ── Network Test store ─────────────────────────────────────────
-  const healthCheck = useNetworkTestStore((s) => s.healthCheck);
-  const bulkRunning = useNetworkTestStore((s) => s.bulkRunning);
-  const monitorRunning = useNetworkTestStore((s) => s.monitorRunning);
-  const monitorSamples = useNetworkTestStore((s) => s.monitorSamples);
 
   // ── Network Devices store ──────────────────────────────────────
   const devStatus = useNetworkDevicesStore((s) => s.status);
   const devices = useNetworkDevicesStore((s) => s.devices);
-  const probed = useNetworkDevicesStore((s) => s.probed);
-  const totalProbes = useNetworkDevicesStore((s) => s.totalProbes);
-  const phaseLabel = useNetworkDevicesStore((s) => s.phaseLabel);
-  const durationMs = useNetworkDevicesStore((s) => s.durationMs);
   const handleProgress = useNetworkDevicesStore((s) => s.handleProgress);
   const { success, error: notifyError, warning } = useNotifications();
-
-  // ── Multicast store ─────────────────────────────────────────────
-  const multicastGroups = useMulticastStore((s) => s.activeGroups);
-  const multicastAudioStreams = useMulticastStore((s) => s.audioStreams);
-  const multicastAudioPlaying = Object.values(multicastAudioStreams).some((s) => s.playing);
-  const multicastGenerators = useMulticastStore((s) => s.generators);
-  const multicastGenerating = Object.keys(multicastGenerators).length > 0;
 
   // ── Subview routing ────────────────────────────────────────────
   useEffect(() => {
@@ -152,14 +131,6 @@ export function NetworkTool() {
     }
     prevStatusRef[0] = devStatus;
   }, [devStatus, devices.length, success, warning, notifyError, prevStatusRef]);
-
-  const anyTestRunning = healthCheck.status === "running" || bulkRunning || monitorRunning;
-  const devScanning = devStatus === "running";
-  const progressPct = totalProbes > 0 ? Math.round((probed / totalProbes) * 100) : 0;
-  const isPathTab = activeTab === SUBVIEW_PATH_PERFORMANCE;
-  const isAccessTab = activeTab === SUBVIEW_DNS_ACCESS;
-  const isDiscoveryTab = activeTab === SUBVIEW_DISCOVERY;
-  const isMulticastTab = activeTab === SUBVIEW_MULTICAST;
 
   const DEFAULT_EXEC_MAP: Record<string, string> = useMemo(() => ({
     [SUBVIEW_PATH_PERFORMANCE]: "ping",
@@ -229,148 +200,6 @@ export function NetworkTool() {
           </TabsContent>
         </div>
 
-        <ViewFooter>
-          {(isPathTab || isAccessTab) ? (
-            <>
-              {anyTestRunning ? (
-                <TooltipWrapper title="Active Operation" description="A network test or monitor is currently running.">
-                  <ViewFooterItem>
-                    <LiveIndicator variant="dot" size="sm" />
-                    <span className="text-foreground font-medium">
-                      {monitorRunning ? "Monitoring" : bulkRunning ? "Testing All" : healthCheck.status === "running" ? "Health Check" : "Testing"}
-                    </span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              ) : (
-                <TooltipWrapper title="Status" description="No active network operations in this view.">
-                  <ViewFooterItem>
-                    <Activity className="h-3 w-3" />
-                    <span>Ready</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              )}
-
-              {healthCheck.result && (
-                <>
-                  <ViewFooterDivider />
-                  <TooltipWrapper title="Internet Connectivity" description={healthCheck.result.internet_reachable ? "Internet is reachable from this machine." : "No internet connectivity detected."}>
-                    <ViewFooterItem>
-                      <Globe className="h-3 w-3" />
-                      <span>{healthCheck.result.internet_reachable ? "Online" : "Offline"}</span>
-                    </ViewFooterItem>
-                  </TooltipWrapper>
-                </>
-              )}
-
-              <ViewFooterSpacer />
-
-              {isPathTab && monitorSamples.length > 0 && (
-                <TooltipWrapper title="Monitor Samples" description={`${monitorSamples.length} latency samples collected by the continuous monitor.`}>
-                  <ViewFooterItem>
-                    <Network className="h-3 w-3" />
-                    <span className="tabular-nums">{monitorSamples.length}</span>
-                    <span>samples</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              )}
-            </>
-          ) : null}
-
-          {isDiscoveryTab ? (
-            <>
-              {devScanning ? (
-                <TooltipWrapper title="Device Scan Progress" description={`${phaseLabel ? `${phaseLabel} — ` : ""}${probed} of ${totalProbes} scan steps complete (${progressPct}%).`}>
-                  <ViewFooterItem>
-                    <LiveIndicator variant="dot" size="sm" />
-                    <span className="text-foreground font-medium">Scanning</span>
-                    <span className="tabular-nums">{progressPct}%</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              ) : (
-                <TooltipWrapper title="Status" description={devStatus === "done" ? "Last scan completed successfully." : "No active scan in this view."}>
-                  <ViewFooterItem>
-                    <Activity className="h-3 w-3" />
-                    <span>{devStatus === "done" ? "Complete" : "Ready"}</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              )}
-
-              {devices.length > 0 && (
-                <>
-                  <ViewFooterDivider />
-                  <TooltipWrapper title="Discovered Devices" description={`${devices.length} device${devices.length !== 1 ? "s" : ""} found on the local network from the most recent scan.`}>
-                    <ViewFooterItem>
-                      <Scan className="h-3 w-3" />
-                      <span className="tabular-nums">{devices.length}</span>
-                      <span>device{devices.length !== 1 ? "s" : ""}</span>
-                    </ViewFooterItem>
-                  </TooltipWrapper>
-                </>
-              )}
-
-              <ViewFooterSpacer />
-
-              {totalProbes > 0 && (
-                <TooltipWrapper title="Scan Progress" description={`${probed} of ${totalProbes} scan steps completed.`}>
-                  <ViewFooterItem>
-                    <Network className="h-3 w-3" />
-                    <span className="tabular-nums">{probed}/{totalProbes}</span>
-                    <span>steps</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              )}
-
-              {durationMs > 0 && (
-                <>
-                  <ViewFooterDivider />
-                  <TooltipWrapper title="Scan Duration" description={`Total elapsed time for the last device scan: ${(durationMs / 1000).toFixed(1)} seconds.`}>
-                    <ViewFooterItem>
-                      <Clock className="h-3 w-3" />
-                      <span className="tabular-nums">{(durationMs / 1000).toFixed(1)}s</span>
-                    </ViewFooterItem>
-                  </TooltipWrapper>
-                </>
-              )}
-            </>
-          ) : null}
-
-          {isMulticastTab ? (
-            <>
-              {multicastGenerating ? (
-                <TooltipWrapper title="Audio Generator" description="Generating and transmitting RTP audio to a multicast group.">
-                  <ViewFooterItem>
-                    <Radio className="h-3 w-3 text-primary" />
-                    <span>Generating</span>
-                    <LiveIndicator variant="dot" size="sm" className="ml-1" />
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              ) : (
-                <ViewFooterItem>
-                  <Activity className="h-3 w-3" />
-                  <span>{multicastGroups.length > 0 ? "Listening" : "Ready"}</span>
-                </ViewFooterItem>
-              )}
-
-              {multicastGroups.length > 0 && (
-                <>
-                  <ViewFooterDivider />
-                  <TooltipWrapper title="Multicast Groups" description={`${multicastGroups.length} active multicast group${multicastGroups.length !== 1 ? "s" : ""}.`}>
-                    <ViewFooterItem>
-                      <Radio className="h-3 w-3" />
-                      <span className="tabular-nums">{multicastGroups.length}</span>
-                      <span>group{multicastGroups.length !== 1 ? "s" : ""}</span>
-                      {multicastAudioPlaying && (
-                        <LiveIndicator variant="dot" size="sm" className="ml-1" />
-                      )}
-                    </ViewFooterItem>
-                  </TooltipWrapper>
-                </>
-              )}
-
-              <ViewFooterSpacer />
-            </>
-          ) : null}
-        </ViewFooter>
       </Tabs>
     </div>
   );

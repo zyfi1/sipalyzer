@@ -4,26 +4,29 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+const BADGE_VARIANT_PRIMARY =
+  "bg-primary/92 text-primary-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.22)] [a&]:hover:bg-primary"
+const BADGE_VARIANT_SECONDARY =
+  "bg-linear-to-b from-card/98 via-card/92 to-muted/72 text-foreground border border-border/85 shadow-none [a&]:hover:from-card [a&]:hover:to-muted/78 [a&]:hover:border-foreground/24"
+const BADGE_VARIANT_SUCCESS =
+  "bg-success text-success-foreground shadow-[0_0_0_1px_hsl(var(--success)/0.2)] [a&]:hover:bg-success/90"
+const BADGE_VARIANT_DESTRUCTIVE =
+  "bg-destructive text-destructive-foreground shadow-[0_0_0_1px_hsl(var(--destructive)/0.2)] [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60"
+
 const badgeVariants = cva(
   "inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:shadow-focus outline-none transition-[color,box-shadow] overflow-hidden",
   {
     variants: {
       variant: {
-        default: "bg-accent text-foreground [a&]:hover:bg-accent/80",
-        success:
-          "bg-success text-success-foreground [a&]:hover:bg-success/90",
-        secondary:
-          "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "text-foreground shadow-card [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        link: "text-foreground underline-offset-4 [a&]:hover:underline",
+        default: BADGE_VARIANT_SECONDARY, // legacy alias
+        primary: BADGE_VARIANT_PRIMARY,
+        secondary: BADGE_VARIANT_SECONDARY,
+        success: BADGE_VARIANT_SUCCESS,
+        destructive: BADGE_VARIANT_DESTRUCTIVE,
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "secondary",
     },
   }
 )
@@ -35,7 +38,7 @@ const Badge = React.forwardRef<
 >(function Badge(
   {
     className,
-    variant = "default",
+    variant = "secondary",
     asChild = false,
     ...props
   },

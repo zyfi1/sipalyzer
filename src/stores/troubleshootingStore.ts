@@ -7,7 +7,7 @@
  *
  * Data flow:
  * - refresh(): loads registration health from backend (get_registration_health).
- * - syncFromStores({ calls, registrars, sessions }): called by TroubleshootingSync when
+ * - syncFromStores({ calls, registrars, sessions, network }): called by TroubleshootingSync when
  *   softphone, registration, or packet capture state changes. Recomputes timeline + findings in one batch.
  * - Packet monitor remains user-controlled; capture sessions list is synced for linkage only.
  *
@@ -22,6 +22,10 @@ import { extractErrorMessage, logError } from "@/lib/errorUtils";
 import { VOIP_THRESHOLDS } from "@/lib/voipThresholds";
 import { getSipCode } from "@/data/sipResponseCodeMap";
 import { getArticlesForSipCode } from "@/lib/troubleshootingEngine";
+import {
+  buildNetworkTimelineAndFindings,
+  type NetworkSyncPayload,
+} from "@/lib/troubleshooting/networkInsights";
 import type {
   RegistrationHealthResponse,
   CallQualitySummary,
@@ -349,6 +353,8 @@ export interface TroubleshootingSyncPayload {
     remote_port?: number;
   }>;
   sessions?: CaptureSession[];
+  /** Latest Network Test / VoIP assessment slices (from `buildNetworkSyncPayload`). */
+  network?: NetworkSyncPayload;
 }
 
 export interface TroubleshootingState {
@@ -504,8 +510,12 @@ export const useTroubleshootingStore = create<TroubleshootingState>((set, get) =
       },
 
   syncFromStores: (payload) => {
-    const { calls, registrars, sessions } = payload;
+    const { calls, registrars, sessions, network } = payload;
     const { registrationHealth } = get();
+    const networkAt = new Date().toISOString();
+    const networkBuilt = network
+      ? buildNetworkTimelineAndFindings(network, networkAt)
+      : { timeline: [] as ForensicsTimelineEntry[], findings: [] as ForensicFinding[] };
 
     const regNames = new Map(
       registrars
@@ -638,6 +648,10 @@ export const useTroubleshootingStore = create<TroubleshootingState>((set, get) =
       }
     }
 
+    for (const nf of networkBuilt.findings) {
+      findings.push(nf);
+    }
+
     const newEvents: ForensicsTimelineEntry[] = [];
     const testHistory = registrationHealth?.test_history ?? [];
     for (const t of testHistory) {
@@ -719,14 +733,20 @@ export const useTroubleshootingStore = create<TroubleshootingState>((set, get) =
 
     // Filter out events that occurred before the timeline was cleared
     const filteredNewEvents = newEvents.filter((e) => new Date(e.timestamp).getTime() >= clearedAtMs);
+    const filteredNetworkTimeline = networkBuilt.timeline.filter(
+      (e) => new Date(e.timestamp).getTime() >= clearedAtMs,
+    );
 
-    const existingIds = new Set(existing.map((e) => e.id));
-    let merged = [...existing];
+    let merged = existing.filter((e) => !e.id.startsWith("net-"));
+    const existingIds = new Set(merged.map((e) => e.id));
     for (const e of filteredNewEvents) {
       if (!existingIds.has(e.id)) {
         merged.push(e);
         existingIds.add(e.id);
       }
+    }
+    for (const e of filteredNetworkTimeline) {
+      merged.push(e);
     }
     merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     if (merged.length > MAX_TIMELINE_ENTRIES) {

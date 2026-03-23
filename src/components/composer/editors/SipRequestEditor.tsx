@@ -14,18 +14,13 @@ import { SipResponseViewer } from "../panels/ResponseViewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { useToastContext } from "@/contexts/ToastContext";
-import { Loader2, Send, RefreshCw, AlertCircle, X, GripVertical, Download } from "@/lib/icons";
+import { Loader2, Send, RefreshCw, AlertCircle, X, Download } from "@/lib/icons";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { SIP_METHODS } from "@/types/crafter";
 import type { SipResponsePart, SipRequestDraft } from "@/types/crafter";
 import { getHeaderSuggestions, getValueSuggestions } from "@/components/request-crafter/crafterSuggestions";
@@ -370,34 +365,27 @@ export function SipRequestEditor({ item }: Props) {
       {/* URL bar */}
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border/50">
         <TooltipWrapper entry={tooltips.crafterSipMethod}>
-          <Select value={draft.method} onValueChange={(v) => {
-            setDraft({ method: v });
-            setValue("method", v, { shouldDirty: true });
-          }}>
-            <SelectTrigger className="w-36 h-9 font-mono text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SIP_METHODS.map((m) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={draft.method}
+            onValueChange={(v) => {
+              setDraft({ method: v });
+              setValue("method", v, { shouldDirty: true });
+            }}
+            options={SIP_METHODS.map((m) => ({ value: m, label: m }))}
+            className="w-36 h-9 font-mono text-sm"
+          />
         </TooltipWrapper>
         <TooltipWrapper entry={tooltips.crafterSipTransport}>
-          <Select
+          <AppDropdown
             value={draft.transport}
             onValueChange={(v) => setDraft({ transport: v as "UDP" | "TCP" | "TLS" })}
-          >
-            <SelectTrigger className="w-20 h-9 font-mono text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="UDP">UDP</SelectItem>
-              <SelectItem value="TCP">TCP</SelectItem>
-              <SelectItem value="TLS">TLS</SelectItem>
-            </SelectContent>
-          </Select>
+            options={[
+              { value: "UDP", label: "UDP" },
+              { value: "TCP", label: "TCP" },
+              { value: "TLS", label: "TLS" },
+            ]}
+            className="w-20 h-9 font-mono text-xs"
+          />
         </TooltipWrapper>
         <TooltipWrapper entry={tooltips.crafterSipUri}>
           <Input
@@ -533,15 +521,13 @@ export function SipRequestEditor({ item }: Props) {
         </div>
 
         {/* Drag handle */}
-        <div
-          className="shrink-0 flex items-center justify-center w-2 cursor-col-resize group hover:bg-primary/10 active:bg-primary/15 transition-smooth border-x border-border/40 select-none"
+        <PanelResizeHandle
+          orientation="vertical"
+          density="comfortable"
+          appearance="grip"
+          label="Resize request and response panels"
           onMouseDown={handleDragStart}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize request and response panels"
-        >
-          <GripVertical className="size-4 text-muted-foreground/60 group-hover:text-muted-foreground/70 transition-smooth" />
-        </div>
+        />
 
         {/* Response pane */}
         <div className="min-h-0 overflow-hidden" style={{ width: `${100 - splitPercent}%` }}>

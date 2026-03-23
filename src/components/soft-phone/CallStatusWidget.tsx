@@ -57,17 +57,12 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { getUseCase, isRegistered } from "@/components/fax-center/FaxShared";
 import { DIAL_KEY_ROWS } from "./softphone-constants";
 import { sanitizeDialInput } from "./sanitizeDialInput";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -482,32 +477,30 @@ export function CallStatusWidget({ onEndCall, shape = "badge" }: CallStatusWidge
                 />
               ) : (
                 <div className="space-y-1.5">
-                  <Select
+                  <AppDropdown
                     value={callRegistrarId ?? registrarsForCalling[0]?.id ?? ""}
                     onValueChange={(v) => {
                       setActiveRegistrar(v || null);
                       setWatchedRegistrars(v ? [v] : []);
                     }}
-                  >
-                    <SelectTrigger className="h-7 w-full text-2xs font-medium [&_svg]:size-3">
-                      <Check className="h-2.5 w-2.5 shrink-0" />
-                      <SelectValue placeholder="Select registrar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {registrarsForCalling.map((r) => {
-                        const ready = isRegistered(r.id, healthRegistrars, testResults);
-                        return (
-                          <SelectItem key={r.id ?? r.name} value={r.id ?? ""}>
-                            <span className="flex items-center gap-1.5">
-                              <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", ready ? "bg-success" : "bg-warning")} />
-                              {r.name}
-                              <span className="text-3xs text-muted-foreground/70">{ready ? "Ready" : "Idle"}</span>
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                    size="sm"
+                    className="h-7 min-h-7 w-full text-2xs font-medium [&_svg]:size-3"
+                    placeholder="Select registrar"
+                    triggerPrefix={<Check className="h-2.5 w-2.5 shrink-0" />}
+                    options={registrarsForCalling.map((r) => {
+                      const ready = isRegistered(r.id, healthRegistrars, testResults);
+                      return {
+                        value: r.id ?? "",
+                        label: (
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", ready ? "bg-success" : "bg-warning")} />
+                            {r.name}
+                            <span className="text-3xs text-muted-foreground/70">{ready ? "Ready" : "Idle"}</span>
+                          </span>
+                        ),
+                      };
+                    })}
+                  />
                   {selectedCallRegistrar && !selectedCallRegistrarReady && (
                     <button
                       type="button"
@@ -904,19 +897,19 @@ export function CallStatusWidget({ onEndCall, shape = "badge" }: CallStatusWidge
                 value={liveMetrics.mos.toFixed(1)}
                 color={callQuality?.color ?? "text-foreground/80"}
               />
-              <div className="w-px h-5 bg-border/10" />
+              <AppDivider orientation="vertical" size="lg" className="mx-0 opacity-80" />
               <MetricCell
                 label="Jitter"
                 value={`${Math.round(liveMetrics.jitter_ms)}ms`}
                 color={liveMetrics.jitter_ms > 50 ? "text-destructive" : liveMetrics.jitter_ms > 30 ? "text-warning" : "text-foreground/80"}
               />
-              <div className="w-px h-5 bg-border/10" />
+              <AppDivider orientation="vertical" size="lg" className="mx-0 opacity-80" />
               <MetricCell
                 label="Loss"
                 value={`${liveMetrics.loss_percent.toFixed(1)}%`}
                 color={liveMetrics.loss_percent > 2 ? "text-destructive" : liveMetrics.loss_percent > 0.5 ? "text-warning" : "text-foreground/80"}
               />
-              <div className="w-px h-5 bg-border/10" />
+              <AppDivider orientation="vertical" size="lg" className="mx-0 opacity-80" />
               <MetricCell
                 label="Quality"
                 value={callQuality?.label ?? "—"}

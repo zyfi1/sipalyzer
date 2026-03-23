@@ -19,13 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   ArrowRight,
   ArrowLeft,
@@ -484,29 +478,28 @@ function StepConnection({
   onLoadConnection: (item: ComposerItem) => void | Promise<void>;
   existingItems: ComposerItem[];
 }) {
+  const [loadSavedPickerValue, setLoadSavedPickerValue] = useState("");
+
   return (
     <div className="space-y-4 animate-in fade-in-0 slide-in-from-right-2 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)]">
       {!isEditing && existingItems.length > 0 && (
         <div>
           <Label className="text-xs text-muted-foreground mb-1.5">Load from saved connection</Label>
-          <Select
+          <AppDropdown
+            value={loadSavedPickerValue}
             onValueChange={(id) => {
               const item = existingItems.find((c) => c.id === id);
-              if (!item) return;
-              void onLoadConnection(item);
+              if (item) void onLoadConnection(item);
+              setLoadSavedPickerValue("");
             }}
-          >
-            <SelectTrigger className="h-8 text-xs w-full">
-              <SelectValue placeholder="Select a saved connection..." />
-            </SelectTrigger>
-            <SelectContent>
-              {existingItems.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} ({c.sshData?.username}@{c.sshData?.host})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={existingItems.map((c) => ({
+              value: c.id,
+              label: `${c.name} (${c.sshData?.username}@${c.sshData?.host})`,
+            }))}
+            placeholder="Select a saved connection..."
+            className="h-8 text-xs w-full"
+            size="sm"
+          />
         </div>
       )}
 
@@ -692,21 +685,19 @@ function StepAdvanced({
 
       <div>
         <Label className="text-xs text-muted-foreground mb-1.5">Strict Host Key Checking</Label>
-        <Select
+        <AppDropdown
           value={options.strictHostKeyChecking}
           onValueChange={(v) =>
             update({ strictHostKeyChecking: v as SshAdvancedOptions["strictHostKeyChecking"] })
           }
-        >
-          <SelectTrigger className="h-8 text-xs w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ask">Ask (default)</SelectItem>
-            <SelectItem value="yes">Yes (strict)</SelectItem>
-            <SelectItem value="no">No (skip verification)</SelectItem>
-          </SelectContent>
-        </Select>
+          options={[
+            { value: "ask", label: "Ask (default)" },
+            { value: "yes", label: "Yes (strict)" },
+            { value: "no", label: "No (skip verification)" },
+          ]}
+          className="h-8 text-xs w-full"
+          size="sm"
+        />
       </div>
 
       <div>

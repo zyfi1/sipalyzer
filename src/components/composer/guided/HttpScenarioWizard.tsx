@@ -15,13 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { useToastContext } from "@/contexts/ToastContext";
 import {
   ChevronLeft,
@@ -572,19 +566,14 @@ function HttpConfigureStep({
           <div className="space-y-3">
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Essentials</h3>
             <div className="flex items-center gap-2">
-              <Select
+              <AppDropdown
                 value={draft.method}
                 onValueChange={(v) => updateDraft({ method: v as HttpMethod })}
-              >
-                <SelectTrigger className="w-28 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HTTP_METHODS.map((m) => (
-                    <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={HTTP_METHODS.map((m) => ({ value: m, label: m }))}
+                className="w-28 h-8 text-xs"
+                size="sm"
+                itemClassName="text-xs"
+              />
 
               <div className="flex-1 relative">
                 <Input
@@ -632,20 +621,19 @@ function HttpConfigureStep({
               <div className="pl-4 space-y-2 animate-in slide-in-from-top-1 duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)]">
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-muted-foreground w-16 shrink-0">Type</label>
-                  <Select
+                  <AppDropdown
                     value={draft.auth.type}
                     onValueChange={(v) => updateDraft({ auth: { ...draft.auth, type: v as HttpAuthType } })}
-                  >
-                    <SelectTrigger className="w-32 h-7 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none" className="text-xs">None</SelectItem>
-                      <SelectItem value="bearer" className="text-xs">Bearer Token</SelectItem>
-                      <SelectItem value="basic" className="text-xs">Basic Auth</SelectItem>
-                      <SelectItem value="custom" className="text-xs">Custom Header</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "none", label: "None" },
+                      { value: "bearer", label: "Bearer Token" },
+                      { value: "basic", label: "Basic Auth" },
+                      { value: "custom", label: "Custom Header" },
+                    ]}
+                    className="w-32 h-7 text-xs"
+                    size="sm"
+                    itemClassName="text-xs"
+                  />
                 </div>
 
                 {draft.auth.type === "bearer" && (

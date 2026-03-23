@@ -12,18 +12,11 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useComposerStore, newItemId } from "@/stores/composerStore";
 import { useLayoutStore } from "@/stores/layoutStore";
-import { useToolStore } from "@/stores/toolStore";
 import { PortForwardingEditor } from "@/components/ssh-helper/PortForwardingEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -148,10 +141,13 @@ const SSH_TABS: Array<{ id: SshTab; label: string }> = [
   { id: "profiles", label: "Port Profiles" },
 ];
 
-export function SshSubview() {
+export function SshSubview({
+  /** When true, register Connections / Port Profiles in the app header breadcrumb (must match Composer SSH tab). */
+  registerHeaderBreadcrumbTabs = false,
+}: {
+  registerHeaderBreadcrumbTabs?: boolean;
+} = {}) {
   const [tab, setTab] = useState<SshTab>("connections");
-  const composerSubview = useToolStore((s) => s.lastViewedSubviews["composer"]);
-  const registerBreadcrumbTabs = composerSubview === "ssh";
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -159,7 +155,7 @@ export function SshSubview() {
         tabs={SSH_TABS}
         activeTab={tab}
         onTabChange={setTab}
-        toolId={registerBreadcrumbTabs ? "composer" : undefined}
+        toolId={registerHeaderBreadcrumbTabs ? "composer" : undefined}
       />
 
       {/* Quick Connect */}
@@ -445,16 +441,18 @@ function ConnectionsGrid() {
                 className="pl-8 h-8 text-xs"
               />
             </div>
-            <Select value={sortMode} onValueChange={(v) => setSortMode(v as typeof sortMode)}>
-              <SelectTrigger className="h-8 w-[130px] text-xs shrink-0">
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Sort: Recent</SelectItem>
-                <SelectItem value="name">Sort: Name</SelectItem>
-                <SelectItem value="tunnels">Sort: Tunnels</SelectItem>
-              </SelectContent>
-            </Select>
+            <AppDropdown
+              value={sortMode}
+              onValueChange={(v) => setSortMode(v as typeof sortMode)}
+              options={[
+                { value: "recent", label: "Sort: Recent" },
+                { value: "name", label: "Sort: Name" },
+                { value: "tunnels", label: "Sort: Tunnels" },
+              ]}
+              placeholder="Sort"
+              className="h-8 w-[130px] text-xs shrink-0"
+              size="sm"
+            />
             <p className="text-2xs text-muted-foreground shrink-0">
               {filteredSorted.length} result{filteredSorted.length !== 1 ? "s" : ""}
             </p>
@@ -1149,7 +1147,7 @@ function TunnelsView({
               {targetConnections.length > 0 ? (
                 <div className="space-y-1">
                   <p className="text-3xs text-muted-foreground">Use saved target</p>
-                  <Select
+                  <AppDropdown
                     value={quickConnectionId}
                     onValueChange={(id) => {
                       setQuickConnectionId(id);
@@ -1160,18 +1158,14 @@ function TunnelsView({
                       setQuickUser(match.sshData.username ?? "");
                       setQuickPort(String(match.sshData.port ?? 22));
                     }}
-                  >
-                    <SelectTrigger className="h-8 text-xs w-full">
-                      <SelectValue placeholder="Select a saved SSH connection..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {targetConnections.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name} ({item.sshData?.username}@{item.sshData?.host}:{item.sshData?.port ?? 22})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={targetConnections.map((item) => ({
+                      value: item.id,
+                      label: `${item.name} (${item.sshData?.username}@${item.sshData?.host}:${item.sshData?.port ?? 22})`,
+                    }))}
+                    placeholder="Select a saved SSH connection..."
+                    className="h-8 text-xs w-full"
+                    size="sm"
+                  />
                 </div>
               ) : null}
             </div>
@@ -1468,12 +1462,12 @@ function TunnelsView({
                   <div className="flex items-center gap-1 mt-2">
                     <div className="flex flex-wrap gap-1 flex-1 min-w-0">
                       {ssh.portForwards.slice(0, 2).map((fwd) => (
-                        <Badge key={fwd.id} variant="outline" className="text-3xs px-1 py-0">
+                        <Badge key={fwd.id} variant="secondary" className="text-3xs px-1 py-0">
                           {fwd.type === "dynamic" ? `-D :${fwd.localPort}` : `:${fwd.localPort}`}
                         </Badge>
                       ))}
                       {ssh.portForwards.length > 2 ? (
-                        <Badge variant="outline" className="text-3xs px-1 py-0">
+                        <Badge variant="secondary" className="text-3xs px-1 py-0">
                           +{ssh.portForwards.length - 2}
                         </Badge>
                       ) : null}

@@ -26,15 +26,8 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  ConfirmDialog,
+} from "@/components/ui/confirm-dialog";
 
 /* ── Constants ──────────────────────────────────────────────────── */
 const DEFAULT_W = 960;
@@ -141,7 +134,7 @@ function AgentTabPicker({ onSelectAgent }: { onSelectAgent: (agentId: string, la
           <ChevronDown className="h-3 w-3" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={4} className="z-[10002] min-w-[180px]">
+      <DropdownMenuContent align="start" sideOffset={4} className="min-w-[180px]">
         <DropdownMenuLabel className="text-xs text-muted-foreground">Remote Shell</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {shellAgents.length === 0 ? (
@@ -899,7 +892,7 @@ export function FloatingTerminal({
     <>
       {/* Overlay blocks xterm from stealing events during drag/resize.
           Cursor comes from the injected <style> tag via forceCursor(). */}
-      {interacting && <div className="fixed inset-0 z-[9997]" />}
+      {interacting && <div className="fixed inset-0 z-[10040]" />}
 
       <div
         ref={boxRef}
@@ -1097,25 +1090,16 @@ export function FloatingTerminal({
         />
       </div>
 
-      <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
-        <AlertDialogContent className="z-[10001]" overlayClassName="z-[10000]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Close Terminal?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {`This will terminate ${tabs.length} active session${tabs.length !== 1 ? "s" : ""}. This action cannot be undone.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => { setShowCloseConfirm(false); doClose(); }}
-            >
-              Close
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showCloseConfirm}
+        onOpenChange={setShowCloseConfirm}
+        title="Close Terminal?"
+        description={`This will terminate ${tabs.length} active session${tabs.length !== 1 ? "s" : ""}. This action cannot be undone.`}
+        confirmText="Close"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={doClose}
+      />
     </>
   );
 }

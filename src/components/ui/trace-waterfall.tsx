@@ -204,10 +204,10 @@ export function SpanDetails({ span }: { span: WaterfallSpan }) {
   return (
     <div className="space-y-3 text-xs">
       <div className="flex gap-2 flex-wrap">
-        <Badge variant="outline" className="text-[10px]">{span.kind}</Badge>
-        <Badge variant="outline" className="text-[10px]">{span.source}</Badge>
+        <Badge variant="secondary" className="text-[10px]">{span.kind}</Badge>
+        <Badge variant="secondary" className="text-[10px]">{span.source}</Badge>
         <Badge
-          variant={span.status === "error" ? "destructive" : "outline"}
+          variant={span.status === "error" ? "destructive" : "secondary"}
           className="text-[10px]"
         >
           {span.status}

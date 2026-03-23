@@ -24,6 +24,7 @@ import {
   Terminal,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import {
   DropdownMenu,
@@ -90,7 +91,7 @@ function ToolbarButton({
 }
 
 function Separator() {
-  return <div className="w-px h-3.5 bg-border/25 mx-0.5 shrink-0" />;
+  return <AppDivider orientation="vertical" size="sm" className="mx-0.5" />;
 }
 
 export const EditorToolbar = memo(function EditorToolbar({

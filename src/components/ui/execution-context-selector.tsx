@@ -62,7 +62,6 @@ interface ExecutionContextSelectorProps {
   onChange?: (ctx: ExecutionContext) => void;
   disabled?: boolean;
   className?: string;
-  variant?: "default" | "header";
 }
 
 export function ExecutionContextSelector({
@@ -71,7 +70,6 @@ export function ExecutionContextSelector({
   onChange,
   disabled,
   className,
-  variant = "default",
 }: ExecutionContextSelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -179,13 +177,11 @@ export function ExecutionContextSelector({
         <button
           disabled={disabled}
           className={cn(
-            "inline-flex items-center gap-1.5 pl-2.5 pr-2 rounded-md text-xs font-medium transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)] max-w-[300px]",
-            variant === "header"
-              ? "ui-header-picker h-7"
-              : isRemote
-                ? "h-8 bg-primary/[0.08] border border-primary/20 text-primary hover:bg-primary/[0.12] shadow-sm"
-                : "h-8 border border-border/50 bg-background/60 text-foreground/80 hover:bg-accent",
-            variant === "header" && open && "is-open",
+            "inline-flex max-w-[320px] items-center gap-1.5 rounded-md border text-xs font-medium",
+            "transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)]",
+            "ui-header-picker",
+            "h-7",
+            open && "is-open",
             disabled && "opacity-50 cursor-not-allowed",
             className,
           )}
@@ -216,11 +212,7 @@ export function ExecutionContextSelector({
           {hasOverride && <span className="h-1.5 w-1.5 rounded-full bg-warning shrink-0" />}
           <ChevronDown className={cn(
             "h-3 w-3 shrink-0 transition-transform duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)]",
-            variant === "header"
-              ? "text-muted-foreground/60"
-              : isRemote
-              ? "text-primary/60"
-              : "text-muted-foreground/60",
+            "text-muted-foreground/60",
             open && "rotate-180",
           )} />
         </button>
@@ -228,7 +220,7 @@ export function ExecutionContextSelector({
       <PopoverContent
         align="end"
         sideOffset={6}
-        className="ui-surface-card w-[380px] p-0 overflow-hidden"
+        className="ui-floating-surface w-[392px] overflow-hidden p-0"
       >
         <div className="ui-section-header-md">
           <div className="flex items-center gap-2">
@@ -243,10 +235,10 @@ export function ExecutionContextSelector({
               type="button"
               onClick={() => setActiveTab("local")}
               className={cn(
-                "h-7 px-2.5 rounded-lg text-2xs font-medium transition-smooth",
+                "h-7 rounded-lg px-2.5 text-2xs font-medium transition-smooth",
                 activeTab === "local"
-                  ? "bg-success/15 text-success"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/20",
+                  ? "bg-success/14 text-success shadow-[0_0_0_1px_rgba(72,187,120,0.26)_inset]"
+                  : "text-muted-foreground hover:bg-muted/20 hover:text-foreground",
               )}
             >
               Local
@@ -255,10 +247,10 @@ export function ExecutionContextSelector({
               type="button"
               onClick={() => setActiveTab("remote")}
               className={cn(
-                "h-7 px-2.5 rounded-lg text-2xs font-medium transition-smooth",
+                "h-7 rounded-lg px-2.5 text-2xs font-medium transition-smooth",
                 activeTab === "remote"
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/20",
+                  ? "bg-primary/14 text-primary shadow-[0_0_0_1px_rgba(66,153,225,0.28)_inset]"
+                  : "text-muted-foreground hover:bg-muted/20 hover:text-foreground",
               )}
             >
               Remote ({connectedAgents.length})
@@ -270,7 +262,7 @@ export function ExecutionContextSelector({
         <div className="ui-section-header-sm p-2">
           <button
             className={cn(
-              "ui-choice-tile ui-choice-tone-primary w-full flex items-center gap-3 px-3 py-3 text-left",
+              "ui-choice-tile ui-choice-tone-primary w-full min-h-11 flex items-center gap-3 px-3 py-2 text-left",
               isActive({ type: "local" }) ? "is-active" : "",
             )}
             onClick={() => select({ type: "local" })}
@@ -279,10 +271,10 @@ export function ExecutionContextSelector({
               <Desktop className={cn("h-4.5 w-4.5", isActive({ type: "local" }) ? "text-success" : "text-muted-foreground/60")} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={cn("text-xs font-medium", isActive({ type: "local" }) ? "text-foreground" : "text-foreground/70")}>
+              <p className={cn("text-xs font-medium leading-tight", isActive({ type: "local" }) ? "text-foreground" : "text-foreground/70")}>
                 Local Device
               </p>
-              <p className="text-2xs text-muted-foreground/60 mt-0.5">Run directly on this device</p>
+              <p className="text-2xs leading-tight text-muted-foreground/60 mt-0.5">Run directly on this device</p>
             </div>
             {isActive({ type: "local" }) && (
               <div className="h-5 w-5 rounded-full bg-success/10 flex items-center justify-center shrink-0">
@@ -299,7 +291,7 @@ export function ExecutionContextSelector({
           <div className="flex items-center gap-2">
             <Satellite className="h-3.5 w-3.5 text-primary/70" />
             <p className="section-label-sm flex-1">Remote Agents</p>
-            <span className="text-3xs tabular-nums text-muted-foreground/60 bg-muted/10 rounded px-1.5 py-px">
+            <span className="text-2xs tabular-nums text-muted-foreground/60 bg-muted/10 rounded px-1.5 py-px">
               {connectedAgents.length} agents
             </span>
           </div>
@@ -356,7 +348,7 @@ export function ExecutionContextSelector({
               <button
                 key={agent.id}
                 className={cn(
-                  "ui-choice-tile w-full flex items-center gap-3 px-3 py-2.5 text-left",
+                  "ui-choice-tile w-full min-h-11 flex items-center gap-3 px-3 py-2 text-left",
                   osToneClass(agent.os),
                   active && "is-active",
                 )}
@@ -369,17 +361,17 @@ export function ExecutionContextSelector({
                   <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card/95 bg-success" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className={cn("text-xs font-medium truncate", active ? "text-foreground" : "text-foreground/70")}>
+                  <span className={cn("text-xs font-medium leading-tight truncate", active ? "text-foreground" : "text-foreground/70")}>
                     {agent.name || agent.hostname}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-2xs text-muted-foreground/60 font-mono truncate">{agent.ip}</span>
+                    <span className="text-2xs leading-tight text-muted-foreground/60 font-mono truncate">{agent.ip}</span>
                     <span className="text-muted-foreground/60">·</span>
-                    <span className="text-2xs text-muted-foreground/60">{agent.os}</span>
+                    <span className="text-2xs leading-tight text-muted-foreground/60">{agent.os}</span>
                     {uptime && (
                       <>
                         <span className="text-muted-foreground/60">·</span>
-                        <span className="text-2xs text-muted-foreground/60 tabular-nums flex items-center gap-0.5">
+                        <span className="text-2xs leading-tight text-muted-foreground/60 tabular-nums flex items-center gap-0.5">
                           <Clock className="h-2.5 w-2.5" />
                           {uptime}
                         </span>

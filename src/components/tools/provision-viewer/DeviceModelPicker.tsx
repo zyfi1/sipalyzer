@@ -192,7 +192,7 @@ export function DeviceModelPicker({ value, onChange, vendor, compact, id: inputI
         sideOffset={6}
         onEscapeKeyDown={() => setOpen(false)}
         className={cn(
-          "ui-panel-shell ui-floating-content z-[9997] min-w-[var(--radix-popover-trigger-width)] w-[min(42rem,calc(100vw-1rem))] max-h-[min(30rem,calc(100vh-4rem))] overflow-hidden p-0",
+          "ui-panel-shell ui-floating-content z-[10050] min-w-[var(--radix-popover-trigger-width)] w-[min(42rem,calc(100vw-1rem))] max-h-[min(30rem,calc(100vh-4rem))] overflow-hidden p-0",
           compact && "w-[min(38rem,calc(100vw-1rem))]"
         )}
       >

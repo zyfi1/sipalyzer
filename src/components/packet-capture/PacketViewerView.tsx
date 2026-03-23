@@ -10,14 +10,14 @@ import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
 import { useOpenCaptureViewer } from "@/hooks/useOpenCapture";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
 import {
   X,
   Eye,
   FolderOpen,
   Upload,
   Trash2,
-  Laptop,
+  Radio,
+  ChevronRight,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -159,7 +159,8 @@ export function PacketViewerView() {
   const getSession = (id: string): CaptureSession | undefined =>
     sessions.find((s) => s.id === id);
 
-  const panelClass = "packet-graphite-panel overflow-hidden rounded-lg";
+  /** Match monitor tab content: flat shell inside tool chrome (no nested graphite card). */
+  const emptyShellClass = "ui-panel-shell flex h-full w-full min-h-0 flex-col overflow-hidden rounded-lg";
 
   // ── Recent sessions for the empty state ──
   const recentSessions = sessions.slice(0, 8);
@@ -181,71 +182,124 @@ export function PacketViewerView() {
   // ── Empty state ──
   if (openTabs.length === 0) {
     return (
-      <div className="h-full flex flex-col overflow-hidden rounded-lg bg-muted/[0.08]">
-        <div className="flex-1 min-h-0 p-1.5">
-          <div className={cn(panelClass, "h-full w-full p-4")}>
-          <div className="h-full w-full max-w-3xl mx-auto flex flex-col justify-center gap-4">
-            <EmptyState
-              variant="inline"
-              icon={<Eye />}
-              title="No captures open"
-              description="Open a capture session to view its packets, or import a PCAP file."
-              className="h-full"
-              action={
-                <div className="flex items-center gap-2">
-                  {sessions.length > 0 && (
-                    <Button size="sm" variant="neutral" className="h-8 gap-1.5 px-3 text-xs" onClick={() => navigateTo("packet-capture", "captures")}>
-                      <FolderOpen className="h-3.5 w-3.5" />
-                      Browse Captures
-                    </Button>
+      <div className="flex h-full flex-col overflow-hidden bg-transparent">
+        <div className="flex min-h-0 flex-1 px-3 pb-3 pt-2">
+          <div
+            className={cn(
+              emptyShellClass,
+              "overflow-y-auto overscroll-contain",
+              "bg-gradient-to-b from-muted/[0.12] via-transparent to-transparent",
+            )}
+          >
+            <div className="mx-auto flex w-full max-w-lg flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10">
+              {/* Compact hero — avoid fill-height EmptyState (felt like a huge empty box) */}
+              <section className="flex flex-col items-center text-center" aria-labelledby="packet-viewer-empty-title">
+                <div
+                  className={cn(
+                    "mb-4 flex h-14 w-14 items-center justify-center rounded-2xl",
+                    "border border-border/50 bg-card/45 text-muted-foreground shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06)]",
                   )}
-                  <Button size="sm" variant="neutral" className="h-8 gap-1.5 px-3 text-xs" onClick={handleImport} disabled={importing}>
+                >
+                  <Eye className="h-7 w-7 opacity-90" aria-hidden />
+                </div>
+                <h2
+                  id="packet-viewer-empty-title"
+                  className="text-balance text-base font-semibold tracking-tight text-foreground sm:text-[1.05rem]"
+                >
+                  No capture open
+                </h2>
+                <p className="mt-2 max-w-[22rem] text-pretty text-sm leading-relaxed text-muted-foreground/85">
+                  Open a session from Captures or import a PCAP to inspect packets, SIP flows, and decoded fields.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    className="h-9 gap-1.5 px-4 text-xs font-semibold"
+                    onClick={handleImport}
+                    disabled={importing}
+                  >
                     <Upload className="h-3.5 w-3.5" />
                     {importing ? "Importing…" : "Import PCAP"}
                   </Button>
+                  {sessions.length > 0 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 gap-1.5 px-4 text-xs"
+                      onClick={() => navigateTo("packet-capture", "captures")}
+                    >
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      Browse captures
+                    </Button>
+                  ) : null}
                 </div>
-              }
-            />
+              </section>
 
-            {/* Quick-open list of recent sessions */}
-            {recentSessions.length > 0 && (
-              <div className="mx-auto w-full max-w-md ui-surface-card p-0 overflow-hidden">
-                <div className="ui-section-header-sm flex items-center justify-between">
-                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent Captures</h4>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="h-8 px-2.5 text-xs gap-1.5"
-                    onClick={() => setConfirmClearSessions(true)}
+              {/* Recent sessions — same width as hero, reads as one flow */}
+              {recentSessions.length > 0 ? (
+                <section className="w-full" aria-label="Recent capture sessions">
+                  <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
+                    <div className="min-w-0 text-left">
+                      <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
+                        Recent captures
+                      </p>
+                      <p className="mt-0.5 text-2xs text-muted-foreground/60">Click a row to open in the viewer</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
+                      onClick={() => setConfirmClearSessions(true)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear all
+                    </Button>
+                  </div>
+                  <ul
+                    className={cn(
+                      "overflow-hidden rounded-xl border border-border/45 bg-card/25",
+                      "shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.04)]",
+                    )}
                   >
-                    <Trash2 className="h-3 w-3" />
-                    Clear
-                  </Button>
-                </div>
-                <div className="flex flex-col overflow-hidden">
-                  {recentSessions.map((session) => {
-                    const isRunning = runningSessionIds.includes(session.id);
-                    return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        className={cn(
-                          "ui-data-row flex items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-xs transition-smooth hover:bg-accent/35 last:border-b-0",
-                          isRunning && liveRingClass,
-                        )}
-                        onClick={() => openTab(session.id)}
-                      >
-                        <span className="flex-1 truncate font-medium">{session.name}</span>
-                        <span className="text-muted-foreground shrink-0">
-                          {isRunning ? "Running" : session.status}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+                    {recentSessions.map((session) => {
+                      const isRunning = runningSessionIds.includes(session.id);
+                      const statusLabel = isRunning ? "Running" : session.status;
+                      return (
+                        <li key={session.id} className="border-b border-border/35 last:border-b-0">
+                          <button
+                            type="button"
+                            className={cn(
+                              "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-smooth",
+                              "hover:bg-accent/30 focus-visible:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                              isRunning && liveRingClass,
+                            )}
+                            onClick={() => openTab(session.id)}
+                          >
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span className="truncate text-xs font-medium text-foreground">{session.name}</span>
+                            </span>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "shrink-0 tabular-nums text-3xs h-5 px-1.5 font-medium",
+                                isRunning && "border-primary/35 bg-primary/10 text-primary",
+                              )}
+                            >
+                              {statusLabel}
+                            </Badge>
+                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
           </div>
         </div>
         <ConfirmDialog
@@ -253,7 +307,7 @@ export function PacketViewerView() {
           onOpenChange={setConfirmClearSessions}
           title="Clear all stopped captures?"
           description="Remove all stopped capture sessions? Running sessions will not be affected. This cannot be undone."
-          confirmText="Clear All"
+          confirmText="Clear all"
           cancelText="Cancel"
           variant="destructive"
           onConfirm={handleClearSessions}
@@ -263,7 +317,7 @@ export function PacketViewerView() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden rounded-lg bg-muted/[0.08]">
+    <div className="flex h-full flex-col overflow-hidden bg-transparent">
       <CaptureTabRail
             items={openTabs}
             getKey={(tabId) => tabId}
@@ -282,7 +336,7 @@ export function PacketViewerView() {
                   )}
                   onClick={() => setActiveTabId(tabId)}
                 >
-                  <Laptop className="h-3 w-3 shrink-0 opacity-50" />
+                  <Radio className="h-3 w-3 shrink-0 opacity-50" />
                   <span className="min-w-0 flex-1 max-w-[150px] truncate">{label}</span>
                   {isRunning && <LiveIndicator variant="dot" size="xs" />}
                   {packetCount > 0 && (
@@ -323,7 +377,7 @@ export function PacketViewerView() {
       />
 
       {/* ── Viewer tabs content (monitor-style stacked panels) ── */}
-      <div className="relative flex-1 min-h-0">
+      <div className="relative min-h-0 flex-1">
         {openTabs.map((tabId) => {
           const session = getSession(tabId);
           const isActive = tabId === activeTabId;
@@ -331,10 +385,10 @@ export function PacketViewerView() {
             <div
               key={tabId}
               className={cn(
-                "absolute inset-0 p-1.5 transition-all duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)]",
+                "absolute inset-0 px-2 pb-2 pt-1 transition-all duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)]",
                 isActive
                   ? "opacity-100 translate-y-0"
-                  : "opacity-0 translate-y-1 pointer-events-none",
+                  : "pointer-events-none translate-y-1 opacity-0",
               )}
             >
               {session ? (
@@ -349,7 +403,7 @@ export function PacketViewerView() {
                   expanded
                 />
               ) : (
-                <div className={cn(panelClass, "h-full flex items-center justify-center text-sm text-muted-foreground")}>
+                <div className={cn(emptyShellClass, "items-center justify-center p-6 text-sm text-muted-foreground")}>
                   Session not found. It may have been deleted.
                 </div>
               )}

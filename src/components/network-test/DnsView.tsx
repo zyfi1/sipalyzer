@@ -5,8 +5,9 @@ import { TestTile } from "./components/TestTile";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import {
   Globe, Search, Phone, ArrowLeft, Terminal, MapPin, Network,
   ChevronRight, Check, X,
@@ -68,6 +69,12 @@ const RECORD_TYPES: DnsRecordType[] = [
   "A", "AAAA", "SRV", "NAPTR", "MX", "TXT", "CNAME", "NS", "SOA", "PTR", "CAA", "TLSA", "SSHFP", "HTTPS", "ANY",
 ];
 
+const LOOKUP_RECORD_OPTIONS = RECORD_TYPES.map((rt) => ({ value: rt, label: rt }));
+const LOOKUP_TRANSPORT_OPTIONS = [
+  { value: "udp", label: "UDP" },
+  { value: "tcp", label: "TCP" },
+] as const;
+
 function LookupTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   const {
     lookup, lookupDomain, lookupRecordType, lookupServer, lookupTransport,
@@ -92,26 +99,25 @@ function LookupTile({ expanded, onToggle }: { expanded: boolean; onToggle: () =>
           disabled={lookup.status === "running"}
           onKeyDown={(e) => e.key === "Enter" && lookup.status !== "running" && runLookup()}
         />
-        <Select value={lookupRecordType} onValueChange={(v) => setLookupRecordType(v as DnsRecordType)}>
-          <SelectTrigger className="h-7 w-[80px] text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {RECORD_TYPES.map((rt) => (
-              <SelectItem key={rt} value={rt} className="text-xs">{rt}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={lookupRecordType}
+          onValueChange={(v) => setLookupRecordType(v as DnsRecordType)}
+          options={LOOKUP_RECORD_OPTIONS}
+          className="h-7 w-[80px] text-xs"
+          itemClassName="text-xs"
+        />
         <Input
           value={lookupServer} onChange={(e) => setLookupServer(e.target.value)}
           placeholder="Server (optional)" className="h-7 text-xs w-[130px]"
           disabled={lookup.status === "running"}
         />
-        <Select value={lookupTransport} onValueChange={(v) => setLookupTransport(v as "udp" | "tcp")}>
-          <SelectTrigger className="h-7 w-[65px] text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="udp" className="text-xs">UDP</SelectItem>
-            <SelectItem value="tcp" className="text-xs">TCP</SelectItem>
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={lookupTransport}
+          onValueChange={(v) => setLookupTransport(v as "udp" | "tcp")}
+          options={[...LOOKUP_TRANSPORT_OPTIONS]}
+          className="h-7 w-[65px] text-xs"
+          itemClassName="text-xs"
+        />
       </div>
 
       {/* Results */}
@@ -122,11 +128,11 @@ function LookupTile({ expanded, onToggle }: { expanded: boolean; onToggle: () =>
             <span className="text-2xs text-muted-foreground/60 tabular-nums">
               {r.records.length} record{r.records.length !== 1 ? "s" : ""}
             </span>
-            <span className="h-3 w-px bg-border/20" />
+            <AppDivider orientation="vertical" size="xs" className="mx-0" />
             <span className="text-2xs text-muted-foreground/60 tabular-nums">{r.resolution_ms.toFixed(0)}ms</span>
             {r.server && (
               <>
-                <span className="h-3 w-px bg-border/20" />
+                <AppDivider orientation="vertical" size="xs" className="mx-0" />
                 <span className="text-2xs text-muted-foreground/60">via <span className="font-mono">{r.server}</span></span>
               </>
             )}
@@ -197,7 +203,7 @@ function SipResolveTile({ expanded, onToggle }: { expanded: boolean; onToggle: (
           <div className="space-y-1.5">
             {r.steps.map((step, i) => (
               <div key={i} className="flex items-start gap-2.5 text-xs">
-                <Badge variant="outline" className="text-3xs px-1.5 py-0 h-4 shrink-0 mt-0.5 bg-muted/10">{step.step_type}</Badge>
+                <Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4 shrink-0 mt-0.5 bg-muted/10">{step.step_type}</Badge>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-muted-foreground/70 truncate">{step.query}</span>
@@ -399,6 +405,20 @@ function GeoIpTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
 
 const DIG_RECORD_TYPES = ["A", "AAAA", "SRV", "NAPTR", "MX", "TXT", "CNAME", "NS", "SOA", "PTR", "CAA", "ANY"];
 
+const DIG_RECORD_OPTIONS = DIG_RECORD_TYPES.map((rt) => ({ value: rt, label: rt }));
+
+const MULTI_SITE_TEST_OPTIONS = [
+  { value: "lookup", label: "DNS Lookup" },
+  { value: "sip_resolve", label: "SIP Resolve" },
+  { value: "reverse", label: "Reverse DNS" },
+  { value: "dig", label: "Dig" },
+] as const;
+
+const MULTI_SITE_RECORD_OPTIONS = ["A", "AAAA", "MX", "TXT", "NS", "SOA", "SRV", "NAPTR"].map((rt) => ({
+  value: rt,
+  label: rt,
+}));
+
 function DigTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   const {
     dig, digDomain, digRecordType, digServer, digUseTcp, digRd, digCd, digAd,
@@ -423,14 +443,13 @@ function DigTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
           disabled={dig.status === "running"}
           onKeyDown={(e) => e.key === "Enter" && dig.status !== "running" && runDig()}
         />
-        <Select value={digRecordType} onValueChange={setDigRecordType}>
-          <SelectTrigger className="h-7 w-[75px] text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {DIG_RECORD_TYPES.map((rt) => (
-              <SelectItem key={rt} value={rt} className="text-xs">{rt}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={digRecordType}
+          onValueChange={setDigRecordType}
+          options={DIG_RECORD_OPTIONS}
+          className="h-7 w-[75px] text-xs"
+          itemClassName="text-xs"
+        />
         <Input
           value={digServer} onChange={(e) => setDigServer(e.target.value)}
           placeholder="@server (default: 8.8.8.8)" className="h-7 text-xs w-[170px]"
@@ -540,15 +559,13 @@ function MultiSiteTile({ expanded, onToggle }: { expanded: boolean; onToggle: ()
     >
       {/* Config */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={testType} onValueChange={(v) => setTestType(v as typeof testType)}>
-          <SelectTrigger className="h-7 w-[110px] text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="lookup" className="text-xs">DNS Lookup</SelectItem>
-            <SelectItem value="sip_resolve" className="text-xs">SIP Resolve</SelectItem>
-            <SelectItem value="reverse" className="text-xs">Reverse DNS</SelectItem>
-            <SelectItem value="dig" className="text-xs">Dig</SelectItem>
-          </SelectContent>
-        </Select>
+        <AppDropdown
+          value={testType}
+          onValueChange={(v) => setTestType(v as typeof testType)}
+          options={[...MULTI_SITE_TEST_OPTIONS]}
+          className="h-7 w-[110px] text-xs"
+          itemClassName="text-xs"
+        />
         <Input
           value={target} onChange={(e) => setTarget(e.target.value)}
           placeholder={testType === "reverse" ? "IP address" : "Domain"}
@@ -557,14 +574,13 @@ function MultiSiteTile({ expanded, onToggle }: { expanded: boolean; onToggle: ()
           onKeyDown={(e) => e.key === "Enter" && multiSite.status !== "running" && handleRun()}
         />
         {(testType === "lookup" || testType === "dig") && (
-          <Select value={recordType} onValueChange={setRecordType}>
-            <SelectTrigger className="h-7 w-[65px] text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {["A", "AAAA", "MX", "TXT", "NS", "SOA", "SRV", "NAPTR"].map((rt) => (
-                <SelectItem key={rt} value={rt} className="text-xs">{rt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={recordType}
+            onValueChange={setRecordType}
+            options={MULTI_SITE_RECORD_OPTIONS}
+            className="h-7 w-[65px] text-xs"
+            itemClassName="text-xs"
+          />
         )}
         <Input
           value={server} onChange={(e) => setServer(e.target.value)}

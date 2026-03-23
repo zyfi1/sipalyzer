@@ -122,7 +122,7 @@ export function DiagnosticsWorkbench({
             onClick={() => setActiveCategory(cat)}
           >
             {CATEGORY_LABELS[cat]}
-            <Badge variant="outline" className="ml-1 h-4 text-3xs">
+            <Badge variant="secondary" className="ml-1 h-4 text-3xs">
               {count}
             </Badge>
           </Button>
@@ -144,7 +144,7 @@ export function DiagnosticsWorkbench({
               <div className="flex items-center gap-2">
                 <span className={cn("h-2 w-2 rounded-full", finding.severity === "critical" ? "bg-destructive" : finding.severity === "warning" ? "bg-warning" : "bg-primary")} />
                 <span className="text-xs font-medium truncate">{finding.title}</span>
-                <Badge variant="outline" className="ml-auto h-4 text-3xs">
+                <Badge variant="secondary" className="ml-auto h-4 text-3xs">
                   {finding.severity}
                 </Badge>
               </div>
@@ -167,7 +167,7 @@ export function DiagnosticsWorkbench({
             <div className="px-1 py-1 md:px-2 md:py-2">
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold">{selectedFinding.title}</h3>
-                <Badge variant="outline" className="h-5 text-3xs">
+                <Badge variant="secondary" className="h-5 text-3xs">
                   {selectedFinding.severity.toUpperCase()}
                 </Badge>
               </div>

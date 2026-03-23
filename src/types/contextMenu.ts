@@ -13,7 +13,9 @@ export type ContextMenuSurface =
   | "editor"
   | "emptyArea"
   | "selection"
-  | "unknown";
+  | "unknown"
+  /** Left navigation column (tool list, subviews, terminal button). */
+  | "sidebarNav";
 
 export type ContextMenuEntity =
   | "packet"

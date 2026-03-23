@@ -1,5 +1,9 @@
 import { create } from "zustand";
 import type { LayoutItem } from "react-grid-layout";
+import {
+  isNavigationSubviewVisible,
+  isNavigationToolFeatureVisible,
+} from "@/lib/navigationCatalog";
 import { toolRegistry } from "@/lib/toolRegistry";
 
 export interface HomeSectionConfig {
@@ -28,19 +32,22 @@ export function makeHomeQuickActionId(toolId: string, subviewId?: string): strin
 
 export function buildDefaultHomeQuickActions(): HomeQuickActionItem[] {
   const allActions = toolRegistry.getAll().filter((tool) => !tool.hidden).flatMap((tool) => {
+    if (!isNavigationToolFeatureVisible(tool.id)) return [];
     const baseAction: HomeQuickActionItem = {
       id: makeHomeQuickActionId(tool.id),
       toolId: tool.id,
       label: tool.name,
       enabled: false,
     };
-    const subviewActions = (tool.subviews ?? []).map<HomeQuickActionItem>((subview) => ({
-      id: makeHomeQuickActionId(tool.id, subview.id),
-      toolId: tool.id,
-      subviewId: subview.id,
-      label: `${tool.name} - ${subview.label}`,
-      enabled: false,
-    }));
+    const subviewActions = (tool.subviews ?? [])
+      .filter((subview) => isNavigationSubviewVisible(tool.id, subview.id))
+      .map<HomeQuickActionItem>((subview) => ({
+        id: makeHomeQuickActionId(tool.id, subview.id),
+        toolId: tool.id,
+        subviewId: subview.id,
+        label: `${tool.name} - ${subview.label}`,
+        enabled: false,
+      }));
     return [baseAction, ...subviewActions];
   });
   return allActions.map((action, index) => ({

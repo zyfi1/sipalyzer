@@ -83,6 +83,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     heading: "Provision Viewer Views",
     items: [
       { label: "Provision", keys: SHORTCUTS.viewProvisionMain },
+      { label: "Firmware", keys: SHORTCUTS.viewToolsFirmware },
       { label: "Contacts", keys: SHORTCUTS.viewProvisionContacts },
       { label: "Device", keys: SHORTCUTS.viewProvisionDevice },
       { label: "Diff", keys: SHORTCUTS.viewProvisionDiff },
@@ -122,7 +123,6 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { label: "Syslog", keys: SHORTCUTS.viewToolsSyslog },
       { label: "Log Viewer", keys: SHORTCUTS.viewToolsLogs },
       { label: "File Server", keys: SHORTCUTS.viewToolsFileServer },
-      { label: "Firmware", keys: SHORTCUTS.viewToolsFirmware },
       { label: "Password Generator", keys: SHORTCUTS.viewToolsPasswordGen },
       { label: "MCP", keys: SHORTCUTS.viewToolsMcp },
     ],

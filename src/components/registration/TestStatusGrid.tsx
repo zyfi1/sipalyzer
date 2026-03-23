@@ -164,7 +164,7 @@ export function TestStatusGrid({ testTypeStatuses, onTestTypeClick }: TestStatus
                     {getStatusIcon(status)}
                     <TooltipWrapper entry={tooltips.regTestStatus}>
                       <Badge 
-                        variant="outline"
+                        variant="secondary"
                         className={cn("text-2xs font-semibold px-2.5 py-1", getStatusColor(status))}
                       >
                         {getStatusLabel(status)}

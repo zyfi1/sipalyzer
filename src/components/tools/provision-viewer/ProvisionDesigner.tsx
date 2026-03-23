@@ -28,6 +28,7 @@ import {
   PanelRight, Code, Eye,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider, PanelResizeHandle } from "@/components/ui/panel-chrome";
 import {
   Tooltip,
   TooltipContent,
@@ -946,7 +947,7 @@ export function ProvisionDesigner({
           </TooltipWrapper>
         </div>
 
-        <div className="h-4 w-px bg-border" />
+        <AppDivider orientation="vertical" size="md" className="mx-0" />
 
         {/* Insert */}
         <TooltipWrapper title="Insert parameter" description="Search and insert a parameter at cursor (Ctrl+I).">
@@ -955,7 +956,7 @@ export function ProvisionDesigner({
           </Button>
         </TooltipWrapper>
 
-        <div className="h-4 w-px bg-border" />
+        <AppDivider orientation="vertical" size="md" className="mx-0" />
 
         {/* Export */}
         <div className="flex items-center gap-1">
@@ -979,7 +980,7 @@ export function ProvisionDesigner({
           <span>Ln {cursorLine}</span>
         </div>
 
-        <div className="h-4 w-px bg-border" />
+        <AppDivider orientation="vertical" size="md" className="mx-0" />
 
         <div className="w-[220px]">
           <DeviceModelPicker
@@ -1111,14 +1112,15 @@ export function ProvisionDesigner({
               )}
             </div>
 
-            {/* Drag handle */}
-            <div
-              className="group relative w-1.5 shrink-0 cursor-col-resize hover:bg-accent/30 active:bg-accent/40 transition-smooth"
+            <PanelResizeHandle
+              as="div"
+              orientation="vertical"
+              density="compact"
+              appearance="rail"
+              label="Resize mockup and editor panels"
+              className="shrink-0 rounded-none"
               onMouseDown={handleResizeStart}
-            >
-              <div className="absolute inset-y-0 left-0 w-px bg-border" />
-              <div className="absolute top-1/2 left-1/2 h-8 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/20 group-hover:bg-foreground/30 transition-smooth" />
-            </div>
+            />
           </>
         )}
 

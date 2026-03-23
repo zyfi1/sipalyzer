@@ -1,30 +1,26 @@
 import { useEffect, useState, useMemo } from "react";
 import { useToolStore } from "@/stores/toolStore";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer } from "@/components/layout/ViewFooter";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import { cn } from "@/lib/utils";
-import { Activity } from "@/lib/icons";
-import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { useRemoteAgentStore } from "@/stores/remoteAgentStore";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
-import { FEATURE_FLAG_MCP_UI } from "@/lib/featureFlags";
+import { FEATURE_FLAG_MCP_UI, FEATURE_FLAG_TOOLS_MOCKUP_UI } from "@/lib/featureFlags";
 
 import { SyslogView } from "@/components/tools/syslog/SyslogView";
 import { LogViewerView } from "@/components/tools/log-viewer/LogViewerView";
 import { FileServerView } from "@/components/tools/file-server/FileServerView";
 import { PasswordGeneratorView } from "@/components/tools/password-gen/PasswordGeneratorView";
-import { FirmwareCatalogView } from "@/components/tools/firmware-catalog/FirmwareCatalogView";
 import { McpView } from "@/components/tools/mcp/McpView";
+import { MockupPlaygroundView } from "@/components/tools/mockup/MockupPlaygroundView";
 import { TextForgeView } from "@/components/tools/text-forge/TextForgeView";
 
 const SUBVIEW_SYSLOG = "syslog";
 const SUBVIEW_LOGS = "logs";
 const SUBVIEW_FILE_SERVER = "file-server";
 const SUBVIEW_PASSWORD_GEN = "password-gen";
-const SUBVIEW_FIRMWARE = "firmware";
 const SUBVIEW_TEXT_FORGE = "text-forge";
+const SUBVIEW_MOCKUP = "mockup";
 const SUBVIEW_MCP = "mcp";
 
 const TOOL_ID = "tools";
@@ -33,7 +29,6 @@ const EXEC_CONTEXT_MAP: Record<string, string> = {
   [SUBVIEW_SYSLOG]: "toolsSyslog",
   [SUBVIEW_LOGS]: "toolsLogs",
   [SUBVIEW_FILE_SERVER]: "toolsFileServer",
-  [SUBVIEW_FIRMWARE]: "toolsFirmware",
   [SUBVIEW_MCP]: "toolsMcp",
 };
 
@@ -44,39 +39,36 @@ export function ToolsTool() {
   const setLastViewedSubview = useToolStore((s) => s.setLastViewedSubview);
   const [activeTab, setActiveTab] = useState<string>(SUBVIEW_SYSLOG);
   const { enabled: mcpEnabled } = useFeatureFlag(FEATURE_FLAG_MCP_UI);
-
-  const connectedAgents = useRemoteAgentStore((s) => s.connections.length);
-  const pendingCommands = useRemoteAgentStore((s) => s.pendingCommands);
-
-  const activeToolCommands = pendingCommands.filter(
-    (c) => c.status === "running" && ["SyslogListen", "TailLog", "FileServe", "FirmwareDownload"].includes(c.type),
-  );
+  const { enabled: mockupEnabled } = useFeatureFlag(FEATURE_FLAG_TOOLS_MOCKUP_UI);
 
   const execContextToolId = useMemo(
     () => EXEC_CONTEXT_MAP[activeTab],
     [activeTab],
   );
-  const validTabs = useMemo(
-    () =>
-      mcpEnabled
-        ? [SUBVIEW_SYSLOG, SUBVIEW_LOGS, SUBVIEW_FILE_SERVER, SUBVIEW_PASSWORD_GEN, SUBVIEW_FIRMWARE, SUBVIEW_TEXT_FORGE, SUBVIEW_MCP]
-        : [SUBVIEW_SYSLOG, SUBVIEW_LOGS, SUBVIEW_FILE_SERVER, SUBVIEW_PASSWORD_GEN, SUBVIEW_FIRMWARE, SUBVIEW_TEXT_FORGE],
-    [mcpEnabled],
-  );
+  const validTabs = useMemo(() => {
+    const tabs = [
+      SUBVIEW_SYSLOG,
+      SUBVIEW_LOGS,
+      SUBVIEW_FILE_SERVER,
+      SUBVIEW_PASSWORD_GEN,
+      SUBVIEW_TEXT_FORGE,
+    ];
+    if (mockupEnabled) tabs.push(SUBVIEW_MOCKUP);
+    if (mcpEnabled) tabs.push(SUBVIEW_MCP);
+    return tabs;
+  }, [mcpEnabled, mockupEnabled]);
   const tabItems = useMemo(() => {
-    const baseItems = [
+    const items = [
       { id: SUBVIEW_SYSLOG, label: "Syslog" },
       { id: SUBVIEW_LOGS, label: "Log Viewer" },
       { id: SUBVIEW_FILE_SERVER, label: "File Server" },
       { id: SUBVIEW_PASSWORD_GEN, label: "Password Generator" },
-      { id: SUBVIEW_FIRMWARE, label: "Firmware" },
       { id: SUBVIEW_TEXT_FORGE, label: "Text Forge" },
     ];
-    if (mcpEnabled) {
-      baseItems.push({ id: SUBVIEW_MCP, label: "MCP" });
-    }
-    return baseItems;
-  }, [mcpEnabled]);
+    if (mockupEnabled) items.push({ id: SUBVIEW_MOCKUP, label: "Mockup" });
+    if (mcpEnabled) items.push({ id: SUBVIEW_MCP, label: "MCP" });
+    return items;
+  }, [mcpEnabled, mockupEnabled]);
 
   useEffect(() => {
     if (activeToolId !== TOOL_ID) return;
@@ -98,6 +90,13 @@ export function ToolsTool() {
       setLastViewedSubview(TOOL_ID, SUBVIEW_SYSLOG);
     }
   }, [mcpEnabled, activeTab, setLastViewedSubview]);
+
+  useEffect(() => {
+    if (!mockupEnabled && activeTab === SUBVIEW_MOCKUP) {
+      setActiveTab(SUBVIEW_SYSLOG);
+      setLastViewedSubview(TOOL_ID, SUBVIEW_SYSLOG);
+    }
+  }, [mockupEnabled, activeTab, setLastViewedSubview]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -130,7 +129,10 @@ export function ToolsTool() {
             )}
           >
             <div className="flex-1 min-h-0 overflow-y-auto app-view-gutter">
-              <FileServerView toolId={TOOL_ID} />
+              <FileServerView
+                toolId={TOOL_ID}
+                registerHeaderBreadcrumbTabs={activeTab === SUBVIEW_FILE_SERVER}
+              />
             </div>
           </TabsContent>
           <TabsContent value={SUBVIEW_PASSWORD_GEN} className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1")}>
@@ -138,16 +140,18 @@ export function ToolsTool() {
               <PasswordGeneratorView />
             </div>
           </TabsContent>
-          <TabsContent value={SUBVIEW_FIRMWARE} className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1")}>
-            <div className="flex-1 min-h-0 overflow-y-auto app-view-gutter">
-              <FirmwareCatalogView />
-            </div>
-          </TabsContent>
           <TabsContent value={SUBVIEW_TEXT_FORGE} className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1")}>
             <div className="flex-1 min-h-0 overflow-y-auto app-view-gutter">
               <TextForgeView />
             </div>
           </TabsContent>
+          {mockupEnabled ? (
+            <TabsContent value={SUBVIEW_MOCKUP} className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1")}>
+              <div className="flex-1 min-h-0 overflow-y-auto app-view-gutter">
+                <MockupPlaygroundView />
+              </div>
+            </TabsContent>
+          ) : null}
           {mcpEnabled ? (
             <TabsContent value={SUBVIEW_MCP} className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1")}>
               <div className="flex-1 min-h-0 overflow-y-auto app-view-gutter">
@@ -157,35 +161,6 @@ export function ToolsTool() {
           ) : null}
         </div>
 
-        <ViewFooter>
-          {activeToolCommands.length > 0 ? (
-            <TooltipWrapper content={`${activeToolCommands.length} tool command${activeToolCommands.length !== 1 ? "s" : ""} currently running`}>
-              <ViewFooterItem>
-                <span className="relative flex h-2 w-2 mr-0.5">
-                  <span className="animate-live-ripple motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-success status-online" />
-                </span>
-                <span className="text-success">
-                  {activeToolCommands.length} active
-                </span>
-              </ViewFooterItem>
-            </TooltipWrapper>
-          ) : (
-            <TooltipWrapper content="No active tool commands">
-              <ViewFooterItem>
-                <Activity className="h-3 w-3" />
-                <span>Ready</span>
-              </ViewFooterItem>
-            </TooltipWrapper>
-          )}
-          <ViewFooterSpacer />
-          <TooltipWrapper content={`${connectedAgents} remote agent${connectedAgents !== 1 ? "s" : ""} connected`}>
-            <ViewFooterItem>
-              <span className="tabular-nums">{connectedAgents}</span>
-              <span>agent{connectedAgents !== 1 ? "s" : ""}</span>
-            </ViewFooterItem>
-          </TooltipWrapper>
-        </ViewFooter>
       </Tabs>
     </div>
   );

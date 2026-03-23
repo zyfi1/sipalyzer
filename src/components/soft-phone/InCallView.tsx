@@ -3,7 +3,7 @@ import { useSoftphoneStore } from "@/stores/softphoneStore";
 import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { navigateTo } from "@/lib/navigation";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
   Mic, MicOff, PlayCircle, PhoneOff, ArrowRightLeft,
   ChevronDown, ChevronUp, AlertTriangle, CircleArrowOutDownRight, Timer, Radio, FileText,
@@ -341,16 +341,17 @@ export function InCallView({ call, displayMetrics, waveformRef, callTimerTick }:
                 <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-[#60a5fa]" /><span className="text-muted-foreground">Them</span></span>
               </div>
               <div className="absolute top-2 right-2">
-                <Select value={visualizer} onValueChange={(v) => updateSettings({ visualizer: v as VisualizerId })}>
-                  <SelectTrigger className="h-6 w-[130px] text-2xs [&>svg]:h-3 [&>svg]:w-3">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VISUALIZER_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.id} value={opt.id} className="text-xs">{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={visualizer}
+                  onValueChange={(v) => updateSettings({ visualizer: v as VisualizerId })}
+                  size="sm"
+                  className="h-6 min-h-6 w-[130px] text-2xs [&>svg]:h-3 [&>svg]:w-3"
+                  options={VISUALIZER_OPTIONS.map((opt) => ({
+                    value: opt.id,
+                    label: opt.label,
+                    itemClassName: "text-xs",
+                  }))}
+                />
               </div>
             </div>
           )}

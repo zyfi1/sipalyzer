@@ -1,5 +1,6 @@
 /**
- * GlobalSearchDialog -- comprehensive command palette and search.
+ * GlobalSearchDialog — full command palette (modal). Opens from the header
+ * control or ⌘K / Ctrl+K (layoutStore.searchOpen).
  *
  * Performance notes:
  * - Static commands + Fuse index are cached at module level (instant open)
@@ -7,8 +8,6 @@
  *   actually types a search query, and cached via useRef
  * - No backend fetches on open; uses whatever data is already in stores
  * - Notes search is debounced and async
- *
- * Opens with Cmd+K / Ctrl+K.
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -65,7 +64,6 @@ import { cn } from "@/lib/utils";
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function GlobalSearchDialog() {
-  /* ── Store selectors ── */
   const isOpen = useLayoutStore((s) => s.searchOpen);
   const setSearchOpen = useLayoutStore((s) => s.setSearchOpen);
   const registrars = useRegistrationStore((s) => s.registrars);
@@ -282,7 +280,7 @@ export function GlobalSearchDialog() {
     return () => clearTimeout(timer);
   }, [trimmed, setSelectedNoteId, setNotesCenterOpen]);
 
-  /* ── Reset on open (lightweight -- no backend calls) ── */
+  /* ── Reset on open (lightweight — no backend calls) ── */
   useEffect(() => {
     if (!isOpen) return;
     setQuery("");
@@ -318,7 +316,7 @@ export function GlobalSearchDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={(v) => !v && close()}>
       <DialogContent
-        className="sm:max-w-2xl overflow-hidden p-0 gap-0"
+        className="sm:max-w-2xl overflow-hidden p-0 gap-0 rounded-xl border-border/50 shadow-2xl"
         showCloseButton={false}
       >
         <DialogHeader className="sr-only">
@@ -340,7 +338,7 @@ export function GlobalSearchDialog() {
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Type a command or search…"
+            placeholder="Search tools, registrars, captures, notes…"
           />
 
           <CommandList className="max-h-[min(60vh,420px)] scroll-py-1 overflow-x-hidden overflow-y-auto">
@@ -524,7 +522,7 @@ export function GlobalSearchDialog() {
             <span className="ml-auto">
               {searching
                 ? `${totalResults} result${totalResults !== 1 ? "s" : ""}`
-                : "Command Palette"}
+                : "Command palette"}
             </span>
           </div>
         </Command>

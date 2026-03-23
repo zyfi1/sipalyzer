@@ -119,6 +119,32 @@ pub struct TestConfig {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
+/// Maximum seconds a single REGISTER exchange (including digest auth) may block inside the
+/// UI-driven registrar test suite. Prevents multi-minute hangs when registrars use very
+/// large `timeout_seconds` or when tests chain many attempts.
+const REGISTRATION_TEST_SUITE_TIMEOUT_CAP_SECS: u64 = 45;
+
+/// Per-socket TCP connect timeout for connectivity / firewall port probes.
+const REGISTRATION_TEST_TCP_CONNECT_CAP_SECS: u64 = 8;
+
+fn suite_registration_timeout_secs(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> u64 {
+    let requested = test_config
+        .and_then(|c| c.timeout_seconds)
+        .unwrap_or(config.timeout_seconds)
+        .max(1);
+    requested.min(REGISTRATION_TEST_SUITE_TIMEOUT_CAP_SECS)
+}
+
+fn config_for_registration_test(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> RegistrarConfig {
+    let mut c = config.clone();
+    c.timeout_seconds = suite_registration_timeout_secs(config, test_config);
+    c
+}
+
+fn tcp_probe_timeout_secs(timeout_secs: u64) -> u64 {
+    timeout_secs.max(1).min(REGISTRATION_TEST_TCP_CONNECT_CAP_SECS)
+}
+
 pub struct TestSuite;
 
 impl TestSuite {
@@ -202,13 +228,7 @@ impl TestSuite {
 
     /// Basic registration test (existing functionality)
     fn test_basic_registration(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
-        
+        let config_with_timeout = config_for_registration_test(config, test_config);
         let result = RegistrationTester::test_registration(&config_with_timeout)?;
         
         // Check if authentication was required (401/407 indicates auth challenge)
@@ -234,15 +254,10 @@ impl TestSuite {
 
     /// Re-registration test - tests periodic refresh
     fn test_reregistration(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
         let delay_ms = test_config
             .and_then(|c| c.delay_between_registrations_ms)
             .unwrap_or(500);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // First register
         let first_result = RegistrationTester::test_registration(&config_with_timeout)?;
@@ -278,12 +293,7 @@ impl TestSuite {
 
     /// De-registration test - sends REGISTER with Expires: 0
     fn test_deregistration(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // First register normally
         let register_result = RegistrationTester::test_registration(&config_with_timeout)?;
@@ -315,9 +325,11 @@ impl TestSuite {
 
     /// Network connectivity test
     fn test_network_connectivity(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout_secs = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(5);
+        let timeout_secs = tcp_probe_timeout_secs(
+            test_config
+                .and_then(|c| c.timeout_seconds)
+                .unwrap_or(5),
+        );
         let test_tcp = test_config
             .and_then(|c| c.test_tcp)
             .unwrap_or(true);
@@ -396,13 +408,7 @@ impl TestSuite {
 
     /// Transport validation test
     fn test_transport_validation(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
-        
+        let config_with_timeout = config_for_registration_test(config, test_config);
         // Test if the configured transport works
         let result = RegistrationTester::test_registration(&config_with_timeout)?;
         
@@ -418,18 +424,16 @@ impl TestSuite {
 
     /// Expires header test
     fn test_expires_header(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
         let expires_values = test_config
             .and_then(|c| c.expires_values.clone())
             .unwrap_or_else(|| vec![60, 300, 3600]);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        // Avoid pathological suites (dozens of REGISTERs × cap still adds up)
+        let expires_values: Vec<u32> = expires_values.into_iter().take(5).collect();
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // Test with different expires values
         let mut results = Vec::new();
+        let mut last_result: Option<RegistrationResult> = None;
         
         for expires in &expires_values {
             let result = RegistrationTester::test_registration_with_expires(&config_with_timeout, *expires)?;
@@ -438,11 +442,10 @@ impl TestSuite {
                 "response_status": result.status_code,
                 "actual_expires": result.expires
             }));
+            last_result = Some(result);
         }
         
-        // Use the last result as the main result
-        let last_expires = expires_values.last().copied().unwrap_or(3600);
-        let last_result = RegistrationTester::test_registration_with_expires(&config_with_timeout, last_expires)?;
+        let last_result = last_result.context("expires_values was empty")?;
         
         Ok(TestResult {
             test_type: TestType::ExpiresHeader,
@@ -457,12 +460,7 @@ impl TestSuite {
 
     /// Contact header test
     fn test_contact_header(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // Test registration with different contact formats
         let result = RegistrationTester::test_registration(&config_with_timeout)?;
@@ -509,15 +507,11 @@ impl TestSuite {
     ///  2. Does the registrar correctly reject obviously bad credentials?
     ///  3. Do we surface clear information about the failure mode?
     fn test_error_handling(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
         let use_invalid = test_config
             .and_then(|c| c.invalid_credentials)
             .unwrap_or(true);
 
-        let mut cfg = config.clone();
-        cfg.timeout_seconds = timeout;
+        let cfg = config_for_registration_test(config, test_config);
 
         // 1) Baseline: run a normal registration with the configured credentials
         let valid_result = RegistrationTester::test_registration(&cfg)?;
@@ -585,12 +579,7 @@ impl TestSuite {
 
     /// NAT Traversal test - detects if behind NAT/firewall
     fn test_nat_traversal(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // Perform registration to get Contact header info
         let result = RegistrationTester::test_registration(&config_with_timeout)?;
@@ -650,9 +639,12 @@ impl TestSuite {
 
     /// Firewall test - comprehensive firewall rules and port accessibility testing
     fn test_firewall(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout_secs = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(10);
+        let timeout_secs = tcp_probe_timeout_secs(
+            test_config
+                .and_then(|c| c.timeout_seconds)
+                .unwrap_or(10),
+        );
+        let base_reg = config_for_registration_test(config, test_config);
         let test_tcp = test_config
             .and_then(|c| c.test_tcp)
             .unwrap_or(true);
@@ -727,9 +719,9 @@ impl TestSuite {
         
         // Helper function to test a UDP port (via registration attempt)
         let test_udp_port = |port: u16, accessible_ports: &mut Vec<String>, blocked_ports: &mut Vec<String>| -> bool {
-            let mut test_config = config.clone();
-            test_config.remote_port = port;
-            match RegistrationTester::test_registration(&test_config) {
+            let mut port_reg = base_reg.clone();
+            port_reg.remote_port = port;
+            match RegistrationTester::test_registration(&port_reg) {
                 Ok(result) => {
                     if result.success {
                         accessible_ports.push(format!("UDP:{}", port));
@@ -842,11 +834,12 @@ impl TestSuite {
         // Test packet sizes (MTU/fragmentation)
         if test_packet_sizes {
             let mut size_results = serde_json::json!({});
-            let sizes = vec![64, 512, 1024, 1500, 2048]; // Common packet sizes
+            // Each iteration is a full REGISTER — keep small to avoid UI freezes
+            let sizes = vec![512, 1500];
             for size in sizes {
                 // Test by attempting registration with different message sizes
                 // This is a simplified test - in reality we'd send custom-sized packets
-                let test_result = RegistrationTester::test_registration(config)?;
+                let test_result = RegistrationTester::test_registration(&base_reg)?;
                 size_results[size.to_string()] = serde_json::json!({
                     "accessible": test_result.success,
                     "response_time_ms": test_result.response_time_ms
@@ -864,9 +857,9 @@ impl TestSuite {
             let mut success_count = 0;
             let mut failure_count = 0;
             
-            // Send 10 rapid requests
-            for i in 0..10 {
-                match RegistrationTester::test_registration(config) {
+            // Few rapid requests — each may wait up to suite timeout cap
+            for i in 0..5 {
+                match RegistrationTester::test_registration(&base_reg) {
                     Ok(result) => {
                         if result.success {
                             success_count += 1;
@@ -941,7 +934,7 @@ impl TestSuite {
         // Test SIP-aware firewall (deep packet inspection)
         if test_sip_aware {
             // Test with valid SIP message
-            let valid_result = RegistrationTester::test_registration(config)?;
+            let valid_result = RegistrationTester::test_registration(&base_reg)?;
             
             // Test with malformed SIP message (if firewall is SIP-aware, it might block this)
             // For now, we'll use the registration result as a proxy
@@ -981,7 +974,7 @@ impl TestSuite {
         });
         
         // Create a result for the test
-        let result = RegistrationTester::test_registration(config)?;
+        let result = RegistrationTester::test_registration(&base_reg)?;
         
         Ok(TestResult {
             test_type: TestType::FirewallTest,
@@ -1048,39 +1041,38 @@ impl TestSuite {
 
     /// Registration stability test - tests long-term registration maintenance
     fn test_registration_stability(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
         let delay_ms = test_config
             .and_then(|c| c.delay_between_registrations_ms)
-            .unwrap_or(2000);
+            .unwrap_or(2000)
+            .min(5000);
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
-        
-        // Perform multiple registrations to test stability
+        // Three REGISTER attempts (not four) — each bounded by suite timeout cap
         let mut results = Vec::new();
         let mut all_successful = true;
-        
-        for i in 0..3 {
-            let result = RegistrationTester::test_registration(&config_with_timeout)?;
+        let mut last_result = RegistrationTester::test_registration(&config_with_timeout)?;
+        results.push(serde_json::json!({
+            "attempt": 1,
+            "status_code": last_result.status_code,
+            "success": last_result.success,
+            "response_time_ms": last_result.response_time_ms
+        }));
+        if !last_result.success {
+            all_successful = false;
+        }
+        for i in 1..3 {
+            std::thread::sleep(Duration::from_millis(delay_ms));
+            last_result = RegistrationTester::test_registration(&config_with_timeout)?;
             results.push(serde_json::json!({
                 "attempt": i + 1,
-                "status_code": result.status_code,
-                "success": result.success,
-                "response_time_ms": result.response_time_ms
+                "status_code": last_result.status_code,
+                "success": last_result.success,
+                "response_time_ms": last_result.response_time_ms
             }));
-            
-            if !result.success {
+            if !last_result.success {
                 all_successful = false;
             }
-            
-            if i < 2 {
-                std::thread::sleep(Duration::from_millis(delay_ms));
-            }
         }
-        
-        let last_result = RegistrationTester::test_registration(&config_with_timeout)?;
         
         Ok(TestResult {
             test_type: TestType::RegistrationStability,
@@ -1096,12 +1088,7 @@ impl TestSuite {
 
     /// Network conditions test - tests registration under poor network conditions
     fn test_network_conditions(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // Perform registration and measure response time
         let result = RegistrationTester::test_registration(&config_with_timeout)?;
@@ -1140,12 +1127,7 @@ impl TestSuite {
 
     /// Multi-transport test - tests registration across different transports
     fn test_multi_transport(config: &RegistrarConfig, test_config: Option<&TestConfig>) -> Result<TestResult> {
-        let timeout = test_config
-            .and_then(|c| c.timeout_seconds)
-            .unwrap_or(config.timeout_seconds);
-        
-        let mut config_with_timeout = config.clone();
-        config_with_timeout.timeout_seconds = timeout;
+        let config_with_timeout = config_for_registration_test(config, test_config);
         
         // Test current transport
         let current_result = RegistrationTester::test_registration(&config_with_timeout)?;

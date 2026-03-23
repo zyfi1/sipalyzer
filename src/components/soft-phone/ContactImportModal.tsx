@@ -683,7 +683,7 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center gap-4 mb-4">
               {fileName && (
-                <Badge variant="outline" className="gap-1">
+                <Badge variant="secondary" className="gap-1">
                   <FileText className="h-3 w-3" />
                   {fileName}
                 </Badge>

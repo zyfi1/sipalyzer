@@ -72,6 +72,7 @@ import { tooltips } from "@/lib/tooltips";
 import { formatDateTime } from "@/lib/dateTime";
 import { LiveIndicator, liveRingClass } from "@/components/ui/live-indicator";
 import { Spinner } from "@/components/ui/spinner";
+import { AppDivider } from "@/components/ui/panel-chrome";
 
 /* ═══════════════════════════════ DnD context ══════════════════════════════ */
 
@@ -411,9 +412,9 @@ export function CapturesView() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="h-full min-h-0 app-view-gutter">
-          <div className="ui-panel-shell h-full min-h-0 flex flex-col overflow-hidden">
-            <div className="ui-section-header-md flex-none">
+        {/* Full-bleed explorer: no inset gutter or ui-panel-shell card */}
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
+            <div className="ui-section-header-md flex-none border-x-0">
               <div className="flex items-center gap-3">
                 <h2 className="text-sm font-semibold text-foreground">{currentFolderLabel}</h2>
                 <Badge variant="secondary" className="text-2xs tabular-nums">{filteredSessions.length}</Badge>
@@ -424,13 +425,30 @@ export function CapturesView() {
                     className="ui-control-shell h-8 w-44 pl-8 pr-7 text-xs focus-visible:ring-1 focus-visible:ring-primary/30" />
                   {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>}
                 </div>
+                {stoppedSessions.length > 0 && (
+                  <>
+                    <TooltipWrapper entry={tooltips.captureDeleteAll}>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-8 w-8 shrink-0 p-0"
+                        aria-label="Delete all saved captures"
+                        onClick={() => setConfirmDeleteAll(true)}
+                        disabled={deletingId === "all"}
+                      >
+                        <Trash className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipWrapper>
+                    <AppDivider orientation="vertical" size="md" className="mx-0.5 h-5 shrink-0 self-center" />
+                  </>
+                )}
                 <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={handleImportPcap} disabled={importing}>
                   <Upload className="h-3.5 w-3.5" />{importing ? "Importing..." : "Import PCAP"}
                 </Button>
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 app-view-stack">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               {!hasAny ? (
                 <div className="h-full flex flex-col relative" onDrop={handleFileDrop} onDragOver={handleFileDragOver} onDragLeave={handleFileDragLeave}>
                   {fileDragOver && <FileDragOverlay />}
@@ -440,7 +458,10 @@ export function CapturesView() {
               ) : (
                 <div className="h-full flex min-h-0 overflow-hidden">
                   {/* ─── Sidebar ─── */}
-                  <aside className={cn("w-60 flex-shrink-0 flex flex-col overflow-hidden border-r border-border/35 bg-background/30 transition-smooth", isDndActive && "bg-muted/10")}>
+                  <aside className={cn(
+                    "flex w-60 shrink-0 flex-col overflow-hidden border-r border-border/25 bg-muted/5 transition-smooth",
+                    isDndActive && "bg-muted/10",
+                  )}>
                     {/* Sidebar header */}
                     <div className="ui-section-header-sm flex-shrink-0 flex items-center justify-between">
                       <span className="section-label-sm">
@@ -492,7 +513,7 @@ export function CapturesView() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {allTags.map((tag) => (
-                            <Badge key={tag} variant={selectedTags.includes(tag) ? "default" : "outline"}
+                            <Badge key={tag} variant={selectedTags.includes(tag) ? "default" : "secondary"}
                               className={cn("text-2xs h-5 px-1.5 cursor-pointer transition-smooth", selectedTags.includes(tag) && "bg-accent text-foreground")}
                               onClick={() => toggleTagFilter(tag)}>
                               {tag}
@@ -553,7 +574,6 @@ export function CapturesView() {
                 </div>
               )}
             </div>
-          </div>
         </div>
 
         {/* ─── Drag overlay (floating preview while dragging) ─── */}
@@ -577,8 +597,8 @@ export function CapturesView() {
 /** File import overlay (from OS drag) */
 function FileDragOverlay() {
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center rounded-md bg-background/60 pointer-events-none">
-      <div className="flex flex-col items-center gap-2 rounded-md border border-border/50 bg-card/50 px-6 py-5 text-foreground">
+    <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-background/50">
+      <div className="flex flex-col items-center gap-2 border border-dashed border-primary/25 bg-muted/15 px-6 py-5 text-foreground">
         <Upload className="h-10 w-10 text-muted-foreground" />
         <span className="text-sm font-medium">Drop PCAP to import</span>
       </div>
@@ -663,7 +683,7 @@ function SectionHeader({ label, icon, count, collapsed, onToggle, action }: {
   label: string; icon: React.ReactNode; count: number; collapsed: boolean; onToggle: () => void; action?: React.ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center border-y border-border/25 bg-background/85 backdrop-blur-sm">
+    <div className="sticky top-0 z-10 flex items-center border-b border-border/25 bg-muted/10">
       <button type="button" onClick={onToggle}
         className="flex-1 flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-smooth">
         {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -803,7 +823,7 @@ function SessionCardInner({
                       {session.name}
                     </span>
                     {showFolder && folderName && (
-                      <Badge variant="outline" className="h-4 shrink-0 px-1.5 py-0 text-2xs max-w-[40%]">
+                      <Badge variant="secondary" className="h-4 shrink-0 px-1.5 py-0 text-2xs max-w-[40%]">
                         <Folder className="mr-0.5 h-2 w-2 shrink-0" />
                         <span className="truncate">{folderName}</span>
                       </Badge>
@@ -895,7 +915,7 @@ function SessionCardInner({
                     <div className="flex flex-wrap gap-1 pt-1 border-t border-border/20">
                       <span className="text-3xs text-muted-foreground w-full mb-0.5">Suggestions</span>
                       {suggestions.slice(0, 8).map((t) => (
-                        <Badge key={t} variant="outline" className="text-2xs h-5 px-1.5 cursor-pointer hover:bg-accent transition-smooth" onClick={() => addTag(t)}>
+                        <Badge key={t} variant="secondary" className="text-2xs h-5 px-1.5 cursor-pointer hover:bg-accent transition-smooth" onClick={() => addTag(t)}>
                           <Plus className="h-2 w-2 mr-0.5" />{t}
                         </Badge>
                       ))}

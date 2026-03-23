@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   X,
-  Laptop,
+  Radio,
   Globe,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -144,7 +144,7 @@ function TabPill({
       )}>
       {isRemote
         ? <Globe className="h-3 w-3 text-info shrink-0" />
-        : <Laptop className="h-3 w-3 shrink-0 opacity-50" />}
+        : <Radio className="h-3 w-3 shrink-0 opacity-50" />}
 
       <span className="min-w-0 flex-1 max-w-[150px] truncate">{tab.label}</span>
 

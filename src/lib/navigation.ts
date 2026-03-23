@@ -5,7 +5,11 @@
  */
 
 import { toolRegistry, HOME_TOOL_ID } from "./toolRegistry";
-import { FEATURE_FLAG_KNOWLEDGE_BASE_UI, FEATURE_FLAG_MCP_UI } from "./featureFlags";
+import {
+  FEATURE_FLAG_KNOWLEDGE_BASE_UI,
+  FEATURE_FLAG_MCP_UI,
+  FEATURE_FLAG_TOOLS_MOCKUP_UI,
+} from "./featureFlags";
 import { isFeatureFlagEnabled } from "./featureFlagCache";
 
 import { useToolStore } from "@/stores/toolStore";
@@ -81,8 +85,17 @@ export function parseHash(): {
 
   // Home tool has no subviews — KB is accessed via the slide-out panel
   if (toolId === HOME_TOOL_ID && subviewId) subviewId = null;
+  if (toolId === "tools" && subviewId === "mockup" && !isFeatureFlagEnabled(FEATURE_FLAG_TOOLS_MOCKUP_UI, false)) {
+    subviewId = "syslog";
+  }
   if (toolId === "tools" && subviewId === "mcp" && !isFeatureFlagEnabled(FEATURE_FLAG_MCP_UI, false)) {
     subviewId = "syslog";
+  }
+
+  // Firmware catalog moved from Tools → Device Provisioning
+  if (toolId === "tools" && subviewId === "firmware") {
+    toolId = "provision-viewer";
+    subviewId = "firmware";
   }
 
   // Legacy: packet-monitor → packet-capture/monitor (merged back)
@@ -170,8 +183,15 @@ export function navigateTo(
     toolId = HOME_TOOL_ID;
     subviewId = null;
   }
+  if (toolId === "tools" && subviewId === "mockup" && !isFeatureFlagEnabled(FEATURE_FLAG_TOOLS_MOCKUP_UI, false)) {
+    subviewId = "syslog";
+  }
   if (toolId === "tools" && subviewId === "mcp" && !isFeatureFlagEnabled(FEATURE_FLAG_MCP_UI, false)) {
     subviewId = "syslog";
+  }
+  if (toolId === "tools" && subviewId === "firmware") {
+    toolId = "provision-viewer";
+    subviewId = "firmware";
   }
 
   const tool = toolRegistry.get(toolId);

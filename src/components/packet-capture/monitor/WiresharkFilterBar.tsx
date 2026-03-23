@@ -6,6 +6,7 @@ import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import type { DropdownControlSize } from "@/components/ui/dropdown-control";
 import type { PacketInfo } from "@/types/packetCapture";
 import { WiresharkFilterReference } from "./WiresharkFilterReference";
 import {
@@ -27,6 +28,8 @@ interface WiresharkFilterBarProps {
   filteredCount: number;
   /** Label shown after count (default "packets"), e.g. "calls" or "streams" */
   matchLabel?: string;
+  /** Same height scale as `Button` / `AppDropdown` (default **sm** for dense toolbars). */
+  controlSize?: DropdownControlSize;
 }
 
 interface FilterParseResult {
@@ -482,6 +485,7 @@ export function WiresharkFilterBar({
   onFilterChange,
   filteredCount,
   matchLabel = "packets",
+  controlSize = "sm",
 }: WiresharkFilterBarProps) {
   const [parseResult, setParseResult] = useState<FilterParseResult>({ isValid: true });
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -834,12 +838,13 @@ export function WiresharkFilterBar({
   }, [filter, cursorPosition, getCurrentWord]);
 
   return (
-    <div className="relative flex-1 min-w-0">
+    <div className="relative w-full min-w-0 flex-1">
       {/* Input with ghost text overlay */}
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground z-10" />
         <Input
           ref={inputRef}
+          size={controlSize}
           placeholder="Filter — e.g. sip, ip.addr == 10.0.0.1, tcp.port == 5060"
           value={filter}
           onChange={handleInputChange}
@@ -854,7 +859,8 @@ export function WiresharkFilterBar({
           autoCapitalize="off"
           spellCheck={false}
           className={cn(
-            "ui-control-shell pl-8 h-7 text-xs font-mono w-full",
+            "pl-8 font-mono w-full",
+            controlSize === "lg" ? "text-sm" : "text-xs",
             !parseResult.isValid
               ? "pr-44 border-warning/50 focus-visible:ring-warning/50"
               : filter ? "pr-44" : "pr-16"
@@ -926,7 +932,7 @@ export function WiresharkFilterBar({
       {showAutocomplete && suggestions.length > 0 && inputRef.current && createPortal(
         <div
           ref={autocompleteRef}
-          className="fixed z-[9997] ui-panel-shell rounded-md overflow-y-auto"
+          className="fixed z-[10050] ui-panel-shell rounded-md overflow-y-auto"
           style={{
             top: `${dropdownPosition.top}px`,
             left: `${dropdownPosition.left}px`,

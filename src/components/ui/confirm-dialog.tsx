@@ -17,7 +17,7 @@ interface ConfirmDialogProps {
   description: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: "default" | "primary" | "destructive";
+  variant?: "neutral" | "success" | "destructive";
   onConfirm: () => void;
   /** Extra class name applied to the dialog content (useful for z-index overrides). */
   className?: string;
@@ -30,7 +30,7 @@ export function ConfirmDialog({
   description,
   confirmText = "Confirm",
   cancelText = "Cancel",
-  variant = "primary",
+  variant = "neutral",
   onConfirm,
   className,
 }: ConfirmDialogProps) {
@@ -42,6 +42,7 @@ export function ConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
+        tone={variant}
         className={cn(
           "max-w-md",
           className
@@ -55,7 +56,7 @@ export function ConfirmDialog({
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            variant={variant === "destructive" ? "destructive" : variant}
+            variant={variant === "success" ? "success" : variant === "destructive" ? "destructive" : "secondary"}
           >
             {confirmText}
           </AlertDialogAction>

@@ -14,13 +14,7 @@ import { sanitizeDialInput } from "./sanitizeDialInput";
 import { digitsOnly } from "@/lib/e164";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { isRegistered } from "@/components/fax-center/FaxShared";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 
 const MIC_LEVEL_SNAP_PERCENT = 100;
 const MIC_LEVEL_SNAP_WINDOW = 4;
@@ -589,22 +583,19 @@ function AudioDeviceSection() {
             <Mic className="h-3 w-3" />
             Input
           </div>
-          <Select
+          <AppDropdown
             value={audioInputDeviceId ?? "__default__"}
             onValueChange={(value) => setAudioInputDevice(value === "__default__" ? null : value)}
-          >
-            <SelectTrigger className="ui-control-shell w-full h-8 px-2 text-xs">
-              <SelectValue placeholder="System Default" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__default__">System Default</SelectItem>
-              {audioInputDevices.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}{d.isDefault ? " (Default)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            className="ui-control-shell w-full h-8 px-2 text-xs"
+            placeholder="System Default"
+            options={[
+              { value: "__default__", label: "System Default" },
+              ...audioInputDevices.map((d) => ({
+                value: d.id,
+                label: `${d.name}${d.isDefault ? " (Default)" : ""}`,
+              })),
+            ]}
+          />
         </div>
 
         {/* Speaker */}
@@ -613,22 +604,19 @@ function AudioDeviceSection() {
             <Volume2 className="h-3 w-3" />
             Output
           </div>
-          <Select
+          <AppDropdown
             value={audioOutputDeviceId ?? "__default__"}
             onValueChange={(value) => setAudioOutputDevice(value === "__default__" ? null : value)}
-          >
-            <SelectTrigger className="ui-control-shell w-full h-8 px-2 text-xs">
-              <SelectValue placeholder="System Default" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__default__">System Default</SelectItem>
-              {audioOutputDevices.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}{d.isDefault ? " (Default)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            className="ui-control-shell w-full h-8 px-2 text-xs"
+            placeholder="System Default"
+            options={[
+              { value: "__default__", label: "System Default" },
+              ...audioOutputDevices.map((d) => ({
+                value: d.id,
+                label: `${d.name}${d.isDefault ? " (Default)" : ""}`,
+              })),
+            ]}
+          />
         </div>
 
         {/* Input level */}

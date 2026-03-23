@@ -75,7 +75,7 @@ export function WindowControls() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   const btn = cn(
-    "h-8 w-9 inline-flex items-center justify-center rounded-lg text-muted-foreground",
+    "h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground",
     "transition-smooth ui-hover-press motion-reduce:transform-none",
     "outline-none focus-visible:shadow-focus"
   );

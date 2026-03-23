@@ -1,10 +1,11 @@
 /**
- * UnifiedControlBar — Primary capture control strip.
+ * UnifiedControlBar — Capture + display filter toolbar (single row when slots used).
  *
- * Layout: [ Start/Stop ] [ Interface ▼ ] │ [ ──── Filter Bar ──── ]
+ * Default: [ Start/Stop ] [ Interface ▼ ] [ Rules ] [ toolbarBeforeFilter? ] [ Filter… ] │ [ toolbarAfterFilter? ]
+ * captureRulesAfterFilter: [ Start/Stop ] [ Interface ▼ ] [ toolbarBeforeFilter? ] [ Filter… ] [ Rules ][ toolbarAfterFilter? ]
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, type ReactNode } from "react";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ import {
 } from "@/lib/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { WiresharkFilterBar } from "./WiresharkFilterBar";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import type { NetworkInterface } from "@/types/packetCapture";
@@ -47,6 +49,12 @@ interface UnifiedControlBarProps {
   wiresharkFilter: string;
   onWiresharkFilterChange: (filter: string) => void;
   filteredCount: number;
+  /** Placed after capture controls, before the display filter (e.g. Marked). */
+  toolbarBeforeFilter?: ReactNode;
+  /** After the filter (and after Rules when captureRulesAfterFilter). */
+  toolbarAfterFilter?: ReactNode;
+  /** When true, labeled Rules renders after the filter instead of next to the interface. */
+  captureRulesAfterFilter?: boolean;
 }
 
 export function UnifiedControlBar({
@@ -62,6 +70,9 @@ export function UnifiedControlBar({
   wiresharkFilter,
   onWiresharkFilterChange,
   filteredCount,
+  toolbarBeforeFilter,
+  toolbarAfterFilter,
+  captureRulesAfterFilter = false,
 }: UnifiedControlBarProps) {
   const [showPopover, setShowPopover] = useState(false);
   const localIp = useNetworkStore((s) => s.localIp);
@@ -124,8 +135,32 @@ export function UnifiedControlBar({
 
   const canStart = isRemote ? true : !!resolvedName;
 
+  const rulesButton = (
+    <TooltipWrapper title="Capture rules" description={captureFilterSummary}>
+      <Button
+        type="button"
+        variant="neutral"
+        size="sm"
+        className="shrink-0 gap-1.5 px-2.5 text-xs"
+        onClick={onOpenCaptureFilters}
+        disabled={isCapturing}
+      >
+        <Zap className="h-3.5 w-3.5" />
+        Rules
+        {activeCaptureFilterCount > 0 && (
+          <Badge
+            variant="secondary"
+            className="h-4 border border-border/35 bg-muted/40 px-1 text-3xs tabular-nums"
+          >
+            {activeCaptureFilterCount}
+          </Badge>
+        )}
+      </Button>
+    </TooltipWrapper>
+  );
+
   return (
-    <div className="flex w-full items-center gap-2">
+    <div className="flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:thin]">
       {/* ── Start / Stop ── */}
       {isCapturing ? (
         <Button onClick={onStop} variant="destructive" size="sm" className="shrink-0 gap-1.5 px-2.5 text-xs">
@@ -268,37 +303,28 @@ export function UnifiedControlBar({
         </PopoverContent>
       </Popover>
 
-      <TooltipWrapper
-        title="Capture rules"
-        description={captureFilterSummary}
-      >
-        <Button
-          type="button"
-          variant="neutral"
-          size="sm"
-          className="shrink-0 gap-1.5 px-2.5 text-xs"
-          onClick={onOpenCaptureFilters}
-          disabled={isCapturing}
-        >
-          <Zap className="h-3.5 w-3.5" />
-          Rules
-          {activeCaptureFilterCount > 0 && (
-            <Badge
-              variant="secondary"
-              className="h-4 px-1 text-3xs tabular-nums border border-border/35 bg-muted/40"
-            >
-              {activeCaptureFilterCount}
-            </Badge>
-          )}
-        </Button>
-      </TooltipWrapper>
+      {!captureRulesAfterFilter ? rulesButton : null}
 
-      <div className="h-4 w-px shrink-0 bg-border/35" />
+      {toolbarBeforeFilter ? (
+        <div className="flex shrink-0 items-center gap-1">{toolbarBeforeFilter}</div>
+      ) : null}
 
-      {/* ── Wireshark display filter ── */}
-      <div className="flex-1 min-w-0">
+      {/* ── Wireshark display filter (same height as Button size="sm" — avoid min-h-8 so input isn’t top-offset vs siblings) ── */}
+      <div className="flex min-h-0 min-w-0 flex-1 items-center">
         <WiresharkFilterBar filter={wiresharkFilter} onFilterChange={onWiresharkFilterChange} filteredCount={filteredCount} />
       </div>
+
+      {captureRulesAfterFilter ? (
+        <div className="flex shrink-0 items-center gap-1">
+          {rulesButton}
+          {toolbarAfterFilter}
+        </div>
+      ) : toolbarAfterFilter ? (
+        <>
+          <AppDivider orientation="vertical" size="md" className="mx-0 shrink-0" />
+          <div className="flex shrink-0 items-center gap-1">{toolbarAfterFilter}</div>
+        </>
+      ) : null}
     </div>
   );
 }

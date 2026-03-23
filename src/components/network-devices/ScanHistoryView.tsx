@@ -110,15 +110,15 @@ export function ScanHistoryView() {
                         <span className="text-sm font-medium font-mono truncate">
                           {entry.targets}
                         </span>
-                        <Badge variant="outline" className="text-3xs h-4 px-1.5 uppercase">
+                        <Badge variant="secondary" className="text-3xs h-4 px-1.5 uppercase">
                           {modeLabel}
                         </Badge>
                         {entry.scanMode !== "quick" && (
                           <>
-                            <Badge variant="outline" className="text-3xs h-4 px-1.5 uppercase">
+                            <Badge variant="secondary" className="text-3xs h-4 px-1.5 uppercase">
                               {entry.method}
                             </Badge>
-                            <Badge variant="outline" className="text-3xs h-4 px-1.5 uppercase">
+                            <Badge variant="secondary" className="text-3xs h-4 px-1.5 uppercase">
                               {entry.transport}
                             </Badge>
                           </>

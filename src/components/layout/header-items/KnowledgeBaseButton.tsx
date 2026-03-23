@@ -16,7 +16,7 @@ export function KnowledgeBaseButton({ onClick }: KnowledgeBaseButtonProps) {
   return (
     <TooltipWrapper title="Knowledge Base" description="Open the troubleshooting knowledge base.">
       <button type="button" onClick={onClick} className="header-icon-button" aria-label="Open knowledge base">
-        <BookOpen className="h-4.5 w-4.5" />
+        <BookOpen className="h-4 w-4" />
       </button>
     </TooltipWrapper>
   );

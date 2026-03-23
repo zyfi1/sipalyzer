@@ -2,16 +2,22 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Plus, Play, Loader2, Shield, Trash, Info } from "@/lib/icons";
 import { useNetworkTestStore } from "@/stores/networkTestStore";
 import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { PortTestEntry, PortProtocol, PortTestResult } from "@/types/networkTest";
+
+const PORT_PROTOCOL_OPTIONS: { value: PortProtocol; label: string }[] = [
+  { value: "tcp", label: "TCP" },
+  { value: "udp", label: "UDP" },
+];
 
 export function PortTestPanel({ borderless = false }: { borderless?: boolean } = {}) {
   const portScan = useNetworkTestStore((s) => s.portScan);
@@ -140,17 +146,16 @@ export function PortTestPanel({ borderless = false }: { borderless?: boolean } =
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Protocol</label>
-            <Select value={newProtocol} onValueChange={(v) => setNewProtocol(v as PortProtocol)}>
-              <TooltipWrapper title="Protocol" description="Choose TCP or UDP for the port(s) to scan.">
-                <SelectTrigger className="w-24 h-10 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-              </TooltipWrapper>
-              <SelectContent>
-                <SelectItem value="tcp">TCP</SelectItem>
-                <SelectItem value="udp">UDP</SelectItem>
-              </SelectContent>
-            </Select>
+            <TooltipWrapper title="Protocol" description="Choose TCP or UDP for the port(s) to scan.">
+              <span className="inline-flex">
+                <AppDropdown
+                  value={newProtocol}
+                  onValueChange={(v) => setNewProtocol(v as PortProtocol)}
+                  options={PORT_PROTOCOL_OPTIONS}
+                  className="w-24 h-10 text-xs"
+                />
+              </span>
+            </TooltipWrapper>
           </div>
           <div className="flex-1 min-w-[100px]">
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Label</label>
@@ -200,7 +205,7 @@ export function PortTestPanel({ borderless = false }: { borderless?: boolean } =
               {customPortEntries.map((entry, i) => (
                 <div key={i} className="flex items-center gap-3 px-3 py-1.5 text-xs hover:bg-muted/10 transition-smooth group">
                   <span className="font-mono tabular-nums font-medium w-14">{entry.port}</span>
-                  <Badge variant="outline" className="text-3xs h-4 px-1.5 uppercase">{entry.protocol}</Badge>
+                  <Badge variant="secondary" className="text-3xs h-4 px-1.5 uppercase">{entry.protocol}</Badge>
                   <span className="text-muted-foreground truncate flex-1">{entry.label || ""}</span>
                   <TooltipWrapper title="Remove" description="Remove this port from the scan list.">
                     <button
@@ -237,7 +242,7 @@ export function PortTestPanel({ borderless = false }: { borderless?: boolean } =
             </div>
             <div className="flex items-center gap-2">
               <ResultSummary results={rawResults} />
-              <div className="h-4 w-px bg-border/25" />
+              <AppDivider orientation="vertical" size="md" className="mx-0" />
               <div className="inline-flex items-center gap-1">
                 <button type="button" className={cn("h-6 rounded-md px-2 text-3xs transition-smooth", resultFilter === "all" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/20")} onClick={() => setResultFilter("all")}>All</button>
                 <button type="button" className={cn("h-6 rounded-md px-2 text-3xs transition-smooth", resultFilter === "pass" ? "bg-success/15 text-success" : "text-muted-foreground hover:bg-muted/20")} onClick={() => setResultFilter("pass")}>Pass</button>
@@ -355,7 +360,7 @@ function PortResultRow({ result: r }: { result: PortTestResult }) {
     <div className="flex items-center gap-3 px-5 py-2 text-xs hover:bg-muted/10 transition-smooth">
       <span className={cn("h-2 w-2 rounded-full shrink-0", DOT_COLORS[r.status] ?? "bg-muted")} />
       <span className="font-mono tabular-nums w-14 shrink-0 font-medium">{r.port}</span>
-      <Badge variant="outline" className="text-3xs h-4 px-1.5 uppercase shrink-0">{r.protocol}</Badge>
+      <Badge variant="secondary" className="text-3xs h-4 px-1.5 uppercase shrink-0">{r.protocol}</Badge>
       <span className={cn(
         "font-medium shrink-0 flex items-center gap-1",
         isReachable && "text-success",
@@ -371,7 +376,7 @@ function PortResultRow({ result: r }: { result: PortTestResult }) {
       </span>
       {r.label && <span className="text-muted-foreground truncate">{r.label}</span>}
       {isReachable && (
-        <Badge variant="outline" className="text-3xs h-3.5 px-1 border-success/30 bg-success/[0.06] text-success shrink-0 ml-auto">
+        <Badge variant="secondary" className="text-3xs h-3.5 px-1 border-success/30 bg-success/[0.06] text-success shrink-0 ml-auto">
           PASS
         </Badge>
       )}

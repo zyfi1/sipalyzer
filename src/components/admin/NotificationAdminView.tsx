@@ -152,7 +152,7 @@ export function NotificationAdminView() {
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {(Object.entries(countBySource) as [NotificationSource, number][]).map(
                   ([source, count]) => (
-                    <Badge key={source} variant="outline" className="text-xs gap-1">
+                    <Badge key={source} variant="secondary" className="text-xs gap-1">
                       {SOURCE_LABELS[source]}
                       <span className="font-semibold tabular-nums">{count}</span>
                     </Badge>

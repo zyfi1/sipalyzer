@@ -146,8 +146,8 @@ function RegistrarListRow({
       {...attributes}
       {...listeners}
       className={cn(
-        "flex cursor-grab flex-col gap-0.5 px-3 py-2.5 text-left border-b border-border/30 transition-smooth active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/55",
-        isSelected ? "bg-primary/8 border-l-2 border-l-primary shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.03)]" : "hover:bg-card/40 border-l-2 border-l-transparent",
+        "flex cursor-grab flex-col gap-0.5 border-b border-border/25 px-3 py-2.5 text-left transition-smooth active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/55",
+        isSelected ? "border-l-2 border-l-primary bg-primary/10" : "border-l-2 border-l-transparent hover:bg-muted/15",
         isDragging && "opacity-70 shadow-md"
       )}
     >

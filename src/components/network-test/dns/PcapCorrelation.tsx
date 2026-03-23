@@ -40,7 +40,7 @@ export default function PcapCorrelation({ correlation }: PcapCorrelationProps) {
             <div key={i} className="px-3 py-1.5 text-2xs font-mono flex items-center gap-2">
               <span className="text-muted-foreground/60 w-6 text-right">#{pkt.packet_index}</span>
               <Badge
-                variant={pkt.is_response ? "secondary" : "outline"}
+                variant={pkt.is_response ? "secondary" : "secondary"}
                 className="text-3xs px-1 py-0 h-3.5 shrink-0"
               >
                 {pkt.is_response ? "RESP" : "QUERY"}

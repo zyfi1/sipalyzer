@@ -3,6 +3,7 @@ import { Tick, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
 import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { dropdownControlTriggerVariants, type DropdownControlSize } from "@/components/ui/dropdown-control"
 
 function Select({
   ...props
@@ -24,25 +25,34 @@ function SelectValue({
 
 function SelectTrigger({
   className,
-  size = "default",
+  size = "md",
   children,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
-  size?: "sm" | "default"
+  size?: DropdownControlSize
 }) {
+  const resolved = size
+  const chevronClass =
+    resolved === "sm"
+      ? "size-3.5 shrink-0 text-muted-foreground opacity-55"
+      : resolved === "lg"
+        ? "size-[18px] shrink-0 text-muted-foreground opacity-55"
+        : "size-4 shrink-0 text-muted-foreground opacity-55"
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
-      data-size={size}
+      data-size={resolved}
       className={cn(
-        "ui-control-shell data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:shadow-focus flex w-fit items-center justify-between gap-2 px-3 py-2 text-sm whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-[var(--ui-control-height)] data-[size=sm]:h-[var(--ui-control-height-sm)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
+        dropdownControlTriggerVariants({ size: resolved }),
+        "w-fit whitespace-nowrap data-[placeholder]:text-muted-foreground/80 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "*:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2",
+        className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
+        <ChevronDownIcon className={chevronClass} />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -53,14 +63,18 @@ function SelectContent({
   children,
   position = "item-aligned",
   align = "center",
+  sideOffset = 4,
+  collisionPadding = 8,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         data-slot="select-content"
+        sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "ui-floating-surface text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[9997] max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overscroll-contain overflow-x-hidden overflow-y-auto",
+          "ui-floating-surface text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[10050] max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overscroll-contain overflow-x-hidden overflow-y-auto",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className

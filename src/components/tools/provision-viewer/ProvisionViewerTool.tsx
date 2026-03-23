@@ -5,7 +5,7 @@ import { fetchUrl } from "@/api/provision";
 import { useToolStore } from "@/stores/toolStore";
 import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { dispatchFetchProvision } from "@/lib/executionDispatch";
-import { FileSearch, Loader2, ChevronRight, ChevronDown, Copy, Check, Link2, Search, Smartphone, Users, Info, Trash2, Activity, CheckCircle2, FileText, Phone, List, Code, Layers, Plus } from "@/lib/icons";
+import { FileSearch, Loader2, ChevronRight, ChevronDown, Copy, Check, Link2, Search, Smartphone, Users, Info, Trash2, CheckCircle2, FileText, Phone, List, Code, Layers, Plus } from "@/lib/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,10 +25,11 @@ import { DeviceModelPicker, MODEL_VENDOR } from "./DeviceModelPicker";
 import { ProvisionRegistrarWizard } from "./ProvisionRegistrarWizard";
 import { ProvisionDiffView } from "./ProvisionDiffView";
 import { ProvisionDesigner } from "./ProvisionDesigner";
+import { FirmwareCatalogView } from "@/components/tools/firmware-catalog/FirmwareCatalogView";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer, ViewFooterDivider } from "@/components/layout/ViewFooter";
 import { getFieldInfoWithFallback } from "./yealinkFieldReference";
 import { cn } from "@/lib/utils";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { parseContactsFile, getBestPhone, parsedContactToImport } from "@/lib/provisionContactUtils";
 import { useContactsStore } from "@/stores/contactsStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -555,7 +556,7 @@ export function ProvisionViewerTool() {
     setTableColumnWidths((prev) => ({ ...prev, [column]: nextWidth }));
   };
 
-  const startTableColumnResize = (column: TableColumnKey, e: ReactMouseEvent<HTMLButtonElement>) => {
+  const startTableColumnResize = (column: TableColumnKey, e: ReactMouseEvent<HTMLElement>) => {
     if (e.detail > 1) return;
     e.preventDefault();
     e.stopPropagation();
@@ -596,7 +597,6 @@ export function ProvisionViewerTool() {
           <div className="flex items-center ml-0">
             <ExecutionContextSelector
               toolId="provisionFetch"
-              variant="header"
               className="w-[150px] max-w-[150px]"
             />
           </div>,
@@ -1281,47 +1281,53 @@ export function ProvisionViewerTool() {
                                 <tr className="border-b border-border">
                                   <th className="relative text-left py-2 px-3 section-label-sm border-r border-border/60">
                                     Key
-                                    <button
-                                      type="button"
-                                      className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none bg-border/40 hover:bg-primary/40 transition-colors"
+                                    <PanelResizeHandle
+                                      orientation="vertical"
+                                      density="compact"
+                                      appearance="table-edge"
+                                      label="Resize Key column"
+                                      title="Drag to resize. Double-click to auto-fit."
+                                      className="absolute top-0 right-0 h-full w-2 rounded-none touch-none"
                                       onMouseDown={(e) => startTableColumnResize("key", e)}
                                       onDoubleClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         autoFitTableColumn("key");
                                       }}
-                                      title="Drag to resize. Double-click to auto-fit."
-                                      aria-label="Resize Key column"
                                     />
                                   </th>
                                   <th className="relative text-left py-2 px-3 section-label-sm border-r border-border/60">
                                     Value
-                                    <button
-                                      type="button"
-                                      className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none bg-border/40 hover:bg-primary/40 transition-colors"
+                                    <PanelResizeHandle
+                                      orientation="vertical"
+                                      density="compact"
+                                      appearance="table-edge"
+                                      label="Resize Value column"
+                                      title="Drag to resize. Double-click to auto-fit."
+                                      className="absolute top-0 right-0 h-full w-2 rounded-none touch-none"
                                       onMouseDown={(e) => startTableColumnResize("value", e)}
                                       onDoubleClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         autoFitTableColumn("value");
                                       }}
-                                      title="Drag to resize. Double-click to auto-fit."
-                                      aria-label="Resize Value column"
                                     />
                                   </th>
                                   <th className="relative text-left py-2 px-3 section-label-sm">
                                     Info
-                                    <button
-                                      type="button"
-                                      className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none bg-border/40 hover:bg-primary/40 transition-colors"
+                                    <PanelResizeHandle
+                                      orientation="vertical"
+                                      density="compact"
+                                      appearance="table-edge"
+                                      label="Resize Info column"
+                                      title="Drag to resize. Double-click to auto-fit."
+                                      className="absolute top-0 right-0 h-full w-2 rounded-none touch-none"
                                       onMouseDown={(e) => startTableColumnResize("info", e)}
                                       onDoubleClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         autoFitTableColumn("info");
                                       }}
-                                      title="Drag to resize. Double-click to auto-fit."
-                                      aria-label="Resize Info column"
                                     />
                                   </th>
                                 </tr>
@@ -1484,76 +1490,14 @@ export function ProvisionViewerTool() {
             </div>
           </TabsContent>
 
+          <TabsContent value="firmware" className={TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS}>
+            <div className="h-full min-h-0 overflow-y-auto app-view-gutter">
+              <FirmwareCatalogView />
+            </div>
+          </TabsContent>
+
         </AnimatedTabsContent>
 
-        <ViewFooter>
-          {loading ? (
-            <ViewFooterItem>
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Loading…</span>
-            </ViewFooterItem>
-          ) : view === "contacts" ? (
-            contactsFileLoading ? (
-              <ViewFooterItem>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Loading contacts...</span>
-              </ViewFooterItem>
-            ) : contactsFileError ? (
-              <ViewFooterItem className="text-destructive">
-                <Activity className="h-3 w-3" />
-                <span>Contacts unavailable</span>
-              </ViewFooterItem>
-            ) : (
-              <ViewFooterItem>
-                <Users className="h-3 w-3" />
-                <span className="tabular-nums">{parsedContacts.length}</span>
-                <span>contacts</span>
-              </ViewFooterItem>
-            )
-          ) : result?.request_info?.final_url ? (
-            <>
-              <ViewFooterItem>
-                <CheckCircle2 className="h-3 w-3 text-success" />
-                <span>Loaded</span>
-                {result.request_info.mac_used && (
-                  <span className="font-mono opacity-60">{result.request_info.mac_used}</span>
-                )}
-              </ViewFooterItem>
-              {result?.parsed?.entries?.length ? (
-                <>
-                  <ViewFooterDivider />
-                  <ViewFooterItem>
-                    <span className="tabular-nums">{result.parsed.entries.length}</span>
-                    <span>entries</span>
-                  </ViewFooterItem>
-                </>
-              ) : null}
-              {model && (
-                <ViewFooterItem>
-                  <Phone className="h-3 w-3" />
-                  <span>{model}</span>
-                </ViewFooterItem>
-              )}
-            </>
-          ) : (
-            <ViewFooterItem>
-              <Activity className="h-3 w-3" />
-              <span>Ready</span>
-            </ViewFooterItem>
-          )}
-
-          <ViewFooterSpacer />
-
-          {view !== "contacts" && parsedContacts.length > 0 && !contactsFileLoading && !contactsFileError && (
-            <TooltipWrapper title="Contacts" description="Open the contacts tab to view or import device contacts.">
-              <ViewFooterItem onClick={() => setView("contacts")}>
-                <Users className="h-3 w-3" />
-                <span className="tabular-nums">{parsedContacts.length}</span>
-                <span>contacts</span>
-              </ViewFooterItem>
-            </TooltipWrapper>
-          )}
-        </ViewFooter>
         </div>
       </Tabs>
 

@@ -7,11 +7,9 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import { useToolVisible } from "@/hooks/useToolVisible";
 import { ToolHeader } from "@/components/layout/ToolHeader";
 import { getCallMetrics, getCallJitterHistory, getCallWaveform } from "@/lib/softphone";
-import { Activity, ChevronLeft, Grid3x3, Hash, Mic, PhoneCall, Radio, Users } from "@/lib/icons";
+import { ChevronLeft, Grid3x3, Hash, Mic, PhoneCall, Users } from "@/lib/icons";
 import { isRecording as checkIsRecording } from "@/lib/softphone";
 import { cn } from "@/lib/utils";
-import { ViewFooter, ViewFooterDivider, ViewFooterItem, ViewFooterSpacer } from "@/components/layout/ViewFooter";
-import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { SoftphoneHeader } from "./SoftphoneHeader";
 import { KeypadPane, IncomingCallScreen } from "./DialerView";
 import { CallsView } from "./CallsView";
@@ -41,8 +39,6 @@ export function SoftPhoneTool() {
   const fetchRegistrars = useRegistrationStore((s) => s.fetchRegistrars);
   const registrars = useRegistrationStore((s) => s.registrars);
   const activeRegistrarId = useSoftphoneStore((s) => s.activeRegistrarId);
-  const mwiState = useSoftphoneStore((s) => s.mwiState);
-  const inboundListenerActive = useSoftphoneStore((s) => s.inboundListenerActive);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
   const activeToolId = useToolStore((s) => s.activeToolId);
   const activeSubviewId = useToolStore((s) => s.activeSubviewId);
@@ -136,13 +132,6 @@ export function SoftPhoneTool() {
 
   const activeCall = calls.find((c) => c.id === activeCallId);
   const activeRegistrar = registrars.find((r) => r.id === activeRegistrarId) ?? null;
-  const registrarMwi = activeRegistrarId ? mwiState[activeRegistrarId] : undefined;
-  const liveCalls = calls.filter((c) =>
-    c.state === "active" || c.state === "on-hold" || c.state === "connecting" || c.state === "ringing"
-  );
-  const activeCallsCount = calls.filter((c) => c.state === "active").length;
-  const heldCallsCount = calls.filter((c) => c.state === "on-hold").length;
-  const ringingCallsCount = calls.filter((c) => c.state === "ringing").length;
   useRingbackTone(activeCall?.state === "ringing" && !activeCall?.isInbound);
   const hasInboundRinging = calls.some((c) => c.state === "ringing" && c.isInbound);
   const ringtonePreset = useSoftphoneStore((s) => s.ringtonePreset);
@@ -480,14 +469,6 @@ export function SoftPhoneTool() {
     { id: "calls" as const, label: "Calls", icon: PhoneCall, badge: calls.length > 0 ? String(calls.length) : undefined },
     { id: "recordings" as const, label: "Recordings", icon: Mic, badge: anyRecording ? "LIVE" : undefined },
   ];
-  const activeRegistrarInboundPort = useMemo(() => {
-    const port = activeRegistrar?.listening_port ?? activeRegistrar?.local_port ?? null;
-    return typeof port === "number" && port > 0 ? port : null;
-  }, [activeRegistrar?.listening_port, activeRegistrar?.local_port]);
-  const inboundPortsTooltip = activeRegistrarInboundPort
-    ? `Active registrar port: :${activeRegistrarInboundPort}`
-    : "No active registrar listen port configured";
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <ToolHeader toolId="soft-phone" execToolId="softphone" />
@@ -622,92 +603,6 @@ export function SoftPhoneTool() {
         </div>
       </div>
 
-      <ViewFooter>
-        {liveCalls.length > 0 ? (
-          <ViewFooterItem>
-            <PhoneCall className="h-3 w-3" />
-            <span className="font-medium text-foreground tabular-nums">{liveCalls.length}</span>
-            <span>live</span>
-          </ViewFooterItem>
-        ) : (
-          <ViewFooterItem>
-            <Activity className="h-3 w-3" />
-            <span>Idle</span>
-          </ViewFooterItem>
-        )}
-
-        {(activeCallsCount > 0 || heldCallsCount > 0 || ringingCallsCount > 0) && (
-          <>
-            <ViewFooterDivider />
-            <ViewFooterItem>
-              <span className="tabular-nums">{activeCallsCount}</span>
-              <span>active</span>
-            </ViewFooterItem>
-            <ViewFooterItem>
-              <span className="tabular-nums">{heldCallsCount}</span>
-              <span>held</span>
-            </ViewFooterItem>
-            <ViewFooterItem>
-              <span className="tabular-nums">{ringingCallsCount}</span>
-              <span>ringing</span>
-            </ViewFooterItem>
-          </>
-        )}
-
-        <ViewFooterDivider />
-        <ViewFooterItem>
-          <Radio className="h-3 w-3" />
-          <span className="truncate max-w-[220px]">{activeRegistrar?.name ?? "No registrar"}</span>
-        </ViewFooterItem>
-
-        {registrarMwi && (
-          <>
-            <ViewFooterDivider />
-            <ViewFooterItem className={registrarMwi.waiting ? "text-warning" : undefined}>
-              <Mic className="h-3 w-3" />
-              <span>VM</span>
-              <span className="tabular-nums">{registrarMwi.newCount}</span>
-            </ViewFooterItem>
-          </>
-        )}
-
-        {anyRecording && (
-          <>
-            <ViewFooterDivider />
-            <ViewFooterItem className="text-destructive">
-              <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-live-breathe motion-reduce:animate-none" />
-              <span>Recording</span>
-            </ViewFooterItem>
-          </>
-        )}
-
-        <ViewFooterSpacer />
-
-        {activeRegistrarId && activeRegistrar ? (
-          <TooltipWrapper
-            title="Inbound Listener"
-            description={inboundListenerActive ? inboundPortsTooltip : "Listener is currently off"}
-          >
-            <ViewFooterItem className={inboundListenerActive ? "text-success" : "text-muted-foreground/70"}>
-              {inboundListenerActive ? (
-                <>
-                  <span>Listening</span>
-                  {activeRegistrarInboundPort ? <span className="tabular-nums">:{activeRegistrarInboundPort}</span> : null}
-                </>
-              ) : (
-                <>
-                  <span>Listener off</span>
-                  {activeRegistrarInboundPort ? <span className="tabular-nums">:{activeRegistrarInboundPort}</span> : null}
-                </>
-              )}
-            </ViewFooterItem>
-          </TooltipWrapper>
-        ) : (
-          <ViewFooterItem className="text-muted-foreground/70">
-            <span>Select registrar for listener status</span>
-          </ViewFooterItem>
-        )}
-      </ViewFooter>
     </div>
   );
 }

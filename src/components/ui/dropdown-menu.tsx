@@ -43,7 +43,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         collisionPadding={8}
         className={cn(
-          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[9997] max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto",
+          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[10050] max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto",
           className
         )}
         {...props}
@@ -93,18 +93,25 @@ function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "ui-floating-item data-[highlighted]:bg-accent/28 data-[highlighted]:text-accent-foreground focus:bg-accent/28 focus:text-accent-foreground relative flex cursor-default items-center gap-2 pr-2 pl-8 text-sm outline-hidden select-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "ui-floating-item data-[highlighted]:bg-accent/28 data-[highlighted]:text-accent-foreground focus:bg-accent/28 focus:text-accent-foreground flex min-h-8 cursor-default items-center px-2 py-1.5 text-sm outline-hidden select-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:[&_.ui-dropdown-checkbox-box]:border-primary/70 data-[state=checked]:[&_.ui-dropdown-checkbox-box]:bg-primary/18 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.ItemIndicator>
-          <Tick className="size-3.5" strokeWidth={3} />
+      {/*
+        In-flow checkbox (not absolute) so label text never sits under the box.
+        mr-2 survives consumer gap-0 on the row.
+      */}
+      <span
+        aria-hidden
+        className="ui-dropdown-checkbox-box mr-2 flex size-4 shrink-0 items-center justify-center rounded border-2 border-foreground/45 bg-card shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.06)]"
+      >
+        <DropdownMenuPrimitive.ItemIndicator className="flex size-full items-center justify-center">
+          <Tick className="size-3.5 text-primary" strokeWidth={3.25} />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
-      {children}
+      <div className="min-w-0 flex-1">{children}</div>
     </DropdownMenuPrimitive.CheckboxItem>
   )
 }
@@ -234,7 +241,7 @@ function DropdownMenuSubContent({
         sideOffset={6}
         collisionPadding={8}
         className={cn(
-          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[9997] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden",
+          "ui-floating-surface ui-floating-content text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[10060] min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden",
           className
         )}
         {...props}

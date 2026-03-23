@@ -207,7 +207,7 @@ export function BulkEditorDialog({
                     return (
                       <Badge
                         key={tag}
-                        variant={willBeAdded ? "default" : "outline"}
+                        variant={willBeAdded ? "default" : "secondary"}
                         className={cn(
                           "cursor-pointer gap-1.5 px-2 py-1 text-xs",
                           willBeAdded && "bg-accent text-foreground"
@@ -311,7 +311,7 @@ export function BulkEditorDialog({
                   {currentCategories.map((cat) => (
                     <Badge
                       key={cat}
-                      variant={categoryToSet === null ? "destructive" : categoryToSet === cat ? "default" : "outline"}
+                      variant={categoryToSet === null ? "destructive" : categoryToSet === cat ? "default" : "secondary"}
                       className={cn(
                         "gap-1.5 px-2 py-1 text-xs",
                         categoryToSet === null && "line-through opacity-60",
@@ -368,7 +368,7 @@ export function BulkEditorDialog({
                     return (
                       <Badge
                         key={cat}
-                        variant={isSelected ? "default" : "outline"}
+                        variant={isSelected ? "default" : "secondary"}
                         className={cn(
                           "cursor-pointer gap-1.5 px-2 py-1 text-xs",
                           isSelected && "bg-accent text-foreground",

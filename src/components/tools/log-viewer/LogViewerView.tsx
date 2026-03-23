@@ -9,13 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown, SelectItem } from "@/components/ui/app-dropdown";
 import {
   FileText,
   Play,
@@ -221,28 +215,27 @@ export function LogViewerView() {
         {/* Row 1: Presets + path */}
         <div className="flex items-center gap-2">
           <TooltipWrapper entry={tooltips.logPresets}>
-            <Select onValueChange={handlePresetSelect}>
-              <SelectTrigger className="w-[180px] h-7 text-xs">
-                <SelectValue placeholder="Choose a log file..." />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                {LOG_CATEGORIES.map((cat) => (
-                  <div key={cat}>
-                    <div className="px-2 py-1 section-label-sm">{cat}</div>
-                    {LOG_PRESETS.filter((p) => p.category === cat).map((p) => (
-                      <SelectItem key={p.id} value={p.id} className="text-xs">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{p.label}</span>
-                            <span className="text-2xs text-muted-foreground/60 font-mono">{p.path}</span>
-                          </div>
+            <AppDropdown
+              onValueChange={handlePresetSelect}
+              className="w-[180px] h-7 text-xs"
+              placeholder="Choose a log file..."
+              contentClassName="max-h-[300px]"
+              contentChildren={LOG_CATEGORIES.map((cat) => (
+                <div key={cat}>
+                  <div className="px-2 py-1 section-label-sm">{cat}</div>
+                  {LOG_PRESETS.filter((p) => p.category === cat).map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{p.label}</span>
+                          <span className="text-2xs text-muted-foreground/60 font-mono">{p.path}</span>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </div>
+              ))}
+            />
           </TooltipWrapper>
           <Input
             value={logPath}
@@ -339,7 +332,7 @@ export function LogViewerView() {
       {/* ── Toolbar (visible when content loaded) ── */}
       {lines.length > 0 && (
         <div className="ui-panel-shell rounded-md px-5 py-3 flex items-center gap-2">
-          <Badge variant="outline" className="text-2xs h-5 px-1.5 tabular-nums">{lines.length} lines</Badge>
+          <Badge variant="secondary" className="text-2xs h-5 px-1.5 tabular-nums">{lines.length} lines</Badge>
           {totalLines > 0 && (
             <span className="caption-text-sm">of {totalLines.toLocaleString()} total</span>
           )}
@@ -360,7 +353,7 @@ export function LogViewerView() {
               </div>
             </TooltipWrapper>
             {searchText && (
-              <Badge variant={matchCount > 0 ? "default" : "outline"} className="text-2xs h-5 px-1.5 tabular-nums">
+              <Badge variant={matchCount > 0 ? "default" : "secondary"} className="text-2xs h-5 px-1.5 tabular-nums">
                 {matchCount} match{matchCount !== 1 ? "es" : ""}
               </Badge>
             )}

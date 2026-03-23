@@ -382,7 +382,7 @@ export default function SnmpPanel() {
                           {iface.type && <div className="text-2xs text-muted-foreground">{iface.type}</div>}
                         </td>
                         <td className="px-3 py-1.5 text-center">
-                          <Badge variant={iface.oper_status === "up" ? "default" : "outline"} className="text-3xs px-1.5 py-0 h-4">
+                          <Badge variant={iface.oper_status === "up" ? "default" : "secondary"} className="text-3xs px-1.5 py-0 h-4">
                             {iface.oper_status || "--"}
                           </Badge>
                         </td>

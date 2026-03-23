@@ -20,13 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -36,10 +30,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Globe,
-  Shield,
   Play,
   Wifi,
-  Terminal,
   HelpCircle,
 } from "@/lib/icons";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
@@ -327,34 +319,18 @@ export function RemoteCaptureWizard({
 
             <div className="space-y-1.5">
               <Label>Authentication Method</Label>
-              <Select
+              <AppDropdown
                 value={authMethod}
-                onValueChange={(v) => {
+                onValueChange={(v: string) => {
                   setAuthMethod(v as SshAuthMethod);
                   setTestResult(null);
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="password">
-                    <span className="flex items-center gap-2">
-                      <Shield className="h-3.5 w-3.5" /> Password
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="keyFile">
-                    <span className="flex items-center gap-2">
-                      <Shield className="h-3.5 w-3.5" /> SSH Key File
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="agent">
-                    <span className="flex items-center gap-2">
-                      <Terminal className="h-3.5 w-3.5" /> SSH Agent
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "password", label: "Password" },
+                  { value: "keyFile", label: "SSH Key File" },
+                  { value: "agent", label: "SSH Agent" },
+                ]}
+              />
             </div>
 
             {authMethod === "password" && (
@@ -445,22 +421,14 @@ export function RemoteCaptureWizard({
                   Detecting interfaces...
                 </div>
               ) : (
-                <Select
+                <AppDropdown
                   value={remoteInterface}
                   onValueChange={setRemoteInterface}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">any (all interfaces)</SelectItem>
-                    {remoteInterfaces.map((iface) => (
-                      <SelectItem key={iface} value={iface}>
-                        {iface}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "any", label: "any (all interfaces)" },
+                    ...remoteInterfaces.map((iface) => ({ value: iface, label: iface })),
+                  ]}
+                />
               )}
             </div>
 
@@ -587,7 +555,7 @@ export function RemoteCaptureWizard({
               {useSudo && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Sudo</span>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="secondary" className="text-xs">
                     Enabled
                   </Badge>
                 </div>

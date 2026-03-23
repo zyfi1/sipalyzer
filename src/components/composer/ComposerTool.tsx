@@ -20,19 +20,9 @@ import {
 } from "@/components/ui/dialog";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import {
-  ViewFooter,
-  ViewFooterItem,
-  ViewFooterSpacer,
-  ViewFooterDivider,
-} from "@/components/layout/ViewFooter";
-import {
-  Send,
-  SshKey,
-  PanelLeft,
-  Keyboard,
-} from "@/lib/icons";
+import { Keyboard, PanelLeft } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { AppDivider, PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 const ComposerSidebar = lazy(() =>
   import("./ComposerSidebar").then((m) => ({ default: m.ComposerSidebar }))
@@ -240,17 +230,6 @@ export function ComposerTool() {
     return () => document.removeEventListener("keydown", handler);
   }, [activeToolId]);
 
-  // ── Footer stats ───────────────────────────────────────────────────────────
-  const items = useComposerStore((s) => s.collections.items);
-  const requestCount = items.filter((i) => i.protocol !== "ssh").length;
-  const sshCount = items.filter((i) => i.protocol === "ssh").length;
-  const activeEnvId = useComposerStore((s) => s.activeEnvironmentId);
-  const environments = useComposerStore((s) => s.environments);
-  const activeEnvName =
-    activeEnvId
-      ? environments.find((e) => e.id === activeEnvId)?.name ?? "None"
-      : "None";
-  const historyCount = useComposerStore((s) => s.history.length);
   return (
     <div className="flex flex-col h-full min-h-0">
       <Tabs
@@ -294,13 +273,13 @@ export function ComposerTool() {
           className="flex-1 min-h-0 data-[state=inactive]:hidden flex flex-col mt-0 overflow-hidden"
         >
           <Suspense fallback={<ComposerSubviewFallback label="SSH" />}>
-            <SshSubview />
+            <SshSubview registerHeaderBreadcrumbTabs={activeTab === SUBVIEW_SSH} />
           </Suspense>
         </TabsContent>
 
         <TabsContent
           value={SUBVIEW_HISTORY}
-          className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1 app-view-gutter overflow-y-auto")}
+          className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1 app-view-gutter overflow-hidden")}
         >
           <Suspense fallback={<ComposerSubviewFallback label="History" />}>
             <UnifiedHistory />
@@ -316,66 +295,6 @@ export function ComposerTool() {
           </Suspense>
         </TabsContent>
       </Tabs>
-
-      <ViewFooter>
-        {activeTab === SUBVIEW_REQUESTS ? (
-          <>
-            <ViewFooterItem>
-              <Send className="h-3 w-3" />
-              {requestCount} request{requestCount !== 1 ? "s" : ""}
-            </ViewFooterItem>
-            <ViewFooterDivider />
-            <ViewFooterItem>
-              Env: {activeEnvName}
-            </ViewFooterItem>
-            <ViewFooterSpacer />
-            <ViewFooterItem>
-              {historyCount} history
-            </ViewFooterItem>
-          </>
-        ) : null}
-
-        {activeTab === SUBVIEW_SSH ? (
-          <>
-            <ViewFooterItem>
-              <SshKey className="h-3 w-3" />
-              {sshCount} SSH item{sshCount !== 1 ? "s" : ""}
-            </ViewFooterItem>
-            <ViewFooterDivider />
-            <ViewFooterItem>
-              Env: {activeEnvName}
-            </ViewFooterItem>
-            <ViewFooterSpacer />
-          </>
-        ) : null}
-
-        {activeTab === SUBVIEW_HISTORY ? (
-          <>
-            <ViewFooterItem>
-              <PanelLeft className="h-3 w-3" />
-              {historyCount} history item{historyCount !== 1 ? "s" : ""}
-            </ViewFooterItem>
-            <ViewFooterSpacer />
-            <ViewFooterItem>
-              <Send className="h-3 w-3" />
-              {requestCount} request{requestCount !== 1 ? "s" : ""}
-            </ViewFooterItem>
-          </>
-        ) : null}
-
-        {activeTab === SUBVIEW_DOCS ? (
-          <>
-            <ViewFooterItem>
-              <Keyboard className="h-3 w-3" />
-              <span>Composer docs</span>
-            </ViewFooterItem>
-            <ViewFooterSpacer />
-            <ViewFooterItem>
-              Env: {activeEnvName}
-            </ViewFooterItem>
-          </>
-        ) : null}
-      </ViewFooter>
 
       <NewComposerTypeDialog
         open={newTypeDialogOpen}
@@ -499,12 +418,13 @@ function AdvancedRequestsView({
               <ComposerSidebar />
             </Suspense>
           </div>
-          <div
-            className="shrink-0 w-1 cursor-col-resize group hover:bg-primary/10 active:bg-primary/15 transition-smooth select-none"
+          <PanelResizeHandle
+            orientation="vertical"
+            density="compact"
+            appearance="minimal"
+            label="Resize composer sidebar"
+            className="shrink-0 rounded-none"
             onMouseDown={onSidebarDragStart}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize sidebar"
           />
         </>
       )}
@@ -530,7 +450,7 @@ function AdvancedRequestsView({
             </button>
           </TooltipWrapper>
 
-          <div className="w-px h-4 bg-border/30 mx-0.5" />
+          <AppDivider orientation="vertical" size="md" className="mx-0.5" />
 
           <div className="flex-1" />
 

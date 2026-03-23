@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNoteStore } from "@/stores/noteStore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppDropdown } from "@/components/ui/app-dropdown";
 import { Badge } from "@/components/ui/badge";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { Search, X } from "@/lib/icons";
@@ -112,34 +112,30 @@ export function AdvancedSearch({ onResults, onClose }: AdvancedSearchProps) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Folder</label>
-          <Select value={folderId || "__all__"} onValueChange={(v) => setFolderId(v === "__all__" ? undefined : v)}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="All folders" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All folders</SelectItem>
-              {folders.map((f) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {f.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={folderId || "__all__"}
+            onValueChange={(v) => setFolderId(v === "__all__" ? undefined : v)}
+            placeholder="All folders"
+            className="h-8 text-xs"
+            options={[
+              { value: "__all__", label: "All folders" },
+              ...folders.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
         </div>
 
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Category</label>
-          <Select value={category || "__all__"} onValueChange={(v) => setCategory(v === "__all__" ? undefined : v)}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="All categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All categories</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AppDropdown
+            value={category || "__all__"}
+            onValueChange={(v) => setCategory(v === "__all__" ? undefined : v)}
+            placeholder="All categories"
+            className="h-8 text-xs"
+            options={[
+              { value: "__all__", label: "All categories" },
+              ...categories.map((cat) => ({ value: cat, label: cat })),
+            ]}
+          />
         </div>
 
         <div>

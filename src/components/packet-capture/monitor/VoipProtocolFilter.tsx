@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AppDivider } from "@/components/ui/panel-chrome";
 import { Phone, Radio, FileText } from "@/lib/icons";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
@@ -50,7 +51,7 @@ export function VoipProtocolFilter({
           </TooltipWrapper>
         );
       })}
-      <div className="h-6 w-px bg-border mx-1" />
+      <AppDivider orientation="vertical" size="lg" className="mx-1 h-6" />
       <TooltipWrapper entry={tooltips.captureVoipToggle}>
         <Button
           variant="ghost"

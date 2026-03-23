@@ -209,7 +209,7 @@ export function CapturePreviewModal({
                     <div className="text-xs text-muted-foreground mb-1">Top Protocols</div>
                     <div className="flex flex-wrap gap-2">
                       {protocolBreakdown()!.map(([protocol, count]: any) => (
-                        <Badge key={protocol} variant="outline" className="text-xs">
+                        <Badge key={protocol} variant="secondary" className="text-xs">
                           {protocol}: {count}
                         </Badge>
                       ))}

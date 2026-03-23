@@ -1,6 +1,6 @@
 /**
  * Unified Call Analysis view — SIP signaling + RTP media in a single tab.
- * Layout: Control bar → Left panel (Signaling / Media sub-tabs) | Collapsible right sidebar (details).
+ * Layout: Compact control bar (call picker + Signaling/Media + tools) → split workspace + details.
  */
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
@@ -10,14 +10,8 @@ import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
 import { useOpenCapture } from "@/hooks/useOpenCapture";
 import { navigateTo } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Loader2, ExternalLink, Download, Scan, GitBranch, List, CheckCircle, XCircle, AlertTriangle, BellRing, Circle, Search, Activity, PanelRightClose, PanelRightOpen, PanelLeftClose, PanelLeftOpen, RotateCcw } from "@/lib/icons";
+import { AppDropdown, SelectItem } from "@/components/ui/app-dropdown";
+import { Loader2, ExternalLink, Download, GitBranch, List, CheckCircle, XCircle, AlertTriangle, BellRing, Circle, Search, Activity, PanelRightClose, PanelRightOpen, PanelLeftClose, PanelLeftOpen, RotateCcw } from "@/lib/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import type { SipDialog, SipDialogMessage } from "@/types/forensics";
@@ -31,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { PanelResizeHandle } from "@/components/ui/panel-chrome";
 import { getDialogStatus } from "@/lib/sipDialogStatus";
 import { getAnalysisDiagnostics } from "@/lib/diagnostics/query";
 import { useMediaInvestigationModel } from "./media/model/useMediaInvestigationModel";
@@ -434,6 +429,8 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
   }, [sessionId, selectedDialog, selectedDialogIndex, notify]);
 
   const hasCall = sessionId && selectedDialog != null;
+  /** Signaling-only chrome stays mounted in Media view so the toolbar does not reflow — controls are disabled + muted. */
+  const signalingChromeInactive = activePanel === "media";
   const hasDialogSearchFilter = dialogSearchQuery.trim().length > 0;
   const isFilteredToNoMatches =
     !loadingDialogs &&
@@ -451,73 +448,76 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
   return (
     <div className="h-full flex flex-col flex-1 min-h-0 overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className="shrink-0 border-b border-border/20 px-2.5 py-2 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="min-w-0">
-              <Select
+        <div className="shrink-0 border-b border-border/20 bg-[hsl(var(--card)/0.22)] px-2 py-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="flex min-w-0 flex-1 basis-full sm:basis-[min(100%,380px)] items-center gap-1.5">
+              <div className="min-w-0 flex-1">
+              <AppDropdown
+                size="md"
                 value={selectedDialogIndex >= 0 && selectedDialogIndex < dialogs.length ? selectedDialogIndex.toString() : ""}
                 onValueChange={(v) => {
                   setSelectedDialogIndex(v === "" ? -1 : parseInt(v, 10));
                   setDialogSearchQuery("");
                 }}
                 disabled={!sessionId || loadingDialogs || !filteredDialogEntries.length}
-              >
-                <SelectTrigger className="h-8 w-[clamp(280px,32vw,520px)] text-xs ui-control-shell">
-                  <SelectValue placeholder="Select a call…">
-                    {selectedDialog ? getDialogCondensedLabel(selectedDialog) : null}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="min-w-[var(--radix-select-trigger-width)] w-[460px] max-w-[90vw] isolate p-0" position="popper">
-                  <div
-                    className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/40 bg-[hsl(var(--card)/1)] px-2.5 py-2"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by method, code, participant…"
-                      value={dialogSearchQuery}
-                      onChange={(e) => setDialogSearchQuery(e.target.value)}
-                      className="h-8 rounded-[var(--radius-md)] border-border/45 bg-[hsl(var(--background)/0.88)] shadow-none text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
+                className="min-w-0 w-full max-w-[min(100%,560px)] font-normal"
+                placeholder="Choose SIP dialog or session…"
+                valueDisplay={selectedDialog ? getDialogCondensedLabel(selectedDialog) : null}
+                contentPosition="popper"
+                contentClassName="min-w-[var(--radix-select-trigger-width)] w-[min(560px,92vw)] max-w-[92vw] isolate p-0"
+                contentChildren={(
+                  <>
+                    <div
+                      className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/40 bg-[hsl(var(--card)/1)] px-2.5 py-2"
                       onPointerDown={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  {searchFilteredDialogs.length === 0 ? (
-                    <EmptyState compact variant="inline" title="No calls match" />
-                  ) : (
-                    searchFilteredDialogs.map(({ dialog: d, originalIndex: i }) => {
-                      const status = getDialogStatus(d);
-                      const statusConfig = {
-                        success: { icon: CheckCircle, className: "text-success", bg: "bg-success/[0.08]" },
-                        error: { icon: XCircle, className: "text-destructive", bg: "bg-destructive/[0.08]" },
-                        warning: { icon: AlertTriangle, className: "text-warning", bg: "bg-warning/[0.08]" },
-                        ringing: { icon: BellRing, className: "text-primary", bg: "bg-primary/[0.08]" },
-                        unknown: { icon: Circle, className: "text-muted-foreground", bg: "bg-muted/30" },
-                      }[status];
-                      const StatusIcon = statusConfig.icon;
-                      return (
-                        <SelectItem key={d.callId + i} value={i.toString()} className="py-1.5 pl-2 pr-8 cursor-pointer">
-                          <div className="flex w-full items-center gap-3 min-w-0">
-                            <div className={cn("shrink-0 flex items-center justify-center w-6 h-6 rounded", statusConfig.bg)}>
-                              <StatusIcon className={cn("h-3.5 w-3.5", statusConfig.className)} />
+                    >
+                      <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <Input
+                        size="sm"
+                        placeholder="Search Call-ID, methods, parties, fax/T.38 hints…"
+                        value={dialogSearchQuery}
+                        onChange={(e) => setDialogSearchQuery(e.target.value)}
+                        className="min-w-0 flex-1 text-xs"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {searchFilteredDialogs.length === 0 ? (
+                      <EmptyState compact variant="inline" title="No dialogs match your search" />
+                    ) : (
+                      searchFilteredDialogs.map(({ dialog: d, originalIndex: i }) => {
+                        const status = getDialogStatus(d);
+                        const statusConfig = {
+                          success: { icon: CheckCircle, className: "text-success", bg: "bg-success/[0.08]" },
+                          error: { icon: XCircle, className: "text-destructive", bg: "bg-destructive/[0.08]" },
+                          warning: { icon: AlertTriangle, className: "text-warning", bg: "bg-warning/[0.08]" },
+                          ringing: { icon: BellRing, className: "text-primary", bg: "bg-primary/[0.08]" },
+                          unknown: { icon: Circle, className: "text-muted-foreground", bg: "bg-muted/30" },
+                        }[status];
+                        const StatusIcon = statusConfig.icon;
+                        return (
+                          <SelectItem key={d.callId + i} value={i.toString()} className="py-1.5 pl-2 pr-8 cursor-pointer">
+                            <div className="flex w-full items-center gap-3 min-w-0">
+                              <div className={cn("shrink-0 flex items-center justify-center w-6 h-6 rounded", statusConfig.bg)}>
+                                <StatusIcon className={cn("h-3.5 w-3.5", statusConfig.className)} />
+                              </div>
+                              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                <span className="font-semibold text-foreground truncate">
+                                  {getCallPartiesLabel(d)}
+                                </span>
+                                <span className="text-2xs text-muted-foreground truncate">
+                                  {formatCallStatusLabel(d)} · Started {formatDialogStartTime(d)} · {formatDialogDuration(d)} · {d.messages.length} messages
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                              <span className="font-semibold text-foreground truncate">
-                                {getCallPartiesLabel(d)}
-                              </span>
-                              <span className="text-2xs text-muted-foreground truncate">
-                                {formatCallStatusLabel(d)} · Started {formatDialogStartTime(d)} · {formatDialogDuration(d)} · {d.messages.length} messages
-                              </span>
-                            </div>
-                          </div>
-                        </SelectItem>
-                      );
-                    })
-                  )}
-                </SelectContent>
-              </Select>
+                          </SelectItem>
+                        );
+                      })
+                    )}
+                  </>
+                )}
+              />
               </div>
               {sessionId && dialogs.some((d) => isVoipCallDialog(d)) && (
                 <Popover open={voipCallsOpen} onOpenChange={setVoipCallsOpen}>
@@ -525,10 +525,10 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
                     <Button
                       variant="neutral"
                       size="sm"
-                      className="h-8 gap-1.5 text-xs px-3 font-medium"
+                      className="h-7 shrink-0 gap-1 px-2 text-2xs font-medium"
                     >
                       <List className="h-3 w-3" />
-                      Filter Calls
+                      Filter
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent
@@ -538,13 +538,13 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
                     className="w-[min(700px,92vw)] p-0 overflow-hidden"
                   >
                     <div className="h-10 border-b border-border/45 px-3 flex items-center">
-                      <h2 className="text-xs font-semibold">VoIP Calls</h2>
+                      <h2 className="text-xs font-semibold">SIP sessions</h2>
                     </div>
                     <div className="p-3 space-y-2">
                       <Input
                         value={voipCallSearchQuery}
                         onChange={(e) => setVoipCallSearchQuery(e.target.value)}
-                        placeholder="Search calls by method, participant, call-id..."
+                        placeholder="Search SIP Call-ID, methods, parties, media hints…"
                         className="ui-control-shell h-8 text-xs"
                       />
                       <div className="surface max-h-[52vh] overflow-auto divide-y divide-border/40">
@@ -553,8 +553,8 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
                             compact
                             variant="inline"
                             icon={<Search />}
-                            title="No matching calls"
-                            description="Try a broader search to find dialogs."
+                            title="No matching dialogs"
+                            description="Try a shorter Call-ID fragment or clear the filter."
                             className="h-full p-6"
                           />
                         ) : (
@@ -606,18 +606,15 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
                   </PopoverContent>
                 </Popover>
               )}
-              {loadingDialogs && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              {loadingDialogs && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />}
             </div>
             {hasCall && (
-              <div className="ml-auto flex items-center gap-1">
-                <Button variant="neutral" size="sm" className="h-8 gap-1.5 text-xs px-3 font-medium" onClick={exportPcap}>
-                  <Download className="h-3 w-3" />
-                  PCAP
-                </Button>
-              </div>
+              <Button variant="neutral" size="sm" className="h-7 shrink-0 gap-1 px-2 text-2xs font-medium" onClick={exportPcap}>
+                <Download className="h-3 w-3" />
+                PCAP
+              </Button>
             )}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-1 sm:ml-auto">
             <Tabs
               value={activePanel}
               onValueChange={(v) => {
@@ -636,109 +633,174 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
               }}
               className="w-auto"
             >
-              <TabsList className="subview-tabs-compact shrink-0">
-                <TabsTrigger value="signaling" className="subview-tab-compact">
-                  <GitBranch className="h-4 w-4 mr-1.5" />
+              <TabsList className="subview-tabs-compact h-7 shrink-0 gap-0 p-0.5">
+                <TabsTrigger value="signaling" className="subview-tab-compact h-6 px-2 text-2xs">
                   Signaling
                 </TabsTrigger>
                 <TabsTrigger
                   value="media"
                   disabled={!loadingRtpStreams && !hasMediaForSelectedCall}
                   className={cn(
-                    "subview-tab-compact",
+                    "subview-tab-compact h-6 px-2 text-2xs",
                     !loadingRtpStreams && !hasMediaForSelectedCall && "opacity-45",
                   )}
                 >
-                  <Scan className="h-4 w-4 mr-1.5" />
                   Media
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            {activePanel === "signaling" && (
-              <div className="flex flex-wrap items-center gap-1.5 min-w-0 w-full">
-                <span className="section-label-sm px-1 text-[10px] tracking-[0.06em]">Time</span>
-                <Select
-                  value={signalingTimestampMode}
-                  onValueChange={(value) => setSignalingTimestampMode(value as SipTimestampMode)}
-                >
-                  <SelectTrigger className="ui-control-shell h-7 w-[98px] text-2xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="absolute">Clock</SelectItem>
-                    <SelectItem value="delta">Delta</SelectItem>
-                    <SelectItem value="relative">Relative</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <div
+              role="group"
+              aria-label="Signaling layout"
+              aria-disabled={signalingChromeInactive}
+              className="flex min-w-0 flex-wrap items-center gap-1"
+            >
+              <span
+                className={cn(
+                  "hidden text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/80 sm:inline",
+                  signalingChromeInactive && "text-muted-foreground/50",
+                )}
+              >
+                Time
+              </span>
+              <AppDropdown
+                size="sm"
+                value={signalingTimestampMode}
+                onValueChange={(value) => setSignalingTimestampMode(value as SipTimestampMode)}
+                disabled={signalingChromeInactive}
+                className="w-[88px] font-normal text-2xs"
+                options={[
+                  { value: "absolute", label: "Clock" },
+                  { value: "delta", label: "Delta" },
+                  { value: "relative", label: "Relative" },
+                ]}
+              />
+              <div className="flex flex-wrap items-center gap-0.5">
                 <TooltipWrapper
-                  title={flowPaneCollapsed ? "Show flow pane" : "Hide flow pane"}
-                  description="Toggle the left-side signaling flow."
+                  title={
+                    signalingChromeInactive
+                      ? "Unavailable in Media view"
+                      : flowPaneCollapsed
+                        ? "Show flow pane"
+                        : "Hide flow pane"
+                  }
+                  description={
+                    signalingChromeInactive
+                      ? "Switch to Signaling to show or hide the SIP flow pane."
+                      : "Toggle the left-side signaling flow."
+                  }
                 >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={flowPaneCollapsed ? "Show flow pane" : "Hide flow pane"}
-                    className={cn("h-7 gap-1 text-2xs px-2", !flowPaneCollapsed && "bg-accent/60")}
-                    onClick={() => setFlowPaneCollapsed((prev) => !prev)}
-                  >
-                    {flowPaneCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-                    <span>Flow</span>
-                  </Button>
+                  <span className="inline-flex">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={flowPaneCollapsed ? "Show flow pane" : "Hide flow pane"}
+                      disabled={signalingChromeInactive}
+                      className={cn(
+                        "h-6 gap-0.5 px-1.5 text-2xs",
+                        !flowPaneCollapsed && !signalingChromeInactive && "bg-accent/60",
+                      )}
+                      onClick={() => setFlowPaneCollapsed((prev) => !prev)}
+                    >
+                      {flowPaneCollapsed ? <PanelLeftOpen className="h-3 w-3" /> : <PanelLeftClose className="h-3 w-3" />}
+                      <span>Flow</span>
+                    </Button>
+                  </span>
                 </TooltipWrapper>
-                {hasSelectedSipPacket && (
-                  <TooltipWrapper
-                    title={effectivePacketPaneCollapsed ? "Show packet pane" : "Hide packet pane"}
-                    description="Toggle the right-side details pane."
-                  >
+                <TooltipWrapper
+                  title={
+                    signalingChromeInactive
+                      ? "Unavailable in Media view"
+                      : !hasSelectedSipPacket
+                        ? "Select a signaling message"
+                        : effectivePacketPaneCollapsed
+                          ? "Show packet pane"
+                          : "Hide packet pane"
+                  }
+                  description={
+                    signalingChromeInactive
+                      ? "Switch to Signaling to toggle the packet details pane."
+                      : "Toggle the right-side details pane."
+                  }
+                >
+                  <span className="inline-flex">
                     <Button
                       variant="ghost"
                       size="sm"
                       aria-label={effectivePacketPaneCollapsed ? "Show packet pane" : "Hide packet pane"}
-                      className={cn("h-7 gap-1 text-2xs px-2", !effectivePacketPaneCollapsed && "bg-accent/60")}
+                      disabled={signalingChromeInactive || !hasSelectedSipPacket}
+                      className={cn(
+                        "h-6 gap-0.5 px-1.5 text-2xs",
+                        !effectivePacketPaneCollapsed && !signalingChromeInactive && hasSelectedSipPacket && "bg-accent/60",
+                      )}
                       onClick={() => setPacketPaneCollapsed((prev) => !prev)}
                     >
-                      {effectivePacketPaneCollapsed ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
+                      {effectivePacketPaneCollapsed ? <PanelRightOpen className="h-3 w-3" /> : <PanelRightClose className="h-3 w-3" />}
                       <span>Packet</span>
                     </Button>
-                  </TooltipWrapper>
-                )}
-                <TooltipWrapper
-                  title="Reset layout"
-                  description="Restore default pane visibility and width."
-                >
-                  <Button
-                    variant="neutral"
-                    size="sm"
-                    aria-label="Reset split layout"
-                    className="h-7 gap-1 text-2xs px-2.5 font-medium"
-                    onClick={() => {
-                      setPacketPaneCollapsed(false);
-                      setFlowPaneCollapsed(false);
-                      setSignalingSplitPct(36);
-                    }}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    <span>Reset</span>
-                  </Button>
+                  </span>
                 </TooltipWrapper>
-                {sessionId && selectedItem?.kind === "sip" && (
-                  <Button
-                    variant="neutral"
-                    size="sm"
-                    className="h-7 gap-1 text-2xs px-2.5 font-medium"
-                    onClick={() => {
-                      openViewer(sessionId);
-                      navigateTo("packet-capture", "captures");
-                    }}
+                <TooltipWrapper
+                  title={signalingChromeInactive ? "Unavailable in Media view" : "Reset layout"}
+                  description={
+                    signalingChromeInactive
+                      ? "Switch to Signaling to restore default pane layout."
+                      : "Restore default pane visibility and width."
+                  }
+                >
+                  <span className="inline-flex">
+                    <Button
+                      variant="neutral"
+                      size="sm"
+                      aria-label="Reset split layout"
+                      disabled={signalingChromeInactive}
+                      className="h-6 gap-0.5 px-2 text-2xs font-medium"
+                      onClick={() => {
+                        setPacketPaneCollapsed(false);
+                        setFlowPaneCollapsed(false);
+                        setSignalingSplitPct(36);
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      <span>Reset</span>
+                    </Button>
+                  </span>
+                </TooltipWrapper>
+                {hasCall && sessionId ? (
+                  <TooltipWrapper
+                    title={
+                      signalingChromeInactive
+                        ? "Unavailable in Media view"
+                        : selectedItem?.kind === "sip"
+                          ? "Open in Packet Viewer"
+                          : "Select a signaling message"
+                    }
+                    description={
+                      signalingChromeInactive
+                        ? "Switch to Signaling and select a SIP message to jump to this packet in the viewer."
+                        : "Open this capture in the Packet Viewer at the selected SIP message."
+                    }
                   >
-                    <ExternalLink className="h-3 w-3" />
-                    Viewer
-                  </Button>
-                )}
-                </div>
+                    <span className="inline-flex">
+                      <Button
+                        variant="neutral"
+                        size="sm"
+                        className="h-6 gap-0.5 px-2 text-2xs font-medium"
+                        disabled={signalingChromeInactive || selectedItem?.kind !== "sip"}
+                        onClick={() => {
+                          openViewer(sessionId);
+                          navigateTo("packet-capture", "captures");
+                        }}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Viewer
+                      </Button>
+                    </span>
+                  </TooltipWrapper>
+                ) : null}
               </div>
-            )}
+            </div>
+            </div>
           </div>
         </div>
 
@@ -748,7 +810,7 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
               variant="inline"
               icon={<Activity />}
               title="Select a capture"
-              description="Choose a capture session from the sidebar to analyze call signaling and media."
+              description="Pick a capture from the bar above to analyze SIP signaling, RTP media, and related traffic."
               action={(
                 <Button
                   size="sm"
@@ -766,8 +828,8 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
               <EmptyState
                 variant="inline"
                 icon={<Loader2 className="animate-spin" />}
-                title="Loading calls"
-                description="Reading SIP dialogs from this capture session."
+                title="Loading SIP dialogs"
+                description="Reading dialogs from this capture."
               />
             ) : dialogs.length === 0 ? (
               <EmptyState
@@ -780,15 +842,15 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
               <EmptyState
                 variant="inline"
                 icon={<Search />}
-                title="No calls match this filter"
-                description="Try broadening your search to find a dialog."
+                title="No dialogs match this filter"
+                description="Clear the search box or try a different keyword."
               />
             ) : (
               <EmptyState
                 variant="inline"
                 icon={<GitBranch />}
-                title="Select a call"
-                description="Choose a call from the list above to analyze signaling and media quality."
+                title="Select a session"
+                description="Choose a SIP dialog from the dropdown above to inspect signaling and media."
               />
             )
           ) : (
@@ -821,10 +883,13 @@ export function CallFlowTimelineView({ sessionId: externalSessionId }: CallFlowT
                     )}
 
                     {!effectivePacketPaneCollapsed && !flowPaneCollapsed && (
-                      <div
-                        role="separator"
-                        aria-orientation="vertical"
-                        className="w-1.5 shrink-0 cursor-col-resize bg-border/35 hover:bg-primary/50 transition-colors"
+                      <PanelResizeHandle
+                        as="div"
+                        orientation="vertical"
+                        density="compact"
+                        appearance="minimal"
+                        label="Resize signaling and packet panes"
+                        className="shrink-0 rounded-none"
                         onMouseDown={() => setIsResizingSignaling(true)}
                       />
                     )}

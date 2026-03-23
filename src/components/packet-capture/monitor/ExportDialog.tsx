@@ -10,9 +10,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, FileText, FileCode, File, Table } from "@/lib/icons";
+import { Save, FileText, FileCode, File, Table, Package, HardDrive } from "@/lib/icons";
 import { useNotifications } from "@/hooks/useNotifications";
+import { navigateTo } from "@/lib/navigation";
+import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
 import {
+  duplicateCaptureToLibrary,
   exportPcap as apiExportPcap,
   loadCaptureSession,
   saveExportFile,
@@ -54,6 +57,7 @@ function formatBytes(bytes: number): string {
 /* ------------------------------------------------------------------ */
 
 type ExportFormat = "csv" | "json" | "html" | "pcap";
+type PcapDestination = "disk" | "library";
 type PacketColumnKey =
   | "timestamp"
   | "src_ip"
@@ -171,6 +175,8 @@ export function ExportDialog({
   };
   const [exporting, setExporting] = useState(false);
   const [loadedPackets, setLoadedPackets] = useState<PacketInfo[] | null>(null);
+  const [pcapDestination, setPcapDestination] = useState<PcapDestination>("disk");
+  const fetchSessions = usePacketCaptureStore((s) => s.fetchSessions);
   const { notify } = useNotifications();
 
   // Packets to export: prefer whatever was passed (filtered), fall back to lazy-loaded
@@ -181,7 +187,10 @@ export function ExportDialog({
 
   // Reset loaded packets when dialog closes or session changes
   useEffect(() => {
-    if (!open) setLoadedPackets(null);
+    if (!open) {
+      setLoadedPackets(null);
+      setPcapDestination("disk");
+    }
   }, [open]);
   useEffect(() => {
     setLoadedPackets(null);
@@ -303,6 +312,19 @@ export function ExportDialog({
     setExporting(true);
     try {
       if (format === "pcap") {
+        if (pcapDestination === "library") {
+          const newSessionId = await duplicateCaptureToLibrary(sessionId!);
+          await fetchSessions();
+          navigateTo("packet-capture", "captures");
+          notify({
+            type: "success",
+            title: "Added to Captures",
+            description: `New session ready for Viewer or further splices (${newSessionId.slice(0, 8)}…).`,
+            source: "packet-capture",
+          });
+          onOpenChange(false);
+          return;
+        }
         const path = await apiExportPcap(sessionId!, null);
         notify({ type: "success", title: "PCAP exported", description: path, source: "packet-capture" });
         onOpenChange(false);
@@ -410,12 +432,12 @@ export function ExportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Export Packets</DialogTitle>
+          <DialogTitle>Save or export packets</DialogTitle>
           <DialogDescription>
             {packetCount > 0
-              ? `${packetCount.toLocaleString()} packets will be exported.`
+              ? `${packetCount.toLocaleString()} packets in scope. Choose a format — PCAP can be saved to disk or copied into Captures.`
               : sessionId
-                ? "Packets will be loaded from the capture session."
+                ? "Packets will be loaded from the capture session when you export."
                 : "No packets available to export."}
           </DialogDescription>
         </DialogHeader>
@@ -468,6 +490,79 @@ export function ExportDialog({
               })}
             </div>
           </div>
+
+          {/* PCAP: choose disk vs Captures library (splice / working copy) */}
+          {format === "pcap" && sessionId && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                PCAP destination
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPcapDestination("disk")}
+                  className={cn(
+                    "flex flex-col items-start gap-1 rounded-md border border-border/45 bg-card/50 p-3 text-left transition-smooth",
+                    "hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    pcapDestination === "disk"
+                      ? "border-primary/45 bg-primary/[0.08]"
+                      : "hover:border-border/55",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <HardDrive
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        pcapDestination === "disk" ? "text-primary" : "text-muted-foreground",
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        pcapDestination === "disk" && "text-primary",
+                      )}
+                    >
+                      Save to file
+                    </span>
+                  </div>
+                  <span className="text-2xs leading-snug text-muted-foreground">
+                    Choose a path (Wireshark, sharing, archive).
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPcapDestination("library")}
+                  className={cn(
+                    "flex flex-col items-start gap-1 rounded-md border border-border/45 bg-card/50 p-3 text-left transition-smooth",
+                    "hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    pcapDestination === "library"
+                      ? "border-primary/45 bg-primary/[0.08]"
+                      : "hover:border-border/55",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Package
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        pcapDestination === "library" ? "text-primary" : "text-muted-foreground",
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        pcapDestination === "library" && "text-primary",
+                      )}
+                    >
+                      Captures library
+                    </span>
+                  </div>
+                  <span className="text-2xs leading-snug text-muted-foreground">
+                    New session in Captures — easy to splice or open in Viewer.
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Options - only for text-based formats */}
           {format !== "pcap" && (
@@ -611,8 +706,18 @@ export function ExportDialog({
             disabled={exporting || (packetCount === 0 && !sessionId) || (format !== "pcap" && includedColumnCount === 0)}
             className="gap-2"
           >
-            <Download className="h-4 w-4" />
-            {exporting ? "Exporting\u2026" : "Export"}
+            {format === "pcap" && pcapDestination === "library" ? (
+              <Package className="h-4 w-4" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {exporting
+              ? format === "pcap" && pcapDestination === "library"
+                ? "Adding\u2026"
+                : "Saving\u2026"
+              : format === "pcap" && pcapDestination === "library"
+                ? "Add to Captures"
+                : "Save / export"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useMemo, useRef, type ChangeEvent } f
 import { type ColumnDef, type SortingFn } from "@tanstack/react-table";
 import { useRemoteAgentStore } from "@/stores/remoteAgentStore";
 import { useExecutionContextStore } from "@/stores/executionContextStore";
-import { useToolStore } from "@/stores/toolStore";
 import * as toolsApi from "@/api/tools";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +13,7 @@ import { CopyTextButton } from "@/components/ui/copy-text-button";
 import { ToolSubTabs } from "@/components/ui/tool-sub-tabs";
 import { MetricCard } from "@/components/network-test/components/MetricCard";
 import { tooltips } from "@/lib/tooltips";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AppDropdown, SelectItem } from "@/components/ui/app-dropdown";
 import {
   HardDrive,
   Play,
@@ -111,10 +104,15 @@ const explorerDateSortingFn: SortingFn<DirEntry> = (rowA, rowB) => {
   return a.mod_time.localeCompare(b.mod_time);
 };
 
-export function FileServerView({ toolId }: { toolId?: string }) {
+export function FileServerView({
+  toolId,
+  /** When true, register Explorer / Virtual / Requests in the app header breadcrumb (must match Tools tool active tab). */
+  registerHeaderBreadcrumbTabs = false,
+}: {
+  toolId?: string;
+  registerHeaderBreadcrumbTabs?: boolean;
+}) {
   const [activePanel, setActivePanel] = useState<ActivePanel>("explorer");
-  const activeToolId = useToolStore((s) => s.activeToolId);
-  const toolsLastSubview = useToolStore((s) => s.lastViewedSubviews.tools);
 
   const resolvedContext = useExecutionContextStore((s) => s.resolvedContext);
   const ctx = resolvedContext(TOOL_ID);
@@ -589,10 +587,7 @@ export function FileServerView({ toolId }: { toolId?: string }) {
     { id: "virtual", label: `Virtual${virtualFiles.length > 0 ? ` (${virtualFiles.length})` : ""}`, tip: tooltips.fileVirtualPanel.title, tipDesc: tooltips.fileVirtualPanel.description },
     { id: "requests", label: `Requests${requests.length > 0 ? ` (${requests.length})` : ""}`, tip: tooltips.fileRequests.title, tipDesc: tooltips.fileRequests.description },
   ] as const, [virtualFiles.length, requests.length]);
-  const registerBreadcrumbTabs =
-    toolId != null &&
-    activeToolId === "tools" &&
-    toolsLastSubview === "file-server";
+  const registerBreadcrumbTabs = toolId != null && registerHeaderBreadcrumbTabs;
 
   return (
     <div className="flex flex-col gap-4 pb-8 h-full min-h-full">
@@ -665,16 +660,18 @@ export function FileServerView({ toolId }: { toolId?: string }) {
                 />
               </TooltipWrapper>
               <TooltipWrapper entry={tooltips.fileProtocol} side="bottom">
-                <Select value={protocol} onValueChange={(v: any) => setProtocol(v)} disabled={serving}>
-                  <SelectTrigger className="w-[80px] h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="http" className="text-xs">HTTP</SelectItem>
-                    <SelectItem value="tftp" className="text-xs">TFTP</SelectItem>
-                    <SelectItem value="both" className="text-xs">Both</SelectItem>
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  value={protocol}
+                  onValueChange={(v) => setProtocol(v as typeof protocol)}
+                  disabled={serving}
+                  className="w-[80px] h-7 text-xs"
+                  size="sm"
+                  options={[
+                    { value: "http", label: "HTTP" },
+                    { value: "tftp", label: "TFTP" },
+                    { value: "both", label: "Both" },
+                  ]}
+                />
               </TooltipWrapper>
               {serving ? (
                 <TooltipWrapper title="Stop Server" description="Stop serving and release ports.">
@@ -705,21 +702,21 @@ export function FileServerView({ toolId }: { toolId?: string }) {
                 />
               </div>
               <TooltipWrapper entry={tooltips.fileQuickJump}>
-                <Select onValueChange={(v) => !serving && navigateTo(v)} disabled={serving}>
-                  <SelectTrigger className="w-[120px] h-7 text-xs">
-                    <SelectValue placeholder="Quick jump..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRESET_DIRS.map((d) => (
-                      <SelectItem key={d.path} value={d.path} className="text-xs">
-                        <div className="flex items-center gap-2">
-                          <Folder className="h-3 w-3 text-muted-foreground/60" />
-                          <span className="font-medium">{d.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AppDropdown
+                  onValueChange={(v) => !serving && navigateTo(v)}
+                  disabled={serving}
+                  className="w-[120px] h-7 text-xs"
+                  size="sm"
+                  placeholder="Quick jump..."
+                  contentChildren={PRESET_DIRS.map((d) => (
+                    <SelectItem key={d.path} value={d.path} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <Folder className="h-3 w-3 text-muted-foreground/60" />
+                        <span className="font-medium">{d.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                />
               </TooltipWrapper>
 
               <div className="border-l border-border/20 h-5 mx-0.5" />
@@ -743,7 +740,7 @@ export function FileServerView({ toolId }: { toolId?: string }) {
                   <Switch size="sm" checked={serveHidden} onCheckedChange={setServeHidden} disabled={serving} />
                 </div>
               </TooltipWrapper>
-              <Badge variant="outline" className="text-2xs h-5 px-1.5 tabular-nums shrink-0">
+              <Badge variant="secondary" className="text-2xs h-5 px-1.5 tabular-nums shrink-0">
                 {explorerRows.length} item{explorerRows.length !== 1 ? "s" : ""}
               </Badge>
             </div>
@@ -882,7 +879,7 @@ export function FileServerView({ toolId }: { toolId?: string }) {
                 className="h-8 text-xs pl-7"
               />
             </div>
-            <Badge variant="outline" className="text-2xs h-5 px-1.5 tabular-nums">
+            <Badge variant="secondary" className="text-2xs h-5 px-1.5 tabular-nums">
               {filteredRequests.length === requests.length
                 ? `${requests.length}`
                 : `${filteredRequests.length} / ${requests.length}`}
@@ -922,7 +919,7 @@ export function FileServerView({ toolId }: { toolId?: string }) {
                       {formatRequestTime(req.timestamp)}
                     </span>
                     <span className="w-[50px] px-1 shrink-0">
-                      <Badge variant="outline" className="text-3xs h-[16px] px-1 uppercase">
+                      <Badge variant="secondary" className="text-3xs h-[16px] px-1 uppercase">
                         {req.protocol}
                       </Badge>
                     </span>

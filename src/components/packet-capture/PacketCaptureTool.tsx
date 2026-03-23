@@ -1,7 +1,7 @@
 /**
  * PacketCaptureTool — Unified capture toolset.
  *
- * Subviews: Monitor | Captures | Viewer | Analysis | Remote SSH | Scheduled
+ * Subviews: Monitor | Captures | Viewer | Analysis | Packet Diff | Remote SSH | Scheduled
  */
 
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
@@ -15,12 +15,8 @@ import { cn } from "@/lib/utils";
 import { navigateTo } from "@/lib/navigation";
 import { Tabs, TabsContent, AnimatedTabsContent } from "@/components/ui/tabs";
 import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
-import { FolderOpen, Activity, Network, Wifi } from "@/lib/icons";
 import { tooltips } from "@/lib/tooltips";
-import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { ToolHeader } from "@/components/layout/ToolHeader";
-import { ViewFooter, ViewFooterItem, ViewFooterSpacer, ViewFooterDivider } from "@/components/layout/ViewFooter";
-import { LiveIndicator } from "@/components/ui/live-indicator";
 import { ExecutionContextSelector } from "@/components/ui/execution-context-selector";
 import type { ExecutionContext } from "@/stores/executionContextStore";
 
@@ -42,8 +38,11 @@ const ScheduledCapturesPanel = lazy(() =>
 const VoipInvestigationHubView = lazy(() =>
   import("@/components/forensics/VoipInvestigationHubView").then((m) => ({ default: m.VoipInvestigationHubView }))
 );
+const CallRegressionDiffView = lazy(() =>
+  import("@/components/forensics/CallRegressionDiffView").then((m) => ({ default: m.CallRegressionDiffView }))
+);
 
-const VALID_TABS = ["monitor", "captures", "viewer", "analysis", "remote", "scheduled"] as const;
+const VALID_TABS = ["monitor", "captures", "viewer", "analysis", "packet-diff", "remote", "scheduled"] as const;
 type TabValue = (typeof VALID_TABS)[number];
 
 function PacketSubviewFallback({ label }: { label: string }) {
@@ -63,17 +62,13 @@ export function PacketCaptureTool() {
   const activeSessionId = usePacketCaptureStore((s) => s.activeSessionId);
   const runningSessionIds = usePacketCaptureStore((s) => s.runningSessionIds);
   const sessions = usePacketCaptureStore((s) => s.sessions);
-  const interfaces = usePacketCaptureStore((s) => s.interfaces);
-  const statistics = usePacketCaptureStore((s) => s.statistics);
   const activeToolId = useToolStore((s) => s.activeToolId);
   const activeSubviewId = useToolStore((s) => s.activeSubviewId);
   const setActiveSubview = useToolStore((s) => s.setActiveSubview);
   const setLastViewedSubview = useToolStore((s) => s.setLastViewedSubview);
   const isVisible = useToolVisible("packet-capture");
-  const monitorFooter = useMonitorTabStore((s) => s.footerState);
   const activeMonitorTabId = useMonitorTabStore((s) => s.activeTabId);
   const activeMonitorTab = useMonitorTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
-  const monitorCapturingCount = useMonitorTabStore((s) => s.tabs.filter((t) => t.isCapturing).length);
   const updateMonitorTab = useMonitorTabStore((s) => s.updateTab);
   const [activeTab, setActiveTab] = useState<TabValue>("monitor");
 
@@ -85,11 +80,6 @@ export function PacketCaptureTool() {
   useEffect(() => {
     setHeaderPortal(document.getElementById("header-tool-widget-custom"));
   }, []);
-
-  // Get active session stats
-  const totalPackets = statistics?.totalPackets ?? 0;
-  const sipPackets = statistics?.packetsByProtocol?.["SIP"] ?? 0;
-  const rtpPackets = statistics?.packetsByProtocol?.["RTP"] ?? 0;
 
   // Fetch interfaces when visible (deferred for smoother paint)
   useEffect(() => {
@@ -107,7 +97,7 @@ export function PacketCaptureTool() {
   }, [fetchInterfaces, isVisible]);
 
   useEffect(() => {
-    if (isVisible && (activeTab === "captures" || activeTab === "remote" || activeTab === "viewer" || activeTab === "analysis")) {
+    if (isVisible && (activeTab === "captures" || activeTab === "remote" || activeTab === "viewer" || activeTab === "analysis" || activeTab === "packet-diff")) {
       fetchSessions();
     }
   }, [activeTab, fetchSessions, isVisible]);
@@ -154,10 +144,10 @@ export function PacketCaptureTool() {
     { value: "captures" as const, label: "Captures", tooltip: tooltips.captureTabCaptures },
     { value: "viewer" as const, label: "Viewer", tooltip: tooltips.captureTabViewer },
     { value: "analysis" as const, label: "Analysis", tooltip: tooltips.captureTabAnalysis },
+    { value: "packet-diff" as const, label: "Packet Diff" },
     { value: "remote" as const, label: "Remote SSH", tooltip: tooltips.captureTabRemote },
     { value: "scheduled" as const, label: "Scheduled", tooltip: tooltips.captureTabScheduled },
   ];
-  const activeCaptureCount = activeTab === "monitor" ? monitorCapturingCount : runningSessionIds.length;
   return (
     <div className="packet-graphite-theme app-tool-width flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="flex-1 flex flex-col gap-0 overflow-hidden">
@@ -174,7 +164,6 @@ export function PacketCaptureTool() {
               value={activeMonitorTab?.executionContext ?? { type: "local" }}
               onChange={handleContextChange}
               disabled={activeMonitorTab?.isCapturing}
-              variant="header"
               className="w-[150px] max-w-[150px]"
             />
           </div>,
@@ -186,10 +175,12 @@ export function PacketCaptureTool() {
         <TabsContent
           value="monitor"
           forceMount
-          className="flex-1 min-h-0 data-[state=inactive]:hidden flex flex-col mt-0 overflow-hidden"
+          className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
         >
           <Suspense fallback={<PacketSubviewFallback label="Monitor" />}>
-            <MonitorTabsWrapper />
+            <div className="ui-panel-shell flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+              <MonitorTabsWrapper />
+            </div>
           </Suspense>
         </TabsContent>
 
@@ -199,6 +190,16 @@ export function PacketCaptureTool() {
               <div className="ui-panel-shell h-full min-h-0 overflow-hidden">
                 <Suspense fallback={<PacketSubviewFallback label="Analysis" />}>
                   <VoipInvestigationHubView />
+                </Suspense>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="packet-diff" className={TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS}>
+            <div className="h-full min-h-0 app-view-gutter">
+              <div className="ui-panel-shell h-full min-h-0 overflow-hidden">
+                <Suspense fallback={<PacketSubviewFallback label="Packet Diff" />}>
+                  <CallRegressionDiffView sessions={sessions} preferredAfterSessionId={activeSessionId} />
                 </Suspense>
               </div>
             </div>
@@ -237,112 +238,6 @@ export function PacketCaptureTool() {
           </TabsContent>
         </AnimatedTabsContent>
 
-        <ViewFooter>
-          {/* Capture state */}
-          {activeCaptureCount > 0 ? (
-            <ViewFooterItem>
-              <LiveIndicator variant="badge" label="REC" size="xs" />
-              <span className="text-foreground font-medium tabular-nums">{activeCaptureCount}</span>
-              <span>Capturing</span>
-            </ViewFooterItem>
-          ) : (
-            <ViewFooterItem>
-              <Activity className="h-3 w-3" />
-              <span>Idle</span>
-            </ViewFooterItem>
-          )}
-
-          {/* Packet count */}
-          {(activeTab === "monitor" ? monitorFooter.totalPacketCount : totalPackets) > 0 && (
-            <>
-              <ViewFooterDivider />
-              <TooltipWrapper entry={tooltips.statTotalPackets}>
-                <ViewFooterItem className="cursor-help">
-                  <Network className="h-3 w-3" />
-                  <span className="font-medium tabular-nums">
-                    {(activeTab === "monitor" ? monitorFooter.totalPacketCount : totalPackets).toLocaleString()}
-                  </span>
-                  <span>packets</span>
-                </ViewFooterItem>
-              </TooltipWrapper>
-              {sipPackets > 0 && (
-                <TooltipWrapper entry={tooltips.protoSip}>
-                  <ViewFooterItem className="cursor-help">
-                    <span className="tabular-nums">{sipPackets}</span>
-                    <span>SIP</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              )}
-              {rtpPackets > 0 && (
-                <TooltipWrapper entry={tooltips.protoRtp}>
-                  <ViewFooterItem className="cursor-help">
-                    <span className="tabular-nums">{rtpPackets}</span>
-                    <span>RTP</span>
-                  </ViewFooterItem>
-                </TooltipWrapper>
-              )}
-            </>
-          )}
-
-          {/* Monitor-specific: selected packet + auto-scroll */}
-          {activeTab === "monitor" && (
-            <>
-              {monitorFooter.selectedPacketIndex != null && monitorFooter.selectedPacketIndex >= 0 && (
-                <>
-                  <ViewFooterDivider />
-                  <ViewFooterItem>
-                    <span className="font-mono tabular-nums">Packet #{(monitorFooter.selectedPacketIndex + 1).toLocaleString()}</span>
-                  </ViewFooterItem>
-                </>
-              )}
-              {monitorFooter.autoScroll && monitorFooter.isCapturing && (
-                <>
-                  <ViewFooterDivider />
-                  <ViewFooterItem className="text-success">
-                    <LiveIndicator variant="dot" size="xs" />
-                    <span>Auto-scroll</span>
-                  </ViewFooterItem>
-                </>
-              )}
-            </>
-          )}
-
-          <ViewFooterSpacer />
-
-          {/* Monitor-specific: keyboard hints + FPS */}
-          {activeTab === "monitor" && (
-            <>
-              <ViewFooterItem className="text-muted-foreground/50 hidden md:flex">
-                <span>↑↓ Navigate · Space Scroll lock</span>
-              </ViewFooterItem>
-              <ViewFooterDivider />
-              <ViewFooterItem>
-                <span className={cn(
-                  "font-mono tabular-nums",
-                  monitorFooter.fps >= 50 ? "text-muted-foreground/50" : monitorFooter.fps >= 30 ? "text-warning" : "text-destructive",
-                )}>
-                  {monitorFooter.fps} fps
-                </span>
-              </ViewFooterItem>
-            </>
-          )}
-
-          <TooltipWrapper entry={tooltips.statInterface}>
-            <ViewFooterItem className="cursor-help">
-              <Wifi className="h-3 w-3" />
-              <span className="tabular-nums">{interfaces.length}</span>
-              <span>interfaces</span>
-            </ViewFooterItem>
-          </TooltipWrapper>
-
-          {sessions.length > 0 && (
-            <ViewFooterItem>
-              <FolderOpen className="h-3 w-3" />
-              <span className="tabular-nums">{sessions.length}</span>
-              <span>saved</span>
-            </ViewFooterItem>
-          )}
-        </ViewFooter>
         </div>
       </Tabs>
     </div>

@@ -35,18 +35,16 @@ export function PacketMonitorTool() {
   }, [fetchInterfaces, isVisible]);
 
   return (
-    <div className="surface-subtle flex h-full flex-col overflow-hidden rounded-lg">
-      <div className="ui-panel-shell flex-1 min-h-0 overflow-hidden rounded-lg">
-        <Suspense
-          fallback={
-            <div className="flex min-h-[300px] flex-1 items-center justify-center text-sm text-muted-foreground">
-              Loading monitor…
-            </div>
-          }
-        >
-          <MonitorTabsWrapper />
-        </Suspense>
-      </div>
+    <div className="ui-panel-shell flex h-full flex-col overflow-hidden">
+      <Suspense
+        fallback={
+          <div className="flex min-h-[300px] flex-1 items-center justify-center text-sm text-muted-foreground">
+            Loading monitor…
+          </div>
+        }
+      >
+        <MonitorTabsWrapper />
+      </Suspense>
     </div>
   );
 }

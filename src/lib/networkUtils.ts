@@ -97,3 +97,27 @@ export function pickBestLocalIp(interfaces: NetworkInterface[]): string | null {
 
   return null;
 }
+
+/**
+ * Format IP + port as a single display/copy token. IPv6 uses bracket notation so the port is unambiguous.
+ */
+export function formatIpPortEndpoint(ip: string, port: number): string {
+  const raw = ip.trim();
+  const p = Number(port);
+  if (!raw) {
+    return Number.isFinite(p) ? String(p) : "";
+  }
+  const withoutZone = cleanAddress(raw);
+  const isIPv4 =
+    !withoutZone.includes(":") &&
+    withoutZone.includes(".") &&
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(withoutZone);
+  if (isIPv4) {
+    return `${withoutZone}:${p}`;
+  }
+  // IPv6 (incl. zone id); hostnames stay host:port
+  if (raw.includes(":")) {
+    return `[${raw}]:${p}`;
+  }
+  return `${raw}:${p}`;
+}
