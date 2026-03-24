@@ -35,7 +35,6 @@ fn unsupported_transport_error(transport_type: &TransportType, operation: &str) 
 /// listener all need to use the same port so the registrar's Contact binding
 /// stays consistent.
 pub fn bind_udp_reuse(addr: SocketAddr) -> Result<UdpSocket> {
-    use std::os::fd::AsRawFd;
     let socket2 = socket2::Socket::new(
         socket2::Domain::IPV4,
         socket2::Type::DGRAM,
@@ -45,15 +44,8 @@ pub fn bind_udp_reuse(addr: SocketAddr) -> Result<UdpSocket> {
     #[cfg(target_os = "macos")]
     socket2.set_reuse_port(true).context("SO_REUSEPORT")?;
     socket2.bind(&addr.into()).context("bind")?;
-    // Convert socket2 into std UdpSocket
-    let raw_fd = socket2.as_raw_fd();
-    // Prevent socket2 from closing the fd
-    std::mem::forget(socket2);
-    let std_socket = unsafe { UdpSocket::from_raw_fd(raw_fd) };
-    Ok(std_socket)
+    Ok(socket2.into())
 }
-
-use std::os::fd::FromRawFd;
 
 pub struct Transport {
     transport_type: TransportType,

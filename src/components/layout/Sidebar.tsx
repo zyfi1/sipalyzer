@@ -16,14 +16,20 @@ import { isProvisionViewerSubviewAvailable } from "@/lib/provisionNav";
 /** Tool IDs that are rendered in their own dedicated sidebar section (not in the main nav list). */
 const BOTTOM_TOOL_IDS = new Set(["remote-agent", "composer", "tools"]);
 
-/** Nav selection — subtle neutral active state with primary accent bar */
-const NAV_ACTIVE_CLASS = "bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))] border border-border/50 relative before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-[60%] before:rounded-[1px] before:bg-primary";
+/** Nav selection — icon + text only; left accent bar (no tile fill). */
+const NAV_ACTIVE_CLASS =
+  "bg-transparent text-foreground font-semibold border-0 relative before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-[60%] before:rounded-[1px] before:bg-primary";
 
-/** Tertiary selection — intentionally distinct from parent/nav selection. */
-const TERTIARY_ACTIVE_CLASS = "bg-accent/65 text-foreground border border-border/40 relative before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:h-1.5 before:w-1.5 before:rounded-[var(--radius-sm)] before:bg-primary";
+/** Tertiary selection — dot indicator only (no fill). */
+const TERTIARY_ACTIVE_CLASS =
+  "bg-transparent text-foreground font-medium border-0 relative before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:h-1.5 before:w-1.5 before:rounded-[var(--radius-sm)] before:bg-primary";
 
-/** Active style with pulsing outline — used for Packet Monitor and Terminal only. */
-const PULSE_ACTIVE_CLASS = "bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))] border border-border/50 animate-nav-active-pulse";
+/** Active style with pulsing glow — Packet Monitor & Terminal (no tile fill). */
+const PULSE_ACTIVE_CLASS =
+  "bg-transparent text-foreground font-semibold border-0 animate-nav-active-pulse";
+/** Idle — icon/label only. */
+const SIDEBAR_NAV_IDLE_CLASS =
+  "border-0 bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground";
 const SHOW_TERTIARY_SUBVIEWS = true;
 
 export function Sidebar() {
@@ -147,7 +153,7 @@ export function Sidebar() {
                         "ml-3 h-8 rounded-[var(--radius-md)] px-2.5 flex items-center gap-1.5 transition-smooth",
                         subIsActive
                           ? NAV_ACTIVE_CLASS
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          : SIDEBAR_NAV_IDLE_CLASS,
                       )}
                     >
                       <button
@@ -168,8 +174,8 @@ export function Sidebar() {
                           className={cn(
                             "h-6 w-6 shrink-0 rounded-[var(--radius-sm)] flex items-center justify-center transition-smooth",
                             subIsActive
-                              ? "text-[hsl(var(--sidebar-primary-foreground))/0.92] hover:bg-white/10"
-                              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                              ? "text-[hsl(var(--sidebar-primary-foreground))/0.92] hover:bg-white/80"
+                              : SIDEBAR_NAV_IDLE_CLASS,
                           )}
                           aria-label={tertiaryOpen ? "Collapse nested subviews" : "Expand nested subviews"}
                         >
@@ -201,7 +207,7 @@ export function Sidebar() {
                                         "ml-2 w-[calc(100%-18px)] h-8 pl-6 pr-2 text-left text-xs rounded-[var(--radius-sm)] transition-smooth flex items-center gap-1.5",
                                         tertiaryActive
                                           ? TERTIARY_ACTIVE_CLASS
-                                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                                          : SIDEBAR_NAV_IDLE_CLASS,
                                       )}
                                     >
                                       <span className="truncate block leading-none pl-1">{item.label}</span>
@@ -261,7 +267,7 @@ export function Sidebar() {
                   "p-2.5",
                   isActive
                     ? (isCapturing ? PULSE_ACTIVE_CLASS : NAV_ACTIVE_CLASS)
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    : SIDEBAR_NAV_IDLE_CLASS,
                   isCapturing && !isActive && liveRingClass,
                 )}
               >
@@ -288,7 +294,7 @@ export function Sidebar() {
                   "px-3 py-2",
                   isActive
                     ? (isCapturing ? PULSE_ACTIVE_CLASS : NAV_ACTIVE_CLASS)
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    : SIDEBAR_NAV_IDLE_CLASS,
                   isCapturing && !isActive && liveRingClass,
                 )}
               >
@@ -314,7 +320,7 @@ export function Sidebar() {
             isCollapsed ? "p-3" : "px-4 py-1.5"
           )}
         >
-          <div className={cn("mb-2", isCollapsed ? "mx-1" : "mx-0.5", "h-px bg-border/30")} />
+          <div className={cn("mb-2", isCollapsed ? "mx-1" : "mx-0.5", "h-px bg-border/86")} />
           {bottomTools.map((tool) => {
             const Icon = tool.icon;
             const isActive = activeToolId === tool.id;
@@ -336,7 +342,7 @@ export function Sidebar() {
                       "w-full flex items-center justify-center rounded-[var(--radius-md)] transition-smooth p-2.5",
                       isActive
                         ? NAV_ACTIVE_CLASS
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                        : SIDEBAR_NAV_IDLE_CLASS,
                     )}
                   >
                     <Icon className="h-5 w-5" />
@@ -356,7 +362,7 @@ export function Sidebar() {
                     "px-3 py-2",
                     isActive
                       ? NAV_ACTIVE_CLASS
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                      : SIDEBAR_NAV_IDLE_CLASS,
                   )}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
@@ -368,7 +374,7 @@ export function Sidebar() {
               </div>
             );
           })}
-          <div className={cn("mt-2", isCollapsed ? "mx-1" : "mx-0.5", "h-px bg-border/30")} />
+          <div className={cn("mt-2", isCollapsed ? "mx-1" : "mx-0.5", "h-px bg-border/86")} />
         </div>
       )}
 
@@ -397,7 +403,7 @@ export function Sidebar() {
                   ? liveRingClass
                   : terminalOpen
                     ? PULSE_ACTIVE_CLASS
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    : SIDEBAR_NAV_IDLE_CLASS
               )}
             >
               <Terminal className="h-5 w-5" />
@@ -418,7 +424,7 @@ export function Sidebar() {
                   ? liveRingClass
                   : terminalOpen
                     ? PULSE_ACTIVE_CLASS
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    : SIDEBAR_NAV_IDLE_CLASS
               )}
             >
               <Terminal className="h-4 w-4 flex-shrink-0" />

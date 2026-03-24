@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const logDir = mkdtempSync(join(tmpdir(), "sipalyzer-vite-"));
@@ -13,12 +15,23 @@ const viteLog = createWriteStream(viteLogPath, { flags: "a" });
 let viteChild = null;
 let tauriChild = null;
 
+function resolveCommand(command) {
+  if (process.platform !== "win32") return command;
+  if (command.endsWith(".cmd") || command.endsWith(".exe")) return command;
+  return `${command}.cmd`;
+}
+
+function commandNeedsShell(command) {
+  return process.platform === "win32" && command.endsWith(".cmd");
+}
+
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const resolvedCommand = resolveCommand(command);
+    const child = spawn(resolvedCommand, args, {
       stdio: "inherit",
       env: { ...process.env, ...(options.env ?? {}) },
-      shell: false,
+      shell: commandNeedsShell(resolvedCommand),
     });
     child.on("error", reject);
     child.on("close", (code) => {
@@ -61,11 +74,48 @@ function cleanupAndExit(code) {
   process.exit(code);
 }
 
+function resolveWindowsOpenSslEnv() {
+  if (process.platform !== "win32") return {};
+  const baseDir =
+    process.env.OPENSSL_DIR ??
+    join(process.env.USERPROFILE ?? "C:\\Users\\Public", "vcpkg", "installed", "x64-windows-static-md");
+  const libDir = process.env.OPENSSL_LIB_DIR ?? join(baseDir, "lib");
+  const includeDir = process.env.OPENSSL_INCLUDE_DIR ?? join(baseDir, "include");
+  if (!existsSync(libDir) || !existsSync(includeDir)) return {};
+  return {
+    OPENSSL_DIR: baseDir,
+    OPENSSL_LIB_DIR: libDir,
+    OPENSSL_INCLUDE_DIR: includeDir,
+    OPENSSL_STATIC: process.env.OPENSSL_STATIC ?? "1",
+  };
+}
+
+function resolveWindowsBundledLibEnv() {
+  if (process.platform !== "win32") return {};
+  const targetTriple = process.env.TARGET ?? "x86_64-pc-windows-msvc";
+  const bundledLibDir = join(process.cwd(), "src-tauri", "vendor", "libs", targetTriple);
+  const pathEntries = [];
+  if (existsSync(bundledLibDir)) {
+    pathEntries.push(bundledLibDir);
+  }
+  const npcapRuntimeDir = join(process.env.WINDIR ?? "C:\\Windows", "System32", "Npcap");
+  if (existsSync(npcapRuntimeDir)) {
+    pathEntries.push(npcapRuntimeDir);
+  }
+  if (pathEntries.length === 0) return {};
+  const pathValue = process.env.PATH ?? "";
+  return {
+    PATH: [...pathEntries, pathValue].filter(Boolean).join(delimiter),
+  };
+}
+
 async function main() {
   if (process.env.SIPALYZER_DEV_PREBUILD === "1") {
     await run("npm", ["run", "build"]);
   }
 
+  const opensslEnv = resolveWindowsOpenSslEnv();
+  const bundledLibEnv = resolveWindowsBundledLibEnv();
   const sharedEnv = {
     CARGO_TARGET_DIR:
       process.env.CARGO_TARGET_DIR ?? "src-tauri/target/dev-run",
@@ -73,12 +123,15 @@ async function main() {
     TAURI_CLI_WATCHER_IGNORE:
       process.env.TAURI_CLI_WATCHER_IGNORE ??
       "src-tauri/target/**,src-tauri/target-packet-fidelity/**,src-tauri/target-agent-check/**,src-tauri/target-codex-check/**",
+    ...opensslEnv,
+    ...bundledLibEnv,
   };
 
-  viteChild = spawn("npm", ["run", "dev"], {
+  const viteCommand = resolveCommand("npm");
+  viteChild = spawn(viteCommand, ["run", "dev"], {
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, ...sharedEnv },
-    shell: false,
+    shell: commandNeedsShell(viteCommand),
   });
   viteChild.stdout.pipe(viteLog);
   viteChild.stderr.pipe(viteLog);
@@ -95,14 +148,17 @@ async function main() {
         "echo frontend dev server managed by run-tauri-dev-stable.mjs",
     },
   });
+  const tauriConfigPath = join(logDir, "tauri-dev-config.json");
+  writeFileSync(tauriConfigPath, tauriConfig, "utf8");
 
+  const tauriCommand = resolveCommand("tauri");
   tauriChild = spawn(
-    "tauri",
-    ["dev", "--no-watch", "--no-dev-server-wait", "--config", tauriConfig],
+    tauriCommand,
+    ["dev", "--no-watch", "--no-dev-server-wait", "--config", tauriConfigPath],
     {
       stdio: "inherit",
       env: { ...process.env, ...sharedEnv },
-      shell: false,
+      shell: commandNeedsShell(tauriCommand),
     }
   );
 

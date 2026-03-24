@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 // ── Class helper: ripple rings emanating outward ───────────────────────
 // Apply to any element. Uses --primary so it matches the sidebar/theme.
 export const liveRingClass =
-  "ring-1 ring-primary/40 bg-primary/[0.06] animate-live-ripple";
+  "ring-1 ring-primary/40 bg-transparent animate-live-ripple";
 
 // ── Props ──────────────────────────────────────────────────────────────
 interface LiveIndicatorProps {

@@ -2,8 +2,9 @@
 //! Frontend can override via set_app_user_agent(); otherwise default is used.
 //! Format: SIPalyzer/{version} (macOS 14.2.1) or SIPalyzer/{version} (macOS 14.2.1; username) when user is available.
 
-use std::process::Command;
 use std::sync::Mutex;
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 static OVERRIDE: Mutex<Option<String>> = Mutex::new(None);
 /// When true (default), default_user_agent() includes OS username when available.

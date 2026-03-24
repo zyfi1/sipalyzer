@@ -74,11 +74,12 @@ impl Database {
     fn portable_data_dir() -> Option<PathBuf> {
         let exe = std::env::current_exe().ok()?;
         // `exe` is e.g. /path/to/SIPalyzer.app/Contents/MacOS/sipalyzer on macOS
-        let mut base = exe.parent()?.to_path_buf();
+        let base = exe.parent()?.to_path_buf();
 
         // On macOS, walk up from Contents/MacOS to the folder containing the .app
         #[cfg(target_os = "macos")]
-        {
+        let base = {
+            let mut base = base;
             // Check if we're inside a .app bundle
             // Typical: Foo.app/Contents/MacOS/binary
             if let Some(ancestor) = base.parent().and_then(|p| p.parent()) {
@@ -93,7 +94,8 @@ impl Database {
                     }
                 }
             }
-        }
+            base
+        };
 
         Some(base.join("data"))
     }

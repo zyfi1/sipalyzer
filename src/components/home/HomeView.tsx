@@ -1251,8 +1251,8 @@ export function HomeView() {
 
   return (
     <div className="relative flex flex-1 min-h-0 flex-col overflow-auto bg-[radial-gradient(130%_105%_at_10%_-18%,rgba(95,150,205,0.035)_0%,rgba(17,28,40,0)_56%),linear-gradient(180deg,rgba(14,22,32,0.11)_0%,rgba(10,17,25,0.16)_46%,rgba(7,13,20,0.20)_100%)]">
-      <div className={cn("flex min-h-0 flex-1 min-w-[1180px] flex-col px-5 pb-4", topSectionPadClass, topSectionGridGapClass)}>
-        <div className="ui-panel-shell grid min-h-0 h-full grid-cols-[minmax(0,1fr)_470px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-border/55 bg-[linear-gradient(180deg,hsl(var(--card)/0.92)_0%,hsl(var(--background)/0.86)_100%)] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05),0_16px_30px_hsl(220_30%_3%_/0.25)]">
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col px-5 pb-4", topSectionPadClass, topSectionGridGapClass)}>
+        <div className="ui-panel-shell mx-auto grid h-full min-h-0 w-full min-w-0 max-w-[min(100%,var(--home-shell-max-width))] grid-cols-[minmax(0,1fr)_minmax(0,470px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-border/90 bg-[linear-gradient(180deg,hsl(var(--card)/0.92)_0%,hsl(var(--background)/0.86)_100%)] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05),0_16px_30px_hsl(220_30%_3%_/0.25)]">
           <div className="min-h-0 p-3 pr-2.5">
             {deferredSectionsReady ? (
               <div
@@ -1261,7 +1261,7 @@ export function HomeView() {
                 onClickCapture={handleHeroMoonTripleClick}
               >
                 <SpotlightCard
-                  className="relative h-full max-h-full overflow-hidden rounded-md border border-border/45 before:hidden"
+                  className="relative h-full max-h-full overflow-hidden rounded-md border border-border/88 before:hidden"
                   style={{ background: weatherPanelBackground }}
                 >
                   {mergedHero.showWeatherEffects && weather && !weatherLoading && (
@@ -1287,10 +1287,10 @@ export function HomeView() {
                           }}
                         >
                           <div className="flex flex-1 items-center justify-between gap-4">
-                            <div className="h-12 w-56 rounded-md bg-white/10" />
-                            <div className="h-12 w-44 rounded-md bg-white/10" />
+                            <div className="h-12 w-56 rounded-md bg-white/80" />
+                            <div className="h-12 w-44 rounded-md bg-white/80" />
                           </div>
-                          <div className="mt-2 h-[122px] rounded-md border border-white/10 bg-white/[0.04]" />
+                          <div className="mt-2 h-[122px] rounded-md border border-white/80 bg-white/[0.22]" />
                         </div>
                       );
                     }
@@ -1308,13 +1308,13 @@ export function HomeView() {
                           background: `linear-gradient(180deg, rgba(7,11,18,0.22) 0%, rgba(8,13,20,0.14) 45%, rgba(7,10,16,0.26) 100%), ${weatherPanelOverlay}`,
                         }}
                       >
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] items-stretch gap-6 flex-1 min-h-0">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-6 flex-1 min-h-0">
                           {(mergedHero.showGreeting || mergedHero.showClock || mergedHero.showDate) && (
                             <div className="min-w-0 px-1 py-1.5 flex flex-col justify-center">
                               {mergedHero.showGreeting && (
                                 <p className={cn(
                                   "text-3xs font-semibold tracking-[0.14em] uppercase",
-                                  dayReadable ? "text-foreground/72" : "text-foreground/55",
+                                  dayReadable ? "text-foreground/86" : "text-foreground/69",
                                 )}>
                                   {greeting}
                                 </p>
@@ -1325,7 +1325,7 @@ export function HomeView() {
                                 </h1>
                               )}
                               {mergedHero.showDate && (
-                                <p className={cn("text-xs mt-1", dayReadable ? "text-foreground/78" : "text-foreground/62")}>
+                                <p className={cn("text-xs mt-1", dayReadable ? "text-foreground/92" : "text-foreground/76")}>
                                   {formatDate(now, dateFormat)}
                                 </p>
                               )}
@@ -1336,12 +1336,12 @@ export function HomeView() {
                             <>
                               {weatherLoading ? (
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <Loader2 className="h-4 w-4 animate-spin text-foreground/40" />
+                                  <Loader2 className="h-4 w-4 animate-spin text-foreground/54" />
                                 </div>
                               ) : weather ? (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <div className="group text-right shrink-0 min-w-[340px] px-1 py-1.5 flex flex-col justify-center gap-2 cursor-help transition-transform duration-300 hover:-translate-y-0.5">
+                                    <div className="group flex w-max min-w-[min(100%,340px)] max-w-[min(100%,26rem)] cursor-help flex-col justify-center justify-self-end gap-2 px-1 py-1.5 text-right transition-transform duration-300 hover:-translate-y-0.5">
                                       <div className="grid grid-cols-[40px_auto] items-center justify-end gap-x-3">
                                         <span className="inline-flex h-10 w-10 translate-y-[3px] items-center justify-center">
                                           {weather ? (
@@ -1371,14 +1371,14 @@ export function HomeView() {
                                         </span>
                                       </div>
                                       {mergedHero.showWeatherDescription && (
-                                        <p className={cn("text-sm font-semibold", dayReadable ? "text-foreground/90" : "text-foreground/72")}>
+                                        <p className={cn("text-sm font-semibold", dayReadable ? "text-foreground/94" : "text-foreground/86")}>
                                           {weather.weatherDesc}
                                         </p>
                                       )}
                                       {(mergedHero.showWind || mergedHero.showFeelsLike || mergedHero.showHumidity) && (
                                         <div className={cn(
                                           "flex flex-wrap justify-end items-center gap-x-4 gap-y-1.5 text-xs",
-                                          dayReadable ? "text-foreground/86" : "text-foreground/67",
+                                          dayReadable ? "text-foreground/96" : "text-foreground/81",
                                         )}>
                                           {mergedHero.showWind && (
                                             <span className="inline-flex items-center gap-1">
@@ -1455,7 +1455,7 @@ export function HomeView() {
                         </div>
 
                         {hasForecast && (
-                          <div className="mt-2 h-[122px] overflow-hidden rounded-md border border-white/10">
+                          <div className="mt-2 h-[122px] overflow-hidden rounded-md border border-white/80">
                             <div
                               className="h-full px-2 py-1.5"
                               style={{
@@ -1476,8 +1476,8 @@ export function HomeView() {
                                   return (
                                     <Tooltip key={day.date}>
                                       <TooltipTrigger asChild>
-                                        <div className="group/day w-full h-full flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md transition-all duration-200 hover:bg-white/[0.06] hover:-translate-y-0.5">
-                                          <span className={cn("text-2xs font-medium leading-none", dayReadable ? "text-foreground/84" : "text-foreground/65")}>
+                                        <div className="group/day w-full h-full flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-md transition-all duration-200 hover:bg-white/[0.24] hover:-translate-y-0.5">
+                                          <span className={cn("text-2xs font-medium leading-none", dayReadable ? "text-foreground/96" : "text-foreground/79")}>
                                             {forecastDayLabel(day.date)}
                                           </span>
                                           <span className="transition-transform duration-300 group-hover/day:scale-110">
@@ -1491,12 +1491,12 @@ export function HomeView() {
                                             />
                                           </span>
                                           <div className="flex items-baseline gap-1 leading-none">
-                                            <span className="text-sm font-semibold text-foreground/84 tabular-nums">{hi}</span>
-                                            <span className={cn("text-xs tabular-nums", dayReadable ? "text-foreground/72" : "text-foreground/45")}>{lo}</span>
+                                            <span className="text-sm font-semibold text-foreground/96 tabular-nums">{hi}</span>
+                                            <span className={cn("text-xs tabular-nums", dayReadable ? "text-foreground/86" : "text-foreground/59")}>{lo}</span>
                                           </div>
                                           {mergedHero.showForecastRainChance && day.chanceOfRain > 0 && (
-                                            <div className="flex items-center gap-0.5 text-foreground/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
-                                              <Drop className="h-3 w-3 text-cyan-200/95" />
+                                            <div className="flex items-center gap-0.5 text-foreground/96 [text-shadow:0_1px_2px_rgba(0,0,0,0.3)]">
+                                              <Drop className="h-3 w-3 text-cyan-200/99" />
                                               <span className="text-2xs font-medium tabular-nums">{day.chanceOfRain}%</span>
                                             </div>
                                           )}
@@ -1562,7 +1562,7 @@ export function HomeView() {
                           type="button"
                           tabIndex={0}
                           aria-label={`Moon: ${moonModel.phaseLabel}, ${moonModel.illuminationPercent} percent illuminated`}
-                          className="pointer-events-auto flex h-full w-full cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                          className="pointer-events-auto flex h-full w-full cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/90"
                         />
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={10} className="max-w-[220px]">
@@ -1578,24 +1578,24 @@ export function HomeView() {
               </div>
             ) : (
               <div className={cn("relative w-full", heroCardHeightClass)}>
-                <div className="h-full rounded-md border border-border/45 bg-[linear-gradient(180deg,hsl(var(--card)/0.52)_0%,hsl(var(--background)/0.44)_100%)]" />
+                <div className="h-full rounded-md border border-border/88 bg-[linear-gradient(180deg,hsl(var(--card)/0.52)_0%,hsl(var(--background)/0.44)_100%)]" />
               </div>
             )}
           </div>
 
-          <div className="min-h-0 row-start-2 border-r border-t border-border/50">
+          <div className="min-h-0 row-start-2 border-r border-t border-border/90">
             <section className="h-full min-h-0 p-3">
               {deferredSectionsReady ? (
-                <Suspense fallback={<div className="h-full rounded-md border border-border/45 bg-background/20" />}>
+                <Suspense fallback={<div className="h-full rounded-md border border-border/88 bg-background/84" />}>
                   <ActivityMonitorSection embedded />
                 </Suspense>
               ) : (
-                <div className="h-full rounded-md border border-border/45 bg-background/20" />
+                <div className="h-full rounded-md border border-border/88 bg-background/84" />
               )}
             </section>
           </div>
 
-          <aside className="min-h-0 row-span-2 row-start-1 col-start-2 border-l border-border/45 p-3 pt-2.5 pl-2.5">
+          <aside className="min-h-0 row-span-2 row-start-1 col-start-2 border-l border-border/88 p-3 pt-2.5 pl-2.5">
             <div className="flex h-full min-h-0 flex-col gap-2.5">
               <section className={cn(
                 "shrink-0",
@@ -1606,11 +1606,11 @@ export function HomeView() {
                     : "h-[228px]",
               )}>
                 {deferredSectionsReady ? (
-                  <Suspense fallback={<div className="h-full rounded-md border border-border/45 bg-background/20" />}>
-                    <HomeQuickActionsPanel className="h-full overflow-hidden rounded-md border border-border/45 bg-background/20" />
+                  <Suspense fallback={<div className="h-full rounded-md border border-border/88 bg-background/84" />}>
+                    <HomeQuickActionsPanel className="h-full overflow-hidden rounded-md border border-border/88 bg-background/84" />
                   </Suspense>
                 ) : (
-                  <div className="h-full rounded-md border border-border/45 bg-background/20" />
+                  <div className="h-full rounded-md border border-border/88 bg-background/84" />
                 )}
               </section>
 
@@ -1633,43 +1633,43 @@ export function HomeView() {
                   role="button"
                   tabIndex={0}
                   className={cn(
-                    "relative h-[152px] cursor-pointer overflow-hidden rounded-md border border-border/45 px-4 py-4 transition-[border-color,background,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    "relative h-[152px] cursor-pointer overflow-hidden rounded-md border border-border/88 px-4 py-4 transition-[border-color,background,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/88",
                     heroDragOver
-                      ? "border-primary/45 bg-[linear-gradient(180deg,hsl(var(--primary)/0.16)_0%,hsl(var(--card)/0.58)_56%,hsl(var(--background)/0.50)_100%)]"
-                      : "bg-[linear-gradient(180deg,hsl(var(--card)/0.64)_0%,hsl(var(--background)/0.52)_100%)] hover:border-border/70",
+                      ? "border-primary/88 bg-[linear-gradient(180deg,hsl(var(--primary)/0.16)_0%,hsl(var(--card)/0.58)_56%,hsl(var(--background)/0.50)_100%)]"
+                      : "bg-[linear-gradient(180deg,hsl(var(--card)/0.64)_0%,hsl(var(--background)/0.52)_100%)] hover:border-border/94",
                   )}
                 >
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(110%_90%_at_12%_0%,rgba(108,172,255,0.14)_0%,rgba(108,172,255,0)_58%)]" />
                   <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(7,12,22,0.06)_0%,rgba(7,12,22,0.16)_100%)]" />
                   <div className="relative z-10 flex h-full items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-medium uppercase tracking-[0.13em] text-muted-foreground/82">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.13em] text-muted-foreground/96">
                         Packet Capture Dropzone
                       </p>
-                      <p className="mt-2 truncate text-base font-medium text-foreground/94">
+                      <p className="mt-2 truncate text-base font-medium text-foreground/98">
                         {heroImporting ? "Importing capture..." : "Drop .pcap/.pcapng/.cap"}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground/82">
+                      <p className="mt-1 text-xs text-muted-foreground/96">
                         {heroImporting ? "Parsing and indexing packets now..." : "or select a file to import manually"}
                       </p>
                     </div>
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border/45 bg-background/30 text-primary/90">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border/88 bg-background/86 text-primary/94">
                       {heroImporting ? <Loader2 className="h-5 w-5 animate-spin text-warning" /> : <Upload className="h-5 w-5" />}
                     </span>
                   </div>
                 </div>
               </section>
 
-              <section className="flex min-h-[200px] flex-1 flex-col rounded-md border border-border/45 bg-[linear-gradient(180deg,hsl(var(--card)/0.58)_0%,hsl(var(--background)/0.44)_100%)] px-3 py-2.5">
+              <section className="flex min-h-[200px] flex-1 flex-col rounded-md border border-border/88 bg-[linear-gradient(180deg,hsl(var(--card)/0.58)_0%,hsl(var(--background)/0.44)_100%)] px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2 pb-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <StickyNote className="h-3.5 w-3.5 text-muted-foreground/78" />
-                    <p className="truncate text-[10px] font-medium uppercase tracking-[0.13em] text-muted-foreground/85">Quick Note</p>
+                    <StickyNote className="h-3.5 w-3.5 text-muted-foreground/92" />
+                    <p className="truncate text-[10px] font-medium uppercase tracking-[0.13em] text-muted-foreground/96">Quick Note</p>
                   </div>
                   <button
                     type="button"
                     onClick={openQuickNoteInNotes}
-                    className="ui-control-shell inline-flex h-7 items-center gap-1.5 rounded-sm border border-border/45 px-2.5 text-2xs text-foreground/86 transition-[border-color,background,color] duration-200 hover:border-border/70 hover:bg-background/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                    className="ui-control-shell inline-flex h-7 items-center gap-1.5 rounded-sm border border-border/88 px-2.5 text-2xs text-foreground/96 transition-[border-color,background,color] duration-200 hover:border-border/94 hover:bg-background/88 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/86"
                   >
                     Open
                   </button>
@@ -1681,7 +1681,7 @@ export function HomeView() {
                     setQuickNoteDirty(true);
                   }}
                   placeholder="Write a persistent quick note..."
-                  className="min-h-[120px] w-full flex-1 resize-none border border-border/35 bg-background/20 px-3 py-2 text-sm leading-relaxed text-foreground/92 outline-none transition placeholder:text-muted-foreground/65 focus-visible:border-primary/45"
+                  className="min-h-[120px] w-full flex-1 resize-none border border-border/86 bg-background/84 px-3 py-2 text-sm leading-relaxed text-foreground/96 outline-none transition placeholder:text-muted-foreground/79 focus-visible:border-primary/88"
                 />
                 <div className="mt-2 inline-flex h-7 w-full items-center justify-between px-1 text-xs">
                   <span className={cn(
@@ -1696,7 +1696,7 @@ export function HomeView() {
                           ? "Unsaved changes"
                           : "Saved"}
                   </span>
-                  <span className="text-muted-foreground/80">{quickNoteText.length} chars</span>
+                  <span className="text-muted-foreground/94">{quickNoteText.length} chars</span>
                 </div>
               </section>
             </div>

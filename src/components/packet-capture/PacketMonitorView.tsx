@@ -298,8 +298,11 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
     } catch (e: any) { if (e.name !== "AbortError") console.error("Failed to fetch packets:", e); }
   }, [pmSettings.pageSize, tabId, updateTab]);
 
+  // Poll whenever this tab has a live session — do not gate on isActiveTab (other monitor tabs
+  // would stop ingress for a background capture) or isVisible (tool panel stays mounted with
+  // display:none when switching apps; we still want packets when you return).
   useEffect(() => {
-    if (!isCapturing || !sessionId || !isVisible || !isActiveTab) return;
+    if (!isCapturing || !sessionId) return;
     const filterExpression = wiresharkFilter.trim() || "";
     return subscribeSharedPoll({
       key: `capture:${sessionId}:packets:${pmSettings.pageSize}:${filterExpression}`,
@@ -342,8 +345,6 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
   }, [
     isCapturing,
     sessionId,
-    isVisible,
-    isActiveTab,
     wiresharkFilter,
     pmSettings.pageSize,
     adaptivePacketPollIntervalMs,
@@ -353,7 +354,7 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
   ]);
 
   useEffect(() => {
-    if (!isCapturing || !sessionId || !isVisible || !isActiveTab) return;
+    if (!isCapturing || !sessionId) return;
     return subscribeSharedPoll({
       key: `capture:${sessionId}:live-stats:${isPipelineMode ? "pipeline" : "classic"}`,
       intervalMs: activeStatsPollIntervalMs,
@@ -369,7 +370,7 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
         setPipelineStats(pStats);
       },
     });
-  }, [isCapturing, sessionId, isPipelineMode, isVisible, isActiveTab, activeStatsPollIntervalMs]);
+  }, [isCapturing, sessionId, isPipelineMode, activeStatsPollIntervalMs]);
 
   /* ── Handlers ── */
 
@@ -391,10 +392,12 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
       setSessionId(sid); setActiveSession(sid); setIsCapturing(true);
       if (showDiagnostics) startExpertLivePolling(sid);
       updateTab(tabId, { sessionId: sid, isCapturing: true, label: name });
+      const wf = usePacketCaptureStore.getState().wiresharkFilter;
+      void fetchPackets(sid, wf);
       notify({ source: "packet-capture", type: "success", title: "Capture Started", description: `Capturing on ${interfaceName || "auto"}` });
     } catch (e: any) { notify({ source: "packet-capture", type: "error", title: "Capture Failed", description: e.message || "Unknown error" }); }
     finally { setIsLoading(false); }
-  }, [isPipelineMode, captureFilterConfig, setActiveSession, storeStartCapture, notify, executionContext, tabId, updateTab, showDiagnostics, startExpertLivePolling]);
+  }, [isPipelineMode, captureFilterConfig, setActiveSession, storeStartCapture, notify, executionContext, tabId, updateTab, showDiagnostics, startExpertLivePolling, fetchPackets]);
 
   const handleStop = useCallback(async () => {
     if (!sessionId) return;

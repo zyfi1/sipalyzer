@@ -18,6 +18,7 @@ const WINDOWS_SPANDSP_PKG =
   "https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-spandsp-0.0.6-5-any.pkg.tar.zst";
 const WINDOWS_TIFF_PKG =
   "https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-libtiff-4.7.1-1-any.pkg.tar.zst";
+const WINDOWS_NPCAP_SDK = "https://npcap.com/dist/npcap-sdk-1.16.zip";
 
 function run(command, args, cwd = ROOT) {
   return new Promise((resolvePromise, reject) => {
@@ -177,15 +178,40 @@ async function installWindowsArtifacts() {
   const hasVosk = copyMatchedFile(
     voskExtract,
     [/(^|\/)vosk\.dll$/i, /(^|\/)libvosk\.dll$/i],
-    join(targetDir, "vosk.dll"),
+    join(targetDir, "libvosk.dll"),
   );
-  if (!hasVosk) throw new Error("Failed to resolve Windows vosk.dll from Vosk archive");
+  if (!hasVosk) throw new Error("Failed to resolve Windows libvosk.dll from Vosk archive");
+  const hasVoskImportLib = copyMatchedFile(
+    voskExtract,
+    [/(^|\/)libvosk\.lib$/i],
+    join(targetDir, "libvosk.lib"),
+  );
+  if (!hasVoskImportLib) {
+    throw new Error("Failed to resolve Windows libvosk.lib from Vosk archive");
+  }
   const hasStdCpp = copyMatchedFile(voskExtract, [/(^|\/)libstdc\+\+-6\.dll$/i], join(targetDir, "libstdc++-6.dll"));
   const hasGcc = copyMatchedFile(voskExtract, [/(^|\/)libgcc_s_seh-1\.dll$/i], join(targetDir, "libgcc_s_seh-1.dll"));
   const hasPthread = copyMatchedFile(voskExtract, [/(^|\/)libwinpthread-1\.dll$/i], join(targetDir, "libwinpthread-1.dll"));
   if (!hasStdCpp) throw new Error("Failed to resolve Windows libstdc++-6.dll from Vosk archive");
   if (!hasGcc) throw new Error("Failed to resolve Windows libgcc_s_seh-1.dll from Vosk archive");
   if (!hasPthread) throw new Error("Failed to resolve Windows libwinpthread-1.dll from Vosk archive");
+
+  const npcapArchive = join(TMP_ROOT, "windows-npcap-sdk.zip");
+  const npcapExtract = join(TMP_ROOT, "windows-npcap-sdk-extract");
+  await downloadTo(WINDOWS_NPCAP_SDK, npcapArchive);
+  await extractZip(npcapArchive, npcapExtract);
+  const hasWpcapImportLib = copyMatchedFile(
+    npcapExtract,
+    [/(^|\/)(x64\/)?wpcap\.lib$/i],
+    join(targetDir, "wpcap.lib"),
+  );
+  const hasPacketImportLib = copyMatchedFile(
+    npcapExtract,
+    [/(^|\/)(x64\/)?packet\.lib$/i],
+    join(targetDir, "Packet.lib"),
+  );
+  if (!hasWpcapImportLib) throw new Error("Failed to resolve Windows wpcap.lib from Npcap SDK");
+  if (!hasPacketImportLib) throw new Error("Failed to resolve Windows Packet.lib from Npcap SDK");
 }
 
 async function main() {
@@ -200,9 +226,9 @@ async function main() {
     [
       "Installed upstream native artifacts:",
       "- x86_64-unknown-linux-gnu/{libspandsp.so, libtiff.so, libvosk.so}",
-      "- x86_64-pc-windows-msvc/{spandsp.dll, tiff.dll, vosk.dll}",
+      "- x86_64-pc-windows-msvc/{libvosk.dll, libvosk.lib, Packet.lib, spandsp.dll, tiff.dll, wpcap.lib}",
       "",
-      "Sources: Debian pool (spandsp/libtiff), MSYS2 mingw64 (spandsp/libtiff), vosk-api releases.",
+      "Sources: Debian pool (spandsp/libtiff), MSYS2 mingw64 (spandsp/libtiff), vosk-api releases, Npcap SDK.",
     ].join("\n"),
     "utf8",
   );

@@ -786,7 +786,7 @@ impl CaptureSession {
                 // ICMP
                 return Some(crate::packet_capture::PacketInfo {
                     timestamp: chrono::DateTime::from_timestamp(
-                        packet.header.ts.tv_sec,
+                        packet.header.ts.tv_sec.into(),
                         (packet.header.ts.tv_usec as u32) * 1000,
                     )
                     .unwrap_or_else(|| chrono::Utc::now()),
@@ -813,7 +813,7 @@ impl CaptureSession {
                 let ip_header_len = ((ip_data[0] & 0x0F) * 4) as usize;
                 return Some(crate::packet_capture::PacketInfo {
                     timestamp: chrono::DateTime::from_timestamp(
-                        packet.header.ts.tv_sec,
+                        packet.header.ts.tv_sec.into(),
                         (packet.header.ts.tv_usec as u32) * 1000,
                     )
                     .unwrap_or_else(|| chrono::Utc::now()),
@@ -942,7 +942,7 @@ impl CaptureSession {
         // Convert pcap timestamp to chrono
         // pcap uses timeval: tv_sec (seconds) and tv_usec (microseconds)
         let timestamp = chrono::DateTime::from_timestamp(
-            packet.header.ts.tv_sec,
+            packet.header.ts.tv_sec.into(),
             (packet.header.ts.tv_usec as u32) * 1000, // Convert microseconds to nanoseconds (multiply by 1000)
         )
         .unwrap_or_else(|| chrono::Utc::now());
@@ -1147,16 +1147,31 @@ pub fn list_interfaces() -> Result<Vec<NetworkInterface>> {
         })
         .unwrap_or_default();
     let default_name = default_iface.as_ref().map(|i| i.name.clone());
+    let normalize_addr = |addr: &str| -> String {
+        addr.split('%').next().unwrap_or(addr).trim().to_ascii_lowercase()
+    };
+    let normalized_default_addrs: Vec<String> = default_addrs
+        .iter()
+        .map(|addr| normalize_addr(addr))
+        .collect();
     let devices = Device::list().context("Failed to list network devices")?;
     let mut list: Vec<NetworkInterface> = devices
         .into_iter()
         .map(|d| {
-            let is_default = default_name.as_ref().map_or(false, |n| n == &d.name);
+            let is_default_name = default_name.as_ref().map_or(false, |n| n == &d.name);
             let pcap_addrs: Vec<String> = d
                 .addresses
                 .iter()
                 .map(|a| a.addr.to_string())
                 .collect();
+            let normalized_pcap_addrs: Vec<String> = pcap_addrs
+                .iter()
+                .map(|addr| normalize_addr(addr))
+                .collect();
+            let is_default_addr = normalized_pcap_addrs
+                .iter()
+                .any(|addr| normalized_default_addrs.iter().any(|default_addr| default_addr == addr));
+            let is_default = is_default_name || is_default_addr;
             let addresses = if pcap_addrs.is_empty() && is_default && !default_addrs.is_empty() {
                 default_addrs.clone()
             } else {

@@ -13,7 +13,7 @@ interface ViewSubheaderProps {
 export function ViewSubheader({ children, className }: ViewSubheaderProps) {
   return (
     <div className={cn(
-      "surface-subtle app-chrome-surface app-chrome-content-swap flex min-h-[var(--ui-control-height)] items-center gap-4 border-b border-border/45 px-4 py-1.5 text-sm",
+      "surface-subtle app-chrome-surface app-chrome-content-swap flex min-h-[var(--ui-control-height)] items-center gap-4 border-b border-border/88 px-4 py-1.5 text-sm",
       className
     )}>
       {children}

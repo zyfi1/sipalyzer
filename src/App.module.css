@@ -1,10 +1,18 @@
 .appShell {
   position: relative;
   height: 100vh;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Matches Sidebar expanded width (`w-56`); collapsed overrides below. */
+  --app-sidebar-rail-width: 14rem;
+}
+
+.appShell[data-sidebar-collapsed] {
+  /* Matches Sidebar collapsed width (`w-16`). */
+  --app-sidebar-rail-width: 4rem;
 }
 
 .mainRow {

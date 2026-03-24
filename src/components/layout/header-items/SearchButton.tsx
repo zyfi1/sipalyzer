@@ -362,10 +362,10 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
                 ? "border-0 bg-transparent px-0.5 ring-0 shadow-none"
                 : "ui-header-picker max-w-[320px]",
               !embedded && open && "is-open",
-              embedded && open && "rounded-sm bg-muted/15",
+              embedded && open && "rounded-sm bg-muted/80",
             )}
           >
-            <Search className={cn("h-3.5 w-3.5 flex-shrink-0", embedded && "text-muted-foreground/70")} />
+            <Search className={cn("h-3.5 w-3.5 flex-shrink-0", embedded && "text-muted-foreground/84")} />
             <input
               id={inputId}
               ref={inputRef}
@@ -375,10 +375,10 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
               onFocus={handleOpen}
               onKeyDown={handleKeyDown}
               placeholder="Search or jump…"
-              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/70 text-xs min-w-0"
+              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/84 text-xs min-w-0"
               data-no-window-drag="true"
             />
-            <kbd className="hidden sm:inline text-2xs font-mono text-muted-foreground/65 flex-shrink-0">
+            <kbd className="hidden sm:inline text-2xs font-mono text-muted-foreground/79 flex-shrink-0">
               ⌘K
             </kbd>
           </div>
@@ -400,14 +400,14 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
         <Command shouldFilter={false} onKeyDown={handleKeyDown}>
             <div className="ui-floating-header-sm">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/74" />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Search or jump…"
-                  className="h-8 w-full rounded-md bg-transparent pl-8 pr-2 text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
+                  className="h-8 w-full rounded-md bg-transparent pl-8 pr-2 text-xs text-foreground outline-none placeholder:text-muted-foreground/74"
                 />
               </div>
             </div>
@@ -418,7 +418,7 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
                   <span className="text-sm text-muted-foreground">
                     No results for &ldquo;{trimmed}&rdquo;
                   </span>
-                  <span className="text-xs text-muted-foreground/60">
+                  <span className="text-xs text-muted-foreground/74">
                     Try a different search term
                   </span>
                 </div>
@@ -442,7 +442,7 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
                           key={item.id}
                           item={item}
                           onSelect={handleSelect}
-                          trailing={<Clock className="size-3 text-muted-foreground/60" />}
+                          trailing={<Clock className="size-3 text-muted-foreground/74" />}
                         />
                       ))}
                     </CommandGroup>
@@ -528,7 +528,7 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
             </CommandList>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 border-t border-border/30 px-3 py-2 text-2xs text-muted-foreground/60 select-none">
+            <div className="flex items-center gap-3 border-t border-border/86 px-3 py-2 text-2xs text-muted-foreground/74 select-none">
               <span className="flex items-center gap-0.5">
                 <Kbd>↑</Kbd><Kbd>↓</Kbd> navigate
               </span>
@@ -554,7 +554,7 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex items-center justify-center rounded border border-border/40 bg-muted/30 px-1 py-px font-mono text-2xs leading-tight min-w-[16px]">
+    <kbd className="inline-flex items-center justify-center rounded border border-border/88 bg-muted/86 px-1 py-px font-mono text-2xs leading-tight min-w-[16px]">
       {children}
     </kbd>
   );
@@ -570,7 +570,7 @@ function DropdownRow({ item, onSelect, trailing }: DropdownRowProps) {
   const Icon = item.icon;
   return (
     <CommandItem value={item.id} onSelect={() => onSelect(item)} className="gap-2.5 py-1.5">
-      <div className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-border/30 bg-muted/20">
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-border/86 bg-muted/84">
         <Icon className="size-3" />
       </div>
       <div className="min-w-0 flex-1">

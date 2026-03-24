@@ -45,3 +45,6 @@ src-tauri/vendor/libs/*.so
 
 # Cursor workspace metadata
 .cursor/
+
+# Local downloads / SDK extractions (e.g. Npcap SDK)
+.tmp/

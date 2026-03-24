@@ -107,7 +107,6 @@ fn send_dscp_packet(ip: IpAddr, port: u16, dscp: u8, _timeout_ms: u64) -> Result
 
     #[cfg(windows)]
     {
-        use std::os::windows::io::AsRawSocket;
         // Windows IP_TOS = 3
         socket.set_tos(tos).map_err(|e| format!("Failed to set TOS: {}", e))?;
     }

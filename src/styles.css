@@ -742,7 +742,8 @@ input[type="checkbox"].sr-only {
   html,
   body {
     height: 100vh;
-    width: 100vw;
+    width: 100%;
+    max-width: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -774,7 +775,8 @@ input[type="checkbox"].sr-only {
     position: relative;
     z-index: 1;
     height: 100vh;
-    width: 100vw;
+    width: 100%;
+    max-width: 100%;
     display: flex;
     flex-direction: column;
   }
@@ -1383,7 +1385,7 @@ input[type="checkbox"].sr-only {
   }
   .header-icon-button:hover {
     @apply text-foreground;
-    background: hsl(var(--accent) / 0.55);
+    background: transparent;
   }
   .header-icon-button:focus-visible {
     outline: 2px solid hsl(var(--ring) / 0.6);

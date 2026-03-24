@@ -54,7 +54,7 @@ fn link_vosk() {
     // Set VOSK_PATH so vosk-sys can find libvosk at link time.
     let bundle_dir = native_bundle_dir();
     let vosk_lib_name = if cfg!(target_os = "windows") {
-        "vosk.dll"
+        "libvosk.dll"
     } else if cfg!(target_os = "linux") {
         "libvosk.so"
     } else {

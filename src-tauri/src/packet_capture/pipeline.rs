@@ -60,7 +60,7 @@ impl Default for PipelineConfig {
 #[derive(Clone)]
 pub struct RawPacket {
     /// Timestamp from pcap header.
-    pub timestamp_secs: i64,
+    pub timestamp_secs: i32,
     pub timestamp_usecs: u32,
     /// Packet number.
     pub packet_number: u64,

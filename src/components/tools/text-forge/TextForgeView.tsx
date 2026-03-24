@@ -556,10 +556,10 @@ export function TextForgeView() {
   const canRedo = active.undoFuture.length > 0;
 
   const gutterBtn =
-    "h-9 w-9 shrink-0 rounded-md border border-border/35 bg-background/30 hover:bg-muted/25 transition-smooth flex items-center justify-center text-muted-foreground hover:text-foreground";
+    "h-9 w-9 shrink-0 rounded-md border border-border/86 bg-background/86 hover:bg-muted/84 transition-smooth flex items-center justify-center text-muted-foreground hover:text-foreground";
 
   return (
-    <div className="h-full flex flex-col overflow-hidden rounded-lg bg-muted/[0.08]">
+    <div className="h-full flex flex-col overflow-hidden rounded-lg bg-background/88">
       <div className="shrink-0 px-1.5 pt-1.5">
         <div className="ui-surface-card p-2">
           <CaptureTabRail
@@ -619,7 +619,7 @@ export function TextForgeView() {
                     >
                       <button
                         type="button"
-                        className="min-w-0 flex-1 max-w-[min(120px,28vw)] truncate text-left font-semibold bg-transparent border-0 p-0 text-inherit cursor-pointer rounded-sm outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/70"
+                        className="min-w-0 flex-1 max-w-[min(120px,28vw)] truncate text-left font-semibold bg-transparent border-0 p-0 text-inherit cursor-pointer rounded-sm outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/94"
                         onClick={() => setActiveId(w.id)}
                         onDoubleClick={() => {
                           setRenameId(w.id);
@@ -680,8 +680,8 @@ export function TextForgeView() {
                 className="ui-control-shell h-8 min-w-0 flex-1 text-xs sm:max-w-md"
                 placeholder="Search transforms… (⌘K)"
               />
-              <label className="flex items-center gap-2 rounded-md border border-border/30 bg-background/25 px-2 py-1.5 shrink-0">
-                <span className="text-2xs text-muted-foreground whitespace-nowrap">Auto-update</span>
+              <label className="flex items-center gap-2 rounded-md border border-border/88 bg-background/88 px-2 py-1.5 shrink-0">
+                <span className="text-2xs text-foreground/96 whitespace-nowrap">Auto-update</span>
                 <Switch
                   size="sm"
                   checked={active.autoRun}
@@ -725,30 +725,30 @@ export function TextForgeView() {
       <div className="flex-1 min-h-0 flex px-1.5 pb-0 pt-1.5 gap-0">
         <aside
           ref={asideRef}
-          className="shrink-0 flex flex-col min-h-0 min-w-0 border border-border/25 rounded-lg bg-background/15 overflow-hidden"
+          className="shrink-0 flex flex-col min-h-0 min-w-0 border border-border/88 rounded-lg bg-background/88 overflow-hidden"
           style={{ width: sidebarPx }}
         >
           <div
             className="shrink-0 flex flex-col min-h-0 px-2 pt-2"
             style={{ height: catalogPanelPx }}
           >
-            <div className="text-2xs text-muted-foreground mb-1.5 shrink-0">Catalog</div>
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border/50 bg-card/50 shadow-card">
+            <div className="text-2xs text-foreground/94 mb-1.5 shrink-0">Catalog</div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border/92 bg-card/94 shadow-card">
               {q ? (
                 <div>
-                  <div className="border-b border-border bg-muted/30 px-3 py-2">
+                  <div className="border-b border-border bg-muted/86 px-3 py-2">
                     <span className="text-xs font-medium">All matches</span>
                     <span className="text-2xs text-muted-foreground tabular-nums ml-2">
                       {searchMatches.length}
                     </span>
                   </div>
-                  <div className="divide-y divide-border/30">
+                  <div className="divide-y divide-border/86">
                     {searchMatches.map((rule) => (
                       <TooltipWrapper key={`${rule.type}-${rule.label}`} content={rule.description}>
                         <button
                           type="button"
                           onClick={() => addRule(rule.type)}
-                          className="flex w-full items-start px-3 py-2 text-left transition-smooth hover:bg-muted/30"
+                          className="flex w-full items-start px-3 py-2 text-left transition-smooth hover:bg-muted/86"
                         >
                           <span className="min-w-0 flex-1">
                             <span className="text-xs font-medium text-foreground">{rule.label}</span>
@@ -775,7 +775,7 @@ export function TextForgeView() {
                         <button
                           type="button"
                           onClick={() => toggleCatalogCategoryCollapse(cat.id)}
-                          className="flex w-full items-center gap-2 border-b border-border bg-muted/30 px-3 py-2 text-left hover:bg-muted/50 transition-smooth"
+                          className="flex w-full items-center gap-2 border-b border-border bg-muted/86 px-3 py-2 text-left hover:bg-muted/90 transition-smooth"
                         >
                           <span className="text-xs font-medium truncate">{cat.label}</span>
                           <span className="text-2xs tabular-nums text-muted-foreground shrink-0">
@@ -790,13 +790,13 @@ export function TextForgeView() {
                         </button>
                       </TooltipWrapper>
                       {!isCollapsed ? (
-                        <div className="divide-y divide-border/30">
+                        <div className="divide-y divide-border/86">
                           {rulesInCat.map((rule) => (
                             <TooltipWrapper key={`${rule.type}-${rule.label}`} content={rule.description}>
                               <button
                                 type="button"
                                 onClick={() => addRule(rule.type)}
-                                className="flex w-full items-start px-3 py-2 text-left transition-smooth hover:bg-muted/30"
+                                className="flex w-full items-start px-3 py-2 text-left transition-smooth hover:bg-muted/86"
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="text-xs font-medium text-foreground">{rule.label}</span>
@@ -833,9 +833,9 @@ export function TextForgeView() {
           />
 
           <div className="flex-1 min-h-0 px-2 pb-2 pt-0 flex flex-col min-w-0">
-            <div className="rounded-md border border-border/25 bg-background/20 p-1.5 flex-1 min-h-0 flex flex-col">
+            <div className="rounded-md border border-border/88 bg-background/88 p-1.5 flex-1 min-h-0 flex flex-col">
               <div className="flex items-center justify-between mb-1 shrink-0">
-                <span className="text-2xs text-muted-foreground">Pipeline editor</span>
+                <span className="text-2xs text-foreground/94">Pipeline editor</span>
                 <Badge variant="secondary" className="h-5 text-2xs">
                   {activeRuleCount}/{active.rules.length}
                 </Badge>
@@ -862,7 +862,7 @@ export function TextForgeView() {
                       key={row.id}
                       className={cn(
                         "rounded-md border p-2 min-w-0",
-                        row.enabled ? "border-primary/30 bg-primary/5" : "border-border/25 bg-muted/10",
+                        row.enabled ? "border-primary/86 bg-primary/78" : "border-border/84 bg-muted/80",
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -1270,7 +1270,7 @@ export function TextForgeView() {
 
           <div className="flex-1 min-h-0 ui-surface-card p-2">
             <div className="h-full grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] gap-2 min-h-0">
-              <div className="rounded-lg border border-border/30 bg-background/20 p-2 min-h-0 flex flex-col">
+              <div className="rounded-lg border border-border/90 bg-background/88 p-2 min-h-0 flex flex-col">
                 <div className="mb-2 flex items-center justify-between shrink-0">
                   <span className="section-label-sm">Input</span>
                   <Badge variant="secondary" className="h-5 text-2xs">
@@ -1291,7 +1291,7 @@ export function TextForgeView() {
                 <TooltipWrapper content="Swap: move output into input">
                   <button
                     type="button"
-                    className="h-11 w-11 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-smooth flex items-center justify-center shrink-0"
+                    className="h-11 w-11 rounded-full border border-primary/88 bg-primary/80 hover:bg-primary/84 transition-smooth flex items-center justify-center shrink-0"
                     onClick={flipPanes}
                   >
                     <ArrowRightLeft className="h-4 w-4 text-primary" />
@@ -1301,7 +1301,7 @@ export function TextForgeView() {
                 <TooltipWrapper content="Diff: line changes vs input">
                   <button
                     type="button"
-                    className={cn(gutterBtn, diffMode && "border-primary/50 bg-primary/15 text-primary")}
+                    className={cn(gutterBtn, diffMode && "border-primary/90 bg-primary/80 text-primary")}
                     onClick={() => setDiffMode((d) => !d)}
                     aria-pressed={diffMode}
                   >
@@ -1333,8 +1333,8 @@ export function TextForgeView() {
 
               <div
                 className={cn(
-                  "rounded-lg border border-border/30 bg-background/20 p-2 min-h-0 flex flex-col",
-                  diffMode && "ring-1 ring-primary/25",
+                  "rounded-lg border border-border/90 bg-background/88 p-2 min-h-0 flex flex-col",
+                  diffMode && "ring-1 ring-primary/84",
                 )}
               >
                 <div className="mb-2 flex items-center justify-between gap-2 shrink-0">

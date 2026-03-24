@@ -69,6 +69,18 @@
 .inlineRow {
   min-width: 0;
   flex: 1 1 auto;
+  /*
+   * Align the tool row (Local / env picker) with the main sidebar’s right edge.
+   * --app-sidebar-rail-width is set on `.appShell` (matches Sidebar `w-16` / `w-56`).
+   * --header-left-inset is set on `<header>` (matches `.headerRoot` horizontal padding).
+   * Toggle is `.header-icon-button` (2rem); gap matches `.leftZone` (0.5rem).
+   */
+  margin-left: max(
+    0px,
+    calc(
+      var(--app-sidebar-rail-width, 14rem) - var(--header-left-inset, 0.625rem) - 2rem - 0.5rem
+    )
+  );
 }
 
 .toolWidget {
@@ -82,6 +94,12 @@
 .toolWidgetCustom {
   min-width: 0;
   flex: 1 1 auto;
+}
+
+/* Without this, an empty portal target grows and shoves ExecutionContextSelector to the
+   far right of the header tool strip (Registration, Network, etc.). */
+.toolWidgetCustom:empty {
+  flex: 0 1 auto;
 }
 
 .execWrap {
@@ -118,16 +136,16 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  box-shadow: none;
   color: hsl(var(--muted-foreground) / 0.95);
   outline: none;
-  transition:
-    background-color var(--motion-duration-micro) var(--motion-ease-micro),
-    color var(--motion-duration-micro) var(--motion-ease-micro);
+  transition: color var(--motion-duration-micro) var(--motion-ease-micro);
 }
 
 .historyNavBtn:hover {
-  background: hsl(var(--foreground) / 0.06);
-  color: hsl(var(--foreground) / 0.92);
+  color: hsl(var(--foreground) / 0.95);
 }
 
 .historyNavBtn:focus-visible {
@@ -144,9 +162,9 @@
   gap: 0.45rem;
   padding: 0.2rem 0.65rem 0.2rem 0.5rem;
   border-radius: var(--radius-md);
-  border: 1px solid hsl(var(--border) / 0.5);
-  background: hsl(var(--muted) / 0.24);
-  box-shadow: inset 0 1px 0 0 hsl(var(--foreground) / 0.05);
+  border: 1px solid hsl(var(--border) / 0.58);
+  background: hsl(var(--muted) / 0.52);
+  box-shadow: inset 0 1px 0 0 hsl(var(--foreground) / 0.08);
   cursor: pointer;
   outline: none;
   color: hsl(var(--muted-foreground) / 0.95);
@@ -168,9 +186,9 @@
 }
 
 .paletteCenterTrigger:hover {
-  border-color: hsl(var(--border) / 0.72);
-  background: hsl(var(--muted) / 0.34);
-  color: hsl(var(--foreground) / 0.88);
+  border-color: hsl(var(--border) / 0.78);
+  background: hsl(var(--muted) / 0.62);
+  color: hsl(var(--foreground) / 0.92);
 }
 
 .paletteCenterTrigger:focus-visible {
@@ -182,8 +200,8 @@
 .paletteCenterKbd {
   flex-shrink: 0;
   border-radius: 0.3rem;
-  border: 1px solid hsl(var(--border) / 0.45);
-  background: hsl(var(--background) / 0.55);
+  border: 1px solid hsl(var(--border) / 0.55);
+  background: hsl(var(--card) / 0.85);
   padding: 0.1rem 0.35rem;
   font-family: ui-monospace, monospace;
   font-size: 0.625rem;

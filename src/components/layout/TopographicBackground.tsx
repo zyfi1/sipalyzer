@@ -1,7 +1,10 @@
 import { memo, useMemo } from "react";
 
-const W = 1920;
-const H = 1080;
+/** 4K UHD viewBox (16:9) — finer path coordinates when scaled on large / HiDPI displays */
+const VIEWBOX_W = 3840;
+const VIEWBOX_H = 2160;
+/** Same relative line weight as the former 0.8 stroke at 1920×1080 */
+const STROKE_WIDTH = 0.8 * (VIEWBOX_W / 1920);
 const STIRLING_CASTLE_LAT = 56.123315;
 const STIRLING_CASTLE_LON = -3.949583;
 
@@ -99,15 +102,15 @@ function toPath(points: Array<[number, number]>, minLon: number, maxLon: number,
   const step = points.length > 80 ? 2 : 1;
   const reduced = points.filter((_, i) => i % step === 0 || i === points.length - 1);
   const mapPoint = ([lon, lat]: [number, number]) => {
-    const x = ((lon - minLon) / (maxLon - minLon)) * W;
-    const y = H - ((lat - minLat) / (maxLat - minLat)) * H;
+    const x = ((lon - minLon) / (maxLon - minLon)) * VIEWBOX_W;
+    const y = VIEWBOX_H - ((lat - minLat) / (maxLat - minLat)) * VIEWBOX_H;
     return [x, y] as const;
   };
   const [x0, y0] = mapPoint(reduced[0]!);
-  let d = `M ${x0.toFixed(1)} ${y0.toFixed(1)}`;
+  let d = `M ${x0.toFixed(2)} ${y0.toFixed(2)}`;
   for (let i = 1; i < reduced.length; i++) {
     const [x, y] = mapPoint(reduced[i]!);
-    d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    d += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
   }
   return d;
 }
@@ -131,9 +134,10 @@ export const TopographicBackground = memo(function TopographicBackground() {
     <>
       <svg
         className="absolute inset-0 z-0 pointer-events-none"
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
         preserveAspectRatio="xMidYMid slice"
         fill="none"
+        shapeRendering="geometricPrecision"
         style={{ borderRadius: "inherit", width: "100%", height: "100%" }}
         aria-hidden="true"
       >
@@ -142,13 +146,13 @@ export const TopographicBackground = memo(function TopographicBackground() {
             key={i}
             d={p.d}
             stroke="hsl(var(--foreground))"
-            strokeWidth={0.8}
-            strokeOpacity={p.elevation >= 90 ? 0.09 : p.elevation >= 80 ? 0.075 : 0.065}
+            strokeWidth={STROKE_WIDTH}
+            strokeOpacity={p.elevation >= 90 ? 0.045 : p.elevation >= 80 ? 0.038 : 0.032}
             fill="none"
           />
         ))}
       </svg>
-      <div className="absolute bottom-3 right-3 z-0 font-mono text-[11px] tracking-wide text-foreground/20 pointer-events-none select-none">
+      <div className="absolute bottom-3 right-3 z-0 font-mono text-[11px] tracking-wide text-foreground/34 pointer-events-none select-none">
         <span>{STIRLING_CASTLE_LAT.toFixed(6)}, {STIRLING_CASTLE_LON.toFixed(6)}</span>
       </div>
     </>

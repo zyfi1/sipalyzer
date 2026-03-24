@@ -1,5 +1,7 @@
-use std::net::IpAddr;
-use crate::packet_capture::{Protocol, PacketInfo, protocol_decoder};
+use std::net::{IpAddr, Ipv4Addr};
+use crate::packet_capture::{
+    PacketFidelity, PacketProvenance, Protocol, PacketInfo, protocol_decoder,
+};
 
 /// Efficient, single-pass packet parser
 /// Handles all link layer types and protocols correctly
@@ -29,6 +31,33 @@ impl PacketParser {
         self.link_layer_type
     }
 
+    /// One row per frame when we cannot extract IPv4/IPv6 (Wi‑Fi L2, ARP, odd VLAN stacks, etc.).
+    /// Keeps live ring buffers and packet counts moving; empty `FilterConfig` still matches these.
+    fn opaque_raw_frame(&self, packet: &pcap::Packet, packet_count: Option<u64>) -> PacketInfo {
+        let raw = packet.data.to_vec();
+        PacketInfo {
+            timestamp: self.parse_timestamp(&packet.header),
+            src_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            dst_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            src_port: 0,
+            dst_port: 0,
+            protocol: Protocol::Other,
+            size: raw.len(),
+            frame_length: raw.len(),
+            raw_frame: Some(raw.clone()),
+            data: raw,
+            decoded: protocol_decoder::decode_packet(
+                packet.data,
+                Some(self.link_layer_type),
+                packet_count,
+                self.rtp_port_range,
+            )
+            .ok(),
+            fidelity: PacketFidelity::Authoritative,
+            provenance: PacketProvenance::LocalCapture,
+        }
+    }
+
     /// Parse a raw packet into PacketInfo
     /// Single-pass, efficient parsing with proper error handling
     pub fn parse(&self, packet: &pcap::Packet, packet_count: Option<u64>) -> Option<PacketInfo> {
@@ -36,13 +65,28 @@ impl PacketParser {
             return None;
         }
 
+        // 802.11 (DLT 12) and radiotap (DLT 127): no IP extraction path yet.
+        if matches!(self.link_layer_type, 12 | 127) {
+            return Some(self.opaque_raw_frame(packet, packet_count));
+        }
+
         // Extract IP layer based on link layer type (returns owned Vec to avoid lifetime issues)
         let ip_data = match self.extract_ip_layer_owned(packet.data) {
             Some(data) => data,
-            None => return None,
+            None => {
+                // Ethernet (DLT 1): ARP, LLDP, Q‑in‑Q stacks we did not peel, or Npcap edge formats
+                // used to yield None here → zero packets in the live buffer despite a busy NIC.
+                if self.link_layer_type == 1 {
+                    return Some(self.opaque_raw_frame(packet, packet_count));
+                }
+                return None;
+            }
         };
 
         if ip_data.len() < 20 {
+            if self.link_layer_type == 1 {
+                return Some(self.opaque_raw_frame(packet, packet_count));
+            }
             return None;
         }
 
@@ -74,14 +118,29 @@ impl PacketParser {
             let (transport_proto, transport_offset) = Self::skip_ipv6_ext_headers(&ip_data);
             (src_ip, dst_ip, transport_proto, transport_offset, transport_offset)
         } else {
+            if self.link_layer_type == 1 {
+                return Some(self.opaque_raw_frame(packet, packet_count));
+            }
             return None;
         };
 
         // Parse transport layer and detect protocol
         let transport_data = &ip_data[transport_start..];
         let (src_port, dst_port, payload, detected_protocol) = match ip_protocol {
-            17 => self.parse_udp(transport_data, src_ip, dst_ip)?,
-            6 => self.parse_tcp(transport_data, src_ip, dst_ip)?,
+            17 => match self.parse_udp(transport_data, src_ip, dst_ip) {
+                Some(p) => p,
+                None if self.link_layer_type == 1 => {
+                    return Some(self.opaque_raw_frame(packet, packet_count));
+                }
+                None => return None,
+            },
+            6 => match self.parse_tcp(transport_data, src_ip, dst_ip) {
+                Some(p) => p,
+                None if self.link_layer_type == 1 => {
+                    return Some(self.opaque_raw_frame(packet, packet_count));
+                }
+                None => return None,
+            },
             1 => {
                 // ICMP (IPv4 only; IPv6 ICMPv6 would be next_header 58)
                 return Some(PacketInfo {
@@ -379,7 +438,7 @@ impl PacketParser {
 
     fn parse_timestamp(&self, header: &pcap::PacketHeader) -> chrono::DateTime<chrono::Utc> {
         chrono::DateTime::from_timestamp(
-            header.ts.tv_sec,
+            header.ts.tv_sec.into(),
             (header.ts.tv_usec as u32) * 1000,
         ).unwrap_or_else(|| chrono::Utc::now())
     }

@@ -174,6 +174,7 @@ function AppContent() {
     }))
   );
   const packetViewerSessionId = useOpenCaptureStore((s) => s.modalSessionId);
+  const isSidebarCollapsed = useSidebarStore((s) => s.isCollapsed);
   const onGlobalContextMenu = useGlobalContextMenuHandler();
   const activeRegistrarId = useSoftphoneStore((s) => s.activeRegistrarId);
   const setInboundListenerStatus = useSoftphoneStore((s) => s.setInboundListenerStatus);
@@ -1195,7 +1196,8 @@ function AppContent() {
           data-app-context-menu-root=""
           data-visibility={highVisibility ? "high" : "default"}
           data-motion={reducedMotion ? "reduced" : "default"}
-          style={{ height: "100vh", width: "100vw" }}
+          {...(isSidebarCollapsed ? { "data-sidebar-collapsed": "" } : {})}
+          style={{ height: "100vh", width: "100%", maxWidth: "100%" }}
           onContextMenu={onGlobalContextMenu}
         >
       <LoadingOverlay />

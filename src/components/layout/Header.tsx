@@ -85,6 +85,11 @@ export function Header({
         styles.headerRoot,
         isMac && styles.headerMac,
       )}
+      style={
+        {
+          ["--header-left-inset" as string]: isMac ? "5.25rem" : "0.625rem",
+        } as React.CSSProperties
+      }
       data-tauri-drag-region={isMac ? "" : undefined}
       onMouseDown={handleTitleMouseDown}
     >

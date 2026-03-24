@@ -234,12 +234,12 @@ export function IpBadge() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <p className="font-medium text-foreground leading-snug">{label} connection</p>
-                <span className={cn("text-2xs rounded-full px-1.5 py-0.5 border border-border/50 bg-muted/35", qualityClass)}>
+                <span className={cn("text-2xs rounded-full px-1.5 py-0.5 border border-border/90 bg-muted/86", qualityClass)}>
                   {qualityLabel}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground leading-snug truncate">{qualityHint}</p>
-              <div className="text-2xs text-muted-foreground/85 flex items-center gap-1.5 truncate">
+              <div className="text-2xs text-muted-foreground/96 flex items-center gap-1.5 truncate">
                 <MapPin className="h-3 w-3 shrink-0" />
                 {geoStatus === "running" ? (
                   <span>Locating WAN endpoint...</span>
@@ -252,20 +252,20 @@ export function IpBadge() {
                 )}
               </div>
               {geoMeta ? (
-                <div className="text-2xs text-muted-foreground/75 truncate">{geoMeta}</div>
+                <div className="text-2xs text-muted-foreground/89 truncate">{geoMeta}</div>
               ) : null}
               {geoResult?.source ? (
-                <div className="text-3xs text-muted-foreground/65 truncate">
+                <div className="text-3xs text-muted-foreground/79 truncate">
                   Source: {geoResult.source}
                 </div>
               ) : null}
               {geoStatus === "error" && geoResult?.error ? (
-                <div className="text-3xs text-warning/90 truncate">
+                <div className="text-3xs text-warning/94 truncate">
                   {geoResult.error}
                 </div>
               ) : null}
             </div>
-            <div className="relative h-[86px] w-[142px] rounded-md border border-border/40 bg-sidebar/65 overflow-hidden shrink-0">
+            <div className="relative h-[86px] w-[142px] rounded-md border border-border/88 bg-sidebar/92 overflow-hidden shrink-0">
               {hasGeoCoords ? (
                 <>
                   <div className="absolute inset-0">
@@ -289,55 +289,55 @@ export function IpBadge() {
                 <>
                   <div className="absolute inset-0 opacity-70 [background-image:linear-gradient(to_right,hsl(var(--border)/0.35)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.35)_1px,transparent_1px)] [background-size:16px_16px]" />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.18),transparent_55%),radial-gradient(circle_at_80%_70%,hsl(var(--accent)/0.15),transparent_60%)]" />
-                  <Globe className="absolute left-1/2 top-1/2 h-4 w-4 text-muted-foreground/60 -translate-x-1/2 -translate-y-1/2" />
+                  <Globe className="absolute left-1/2 top-1/2 h-4 w-4 text-muted-foreground/74 -translate-x-1/2 -translate-y-1/2" />
                 </>
               )}
-              <div className="pointer-events-none absolute left-1.5 bottom-1 rounded-[4px] border border-border/40 bg-background/80 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+              <div className="pointer-events-none absolute left-1.5 bottom-1 rounded-[4px] border border-border/88 bg-background/96 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
                 WAN map
               </div>
             </div>
           </div>
 
-          <div className="h-px w-full bg-border/40" />
+          <div className="h-px w-full bg-border/88" />
 
           <div className="grid grid-cols-2 gap-1.5">
-            <div className="rounded-md border border-border/40 bg-muted/30 px-2 py-1">
+            <div className="rounded-md border border-border/88 bg-muted/86 px-2 py-1">
               <p className="text-2xs text-muted-foreground">Local IP</p>
               {localIp ? (
                 <button
                   type="button"
                   onClick={() => void copyIp(localIp, "local")}
-                  className="mt-0.5 text-xs text-foreground/90 tabular-nums underline-offset-2 hover:underline"
+                  className="mt-0.5 text-xs text-foreground/94 tabular-nums underline-offset-2 hover:underline"
                   title="Click to copy"
                 >
                   {localIp}
                 </button>
               ) : (
-                <p className="mt-0.5 text-xs text-foreground/80">{loadingLocal ? "Detecting…" : "Unavailable"}</p>
+                <p className="mt-0.5 text-xs text-foreground/94">{loadingLocal ? "Detecting…" : "Unavailable"}</p>
               )}
               {copiedField === "local" && <p className="text-2xs text-success mt-0.5">Copied</p>}
             </div>
 
-            <div className="rounded-md border border-border/40 bg-muted/30 px-2 py-1">
+            <div className="rounded-md border border-border/88 bg-muted/86 px-2 py-1">
               <p className="text-2xs text-muted-foreground">WAN IP</p>
               {wanIp ? (
                 <button
                   type="button"
                   onClick={() => void copyIp(wanIp, "wan")}
-                  className="mt-0.5 text-xs text-foreground/90 tabular-nums underline-offset-2 hover:underline"
+                  className="mt-0.5 text-xs text-foreground/94 tabular-nums underline-offset-2 hover:underline"
                   title="Click to copy"
                 >
                   {wanIp}
                 </button>
               ) : (
-                <p className="mt-0.5 text-xs text-foreground/80">{loadingWan ? "Detecting…" : "Unavailable"}</p>
+                <p className="mt-0.5 text-xs text-foreground/94">{loadingWan ? "Detecting…" : "Unavailable"}</p>
               )}
               {copiedField === "wan" && <p className="text-2xs text-success mt-0.5">Copied</p>}
             </div>
           </div>
 
           {geoResult?.timezone ? (
-            <div className="text-2xs text-muted-foreground/80">Timezone: {geoResult.timezone}</div>
+            <div className="text-2xs text-muted-foreground/94">Timezone: {geoResult.timezone}</div>
           ) : null}
         </div>
       }

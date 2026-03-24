@@ -75,9 +75,9 @@ export function WindowControls() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   const btn = cn(
-    "h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground",
+    "header-icon-button",
     "transition-smooth ui-hover-press motion-reduce:transform-none",
-    "outline-none focus-visible:shadow-focus"
+    "outline-none focus-visible:shadow-focus",
   );
 
   // On macOS we use native traffic-light controls from the titlebar.
@@ -90,7 +90,7 @@ export function WindowControls() {
         <button
           type="button"
           onClick={minimize}
-          className={cn(btn, "hover:bg-muted/50 hover:text-foreground")}
+          className={cn(btn, "hover:bg-transparent hover:text-foreground")}
           aria-label="Minimize"
         >
           <Minus className="h-3.5 w-3.5" />
@@ -105,7 +105,7 @@ export function WindowControls() {
         <button
           type="button"
           onClick={toggleMaximize}
-          className={cn(btn, "hover:bg-muted/50 hover:text-foreground")}
+          className={cn(btn, "hover:bg-transparent hover:text-foreground")}
           aria-label={maximized ? "Restore" : "Maximize"}
         >
         {maximized ? (
@@ -121,7 +121,7 @@ export function WindowControls() {
         <button
           type="button"
           onClick={close}
-          className={cn(btn, "hover:bg-destructive/15 hover:text-destructive")}
+          className={cn(btn, "hover:bg-transparent hover:text-destructive")}
           aria-label="Close"
         >
           <X className="h-3.5 w-3.5" />

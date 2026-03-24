@@ -65,6 +65,8 @@ import { getPacketRowTint, getProtocolLabelColor } from "./packetProtocolStyles"
 /** Row height in px (fixed for virtualization). */
 const ROW_HEIGHT = 28;
 const OVERSCAN = 20;
+/** When the scroll pane still reports 0 height, still paint this many rows so packets are visible. */
+const FALLBACK_VISIBLE_ROWS = 250;
 
 /** Map column ids to educational tooltip entries. */
 const COLUMN_TOOLTIPS: Partial<Record<ColumnId, { title: string; description?: string }>> = {
@@ -690,17 +692,52 @@ export function WarperPacketList({
 
   // ── Scroll / virtualizer ──────────────────────────────────────────
 
-  // Measure scroll container
-  useEffect(() => {
+  // Measure scroll container. If the first layout runs while the list is inside
+  // `display: none` (e.g. inactive Radix TabsContent), clientHeight stays 0 and the
+  // virtualizer renders zero rows forever unless we remeasure when visible/size changes.
+  useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      if (scrollRef.current) setContainerHeight(scrollRef.current.clientHeight);
-    });
+
+    const measure = () => {
+      const node = scrollRef.current;
+      if (!node) return;
+      const h = node.clientHeight;
+      setContainerHeight((prev) => (h !== prev ? h : prev));
+    };
+
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setContainerHeight(el.clientHeight);
-    return () => ro.disconnect();
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) measure();
+        }
+      },
+      { root: null, threshold: 0 },
+    );
+    io.observe(el);
+
+    measure();
+    const raf = requestAnimationFrame(measure);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      io.disconnect();
+    };
   }, []);
+
+  // Packets can arrive before flex layout gives the scroll pane a height; remeasure when data shows up.
+  useLayoutEffect(() => {
+    if (sortedPackets.length === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const h = el.clientHeight;
+    if (h <= 0) return;
+    setContainerHeight((prev) => (h !== prev ? h : prev));
+  }, [sortedPackets.length]);
 
   // RAF-throttled scroll tracking
   const rafRef = useRef(0);
@@ -715,14 +752,19 @@ export function WarperPacketList({
 
   const totalHeight = sortedPackets.length * ROW_HEIGHT;
 
-  // Visible range — O(1)
+  // Visible range — O(1). If containerHeight is still 0 (hidden tab, incomplete flex layout),
+  // render a capped window so rows are not clipped to zero.
   const startIdx = useMemo(() => {
-    if (sortedPackets.length === 0 || containerHeight <= 0) return 0;
+    if (sortedPackets.length === 0) return 0;
+    if (containerHeight <= 0) return 0;
     return Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   }, [scrollTop, containerHeight, sortedPackets.length]);
 
   const endIdx = useMemo(() => {
-    if (sortedPackets.length === 0 || containerHeight <= 0) return 0;
+    if (sortedPackets.length === 0) return 0;
+    if (containerHeight <= 0) {
+      return Math.min(sortedPackets.length, FALLBACK_VISIBLE_ROWS);
+    }
     return Math.min(sortedPackets.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN);
   }, [scrollTop, containerHeight, sortedPackets.length]);
 
