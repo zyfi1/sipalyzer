@@ -108,9 +108,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "registry"] }
 
 [features]
-default = []
-# Explicit opt-in for host-native build/link steps in build.rs.
-# Default builds stay agnostic and skip SpanDSP/Vosk probing/tooling.
+default = ["native_extensions"]
+# Host-native SpanDSP + libtiff link/bindings when bundled artifacts exist.
+# Use `cargo build --no-default-features` to skip (e.g. CI without vendor DLLs).
 native_extensions = []
 # Internal cfg gate used by Rust code paths when native bindings are available.
 # This is set by build.rs during native_extensions builds.

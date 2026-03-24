@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,17 +8,29 @@ const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = join(ROOT, "src-tauri", "vendor", "libs", "manifest.json");
 
 function parseArgs(argv) {
-  const args = { strict: false, target: null, enforceAll: false };
+  const args = { strict: false, target: null, enforceAll: false, currentHost: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--strict") args.strict = true;
     if (a === "--enforce-all") args.enforceAll = true;
+    if (a === "--current-host") args.currentHost = true;
     if (a === "--target") {
       args.target = argv[i + 1] ?? null;
       i++;
     }
   }
   return args;
+}
+
+/** Rust host triple for this machine (`rustc -vV`). */
+function rustcHostTriple() {
+  try {
+    const v = execSync("rustc -vV", { encoding: "utf8" });
+    const m = v.match(/^host:\s*(.+)$/m);
+    return m ? m[1].trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function checkTarget(baseDir, target, spec) {
@@ -37,6 +50,26 @@ function main() {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const targets = manifest.targets ?? {};
   const baseDir = join(ROOT, "src-tauri", "vendor", "libs");
+
+  if (args.currentHost) {
+    if (args.target) {
+      console.error("Use either --target or --current-host, not both.");
+      process.exit(1);
+    }
+    const host = rustcHostTriple();
+    if (!host) {
+      console.error("Could not run `rustc -vV` or parse host triple.");
+      process.exit(1);
+    }
+    if (!targets[host]) {
+      console.error(
+        `No vendor/libs manifest entry for this host (${host}). Add it to manifest.json.`
+      );
+      process.exit(1);
+    }
+    args.target = host;
+  }
+
   const names = args.target ? [args.target] : Object.keys(targets);
 
   if (names.length === 0) {

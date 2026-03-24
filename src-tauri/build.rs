@@ -17,9 +17,8 @@ fn main() {
     // bundled artifacts are present for the active target.
     link_vosk();
 
-    // Strict agnostic mode (default): skip SpanDSP host-native probing/tooling.
-    // Opt in with `--features native_extensions` when native SpanDSP integration
-    // is explicitly desired for local/dev or distribution builds.
+    // SpanDSP is on by default (`native_extensions` in default features).
+    // Disable with `cargo build --no-default-features` when vendor libs are absent.
     if native_extensions_enabled() {
         link_spandsp();
     } else {
@@ -30,6 +29,73 @@ fn main() {
     #[cfg(target_os = "macos")]
     {
         println!("cargo:rustc-link-lib=framework=Foundation");
+    }
+
+    // Windows target: ship runtime DLLs next to the .exe (SpanDSP, TIFF, Vosk, MinGW, wpcap/Packet shims).
+    // Live interface capture still needs an Npcap (or WinPcap) driver install — not bundled; PCAP file features work without it.
+    // Use TARGET (not cfg!(target_os): build.rs is built for the host).
+    if target_triple().contains("windows") {
+        copy_windows_runtime_dlls_next_to_exe();
+    }
+}
+
+/// Copy bundled `vendor/libs/<target>/*.dll` into `target/<profile>/` so `sipalyzer.exe` and the NSIS bundle resolve dependencies.
+fn copy_windows_runtime_dlls_next_to_exe() {
+    let bundle_dir = native_bundle_dir();
+    if !bundle_dir.is_dir() {
+        return;
+    }
+
+    let Ok(profile) = env::var("PROFILE") else {
+        return;
+    };
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let target_dir = env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| manifest_dir.join("target"));
+    let dest_dir = target_dir.join(&profile);
+    if let Err(e) = std::fs::create_dir_all(&dest_dir) {
+        println!(
+            "cargo:warning=could not create {}: {}",
+            dest_dir.display(),
+            e
+        );
+        return;
+    }
+
+    let entries = match std::fs::read_dir(&bundle_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            println!(
+                "cargo:warning=could not read {}: {}",
+                bundle_dir.display(),
+                e
+            );
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("dll") {
+            continue;
+        }
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        let dest = dest_dir.join(name);
+        match std::fs::copy(&path, &dest) {
+            Ok(_) => {
+                eprintln!("build.rs: copied {} -> {}", path.display(), dest.display());
+                println!("cargo:rerun-if-changed={}", path.display());
+            }
+            Err(e) => println!(
+                "cargo:warning=failed to copy DLL {} to {}: {}",
+                path.display(),
+                dest.display(),
+                e
+            ),
+        }
     }
 }
 
