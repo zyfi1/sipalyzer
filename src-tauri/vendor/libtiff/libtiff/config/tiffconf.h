@@ -9,7 +9,15 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <sys/types.h>  /* For ssize_t */
+
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+/* MSVC: signed size type for libtiff I/O (matches POSIX ssize_t) */
+#define TIFF_SSIZE_T SSIZE_T
+#else
+#include <sys/types.h>
+#define TIFF_SSIZE_T ssize_t
+#endif
 
 /* Use standard C99 types */
 #define TIFF_INT8_T int8_t
@@ -20,7 +28,6 @@
 #define TIFF_UINT16_T uint16_t
 #define TIFF_UINT32_T uint32_t
 #define TIFF_UINT64_T uint64_t
-#define TIFF_SSIZE_T ssize_t
 
 /* Format specifiers for printf */
 #define TIFF_SSIZE_FORMAT "zd"

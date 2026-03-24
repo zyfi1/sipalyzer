@@ -165,19 +165,27 @@ fn link_spandsp() {
     
     if bundled_spandsp.exists() && bundled_tiff.exists() {
         eprintln!("build.rs: using bundled SpanDSP libraries from {}", bundle_dir.display());
+
+        // Bundled Windows DLLs are built with MinGW; linking + compiling UDPTL/bindgen with MSVC
+        // hits incompatible CRT, missing jpeg headers, and symbol clashes. Ship DLLs next to the
+        // exe (see copy step) but use Rust fax fallbacks (`spandsp-native` off) for this target.
+        if target_triple().contains("msvc") {
+            println!("cargo:warning=Windows MSVC: SpanDSP/TIFF DLLs are packaged but not linked at build time; fax/T.38 uses Rust fallbacks until a MSVC-safe native path exists.");
+            return;
+        }
+
         println!("cargo:rustc-link-search=native={}", bundle_dir.display());
         println!("cargo:rustc-link-lib=dylib=spandsp");
         println!("cargo:rustc-link-lib=dylib=tiff");
-        
+
         // Set rpath for bundled libraries in macOS app bundle
         // The frameworks are placed in Contents/Frameworks/
         #[cfg(target_os = "macos")]
         {
             println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
         }
-        
+
         let mut native_bindings_ready = false;
-        // Generate bindings using bundled headers only (strict agnostic native path).
         let bundled_include = bundle_dir.join("include");
         if bundled_include.exists() {
             compile_native_udptl(&bundled_include);
@@ -214,20 +222,34 @@ fn compile_native_udptl(spandsp_include: &PathBuf) {
     
     eprintln!("build.rs: compiling native SpanDSP UDPTL from {:?}", udptl_c);
     println!("cargo:rerun-if-changed={}", udptl_c.display());
-    
-    cc::Build::new()
+
+    let compat_hdr = udptl_h_dir.join("udptl_compat.h");
+    let libtiff_include = manifest_dir.join("vendor").join("libtiff").join("libtiff");
+    let libtiff_config = libtiff_include.join("config");
+    let mut build = cc::Build::new();
+    build
         .file(&udptl_c)
         .include(spandsp_include)
         .include(&udptl_h_dir)
-        // Required for access to SpanDSP internal structures (logging_state_t fields, etc.)
         .define("SPANDSP_EXPOSE_INTERNAL_STRUCTURES", None)
         .define("HAVE_STDBOOL_H", None)
-        // Provide span_alloc/span_free (internal SpanDSP functions not in the public API)
-        .include(&udptl_h_dir) // contains udptl_compat.h
-        .flag("-include")
-        .flag(&udptl_h_dir.join("udptl_compat.h").to_string_lossy().into_owned())
-        .warnings(false)
-        .compile("udptl");
+        .warnings(false);
+    if libtiff_include.join("tiffio.h").is_file() {
+        build.include(&libtiff_include);
+    }
+    if libtiff_config.join("tiffconf.h").is_file() {
+        build.include(&libtiff_config);
+    }
+
+    let target = env::var("TARGET").unwrap_or_default();
+    if target.contains("msvc") {
+        // MSVC: force-include compat header (clang/gcc `-include` is not valid for cl.exe)
+        build.flag(&format!("/FI{}", compat_hdr.display()));
+    } else {
+        build.flag("-include").flag(compat_hdr.to_string_lossy().as_ref());
+    }
+
+    build.compile("udptl");
 }
 
 fn generate_bindings(include_path: &PathBuf, out_dir: &PathBuf) {

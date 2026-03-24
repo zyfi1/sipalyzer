@@ -65,6 +65,8 @@ tiff = "0.9"
 surge-ping = "0.8"
 socket2 = { version = "0.5", features = ["all"] }
 snmp2 = { version = "0.4.14", features = ["v3"] }
+# snmp2 → openssl-sys; vendored avoids a Windows OpenSSL install (OPENSSL_DIR) at build time
+openssl = { version = "0.10", features = ["vendored"] }
 
 # Enterprise packet monitor dependencies
 crossbeam-channel = "0.5"

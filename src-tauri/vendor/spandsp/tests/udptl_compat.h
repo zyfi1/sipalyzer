@@ -10,7 +10,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#if defined(_WIN32)
+#include <winsock2.h>
+#else
 #include <arpa/inet.h>
+#endif
 
 /* Memory allocation — span_alloc/span_free are internal SpanDSP wrappers around malloc/free */
 #ifndef span_alloc
