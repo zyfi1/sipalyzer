@@ -9,7 +9,8 @@ import {
 
 describe("release updater channels", () => {
   it("matches supported channels", () => {
-    expect(RELEASE_CHANNELS).toEqual(["main", "rc", "beta"]);
+    expect(RELEASE_CHANNELS).toEqual(["beta", "rc", "main"]);
+    expect(DEFAULT_RELEASE_CHANNEL).toBe("beta");
   });
 
   it("validates channels", () => {

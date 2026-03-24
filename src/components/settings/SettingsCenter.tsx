@@ -867,7 +867,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                     }))}
                   />
                   <p className={settingsStyles.textXsMuted}>
-                    Main is the full release channel. Beta and RC receive pre-release builds.
+                    Beta is the default pre-release channel (newest builds). RC is late-stage prerelease; main is the stable release line.
                   </p>
                 </div>
                 <div className={settingsStyles.stack2}>

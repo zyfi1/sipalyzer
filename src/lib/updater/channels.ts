@@ -1,8 +1,8 @@
-export const RELEASE_CHANNELS = ["main", "rc", "beta"] as const;
+export const RELEASE_CHANNELS = ["beta", "rc", "main"] as const;
 
 export type ReleaseChannel = (typeof RELEASE_CHANNELS)[number];
 
-export const DEFAULT_RELEASE_CHANNEL: ReleaseChannel = "main";
+export const DEFAULT_RELEASE_CHANNEL: ReleaseChannel = "beta";
 
 export function isReleaseChannel(value: string): value is ReleaseChannel {
   return RELEASE_CHANNELS.includes(value as ReleaseChannel);

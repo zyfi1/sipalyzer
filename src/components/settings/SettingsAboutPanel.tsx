@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, ChevronDown, Code, ExternalLink, FileSearch, Info, LayoutDashboard, Monitor, Network, PhoneCall, Printer, Satellite, Shield, Sparkles, StickyNote, Toolbox, Wifi, Wrench, X, Zap } from "@/lib/icons";
+import { ChevronDown, Code, ExternalLink, FileSearch, Info, LayoutDashboard, Monitor, Network, Package, PhoneCall, Printer, Satellite, Shield, Sparkles, StickyNote, Toolbox, Wrench, X, Zap } from "@/lib/icons";
 import packageManifest from "../../../package.json";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
@@ -24,6 +24,7 @@ const BACKEND_DEPS = [
   { name: "tauri-plugin-shell", license: "MIT/Apache-2.0", url: "https://github.com/tauri-apps/tauri" },
   { name: "tauri-plugin-fs", license: "MIT/Apache-2.0", url: "https://github.com/tauri-apps/tauri" },
   { name: "tauri-plugin-dialog", license: "MIT/Apache-2.0", url: "https://github.com/tauri-apps/tauri" },
+  { name: "tauri-plugin-updater", license: "MIT/Apache-2.0", url: "https://github.com/tauri-apps/tauri" },
   { name: "tokio", license: "MIT", url: "https://github.com/tokio-rs/tokio" },
   { name: "serde / serde_json", license: "MIT/Apache-2.0", url: "https://github.com/serde-rs/serde" },
   { name: "rusqlite (bundled-sqlcipher)", license: "MIT", url: "https://github.com/rusqlite/rusqlite" },
@@ -72,7 +73,8 @@ const BACKEND_DEPS = [
   { name: "tar / bzip2", license: "MIT/Apache-2.0", url: "https://github.com/alexcrichton/tar-rs" },
   { name: "tempfile", license: "MIT/Apache-2.0", url: "https://github.com/Stebalien/tempfile" },
   { name: "lettre", license: "MIT", url: "https://github.com/lettre/lettre" },
-  { name: "tracing (Rust)", license: "MIT/Apache-2.0", url: "https://github.com/tokio-rs/tracing" },
+  { name: "tracing / tracing-subscriber", license: "MIT/Apache-2.0", url: "https://github.com/tokio-rs/tracing" },
+  { name: "url (Rust)", license: "MIT/Apache-2.0", url: "https://github.com/servo/rust-url" },
   { name: "urlencoding", license: "MIT", url: "https://github.com/nickel-org/urlencoding" },
   { name: "cc", license: "MIT/Apache-2.0", url: "https://github.com/rust-lang/cc-rs" },
   { name: "bindgen", license: "BSD-3-Clause", url: "https://github.com/rust-lang/rust-bindgen" },
@@ -109,6 +111,9 @@ interface SettingsAboutPanelProps {
   onClose: () => void;
 }
 
+const APP_VERSION = packageManifest.version ?? "0.0.0";
+const IS_BETA_BUILD = /beta/i.test(APP_VERSION);
+
 export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
   const [packetCaptureInfoOpen, setPacketCaptureInfoOpen] = useState(false);
   return (
@@ -131,9 +136,14 @@ export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
         <div className="flex items-center gap-3">
           <img src="/icon.png" alt="SIPalyzer" className="h-12 w-12 rounded-lg object-contain shrink-0 shadow-md" />
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-base font-bold tracking-tight">SIPalyzer</span>
-              <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-accent text-foreground">v1.0.0</span>
+              <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-accent text-foreground">v{APP_VERSION}</span>
+              {IS_BETA_BUILD ? (
+                <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300">
+                  Beta
+                </span>
+              ) : null}
             </div>
             <span className="text-sm text-muted-foreground">Professional VoIP Diagnostics & Monitoring</span>
           </div>
@@ -141,12 +151,15 @@ export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
 
         <div className="flex flex-wrap gap-2">
           {([
-            { label: "Tauri", Icon: Zap },
-            { label: "React", Icon: Code },
+            { label: "Tauri 2", Icon: Zap },
+            { label: "React 18", Icon: Code },
             { label: "Rust", Icon: Shield },
             { label: "Go", Icon: Code },
             { label: "TypeScript", Icon: Code },
             { label: "Tailwind CSS", Icon: Monitor },
+            { label: "Monaco Editor", Icon: Code },
+            { label: "TipTap", Icon: Code },
+            { label: "React Flow", Icon: Monitor },
           ] as const).map((t) => (
             <span key={t.label} className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground bg-muted/40 rounded-lg">
               <t.Icon className="h-3 w-3 text-muted-foreground" />
@@ -157,19 +170,18 @@ export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
 
         <div className="grid grid-cols-2 gap-2.5">
           {([
-            { title: "Troubleshooting Dashboard", desc: "Customizable widget grid, root-cause analysis & support package export", Icon: LayoutDashboard },
-            { title: "Packet Monitor", desc: "Live multi-threaded capture with SIP flow visualization & RTP stream analysis", Icon: Activity },
-            { title: "Packet Capture", desc: "Session management, remote & scheduled captures with call flow timelines", Icon: Network },
+            { title: "Home", desc: "Unified dashboard with customizable widgets, root-cause analysis & support package export", Icon: LayoutDashboard },
+            { title: "Packet Capture", desc: "Live monitor, capture sessions, viewer, SIP flow analysis, packet diff, remote SSH capture & scheduling", Icon: Package },
             { title: "SIP Registration", desc: "Multi-registrar health monitoring, testing & bulk operations", Icon: Shield },
-            { title: "Softphone", desc: "Built-in SIP calling with G.711/G.722 codecs & real-time MOS scoring", Icon: PhoneCall },
-            { title: "Fax Center", desc: "T.38 & G.711 fax send/receive with PDF & TIFF support", Icon: Printer },
-            { title: "Device Provisioning", desc: "Config fetching, firmware catalog, diff comparison, visual designer & device layouts", Icon: FileSearch },
-            { title: "Network", desc: "Connectivity testing, probe, device discovery, VoIP quality & multicast analysis", Icon: Wifi },
-            { title: "Remote Agent", desc: "Deploy lightweight Go capture agents to remote sites with WebSocket connectivity & scheduling", Icon: Satellite },
-            { title: "Composer", desc: "HTTP/SIP request crafting, SSH terminal, collections & history", Icon: Wrench },
-            { title: "Tools", desc: "Syslog receiver, log viewer, file server & password generator", Icon: Toolbox },
+            { title: "Soft Phone", desc: "Built-in SIP calling with G.711/G.722 codecs, contacts, recordings & real-time MOS scoring", Icon: PhoneCall },
+            { title: "Fax Center", desc: "T.38 & G.711 fax send/receive with inbox, PDF & TIFF support", Icon: Printer },
+            { title: "Device Provisioning", desc: "Provision fetch, firmware catalog, contacts, device layouts, diff, visual designer & templates", Icon: FileSearch },
+            { title: "Network", desc: "Routing, connectivity, device discovery & multicast analysis", Icon: Network },
+            { title: "Remote Agent", desc: "Deploy Go capture agents with WebSocket control, registry, activity & scheduled jobs", Icon: Satellite },
+            { title: "Composer", desc: "HTTP/SIP request crafting, SSH terminal, in-app docs, collections & history", Icon: Wrench },
+            { title: "Tools", desc: "Syslog, log viewer, file server, password generator, Text Forge & optional MCP connectors", Icon: Toolbox },
             { title: "Admin Center", desc: "Protected operational controls and administration workflows for advanced operators", Icon: Shield },
-            { title: "Notes & Search", desc: "Markdown notes with tagging, folders & global command palette search", Icon: StickyNote },
+            { title: "Notes & Search", desc: "Rich notes (Markdown), tagging, folders & global command palette search", Icon: StickyNote },
           ] as const).map((f) => (
             <div key={f.title} className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/20">
               <f.Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
