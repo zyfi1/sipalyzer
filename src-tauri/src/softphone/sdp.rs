@@ -222,11 +222,7 @@ a=T38MaxBitRate:14400\r\n\
 a=T38FaxUdpEC:t38UDPRedundancy\r\n\
 a=T38FaxRateManagement:localTCF\r\n\
 a=T38FaxMaxDatagram:400\r\n",
-        sess_id,
-        sess_ver,
-        local_ip,
-        local_ip,
-        udptl_port
+        sess_id, sess_ver, local_ip, local_ip, udptl_port
     )
 }
 
@@ -239,7 +235,10 @@ mod tests {
         let sdp = build_offer("10.0.0.1", 10000, &[0, 8, 9]);
         assert!(sdp.contains("m=audio"), "SDP must contain m=audio line");
         assert!(sdp.contains("RTP/AVP"), "SDP must contain RTP/AVP");
-        assert!(sdp.contains("a=rtpmap:0 PCMU/8000"), "SDP must contain PCMU rtpmap");
+        assert!(
+            sdp.contains("a=rtpmap:0 PCMU/8000"),
+            "SDP must contain PCMU rtpmap"
+        );
         assert!(sdp.contains("a=sendrecv"), "SDP must contain sendrecv");
         assert!(sdp.len() > 150, "Full SDP should be well over 150 bytes");
     }
@@ -313,15 +312,30 @@ pub fn parse_t38_answer(sdp_body: &str) -> Option<T38NegotiatedParams> {
         }
 
         // T.38 SDP attributes (case-insensitive key matching)
-        if let Some(val) = line.strip_prefix("a=T38FaxVersion:").or_else(|| line.strip_prefix("a=T38FaxVersion=")) {
+        if let Some(val) = line
+            .strip_prefix("a=T38FaxVersion:")
+            .or_else(|| line.strip_prefix("a=T38FaxVersion="))
+        {
             params.version = val.trim().parse().unwrap_or(0);
-        } else if let Some(val) = line.strip_prefix("a=T38maxBitRate:").or_else(|| line.strip_prefix("a=T38maxBitRate=")) {
+        } else if let Some(val) = line
+            .strip_prefix("a=T38maxBitRate:")
+            .or_else(|| line.strip_prefix("a=T38maxBitRate="))
+        {
             params.max_bit_rate = val.trim().parse().unwrap_or(14400);
-        } else if let Some(val) = line.strip_prefix("a=T38FaxUdpEC:").or_else(|| line.strip_prefix("a=T38FaxUdpEC=")) {
+        } else if let Some(val) = line
+            .strip_prefix("a=T38FaxUdpEC:")
+            .or_else(|| line.strip_prefix("a=T38FaxUdpEC="))
+        {
             params.udp_ec = val.trim().to_string();
-        } else if let Some(val) = line.strip_prefix("a=T38FaxRateManagement:").or_else(|| line.strip_prefix("a=T38FaxRateManagement=")) {
+        } else if let Some(val) = line
+            .strip_prefix("a=T38FaxRateManagement:")
+            .or_else(|| line.strip_prefix("a=T38FaxRateManagement="))
+        {
             params.rate_management = val.trim().to_string();
-        } else if let Some(val) = line.strip_prefix("a=T38MaxDatagram:").or_else(|| line.strip_prefix("a=T38MaxDatagram=")) {
+        } else if let Some(val) = line
+            .strip_prefix("a=T38MaxDatagram:")
+            .or_else(|| line.strip_prefix("a=T38MaxDatagram="))
+        {
             params.max_datagram = val.trim().parse().unwrap_or(400);
         }
     }
@@ -350,11 +364,6 @@ a=rtpmap:8 PCMA/8000\r\n\
 a=rtpmap:9 G722/8000\r\n\
 a=rtpmap:101 telephone-event/8000\r\n\
 a=fmtp:101 0-16\r\n",
-        sess_id,
-        sess_ver,
-        local_ip,
-        local_ip,
-        local_rtp_port,
-        dir
+        sess_id, sess_ver, local_ip, local_ip, local_rtp_port, dir
     )
 }

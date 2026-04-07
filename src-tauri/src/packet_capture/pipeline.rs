@@ -10,21 +10,21 @@
 //! Writer thread handles batched PCAP writes asynchronously.
 //! All communication uses lock-free crossbeam channels.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
-use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 use parking_lot::RwLock;
 use pcap::{Capture, Device};
 
-use crate::packet_capture::packet_parser::PacketParser;
-use crate::packet_capture::ring_buffer::{PacketRingBuffer, LockFreePacketBuffer};
 use crate::packet_capture::live_stats::LiveStats;
-use crate::packet_capture::{FilterConfig, PacketInfo, PcapWriter, CaptureStatistics};
+use crate::packet_capture::packet_parser::PacketParser;
+use crate::packet_capture::ring_buffer::{LockFreePacketBuffer, PacketRingBuffer};
+use crate::packet_capture::{CaptureStatistics, FilterConfig, PacketInfo, PcapWriter};
 
 /// Configuration for the capture pipeline.
 #[derive(Debug, Clone)]
@@ -46,10 +46,10 @@ pub struct PipelineConfig {
 impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
-            raw_queue_size: 65536,       // 64K raw packets in queue
-            parsed_queue_size: 32768,    // 32K parsed packets in queue  
-            parser_threads: 0,           // Auto-detect
-            write_batch_size: 1000,      // Write 1000 packets at a time
+            raw_queue_size: 65536,           // 64K raw packets in queue
+            parsed_queue_size: 32768,        // 32K parsed packets in queue
+            parser_threads: 0,               // Auto-detect
+            write_batch_size: 1000,          // Write 1000 packets at a time
             ring_buffer_capacity: 2_000_000, // 2M packets
             rtp_port_range: Some((10000, 60000)),
         }
@@ -112,18 +112,18 @@ pub struct CapturePipeline {
     config: PipelineConfig,
     stop_flag: Arc<AtomicBool>,
     stats: Arc<PipelineStats>,
-    
+
     // Channels
     raw_tx: Sender<RawPacket>,
     raw_rx: Receiver<RawPacket>,
     parsed_tx: Sender<Arc<PacketInfo>>,
     parsed_rx: Receiver<Arc<PacketInfo>>,
-    
+
     // Thread handles
     capture_handle: Option<JoinHandle<()>>,
     parser_handles: Vec<JoinHandle<()>>,
     writer_handle: Option<JoinHandle<()>>,
-    
+
     // Shared state
     ring_buffer: LockFreePacketBuffer,
     filter_config: Arc<RwLock<FilterConfig>>,
@@ -134,7 +134,7 @@ impl CapturePipeline {
     pub fn new(config: PipelineConfig, filter_config: FilterConfig) -> Self {
         let (raw_tx, raw_rx) = bounded(config.raw_queue_size);
         let (parsed_tx, parsed_rx) = bounded(config.parsed_queue_size);
-        
+
         Self {
             ring_buffer: Arc::new(PacketRingBuffer::new(config.ring_buffer_capacity)),
             config,
@@ -150,17 +150,17 @@ impl CapturePipeline {
             filter_config: Arc::new(RwLock::new(filter_config)),
         }
     }
-    
+
     /// Get shared reference to the ring buffer.
     pub fn ring_buffer(&self) -> LockFreePacketBuffer {
         Arc::clone(&self.ring_buffer)
     }
-    
+
     /// Get pipeline statistics.
     pub fn stats(&self) -> Arc<PipelineStats> {
         Arc::clone(&self.stats)
     }
-    
+
     /// Start the capture pipeline.
     pub fn start(
         &mut self,
@@ -179,38 +179,38 @@ impl CapturePipeline {
         if self.capture_handle.is_some() {
             return Ok(()); // Already running
         }
-        
+
         self.stop_flag.store(false, Ordering::SeqCst);
-        
+
         // Start capture thread
         self.start_capture_thread(interface, legacy_stats.clone())?;
-        
+
         // Start parser thread pool
         self.start_parser_threads()?;
-        
+
         // Start writer thread
         self.start_writer_thread(pcap_writer, legacy_stats, live_stats)?;
-        
+
         Ok(())
     }
-    
+
     /// Stop the capture pipeline.
     pub fn stop(&mut self) -> Result<()> {
         let _span = tracing::info_span!("capture.pipeline_stop").entered();
         tracing::info!("Pipeline capture stopped");
 
         self.stop_flag.store(true, Ordering::SeqCst);
-        
+
         // Wait for capture thread
         if let Some(handle) = self.capture_handle.take() {
             let _ = handle.join();
         }
-        
+
         // Wait for parser threads
         for handle in self.parser_handles.drain(..) {
             let _ = handle.join();
         }
-        
+
         // Wait for writer thread
         if let Some(handle) = self.writer_handle.take() {
             let _ = handle.join();
@@ -218,12 +218,12 @@ impl CapturePipeline {
 
         Ok(())
     }
-    
+
     /// Check if the pipeline is running.
     pub fn is_running(&self) -> bool {
         self.capture_handle.is_some() && !self.stop_flag.load(Ordering::Relaxed)
     }
-    
+
     fn start_capture_thread(
         &mut self,
         interface: String,
@@ -234,7 +234,7 @@ impl CapturePipeline {
         let raw_tx = self.raw_tx.clone();
         let filter_config = Arc::clone(&self.filter_config);
         let rtp_port_range = self.config.rtp_port_range;
-        
+
         let handle = thread::Builder::new()
             .name("capture".to_string())
             .spawn(move || {
@@ -251,11 +251,11 @@ impl CapturePipeline {
                 }
             })
             .context("Failed to spawn capture thread")?;
-        
+
         self.capture_handle = Some(handle);
         Ok(())
     }
-    
+
     fn capture_thread_main(
         interface: String,
         stop_flag: Arc<AtomicBool>,
@@ -266,14 +266,14 @@ impl CapturePipeline {
         legacy_stats: Option<Arc<std::sync::Mutex<CaptureStatistics>>>,
     ) -> Result<()> {
         tracing::info!("Capture thread starting on interface: {}", interface);
-        
+
         // Find and open device
         let devices = Device::list().context("Failed to list devices")?;
         let device = devices
             .into_iter()
             .find(|d| d.name == interface)
             .ok_or_else(|| anyhow::anyhow!("Interface not found: {}", interface))?;
-        
+
         let mut cap = Capture::from_device(device)
             .context("Failed to create capture")?
             .promisc(true)
@@ -281,10 +281,10 @@ impl CapturePipeline {
             .timeout(10) // 10ms timeout for responsive stop
             .open()
             .context("Failed to open capture")?;
-        
+
         let link_layer_type = cap.get_datalink().0 as u32;
         tracing::info!("Link layer type: {}", link_layer_type);
-        
+
         // Apply BPF filter if needed
         let filter = filter_config.read();
         if let Some(bpf) = Self::build_bpf_filter(&filter) {
@@ -293,7 +293,7 @@ impl CapturePipeline {
                 .map_err(|e| anyhow::anyhow!("Failed to set BPF filter: {}", e))?;
         }
         drop(filter);
-        
+
         let mut packet_number = 0u64;
         let mut last_log = Instant::now();
         let mut last_pcap_stats_poll = Instant::now();
@@ -305,12 +305,12 @@ impl CapturePipeline {
                 Self::update_legacy_pcap_stats(&mut cap, &legacy_stats);
                 last_pcap_stats_poll = Instant::now();
             }
-            
+
             match cap.next_packet() {
                 Ok(packet) => {
                     packet_number += 1;
                     stats.packets_captured.fetch_add(1, Ordering::Relaxed);
-                    
+
                     let raw_packet = RawPacket {
                         timestamp_secs: packet.header.ts.tv_sec,
                         timestamp_usecs: packet.header.ts.tv_usec as u32,
@@ -318,12 +318,14 @@ impl CapturePipeline {
                         data: packet.data.to_vec(),
                         link_layer_type,
                     };
-                    
+
                     // Non-blocking send to avoid capture thread blocking
                     match raw_tx.try_send(raw_packet) {
                         Ok(()) => {}
                         Err(TrySendError::Full(_)) => {
-                            stats.packets_dropped_capture.fetch_add(1, Ordering::Relaxed);
+                            stats
+                                .packets_dropped_capture
+                                .fetch_add(1, Ordering::Relaxed);
                         }
                         Err(TrySendError::Disconnected(_)) => {
                             break;
@@ -341,7 +343,7 @@ impl CapturePipeline {
                     }
                 }
             }
-            
+
             // Periodic stats logging
             if last_log.elapsed() > Duration::from_secs(10) {
                 let snap = stats.snapshot();
@@ -354,7 +356,7 @@ impl CapturePipeline {
         }
         // Final best-effort stats refresh.
         Self::update_legacy_pcap_stats(&mut cap, &legacy_stats);
-        
+
         tracing::info!("Capture thread stopped");
         Ok(())
     }
@@ -383,16 +385,16 @@ impl CapturePipeline {
             }
         }
     }
-    
+
     fn start_parser_threads(&mut self) -> Result<()> {
         let num_threads = if self.config.parser_threads == 0 {
             (num_cpus::get() / 2).max(2).min(8) // Auto: half of CPUs, min 2, max 8
         } else {
             self.config.parser_threads
         };
-        
+
         tracing::info!("Starting {} parser threads", num_threads);
-        
+
         for i in 0..num_threads {
             let stop_flag = Arc::clone(&self.stop_flag);
             let stats = Arc::clone(&self.stats);
@@ -401,7 +403,7 @@ impl CapturePipeline {
             let ring_buffer = Arc::clone(&self.ring_buffer);
             let filter_config = Arc::clone(&self.filter_config);
             let rtp_port_range = self.config.rtp_port_range;
-            
+
             let handle = thread::Builder::new()
                 .name(format!("parser-{}", i))
                 .spawn(move || {
@@ -416,13 +418,13 @@ impl CapturePipeline {
                     );
                 })
                 .context("Failed to spawn parser thread")?;
-            
+
             self.parser_handles.push(handle);
         }
-        
+
         Ok(())
     }
-    
+
     fn parser_thread_main(
         stop_flag: Arc<AtomicBool>,
         stats: Arc<PipelineStats>,
@@ -435,7 +437,7 @@ impl CapturePipeline {
         let thread_name = thread::current().name().unwrap_or("parser").to_string();
         tracing::info!("{} starting", thread_name);
         let mut parser_cache: HashMap<u32, PacketParser> = HashMap::new();
-        
+
         loop {
             if stop_flag.load(Ordering::Relaxed) {
                 // Drain remaining packets
@@ -452,7 +454,7 @@ impl CapturePipeline {
                 }
                 break;
             }
-            
+
             match raw_rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(raw) => {
                     Self::parse_and_store(
@@ -469,10 +471,10 @@ impl CapturePipeline {
                 Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
             }
         }
-        
+
         tracing::info!("{} stopped", thread_name);
     }
-    
+
     fn parse_and_store(
         raw: &RawPacket,
         stats: &PipelineStats,
@@ -486,7 +488,7 @@ impl CapturePipeline {
         let parser = parser_cache.entry(raw.link_layer_type).or_insert_with(|| {
             PacketParser::with_rtp_port_range(raw.link_layer_type, rtp_port_range)
         });
-        
+
         // Create pcap-compatible packet header
         let header = pcap::PacketHeader {
             ts: libc::timeval {
@@ -496,16 +498,16 @@ impl CapturePipeline {
             caplen: raw.data.len() as u32,
             len: raw.data.len() as u32,
         };
-        
+
         let packet = pcap::Packet {
             header: &header,
             data: &raw.data,
         };
-        
+
         if let Some(mut packet_info) = parser.parse(&packet, Some(raw.packet_number)) {
             packet_info.provenance = crate::packet_capture::PacketProvenance::PipelineCapture;
             stats.packets_parsed.fetch_add(1, Ordering::Relaxed);
-            
+
             // Apply filter
             let filter = filter_config.read();
             if filter.matches(&packet_info) {
@@ -528,7 +530,7 @@ impl CapturePipeline {
             stats.parse_errors.fetch_add(1, Ordering::Relaxed);
         }
     }
-    
+
     fn start_writer_thread(
         &mut self,
         pcap_writer: Option<Arc<std::sync::Mutex<PcapWriter>>>,
@@ -539,7 +541,7 @@ impl CapturePipeline {
         let stats = Arc::clone(&self.stats);
         let parsed_rx = self.parsed_rx.clone();
         let batch_size = self.config.write_batch_size;
-        
+
         let handle = thread::Builder::new()
             .name("writer".to_string())
             .spawn(move || {
@@ -554,11 +556,11 @@ impl CapturePipeline {
                 );
             })
             .context("Failed to spawn writer thread")?;
-        
+
         self.writer_handle = Some(handle);
         Ok(())
     }
-    
+
     fn writer_thread_main(
         stop_flag: Arc<AtomicBool>,
         stats: Arc<PipelineStats>,
@@ -569,10 +571,10 @@ impl CapturePipeline {
         batch_size: usize,
     ) {
         tracing::info!("Writer thread starting");
-        
+
         let mut batch: Vec<Arc<PacketInfo>> = Vec::with_capacity(batch_size);
         let mut last_flush = Instant::now();
-        
+
         loop {
             if stop_flag.load(Ordering::Relaxed) {
                 // Drain and flush remaining packets
@@ -582,13 +584,15 @@ impl CapturePipeline {
                 Self::flush_batch(&batch, &pcap_writer, &legacy_stats, &live_stats, &stats);
                 break;
             }
-            
+
             match parsed_rx.recv_timeout(Duration::from_millis(100)) {
                 Ok(packet) => {
                     batch.push(packet);
-                    
+
                     // Flush when batch is full or timeout
-                    if batch.len() >= batch_size || last_flush.elapsed() > Duration::from_millis(500) {
+                    if batch.len() >= batch_size
+                        || last_flush.elapsed() > Duration::from_millis(500)
+                    {
                         Self::flush_batch(&batch, &pcap_writer, &legacy_stats, &live_stats, &stats);
                         batch.clear();
                         last_flush = Instant::now();
@@ -605,10 +609,10 @@ impl CapturePipeline {
                 Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
             }
         }
-        
+
         tracing::info!("Writer thread stopped");
     }
-    
+
     fn flush_batch(
         batch: &[Arc<PacketInfo>],
         pcap_writer: &Option<Arc<std::sync::Mutex<PcapWriter>>>,
@@ -619,7 +623,7 @@ impl CapturePipeline {
         if batch.is_empty() {
             return;
         }
-        
+
         for packet in batch {
             // Write to PCAP
             if let Some(ref writer) = pcap_writer {
@@ -634,21 +638,21 @@ impl CapturePipeline {
             } else {
                 stats.packets_written.fetch_add(1, Ordering::Relaxed);
             }
-            
+
             // Update legacy statistics
             if let Some(ref legacy) = legacy_stats {
                 if let Ok(mut s) = legacy.lock() {
                     s.add_packet(packet.as_ref());
                 }
             }
-            
+
             // Update high-performance live statistics (lock-free DashMap)
             if let Some(ref ls) = live_stats {
                 ls.record(packet.as_ref());
             }
         }
     }
-    
+
     fn build_bpf_filter(filter: &FilterConfig) -> Option<String> {
         // Reuse existing BPF filter logic
         if filter.protocols.is_empty()
@@ -658,10 +662,10 @@ impl CapturePipeline {
         {
             return None;
         }
-        
+
         let mut protocol_parts = std::collections::HashSet::new();
         let mut port_parts = Vec::new();
-        
+
         if !filter.protocols.is_empty() {
             for protocol in &filter.protocols {
                 let bpf_proto = match protocol.to_lowercase().as_str() {
@@ -675,7 +679,7 @@ impl CapturePipeline {
                 protocol_parts.insert(bpf_proto.to_string());
             }
         }
-        
+
         for port in &filter.src_ports {
             port_parts.push(format!("port {}", port));
         }
@@ -685,7 +689,7 @@ impl CapturePipeline {
         for (min, max) in &filter.port_ranges {
             port_parts.push(format!("portrange {}-{}", min, max));
         }
-        
+
         match (protocol_parts.is_empty(), port_parts.is_empty()) {
             (true, true) => None,
             (false, true) => {
@@ -696,9 +700,7 @@ impl CapturePipeline {
                     Some(format!("({})", parts.join(" or ")))
                 }
             }
-            (true, false) => {
-                Some(format!("(udp or tcp) and ({})", port_parts.join(" or ")))
-            }
+            (true, false) => Some(format!("(udp or tcp) and ({})", port_parts.join(" or "))),
             (false, false) => {
                 let proto_expr = if protocol_parts.len() == 1 {
                     protocol_parts.into_iter().next().unwrap()
@@ -721,7 +723,7 @@ impl Drop for CapturePipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pipeline_config_default() {
         let config = PipelineConfig::default();
@@ -730,26 +732,28 @@ mod tests {
         assert_eq!(config.write_batch_size, 1000);
         assert_eq!(config.ring_buffer_capacity, 2_000_000);
     }
-    
+
     #[test]
     fn test_pipeline_stats() {
         let stats = PipelineStats::default();
         stats.packets_captured.fetch_add(100, Ordering::Relaxed);
         stats.packets_parsed.fetch_add(95, Ordering::Relaxed);
-        stats.packets_dropped_capture.fetch_add(5, Ordering::Relaxed);
-        
+        stats
+            .packets_dropped_capture
+            .fetch_add(5, Ordering::Relaxed);
+
         let snapshot = stats.snapshot();
         assert_eq!(snapshot.packets_captured, 100);
         assert_eq!(snapshot.packets_parsed, 95);
         assert_eq!(snapshot.packets_dropped_capture, 5);
     }
-    
+
     #[test]
     fn test_bpf_filter_empty() {
         let filter = FilterConfig::default();
         assert!(CapturePipeline::build_bpf_filter(&filter).is_none());
     }
-    
+
     #[test]
     fn test_bpf_filter_sip() {
         let filter = FilterConfig {

@@ -1,6 +1,8 @@
 //! Tauri commands for softphone: place call, end call, cancel call, hold call.
 
-use crate::commands::packet_capture::{get_interface_for_ip, list_interfaces, start_capture_session, stop_capture};
+use crate::commands::packet_capture::{
+    get_interface_for_ip, list_interfaces, start_capture_session, stop_capture,
+};
 use crate::packet_capture::FilterConfig;
 use crate::softphone;
 use once_cell::sync::Lazy;
@@ -28,7 +30,8 @@ pub struct CallEndedByRemotePayload {
 }
 
 /// call_id -> capture_session_id for per-call captures; stop when call ends.
-static CALL_CAPTURES: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static CALL_CAPTURES: Lazy<Mutex<HashMap<String, String>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Register a capture session for a call so it can be stopped when the call ends (used by softphone and fax).
 pub(crate) fn register_call_capture(call_id: String, session_id: String) {
@@ -56,7 +59,10 @@ pub async fn softphone_place_call(
     pending_call_id: Option<String>,
 ) -> Result<softphone::PlaceCallResult, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "softphone", "place_call", "user", Some(&target),
+        "softphone",
+        "place_call",
+        "user",
+        Some(&target),
         Some(&format!("registrar={}", registrar_id)),
     );
     let pending_id = pending_call_id.unwrap_or_default();
@@ -64,45 +70,73 @@ pub async fn softphone_place_call(
     let target_for_capture = target.clone();
     let (tx, mut rx) = mpsc::unbounded_channel::<(u16, String)>();
 
-    let on_before_invite: softphone::OnBeforeInvite = Some(Box::new(move |local_ip: &str, _call_id: &str| {
-        let interface = get_interface_for_ip(local_ip.to_string())
-            .ok()
-            .flatten()
-            .unwrap_or_else(|| {
-                list_interfaces()
-                    .ok()
-                    .and_then(|list| {
-                        list.into_iter()
-                            .find(|i| !i.addresses.is_empty() && !i.name.to_lowercase().contains("lo"))
-                            .map(|i| i.name)
-                    })
-                    .unwrap_or_else(|| "any".to_string())
-            });
-        tracing::info!("Starting call capture on interface '{}' (local_ip={})", interface, local_ip);
-        let name = format!(
-            "Call to {} - {}",
-            target_for_capture,
-            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
-        );
-        // Per-call capture: no filter so we capture all packets for the call duration.
-        match start_capture_session(name, None, interface.clone(), FilterConfig::default()) {
-            Ok(id) => {
-                tracing::info!("Capture started: session_id={}", id);
-                Some(id)
+    let on_before_invite: softphone::OnBeforeInvite =
+        Some(Box::new(move |local_ip: &str, _call_id: &str| {
+            let interface = get_interface_for_ip(local_ip.to_string())
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| {
+                    list_interfaces()
+                        .ok()
+                        .and_then(|list| {
+                            list.into_iter()
+                                .find(|i| {
+                                    !i.addresses.is_empty() && !i.name.to_lowercase().contains("lo")
+                                })
+                                .map(|i| i.name)
+                        })
+                        .unwrap_or_else(|| "any".to_string())
+                });
+            tracing::info!(
+                "Starting call capture on interface '{}' (local_ip={})",
+                interface,
+                local_ip
+            );
+            let name = format!(
+                "Call to {} - {}",
+                target_for_capture,
+                chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
+            );
+            // Per-call capture: no filter so we capture all packets for the call duration.
+            match start_capture_session(name, None, interface.clone(), FilterConfig::default()) {
+                Ok(id) => {
+                    tracing::info!("Capture started: session_id={}", id);
+                    Some(id)
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "⚠ CAPTURE FAILED to start on interface '{}': {}",
+                        interface,
+                        e
+                    );
+                    None
+                }
             }
-            Err(e) => {
-                tracing::error!("⚠ CAPTURE FAILED to start on interface '{}': {}", interface, e);
-                None
-            }
-        }
-    }));
+        }));
 
     let join_handle = tokio::task::spawn_blocking(move || {
-        softphone::place_call(registrar_id, target, preferred_codecs, Some(tx), on_before_invite, false, None)
+        softphone::place_call(
+            registrar_id,
+            target,
+            preferred_codecs,
+            Some(tx),
+            on_before_invite,
+            false,
+            None,
+        )
     });
 
     let mut join_handle = join_handle;
-    let mut opt_result: Option<Result<(softphone::PlaceCallResult, Option<std::net::UdpSocket>, Option<std::net::TcpStream>), String>> = None;
+    let mut opt_result: Option<
+        Result<
+            (
+                softphone::PlaceCallResult,
+                Option<std::net::UdpSocket>,
+                Option<std::net::TcpStream>,
+            ),
+            String,
+        >,
+    > = None;
     loop {
         tokio::select! {
             res = &mut join_handle => {
@@ -147,7 +181,10 @@ pub async fn softphone_place_call(
         let remote_contact_uri = result.remote_contact_uri.clone();
         let response_to_header = result.response_to_header.clone();
         let cseq = result.dialog_cseq;
-        let local_ip = result.local_ip.clone().unwrap_or_else(|| "127.0.0.1".to_string());
+        let local_ip = result
+            .local_ip
+            .clone()
+            .unwrap_or_else(|| "127.0.0.1".to_string());
         let local_rtp_port = result.local_rtp_port;
         let reg_id = registrar_id_for_bye;
         let session_expires_secs = result.session_expires_secs;
@@ -156,7 +193,10 @@ pub async fn softphone_place_call(
         softphone::register_dialog_sender(call_id.clone(), bye_tx);
         let call_id_for_callback = call_id.clone();
         let on_remote_bye = move || {
-            let payload = CallEndedByRemotePayload { call_id: call_id_for_callback.clone(), call_id_camel: call_id_for_callback.clone() };
+            let payload = CallEndedByRemotePayload {
+                call_id: call_id_for_callback.clone(),
+                call_id_camel: call_id_for_callback.clone(),
+            };
             let _ = window_for_bye.emit("softphone:call_ended_by_remote", &payload);
             let _ = app_handle.emit("softphone:call_ended_by_remote", &payload);
             if let Some(main_win) = app_handle.get_webview_window("main") {
@@ -234,7 +274,11 @@ pub fn softphone_end_call(
     cseq: u32,
 ) -> Result<(), String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "softphone", "end_call", "user", Some(&call_id), None,
+        "softphone",
+        "end_call",
+        "user",
+        Some(&call_id),
+        None,
     );
     let result = softphone::end_call(
         registrar_id,
@@ -294,8 +338,8 @@ pub async fn softphone_hold_call(
         remote_contact_uri,
         on_hold,
         cseq,
-    call_local_rtp_port,
-    call_local_ip,
+        call_local_rtp_port,
+        call_local_ip,
     )
     .await
 }
@@ -313,7 +357,10 @@ pub async fn softphone_get_remote_ended_calls() -> Result<Vec<String>, String> {
 /// If the port changed, the old listener is shut down and a new one starts.
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn softphone_start_inbound_listener(port: u16, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn softphone_start_inbound_listener(
+    port: u16,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     softphone::start_inbound_listener(port, app_handle)
 }
 
@@ -339,7 +386,10 @@ pub async fn softphone_sync_inbound_listeners(
 /// Returns the capture session ID (if packet capture was started) so the frontend can track it.
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn softphone_answer_inbound_call(registrar_id: String, call_id: String) -> Result<Option<String>, String> {
+pub async fn softphone_answer_inbound_call(
+    registrar_id: String,
+    call_id: String,
+) -> Result<Option<String>, String> {
     // Start a packet capture for the inbound call (same approach as outbound calls)
     let capture_session_id = {
         let interface = list_interfaces()
@@ -361,7 +411,11 @@ pub async fn softphone_answer_inbound_call(registrar_id: String, call_id: String
                 Some(id)
             }
             Err(e) => {
-                tracing::error!("⚠ INBOUND CAPTURE FAILED on interface '{}': {}", interface, e);
+                tracing::error!(
+                    "⚠ INBOUND CAPTURE FAILED on interface '{}': {}",
+                    interface,
+                    e
+                );
                 None
             }
         }
@@ -378,7 +432,10 @@ pub async fn softphone_answer_inbound_call(registrar_id: String, call_id: String
 /// Reject an inbound call (e.g. 486 Busy Here).
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn softphone_reject_inbound_call(call_id: String, status_code: Option<u16>) -> Result<(), String> {
+pub async fn softphone_reject_inbound_call(
+    call_id: String,
+    status_code: Option<u16>,
+) -> Result<(), String> {
     softphone::reject_inbound_call(call_id, status_code.unwrap_or(486))
 }
 
@@ -387,7 +444,11 @@ pub async fn softphone_reject_inbound_call(call_id: String, status_code: Option<
 /// `dtmf_pt` is the negotiated telephone-event payload type (default 101).
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn softphone_send_dtmf(call_id: String, digit: String, dtmf_pt: Option<u8>) -> Result<(), String> {
+pub async fn softphone_send_dtmf(
+    call_id: String,
+    digit: String,
+    dtmf_pt: Option<u8>,
+) -> Result<(), String> {
     let ch = digit.chars().next().ok_or("Empty digit")?;
     softphone::send_dtmf(&call_id, ch, dtmf_pt.unwrap_or(101))
 }
@@ -495,7 +556,7 @@ pub async fn softphone_delete_recording(filename: String) -> Result<(), String> 
 #[command]
 #[tracing::instrument(skip_all)]
 pub async fn softphone_read_recording(filename: String) -> Result<String, String> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     let data = softphone::read_recording_data(&filename)?;
     Ok(STANDARD.encode(&data))
 }
@@ -503,7 +564,10 @@ pub async fn softphone_read_recording(filename: String) -> Result<String, String
 /// Subscribe to MWI (Message Waiting Indicator) for a registrar.
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn softphone_subscribe_mwi(registrar_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn softphone_subscribe_mwi(
+    registrar_id: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     softphone::subscribe_mwi(&registrar_id, app_handle)
 }
 
@@ -518,7 +582,9 @@ pub async fn softphone_unsubscribe_mwi(registrar_id: String) -> Result<(), Strin
 /// Get the current MWI state for a registrar.
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn softphone_get_mwi_state(registrar_id: String) -> Result<Option<softphone::MwiState>, String> {
+pub async fn softphone_get_mwi_state(
+    registrar_id: String,
+) -> Result<Option<softphone::MwiState>, String> {
     Ok(softphone::get_mwi_state(&registrar_id))
 }
 
@@ -597,7 +663,12 @@ pub fn publish_presence(
         "away" => softphone::presence::PresenceState::Away,
         _ => return Err(format!("Unknown presence state: {}", state)),
     };
-    softphone::presence::publish_presence(&registrar_id, presence_state, sip_if_match.as_deref(), 3600)
+    softphone::presence::publish_presence(
+        &registrar_id,
+        presence_state,
+        sip_if_match.as_deref(),
+        3600,
+    )
 }
 
 #[command]

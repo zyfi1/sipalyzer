@@ -54,7 +54,9 @@ pub struct SdpMedia {
     pub connection: Option<String>,
 }
 
-fn default_port_count() -> u16 { 1 }
+fn default_port_count() -> u16 {
+    1
+}
 
 pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
     // First, verify this is actually valid UTF-8 text (SIP is text-based)
@@ -62,20 +64,20 @@ pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
         Ok(t) => t,
         Err(_) => return Err(anyhow::anyhow!("Not valid UTF-8 text")),
     };
-    
+
     // Store the raw message for later use
     let raw_message = text.clone();
-    
+
     let lines: Vec<&str> = text.lines().collect();
-    
+
     if lines.is_empty() {
         return Err(anyhow::anyhow!("Empty SIP message"));
     }
-    
+
     // Validate first line - must be a valid SIP request or response
     let first_line = lines[0].trim();
     let first_line_upper = first_line.to_uppercase();
-    
+
     // Must start with SIP method or "SIP/2.0"
     let is_valid_sip_start = first_line_upper.starts_with("REGISTER ")
         || first_line_upper.starts_with("INVITE ")
@@ -92,7 +94,7 @@ pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
         || first_line_upper.starts_with("PUBLISH ")
         || first_line_upper.starts_with("MESSAGE ")
         || first_line_upper.starts_with("SIP/2.0");
-    
+
     if !is_valid_sip_start {
         return Err(anyhow::anyhow!("Not a valid SIP message"));
     }
@@ -223,7 +225,9 @@ pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
             let header_value = trimmed[colon_pos + 1..].trim().to_string();
             last_header_name = Some(header_name.clone());
 
-            message.headers.insert(header_name.clone(), header_value.clone());
+            message
+                .headers
+                .insert(header_name.clone(), header_value.clone());
 
             match header_name.as_str() {
                 "call-id" | "i" => {
@@ -259,9 +263,16 @@ pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
 
     // Re-parse content_length from headers (handles continuation lines).
     // Header names are now normalized to lowercase; also check compact form "l".
-    let cl = message.headers.get("content-length").or_else(|| message.headers.get("l"));
+    let cl = message
+        .headers
+        .get("content-length")
+        .or_else(|| message.headers.get("l"));
     if let Some(s) = cl {
-        message.content_length = s.trim().split_whitespace().next().and_then(|n| n.parse::<usize>().ok());
+        message.content_length = s
+            .trim()
+            .split_whitespace()
+            .next()
+            .and_then(|n| n.parse::<usize>().ok());
     }
 
     // Parse body per RFC 3261: body starts after \r\n\r\n (or \n\n), length from Content-Length.
@@ -287,7 +298,8 @@ pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
                 rest.len()
             };
             if len > 0 {
-                String::from_utf8(rest[..len].to_vec()).unwrap_or_else(|_| String::from_utf8_lossy(&rest[..len]).to_string())
+                String::from_utf8(rest[..len].to_vec())
+                    .unwrap_or_else(|_| String::from_utf8_lossy(&rest[..len]).to_string())
             } else {
                 String::new()
             }
@@ -315,7 +327,7 @@ pub fn parse_sip_message(data: &[u8]) -> Result<ParsedSipMessage> {
 
 fn parse_sdp(sdp_text: &str) -> Result<ParsedSdp> {
     let lines: Vec<&str> = sdp_text.lines().collect();
-    
+
     let mut sdp = ParsedSdp {
         version: None,
         origin: None,
@@ -369,7 +381,8 @@ fn parse_sdp(sdp_text: &str) -> Result<ParsedSdp> {
                 if parts.len() >= 3 {
                     let port_parts: Vec<&str> = parts[1].splitn(2, '/').collect();
                     let port = port_parts[0].parse::<u16>().ok();
-                    let port_count = port_parts.get(1)
+                    let port_count = port_parts
+                        .get(1)
                         .and_then(|s| s.parse::<u16>().ok())
                         .unwrap_or(1);
                     let payload_types: Vec<u8> = parts[3..]

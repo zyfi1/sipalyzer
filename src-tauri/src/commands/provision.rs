@@ -91,8 +91,14 @@ const POLY_USER_AGENTS: &[(&str, &str)] = &[
     ("SPIP335", "PolycomSoundPointIP-SPIP_335-UA/4.0.15.1009"),
     ("SPIP450", "PolycomSoundPointIP-SPIP_450-UA/4.0.15.1009"),
     // Trio — UCS 7.x
-    ("Trio8500", "PolycomRealPresenceTrio-Trio_8500-UA/7.2.2.1094"),
-    ("Trio8800", "PolycomRealPresenceTrio-Trio_8800-UA/7.2.2.1094"),
+    (
+        "Trio8500",
+        "PolycomRealPresenceTrio-Trio_8500-UA/7.2.2.1094",
+    ),
+    (
+        "Trio8800",
+        "PolycomRealPresenceTrio-Trio_8800-UA/7.2.2.1094",
+    ),
     ("TrioC60", "PolycomRealPresenceTrio-Trio_C60-UA/7.2.2.1094"),
 ];
 
@@ -417,9 +423,15 @@ fn looks_poly_xml(body: &str) -> bool {
     let mut poly_attrs = 0u32;
     for line in trimmed.lines().take(50) {
         let t = line.trim();
-        if t.contains("reg.") || t.contains("voIpProt.") || t.contains("tcpIpApp.")
-            || t.contains("call.") || t.contains("feature.") || t.contains("attendant.")
-            || t.contains("nat.") || t.contains("dir.") || t.contains("mb.")
+        if t.contains("reg.")
+            || t.contains("voIpProt.")
+            || t.contains("tcpIpApp.")
+            || t.contains("call.")
+            || t.contains("feature.")
+            || t.contains("attendant.")
+            || t.contains("nat.")
+            || t.contains("dir.")
+            || t.contains("mb.")
         {
             poly_attrs += 1;
         }
@@ -496,7 +508,8 @@ pub fn fetch_provision_file(args: FetchProvisionFileArgs) -> Result<FetchProvisi
     } else {
         base_ua.to_string()
     };
-    let (body, status, redirects, ua_used) = do_fetch(&client, validated_url.as_str(), &initial_ua, None)?;
+    let (body, status, redirects, ua_used) =
+        do_fetch(&client, validated_url.as_str(), &initial_ua, None)?;
     retry_log.push(format!(
         "Request: UA {} → status {}",
         if send_mac_in_ua {
@@ -676,14 +689,16 @@ fn do_fetch(
     _mac_in_ua: Option<&str>,
 ) -> Result<(String, u16, Vec<String>, String), String> {
     let ua = user_agent.to_string();
-    let request = client
-        .get(url)
-        .header("User-Agent", &ua);
+    let request = client.get(url).header("User-Agent", &ua);
 
-    let response = request.send().map_err(|e| format!("Request failed: {}", e))?;
+    let response = request
+        .send()
+        .map_err(|e| format!("Request failed: {}", e))?;
     let status = response.status().as_u16();
     let final_url = response.url().to_string();
-    let body_bytes = response.bytes().map_err(|e| format!("Reading body failed: {}", e))?;
+    let body_bytes = response
+        .bytes()
+        .map_err(|e| format!("Reading body failed: {}", e))?;
     const MAX_PROVISION_BYTES: usize = 2 * 1024 * 1024;
     if body_bytes.len() > MAX_PROVISION_BYTES {
         return Err("Provision file too large (max 2MB)".to_string());

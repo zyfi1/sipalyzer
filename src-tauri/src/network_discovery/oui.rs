@@ -5,8 +5,8 @@
 //! next to this source file and is pulled in at compile time via
 //! `include_str!`, so there is zero runtime I/O.
 
-use std::collections::HashMap;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 /// Full IEEE OUI database embedded at compile time.
 static OUI_TSV: &str = include_str!("oui_data.tsv");
@@ -53,13 +53,20 @@ mod tests {
     #[test]
     fn test_db_loaded() {
         // Ensure the DB has a reasonable number of entries
-        assert!(OUI_DB.len() > 30_000, "OUI DB should have 30k+ entries, got {}", OUI_DB.len());
+        assert!(
+            OUI_DB.len() > 30_000,
+            "OUI DB should have 30k+ entries, got {}",
+            OUI_DB.len()
+        );
     }
 
     #[test]
     fn test_lookup_known_vendor() {
         assert_eq!(lookup_oui("00:50:56:ab:cd:ef"), Some("VMware".to_string()));
-        assert_eq!(lookup_oui("B8:27:EB:11:22:33"), Some("Raspberry Pi Foundation".to_string()));
+        assert_eq!(
+            lookup_oui("B8:27:EB:11:22:33"),
+            Some("Raspberry Pi Foundation".to_string())
+        );
     }
 
     #[test]

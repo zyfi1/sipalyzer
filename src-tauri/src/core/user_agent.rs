@@ -14,9 +14,7 @@ static INCLUDE_USERNAME: Mutex<bool> = Mutex::new(true);
 fn os_display() -> String {
     #[cfg(target_os = "macos")]
     {
-        let out = Command::new("sw_vers")
-            .arg("-productVersion")
-            .output();
+        let out = Command::new("sw_vers").arg("-productVersion").output();
         if let Ok(o) = out {
             if o.status.success() {
                 let v = String::from_utf8_lossy(&o.stdout).trim().to_string();

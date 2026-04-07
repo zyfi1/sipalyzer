@@ -53,7 +53,9 @@ static STATE: Lazy<Mutex<PortAllocatorState>> =
 /// Allocate the next available even port.
 /// `label` is a diagnostic tag (e.g. call-id or "fax:<job>") shown in status queries.
 pub fn allocate(label: &str) -> Result<u16, String> {
-    let mut s = STATE.lock().map_err(|e| format!("port allocator lock: {}", e))?;
+    let mut s = STATE
+        .lock()
+        .map_err(|e| format!("port allocator lock: {}", e))?;
     let max_attempts = s.pool_size();
 
     for _ in 0..max_attempts {
@@ -88,14 +90,22 @@ pub fn allocate(label: &str) -> Result<u16, String> {
 /// Allocate a **specific** port (e.g. when the registrar has `rtp_port` pinned).
 /// Fails if the port is already in use by the allocator or the OS.
 pub fn allocate_specific(port: u16, label: &str) -> Result<u16, String> {
-    let mut s = STATE.lock().map_err(|e| format!("port allocator lock: {}", e))?;
+    let mut s = STATE
+        .lock()
+        .map_err(|e| format!("port allocator lock: {}", e))?;
 
     if s.in_use.contains(&port) {
-        return Err(format!("RTP port {} is already in use by another session", port));
+        return Err(format!(
+            "RTP port {} is already in use by another session",
+            port
+        ));
     }
 
     if UdpSocket::bind(format!("0.0.0.0:{}", port)).is_err() {
-        return Err(format!("RTP port {} is not available (OS rejected bind)", port));
+        return Err(format!(
+            "RTP port {} is not available (OS rejected bind)",
+            port
+        ));
     }
 
     s.in_use.insert(port);

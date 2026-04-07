@@ -1,9 +1,11 @@
+use crate::packet_capture::{
+    dns_parser, rtcp_parser, rtp_analyzer, sip_parser, t38_parser, websocket_parser,
+};
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
-use crate::packet_capture::{sip_parser, rtp_analyzer, rtcp_parser, dns_parser, t38_parser, websocket_parser};
 
 /// Per-flow TCP SIP reassembly buffer.
 struct TcpSipBuffer {
@@ -146,9 +148,12 @@ pub fn decode_packet(
                 let af_le = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
                 let af_be = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                 if (af_le == 2 || af_be == 2) && (data[4] & 0xF0) == 0x40 {
-                    offset = 4;  // IPv4
-                } else if (af_le == 30 || af_be == 30) && data.len() >= 44 && (data[4] & 0xF0) == 0x60 {
-                    offset = 4;  // IPv6
+                    offset = 4; // IPv4
+                } else if (af_le == 30 || af_be == 30)
+                    && data.len() >= 44
+                    && (data[4] & 0xF0) == 0x60
+                {
+                    offset = 4; // IPv6
                 } else {
                     return Err(anyhow::anyhow!("Invalid BSD loopback header"));
                 }
@@ -161,18 +166,18 @@ pub fn decode_packet(
             if data.len() >= 16 {
                 let protocol = u16::from_be_bytes([data[14], data[15]]);
                 if protocol == 0x0800 && data.len() >= 36 && (data[16] & 0xF0) == 0x40 {
-                    offset = 16;  // IPv4 after SLL header
+                    offset = 16; // IPv4 after SLL header
                 } else if protocol == 0x86dd && data.len() >= 56 && (data[16] & 0xF0) == 0x60 {
-                    offset = 16;  // IPv6 after SLL header
+                    offset = 16; // IPv6 after SLL header
                 } else if data.len() >= 20 && (data[0] & 0xF0) == 0x40 {
-                    offset = 0;  // Raw IPv4
+                    offset = 0; // Raw IPv4
                 } else if data.len() >= 40 && (data[0] & 0xF0) == 0x60 {
-                    offset = 0;  // Raw IPv6
+                    offset = 0; // Raw IPv6
                 } else {
                     return Err(anyhow::anyhow!("Cannot determine IP offset for type 113"));
                 }
             } else if data.len() >= 20 && (data[0] & 0xF0) == 0x40 {
-                offset = 0;  // Raw IPv4
+                offset = 0; // Raw IPv4
             } else {
                 return Err(anyhow::anyhow!("Packet too short for type 113"));
             }
@@ -184,7 +189,10 @@ pub fn decode_packet(
                 let af_be = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                 if (af_le == 2 || af_be == 2) && (data[4] & 0xF0) == 0x40 {
                     offset = 4;
-                } else if (af_le == 30 || af_be == 30) && data.len() >= 44 && (data[4] & 0xF0) == 0x60 {
+                } else if (af_le == 30 || af_be == 30)
+                    && data.len() >= 44
+                    && (data[4] & 0xF0) == 0x60
+                {
                     offset = 4;
                 } else {
                     return Err(anyhow::anyhow!("Invalid loopback header for type 147"));
@@ -200,9 +208,9 @@ pub fn decode_packet(
         _ => {
             // Unknown type - auto-detect format (same logic as packet_parser.rs)
             if data.len() >= 20 && (data[0] & 0xF0) == 0x40 {
-                offset = 0;  // Raw IPv4
+                offset = 0; // Raw IPv4
             } else if data.len() >= 40 && (data[0] & 0xF0) == 0x60 {
-                offset = 0;  // Raw IPv6
+                offset = 0; // Raw IPv6
             } else if data.len() >= 14 {
                 // Try Ethernet (with optional VLAN tags)
                 let mut ethertype = u16::from_be_bytes([data[12], data[13]]);
@@ -211,14 +219,20 @@ pub fn decode_packet(
                     ethertype = u16::from_be_bytes([data[eth_offset + 2], data[eth_offset + 3]]);
                     eth_offset += 4;
                 }
-                if ethertype == 0x0800 && data.len() >= eth_offset + 20 && (data[eth_offset] & 0xF0) == 0x40 {
+                if ethertype == 0x0800
+                    && data.len() >= eth_offset + 20
+                    && (data[eth_offset] & 0xF0) == 0x40
+                {
                     decoded.ethernet = Some(EthernetHeader {
                         dst_mac: format_mac(&data[0..6]),
                         src_mac: format_mac(&data[6..12]),
                         ethertype,
                     });
                     offset = eth_offset;
-                } else if ethertype == 0x86dd && data.len() >= eth_offset + 40 && (data[eth_offset] & 0xF0) == 0x60 {
+                } else if ethertype == 0x86dd
+                    && data.len() >= eth_offset + 40
+                    && (data[eth_offset] & 0xF0) == 0x60
+                {
                     decoded.ethernet = Some(EthernetHeader {
                         dst_mac: format_mac(&data[0..6]),
                         src_mac: format_mac(&data[6..12]),
@@ -231,7 +245,10 @@ pub fn decode_packet(
                     let af_be = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                     if (af_le == 2 || af_be == 2) && (data[4] & 0xF0) == 0x40 {
                         offset = 4;
-                    } else if (af_le == 30 || af_be == 30) && data.len() >= 44 && (data[4] & 0xF0) == 0x60 {
+                    } else if (af_le == 30 || af_be == 30)
+                        && data.len() >= 44
+                        && (data[4] & 0xF0) == 0x60
+                    {
                         offset = 4;
                     } else {
                         return Err(anyhow::anyhow!("Cannot determine link layer format"));
@@ -256,22 +273,22 @@ pub fn decode_packet(
                 tos: ip_data.get(1).copied().unwrap_or(0),
                 total_length: u16::from_be_bytes([
                     ip_data.get(2).copied().unwrap_or(0),
-                    ip_data.get(3).copied().unwrap_or(0)
+                    ip_data.get(3).copied().unwrap_or(0),
                 ]),
                 identification: u16::from_be_bytes([
                     ip_data.get(4).copied().unwrap_or(0),
-                    ip_data.get(5).copied().unwrap_or(0)
+                    ip_data.get(5).copied().unwrap_or(0),
                 ]),
                 flags: (ip_data.get(6).copied().unwrap_or(0) >> 5) & 0x07,
                 fragment_offset: u16::from_be_bytes([
                     ip_data.get(6).copied().unwrap_or(0),
-                    ip_data.get(7).copied().unwrap_or(0)
+                    ip_data.get(7).copied().unwrap_or(0),
                 ]) & 0x1FFF,
                 ttl: ip_data.get(8).copied().unwrap_or(0),
                 protocol: ip_data.get(9).copied().unwrap_or(0),
                 checksum: u16::from_be_bytes([
                     ip_data.get(10).copied().unwrap_or(0),
-                    ip_data.get(11).copied().unwrap_or(0)
+                    ip_data.get(11).copied().unwrap_or(0),
                 ]),
                 src_ip: IpAddr::V4(std::net::Ipv4Addr::new(
                     ip_data.get(12).copied().unwrap_or(0),
@@ -340,142 +357,178 @@ pub fn decode_packet(
         }
     }
 
-    let ip_header_len = decoded.ip.as_ref()
+    let ip_header_len = decoded
+        .ip
+        .as_ref()
         .map(|ip| ip.header_length as usize)
         .unwrap_or(20);
-        let transport_offset = offset + ip_header_len;
+    let transport_offset = offset + ip_header_len;
 
-        // Decode transport layer
-        let ip_protocol = decoded.ip.as_ref()
-            .map(|ip| ip.protocol)
-            .unwrap_or(0);
-        match ip_protocol {
-            17 => {
-                // UDP
-                if data.len() >= transport_offset + 8 {
-                    let udp_data = &data[transport_offset..];
-                    // Safe bounds check
-                    if udp_data.len() >= 8 {
-                        decoded.udp = Some(UdpHeader {
-                            src_port: u16::from_be_bytes([
-                                udp_data.get(0).copied().unwrap_or(0),
-                                udp_data.get(1).copied().unwrap_or(0)
-                            ]),
-                            dst_port: u16::from_be_bytes([
-                                udp_data.get(2).copied().unwrap_or(0),
-                                udp_data.get(3).copied().unwrap_or(0)
-                            ]),
-                            length: u16::from_be_bytes([
-                                udp_data.get(4).copied().unwrap_or(0),
-                                udp_data.get(5).copied().unwrap_or(0)
-                            ]),
-                            checksum: u16::from_be_bytes([
-                                udp_data.get(6).copied().unwrap_or(0),
-                                udp_data.get(7).copied().unwrap_or(0)
-                            ]),
-                        });
-                    }
+    // Decode transport layer
+    let ip_protocol = decoded.ip.as_ref().map(|ip| ip.protocol).unwrap_or(0);
+    match ip_protocol {
+        17 => {
+            // UDP
+            if data.len() >= transport_offset + 8 {
+                let udp_data = &data[transport_offset..];
+                // Safe bounds check
+                if udp_data.len() >= 8 {
+                    decoded.udp = Some(UdpHeader {
+                        src_port: u16::from_be_bytes([
+                            udp_data.get(0).copied().unwrap_or(0),
+                            udp_data.get(1).copied().unwrap_or(0),
+                        ]),
+                        dst_port: u16::from_be_bytes([
+                            udp_data.get(2).copied().unwrap_or(0),
+                            udp_data.get(3).copied().unwrap_or(0),
+                        ]),
+                        length: u16::from_be_bytes([
+                            udp_data.get(4).copied().unwrap_or(0),
+                            udp_data.get(5).copied().unwrap_or(0),
+                        ]),
+                        checksum: u16::from_be_bytes([
+                            udp_data.get(6).copied().unwrap_or(0),
+                            udp_data.get(7).copied().unwrap_or(0),
+                        ]),
+                    });
+                }
 
-                    // Decode application layer
-                    let app_offset = transport_offset + 8;
-                    if data.len() > app_offset {
-                        let app_data = &data[app_offset..];
-                        if let Some(udp) = decoded.udp.as_ref() {
-                            // Check both source and destination ports for DNS (DNS can be on either port 53)
-                            let is_dns_port = udp.src_port == 53 || udp.dst_port == 53;
-                            decoded.application = decode_application_layer(app_data, udp.src_port, udp.dst_port, is_dns_port, packet_count, rtp_port_range);
-                        }
-                        // If UDP header missing, leave application as Unknown (already set in initializer)
+                // Decode application layer
+                let app_offset = transport_offset + 8;
+                if data.len() > app_offset {
+                    let app_data = &data[app_offset..];
+                    if let Some(udp) = decoded.udp.as_ref() {
+                        // Check both source and destination ports for DNS (DNS can be on either port 53)
+                        let is_dns_port = udp.src_port == 53 || udp.dst_port == 53;
+                        decoded.application = decode_application_layer(
+                            app_data,
+                            udp.src_port,
+                            udp.dst_port,
+                            is_dns_port,
+                            packet_count,
+                            rtp_port_range,
+                        );
                     }
+                    // If UDP header missing, leave application as Unknown (already set in initializer)
                 }
             }
-            6 => {
-                // TCP
-                if data.len() >= transport_offset + 20 {
-                    let tcp_data = &data[transport_offset..];
-                    // Safe bounds check for TCP header
-                    if tcp_data.len() >= 20 {
-                        let data_offset = ((tcp_data.get(12).copied().unwrap_or(0) >> 4) & 0x0F) * 4;
-                        // Ensure data_offset is reasonable (between 20 and 60 bytes)
-                        let safe_data_offset = data_offset.max(20).min(60) as usize;
-                        decoded.tcp = Some(TcpHeader {
-                            src_port: u16::from_be_bytes([
-                                tcp_data.get(0).copied().unwrap_or(0),
-                                tcp_data.get(1).copied().unwrap_or(0)
-                            ]),
-                            dst_port: u16::from_be_bytes([
-                                tcp_data.get(2).copied().unwrap_or(0),
-                                tcp_data.get(3).copied().unwrap_or(0)
-                            ]),
-                            sequence: u32::from_be_bytes([
-                                tcp_data.get(4).copied().unwrap_or(0),
-                                tcp_data.get(5).copied().unwrap_or(0),
-                                tcp_data.get(6).copied().unwrap_or(0),
-                                tcp_data.get(7).copied().unwrap_or(0)
-                            ]),
-                            acknowledgment: u32::from_be_bytes([
-                                tcp_data.get(8).copied().unwrap_or(0),
-                                tcp_data.get(9).copied().unwrap_or(0),
-                                tcp_data.get(10).copied().unwrap_or(0),
-                                tcp_data.get(11).copied().unwrap_or(0)
-                            ]),
-                            data_offset: (tcp_data.get(12).copied().unwrap_or(0) >> 4) & 0x0F,
-                            flags: tcp_data.get(13).copied().unwrap_or(0),
-                            window: u16::from_be_bytes([
-                                tcp_data.get(14).copied().unwrap_or(0),
-                                tcp_data.get(15).copied().unwrap_or(0)
-                            ]),
-                            checksum: u16::from_be_bytes([
-                                tcp_data.get(16).copied().unwrap_or(0),
-                                tcp_data.get(17).copied().unwrap_or(0)
-                            ]),
-                            urgent_pointer: u16::from_be_bytes([
-                                tcp_data.get(18).copied().unwrap_or(0),
-                                tcp_data.get(19).copied().unwrap_or(0)
-                            ]),
-                        });
+        }
+        6 => {
+            // TCP
+            if data.len() >= transport_offset + 20 {
+                let tcp_data = &data[transport_offset..];
+                // Safe bounds check for TCP header
+                if tcp_data.len() >= 20 {
+                    let data_offset = ((tcp_data.get(12).copied().unwrap_or(0) >> 4) & 0x0F) * 4;
+                    // Ensure data_offset is reasonable (between 20 and 60 bytes)
+                    let safe_data_offset = data_offset.max(20).min(60) as usize;
+                    decoded.tcp = Some(TcpHeader {
+                        src_port: u16::from_be_bytes([
+                            tcp_data.get(0).copied().unwrap_or(0),
+                            tcp_data.get(1).copied().unwrap_or(0),
+                        ]),
+                        dst_port: u16::from_be_bytes([
+                            tcp_data.get(2).copied().unwrap_or(0),
+                            tcp_data.get(3).copied().unwrap_or(0),
+                        ]),
+                        sequence: u32::from_be_bytes([
+                            tcp_data.get(4).copied().unwrap_or(0),
+                            tcp_data.get(5).copied().unwrap_or(0),
+                            tcp_data.get(6).copied().unwrap_or(0),
+                            tcp_data.get(7).copied().unwrap_or(0),
+                        ]),
+                        acknowledgment: u32::from_be_bytes([
+                            tcp_data.get(8).copied().unwrap_or(0),
+                            tcp_data.get(9).copied().unwrap_or(0),
+                            tcp_data.get(10).copied().unwrap_or(0),
+                            tcp_data.get(11).copied().unwrap_or(0),
+                        ]),
+                        data_offset: (tcp_data.get(12).copied().unwrap_or(0) >> 4) & 0x0F,
+                        flags: tcp_data.get(13).copied().unwrap_or(0),
+                        window: u16::from_be_bytes([
+                            tcp_data.get(14).copied().unwrap_or(0),
+                            tcp_data.get(15).copied().unwrap_or(0),
+                        ]),
+                        checksum: u16::from_be_bytes([
+                            tcp_data.get(16).copied().unwrap_or(0),
+                            tcp_data.get(17).copied().unwrap_or(0),
+                        ]),
+                        urgent_pointer: u16::from_be_bytes([
+                            tcp_data.get(18).copied().unwrap_or(0),
+                            tcp_data.get(19).copied().unwrap_or(0),
+                        ]),
+                    });
 
-                        // Decode application layer (SIP over TCP)
-                        let app_offset = transport_offset + safe_data_offset;
-                        if data.len() > app_offset {
-                            let app_data = &data[app_offset..];
-                            if let Some(tcp) = decoded.tcp.as_ref() {
-                                let is_dns_port = tcp.src_port == 53 || tcp.dst_port == 53;
-                                let result = decode_application_layer(app_data, tcp.src_port, tcp.dst_port, is_dns_port, packet_count, rtp_port_range);
-                                decoded.application = match result {
-                                    ApplicationLayer::Unknown(_) => {
-                                        if let Some(ref ip) = decoded.ip {
-                                            if let Some(reassembled) = try_reassemble_tcp_sip(
-                                                app_data, ip.src_ip, tcp.src_port, ip.dst_ip, tcp.dst_port,
-                                            ) {
-                                                decode_application_layer(&reassembled, tcp.src_port, tcp.dst_port, is_dns_port, packet_count, rtp_port_range)
-                                            } else {
-                                                ApplicationLayer::Unknown(app_data.to_vec())
-                                            }
+                    // Decode application layer (SIP over TCP)
+                    let app_offset = transport_offset + safe_data_offset;
+                    if data.len() > app_offset {
+                        let app_data = &data[app_offset..];
+                        if let Some(tcp) = decoded.tcp.as_ref() {
+                            let is_dns_port = tcp.src_port == 53 || tcp.dst_port == 53;
+                            let result = decode_application_layer(
+                                app_data,
+                                tcp.src_port,
+                                tcp.dst_port,
+                                is_dns_port,
+                                packet_count,
+                                rtp_port_range,
+                            );
+                            decoded.application = match result {
+                                ApplicationLayer::Unknown(_) => {
+                                    if let Some(ref ip) = decoded.ip {
+                                        if let Some(reassembled) = try_reassemble_tcp_sip(
+                                            app_data,
+                                            ip.src_ip,
+                                            tcp.src_port,
+                                            ip.dst_ip,
+                                            tcp.dst_port,
+                                        ) {
+                                            decode_application_layer(
+                                                &reassembled,
+                                                tcp.src_port,
+                                                tcp.dst_port,
+                                                is_dns_port,
+                                                packet_count,
+                                                rtp_port_range,
+                                            )
                                         } else {
                                             ApplicationLayer::Unknown(app_data.to_vec())
                                         }
+                                    } else {
+                                        ApplicationLayer::Unknown(app_data.to_vec())
                                     }
-                                    other => other,
-                                };
-                            }
+                                }
+                                other => other,
+                            };
                         }
                     }
                 }
             }
-            _ => {}
         }
+        _ => {}
+    }
 
     Ok(decoded)
 }
 
-fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_port: bool, _packet_count: Option<u64>, rtp_port_range: Option<(u16, u16)>) -> ApplicationLayer {
+fn decode_application_layer(
+    data: &[u8],
+    src_port: u16,
+    dst_port: u16,
+    is_dns_port: bool,
+    _packet_count: Option<u64>,
+    rtp_port_range: Option<(u16, u16)>,
+) -> ApplicationLayer {
     // Try DNS first if on port 53 or looks like DNS
     // DNS has a very specific structure and should be checked early
     if is_dns_port || (data.len() >= 12 && is_dns_packet(data)) {
         match dns_parser::parse_dns_message(data) {
             Ok(dns) => {
-                if dns.queries.len() > 0 || dns.answers.len() > 0 || dns.questions > 0 || dns.answer_rrs > 0 {
+                if dns.queries.len() > 0
+                    || dns.answers.len() > 0
+                    || dns.questions > 0
+                    || dns.answer_rrs > 0
+                {
                     return ApplicationLayer::Dns(dns);
                 }
             }
@@ -486,7 +539,11 @@ fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_po
     // STUN guard: STUN binding requests/responses start with specific message types
     // and have a 32-bit magic cookie 0x2112A442 at bytes 4-7 (RFC 5389 §6).
     // Check STUN *before* T.38 to prevent STUN being misidentified as UDPTL.
-    let is_stun = data.len() >= 20 && data[4] == 0x21 && data[5] == 0x12 && data[6] == 0xA4 && data[7] == 0x42;
+    let is_stun = data.len() >= 20
+        && data[4] == 0x21
+        && data[5] == 0x12
+        && data[6] == 0xA4
+        && data[7] == 0x42;
 
     // T.38 / UDPTL (FAX over IP): content-based detection — skip if STUN
     if !is_stun && t38_parser::looks_like_udptl(data) && data.len() >= 5 {
@@ -499,22 +556,30 @@ fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_po
     let looks_like_sip = if data.len() >= 4 {
         let text = String::from_utf8_lossy(&data[..data.len().min(200)]);
         let text_upper = text.to_uppercase();
-        text_upper.starts_with("REGISTER ") || text_upper.starts_with("INVITE ") ||
-        text_upper.starts_with("ACK ") || text_upper.starts_with("BYE ") ||
-        text_upper.starts_with("CANCEL ") || text_upper.starts_with("OPTIONS ") ||
-        text_upper.starts_with("PRACK ") || text_upper.starts_with("UPDATE ") ||
-        text_upper.starts_with("INFO ") || text_upper.starts_with("REFER ") ||
-        text_upper.starts_with("NOTIFY ") || text_upper.starts_with("SUBSCRIBE ") ||
-        text_upper.starts_with("PUBLISH ") || text_upper.starts_with("MESSAGE ") ||
-        text_upper.starts_with("SIP/2.0") || text_upper.contains("VIA: SIP/2.0")
+        text_upper.starts_with("REGISTER ")
+            || text_upper.starts_with("INVITE ")
+            || text_upper.starts_with("ACK ")
+            || text_upper.starts_with("BYE ")
+            || text_upper.starts_with("CANCEL ")
+            || text_upper.starts_with("OPTIONS ")
+            || text_upper.starts_with("PRACK ")
+            || text_upper.starts_with("UPDATE ")
+            || text_upper.starts_with("INFO ")
+            || text_upper.starts_with("REFER ")
+            || text_upper.starts_with("NOTIFY ")
+            || text_upper.starts_with("SUBSCRIBE ")
+            || text_upper.starts_with("PUBLISH ")
+            || text_upper.starts_with("MESSAGE ")
+            || text_upper.starts_with("SIP/2.0")
+            || text_upper.contains("VIA: SIP/2.0")
     } else {
         false
     };
 
     // Skip RTP/RTCP for SIP, STUN, or well-known non-RTP ports (HTTPS/QUIC on 443).
     // UDP 443 is QUIC/HTTP3; encrypted payloads can randomly match RTP header bits.
-    let is_well_known_non_rtp_port = dst_port == 443 || src_port == 443
-        || dst_port == 80 || src_port == 80;
+    let is_well_known_non_rtp_port =
+        dst_port == 443 || src_port == 443 || dst_port == 80 || src_port == 80;
 
     // Port range gate: only consider RTP/RTCP on ports within the expected range
     // (default 10000-60000). Excludes random UDP on low ports (NTP/123, SNMP/161, etc.)
@@ -528,12 +593,13 @@ fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_po
     // DTLS records (content types 20-25, version 0xFEFF or 0xFEFD) often share ports
     // with RTP in WebRTC; their first byte (20-25) with version=2 bit can false-match.
     let is_dtls = data.len() >= 13
-        && data[0] >= 20 && data[0] <= 25
+        && data[0] >= 20
+        && data[0] <= 25
         && data[1] == 0xFE
         && (data[2] == 0xFF || data[2] == 0xFD);
 
-    let should_skip_rtp = looks_like_sip || is_stun || is_well_known_non_rtp_port
-        || outside_rtp_range || is_dtls;
+    let should_skip_rtp =
+        looks_like_sip || is_stun || is_well_known_non_rtp_port || outside_rtp_range || is_dtls;
 
     // RTP/RTCP have very specific binary header formats
     if !should_skip_rtp && data.len() >= 12 {
@@ -555,7 +621,8 @@ fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_po
                     let mut rtp = rtp;
                     let codec = rtp_analyzer::get_codec_name(rtp.payload_type);
                     if codec == "telephone-event" || rtp.payload_type == 101 {
-                        let header_len = 12 + (rtp.csrc_count as usize) * 4
+                        let header_len = 12
+                            + (rtp.csrc_count as usize) * 4
                             + rtp.extension_length.map(|l| l as usize).unwrap_or(0);
                         if data.len() > header_len {
                             rtp.dtmf_event = rtp_analyzer::parse_dtmf_event(&data[header_len..]);
@@ -575,28 +642,29 @@ fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_po
         let text_lossy = String::from_utf8_lossy(&data[..data.len().min(200)]);
         let text_upper = text_lossy.to_uppercase();
         let has_sip_signature = text_upper.starts_with("REGISTER ")
-                || text_upper.starts_with("INVITE ")
-                || text_upper.starts_with("ACK ")
-                || text_upper.starts_with("BYE ")
-                || text_upper.starts_with("CANCEL ")
-                || text_upper.starts_with("OPTIONS ")
-                || text_upper.starts_with("PRACK ")
-                || text_upper.starts_with("UPDATE ")
-                || text_upper.starts_with("INFO ")
-                || text_upper.starts_with("REFER ")
-                || text_upper.starts_with("NOTIFY ")
-                || text_upper.starts_with("SUBSCRIBE ")
-                || text_upper.starts_with("PUBLISH ")
-                || text_upper.starts_with("MESSAGE ")
-                || text_upper.starts_with("SIP/2.0")
-                || text_upper.contains("VIA: SIP/2.0")
-                || text_upper.contains("FROM: <SIP:")
-                || text_upper.contains("TO: <SIP:")
-                || (text_upper.contains("CSEQ:") && (text_upper.contains("REGISTER") || text_upper.contains("INVITE")))
-                || (text_upper.contains("CALL-ID:") || text_upper.contains("CALLID:"));
+            || text_upper.starts_with("INVITE ")
+            || text_upper.starts_with("ACK ")
+            || text_upper.starts_with("BYE ")
+            || text_upper.starts_with("CANCEL ")
+            || text_upper.starts_with("OPTIONS ")
+            || text_upper.starts_with("PRACK ")
+            || text_upper.starts_with("UPDATE ")
+            || text_upper.starts_with("INFO ")
+            || text_upper.starts_with("REFER ")
+            || text_upper.starts_with("NOTIFY ")
+            || text_upper.starts_with("SUBSCRIBE ")
+            || text_upper.starts_with("PUBLISH ")
+            || text_upper.starts_with("MESSAGE ")
+            || text_upper.starts_with("SIP/2.0")
+            || text_upper.contains("VIA: SIP/2.0")
+            || text_upper.contains("FROM: <SIP:")
+            || text_upper.contains("TO: <SIP:")
+            || (text_upper.contains("CSEQ:")
+                && (text_upper.contains("REGISTER") || text_upper.contains("INVITE")))
+            || (text_upper.contains("CALL-ID:") || text_upper.contains("CALLID:"));
         // Also keep a strict UTF-8 result for the SIP parser (which requires valid UTF-8)
         let text_result = String::from_utf8(data[..data.len().min(200)].to_vec());
-        
+
         if has_sip_signature {
             match sip_parser::parse_sip_message(data) {
                 Ok(sip) => {
@@ -662,16 +730,19 @@ fn decode_application_layer(data: &[u8], src_port: u16, dst_port: u16, is_dns_po
 
 /// Extract a SIP method from the first line of raw text data.
 /// Preserves wire casing (RFC 3261: methods are case-sensitive).
-fn extract_sip_method_from_raw(text_result: &Result<String, std::string::FromUtf8Error>) -> Option<String> {
+fn extract_sip_method_from_raw(
+    text_result: &Result<String, std::string::FromUtf8Error>,
+) -> Option<String> {
     let text = text_result.as_ref().ok()?;
     let first_line = text.lines().next()?.trim();
     let method_token = first_line.split_whitespace().next()?;
     // Validate it looks like a SIP method (all uppercase letters per RFC 3261 ABNF)
     let upper = method_token.to_uppercase();
     match upper.as_str() {
-        "REGISTER" | "INVITE" | "ACK" | "BYE" | "CANCEL" | "OPTIONS" |
-        "PRACK" | "UPDATE" | "INFO" | "REFER" | "NOTIFY" | "SUBSCRIBE" |
-        "PUBLISH" | "MESSAGE" => Some(method_token.to_string()),
+        "REGISTER" | "INVITE" | "ACK" | "BYE" | "CANCEL" | "OPTIONS" | "PRACK" | "UPDATE"
+        | "INFO" | "REFER" | "NOTIFY" | "SUBSCRIBE" | "PUBLISH" | "MESSAGE" => {
+            Some(method_token.to_string())
+        }
         _ => None,
     }
 }
@@ -685,13 +756,25 @@ fn format_mac(bytes: &[u8]) -> String {
 }
 
 fn has_sip_start(data: &[u8]) -> bool {
-    if data.len() < 4 { return false; }
+    if data.len() < 4 {
+        return false;
+    }
     let s = String::from_utf8_lossy(&data[..data.len().min(20)]).to_uppercase();
-    s.starts_with("SIP/2.0") || s.starts_with("REGISTER ") || s.starts_with("INVITE ")
-        || s.starts_with("ACK ") || s.starts_with("BYE ") || s.starts_with("CANCEL ")
-        || s.starts_with("OPTIONS ") || s.starts_with("PRACK ") || s.starts_with("UPDATE ")
-        || s.starts_with("INFO ") || s.starts_with("REFER ") || s.starts_with("NOTIFY ")
-        || s.starts_with("SUBSCRIBE ") || s.starts_with("PUBLISH ") || s.starts_with("MESSAGE ")
+    s.starts_with("SIP/2.0")
+        || s.starts_with("REGISTER ")
+        || s.starts_with("INVITE ")
+        || s.starts_with("ACK ")
+        || s.starts_with("BYE ")
+        || s.starts_with("CANCEL ")
+        || s.starts_with("OPTIONS ")
+        || s.starts_with("PRACK ")
+        || s.starts_with("UPDATE ")
+        || s.starts_with("INFO ")
+        || s.starts_with("REFER ")
+        || s.starts_with("NOTIFY ")
+        || s.starts_with("SUBSCRIBE ")
+        || s.starts_with("PUBLISH ")
+        || s.starts_with("MESSAGE ")
 }
 
 /// Check if a SIP message in `data` is complete (has header/body separator and full body).
@@ -724,8 +807,10 @@ fn is_sip_complete(data: &[u8]) -> bool {
 /// Attempt TCP SIP reassembly. Returns Some(complete_message) or None.
 fn try_reassemble_tcp_sip(
     payload: &[u8],
-    src_ip: IpAddr, src_port: u16,
-    dst_ip: IpAddr, dst_port: u16,
+    src_ip: IpAddr,
+    src_port: u16,
+    dst_ip: IpAddr,
+    dst_port: u16,
 ) -> Option<Vec<u8>> {
     let key = make_flow_key(src_ip, src_port, dst_ip, dst_port);
     let mut buffers = TCP_SIP_BUFFERS.lock().ok()?;
@@ -750,10 +835,13 @@ fn try_reassemble_tcp_sip(
     }
 
     if has_sip_start(payload) && !is_sip_complete(payload) {
-        buffers.insert(key, TcpSipBuffer {
-            data: payload.to_vec(),
-            last_seen: now,
-        });
+        buffers.insert(
+            key,
+            TcpSipBuffer {
+                data: payload.to_vec(),
+                last_seen: now,
+            },
+        );
         return None;
     }
 
@@ -771,25 +859,33 @@ fn skip_ipv6_extension_headers(data: &[u8]) -> (u8, usize) {
     for _ in 0..10 {
         match next_header {
             0 | 43 | 60 | 135 => {
-                if offset + 2 > data.len() { break; }
+                if offset + 2 > data.len() {
+                    break;
+                }
                 let ext_len = (data[offset + 1] as usize + 1) * 8;
                 next_header = data[offset];
                 offset += ext_len;
             }
             44 => {
-                if offset + 8 > data.len() { break; }
+                if offset + 8 > data.len() {
+                    break;
+                }
                 next_header = data[offset];
                 offset += 8;
             }
             51 => {
-                if offset + 2 > data.len() { break; }
+                if offset + 2 > data.len() {
+                    break;
+                }
                 let ext_len = (data[offset + 1] as usize + 2) * 4;
                 next_header = data[offset];
                 offset += ext_len;
             }
             _ => break,
         }
-        if offset >= data.len() { break; }
+        if offset >= data.len() {
+            break;
+        }
     }
     (next_header, offset)
 }

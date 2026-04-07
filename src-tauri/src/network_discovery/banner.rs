@@ -44,9 +44,8 @@ const COMMON_PORTS: &[(u16, &str)] = &[
 /// Default ports to scan during a Full scan.
 /// Covers SSH, HTTP(S), common services, VoIP, databases, and management ports.
 pub const FULL_SCAN_PORTS: &[u16] = &[
-    21, 22, 23, 25, 53, 80, 110, 111, 139, 143, 389, 443, 445, 515, 554, 631, 993, 995,
-    1433, 1521, 3306, 3389, 5000, 5001, 5060, 5061, 5432, 5900, 6379, 8080, 8443, 8888,
-    9090, 9100, 9200,
+    21, 22, 23, 25, 53, 80, 110, 111, 139, 143, 389, 443, 445, 515, 554, 631, 993, 995, 1433, 1521,
+    3306, 3389, 5000, 5001, 5060, 5061, 5432, 5900, 6379, 8080, 8443, 8888, 9090, 9100, 9200,
 ];
 
 /// Probe a single TCP port and grab its banner.
@@ -72,7 +71,12 @@ pub async fn probe_port(ip: IpAddr, port: u16, timeout: Duration) -> Option<Open
 }
 
 /// Scan multiple ports on a single host.
-pub async fn scan_ports(ip: IpAddr, ports: &[u16], timeout: Duration, concurrency: usize) -> Vec<OpenPort> {
+pub async fn scan_ports(
+    ip: IpAddr,
+    ports: &[u16],
+    timeout: Duration,
+    concurrency: usize,
+) -> Vec<OpenPort> {
     let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(concurrency));
     let mut handles = Vec::new();
 
@@ -118,7 +122,10 @@ async fn grab_banner(
             // Send a minimal HTTP request to elicit a response
             let req = format!(
                 "HEAD / HTTP/1.0\r\nHost: {}\r\nUser-Agent: NetworkScanner/1.0\r\n\r\n",
-                stream.peer_addr().map(|a| a.ip().to_string()).unwrap_or_default()
+                stream
+                    .peer_addr()
+                    .map(|a| a.ip().to_string())
+                    .unwrap_or_default()
             );
             let _ = stream.write_all(req.as_bytes()).await;
         }
@@ -129,10 +136,13 @@ async fn grab_banner(
     }
 
     // Read response
-    let banner = match tokio::time::timeout(Duration::from_millis(timeout.as_millis() as u64), stream.read(&mut buf)).await {
-        Ok(Ok(n)) if n > 0 => {
-            String::from_utf8_lossy(&buf[..n]).to_string()
-        }
+    let banner = match tokio::time::timeout(
+        Duration::from_millis(timeout.as_millis() as u64),
+        stream.read(&mut buf),
+    )
+    .await
+    {
+        Ok(Ok(n)) if n > 0 => String::from_utf8_lossy(&buf[..n]).to_string(),
         _ => String::new(),
     };
 
@@ -155,7 +165,9 @@ fn identify_service(port: u16, banner: &str, expected: &str) -> String {
     }
 
     // SMTP: "220 ... SMTP" or "220 ... ESMTP"
-    if banner.starts_with("220") && (banner_lower.contains("smtp") || banner_lower.contains("esmtp")) {
+    if banner.starts_with("220")
+        && (banner_lower.contains("smtp") || banner_lower.contains("esmtp"))
+    {
         return "SMTP".to_string();
     }
 

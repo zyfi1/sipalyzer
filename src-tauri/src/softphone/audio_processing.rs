@@ -23,10 +23,10 @@ impl Agc {
         Self {
             target_rms,
             gain: 1.0,
-            max_gain: 10.0,  // +20 dB max boost
-            min_gain: 0.1,   // -20 dB max attenuation
-            attack: 0.1,     // fast when too loud
-            release: 0.01,   // slow when too quiet (avoid pumping)
+            max_gain: 10.0, // +20 dB max boost
+            min_gain: 0.1,  // -20 dB max attenuation
+            attack: 0.1,    // fast when too loud
+            release: 0.01,  // slow when too quiet (avoid pumping)
         }
     }
 
@@ -49,7 +49,11 @@ impl Agc {
         let desired = (self.target_rms / rms).clamp(self.min_gain, self.max_gain);
 
         // Smooth gain changes: fast attack, slow release
-        let alpha = if desired < self.gain { self.attack } else { self.release };
+        let alpha = if desired < self.gain {
+            self.attack
+        } else {
+            self.release
+        };
         self.gain = self.gain * (1.0 - alpha) + desired * alpha;
         self.gain = self.gain.clamp(self.min_gain, self.max_gain);
 
@@ -135,7 +139,8 @@ impl Plc {
         self.consecutive_losses += 1;
         // Apply decay: each consecutive loss reduces volume
         let decay = self.decay_factor.powi(self.consecutive_losses as i32);
-        let concealed: Vec<i16> = self.last_frame
+        let concealed: Vec<i16> = self
+            .last_frame
             .iter()
             .map(|&s| (s as f64 * decay).clamp(-32768.0, 32767.0) as i16)
             .collect();
@@ -253,7 +258,9 @@ impl NoiseSuppressor {
     /// Process a PCM frame in-place. Subtracts estimated noise from the spectrum.
     pub fn process(&mut self, pcm: &mut [i16]) {
         let n = pcm.len().min(self.fft_size);
-        if n < 4 { return; }
+        if n < 4 {
+            return;
+        }
 
         // Convert to f64
         let mut buf: Vec<f64> = pcm[..n].iter().map(|&s| s as f64).collect();
@@ -268,7 +275,8 @@ impl NoiseSuppressor {
             let mut re = 0.0;
             let mut im = 0.0;
             for (t, sample) in buf.iter().enumerate() {
-                let angle = -2.0 * std::f64::consts::PI * (k as f64) * (t as f64) / (self.fft_size as f64);
+                let angle =
+                    -2.0 * std::f64::consts::PI * (k as f64) * (t as f64) / (self.fft_size as f64);
                 re += sample * angle.cos();
                 im += sample * angle.sin();
             }
@@ -281,13 +289,15 @@ impl NoiseSuppressor {
         if self.frame_count <= self.init_frames {
             // During init, accumulate average noise
             for k in 0..half {
-                self.noise_est[k] = self.noise_est[k] + (mag[k] - self.noise_est[k]) / self.frame_count as f64;
+                self.noise_est[k] =
+                    self.noise_est[k] + (mag[k] - self.noise_est[k]) / self.frame_count as f64;
             }
         } else {
             // Slow upward tracking of noise floor (only when signal is close to current estimate)
             for k in 0..half {
                 if mag[k] < self.noise_est[k] * 3.0 {
-                    self.noise_est[k] = self.alpha * self.noise_est[k] + (1.0 - self.alpha) * mag[k];
+                    self.noise_est[k] =
+                        self.alpha * self.noise_est[k] + (1.0 - self.alpha) * mag[k];
                 }
             }
         }
@@ -302,7 +312,8 @@ impl NoiseSuppressor {
         for t in 0..n {
             let mut sum = 0.0;
             for k in 0..half {
-                let angle = 2.0 * std::f64::consts::PI * (k as f64) * (t as f64) / (self.fft_size as f64);
+                let angle =
+                    2.0 * std::f64::consts::PI * (k as f64) * (t as f64) / (self.fft_size as f64);
                 let re = mag[k] * phase[k].cos();
                 let im = mag[k] * phase[k].sin();
                 sum += re * angle.cos() - im * angle.sin();
@@ -424,12 +435,16 @@ mod tests {
     fn agc_boosts_quiet_signal() {
         let mut agc = Agc::new(-20.0);
         // Very quiet signal
-        let mut frame: Vec<i16> = (0..160).map(|i| ((i as f64 * 0.1).sin() * 100.0) as i16).collect();
-        let rms_before: f64 = (frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64).sqrt();
+        let mut frame: Vec<i16> = (0..160)
+            .map(|i| ((i as f64 * 0.1).sin() * 100.0) as i16)
+            .collect();
+        let rms_before: f64 =
+            (frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64).sqrt();
         for _ in 0..50 {
             agc.process(&mut frame);
         }
-        let rms_after: f64 = (frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64).sqrt();
+        let rms_after: f64 =
+            (frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64).sqrt();
         assert!(rms_after > rms_before, "AGC should boost quiet signal");
     }
 
@@ -466,16 +481,23 @@ mod tests {
         // After adaptation, noise should be reduced
         let mut frame = noise.clone();
         ns.process(&mut frame);
-        let noise_power: f64 = frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64;
-        let orig_power: f64 = noise.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / noise.len() as f64;
-        assert!(noise_power < orig_power, "Noise suppressor should reduce noise power");
+        let noise_power: f64 =
+            frame.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / frame.len() as f64;
+        let orig_power: f64 =
+            noise.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / noise.len() as f64;
+        assert!(
+            noise_power < orig_power,
+            "Noise suppressor should reduce noise power"
+        );
     }
 
     #[test]
     fn aec_reduces_echo() {
         let mut aec = Aec::new(64);
         // Simulate a far-end tone and the same tone picked up by the mic (echo)
-        let far: Vec<i16> = (0..160).map(|i| ((i as f64 * 0.05).sin() * 10000.0) as i16).collect();
+        let far: Vec<i16> = (0..160)
+            .map(|i| ((i as f64 * 0.05).sin() * 10000.0) as i16)
+            .collect();
         // Feed far-end multiple times to let the filter adapt
         for _ in 0..50 {
             aec.feed_far_end(&far);
@@ -486,8 +508,13 @@ mod tests {
         aec.feed_far_end(&far);
         let mut mic = far.clone();
         aec.cancel(&mut mic);
-        let echo_power: f64 = mic.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / mic.len() as f64;
-        let orig_power: f64 = far.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / far.len() as f64;
-        assert!(echo_power < orig_power * 0.5, "AEC should reduce echo by at least 3 dB");
+        let echo_power: f64 =
+            mic.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / mic.len() as f64;
+        let orig_power: f64 =
+            far.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / far.len() as f64;
+        assert!(
+            echo_power < orig_power * 0.5,
+            "AEC should reduce echo by at least 3 dB"
+        );
     }
 }

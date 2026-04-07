@@ -62,15 +62,15 @@ pub fn parse_dns_message(data: &[u8]) -> Result<DnsMessage> {
         if offset >= data.len() {
             break; // Truncated, but return what we have
         }
-        
+
         match parse_dns_name(data, offset) {
             Ok((name, new_offset)) => {
                 offset = new_offset;
-                
+
                 if offset + 4 > data.len() {
                     break; // Truncated, but return what we have
                 }
-                
+
                 let qtype = u16::from_be_bytes([data[offset], data[offset + 1]]);
                 let qclass = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
                 offset += 4;
@@ -93,17 +93,17 @@ pub fn parse_dns_message(data: &[u8]) -> Result<DnsMessage> {
         if offset >= data.len() {
             break; // Truncated, but return what we have
         }
-        
+
         let (name, new_offset) = match parse_dns_name(data, offset) {
             Ok(result) => result,
             Err(_) => break, // Name parsing failed, skip remaining answers
         };
         offset = new_offset;
-        
+
         if offset + 10 > data.len() {
             break; // Truncated, but return what we have
         }
-        
+
         let rtype = u16::from_be_bytes([data[offset], data[offset + 1]]);
         let rclass = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
         let ttl = u32::from_be_bytes([
@@ -139,7 +139,8 @@ pub fn parse_dns_message(data: &[u8]) -> Result<DnsMessage> {
                 if data_length == 16 {
                     let mut parts = Vec::new();
                     for i in 0..8 {
-                        let val = u16::from_be_bytes([data[offset + i * 2], data[offset + i * 2 + 1]]);
+                        let val =
+                            u16::from_be_bytes([data[offset + i * 2], data[offset + i * 2 + 1]]);
                         parts.push(format!("{:x}", val));
                     }
                     parts.join(":")
@@ -156,10 +157,13 @@ pub fn parse_dns_message(data: &[u8]) -> Result<DnsMessage> {
             }
             _ => {
                 // Other record types - show hex
-                format!("0x{}", data[offset..offset + data_length]
-                    .iter()
-                    .map(|b| format!("{:02x}", b))
-                    .collect::<String>())
+                format!(
+                    "0x{}",
+                    data[offset..offset + data_length]
+                        .iter()
+                        .map(|b| format!("{:02x}", b))
+                        .collect::<String>()
+                )
             }
         };
 
@@ -218,7 +222,7 @@ fn parse_dns_name(data: &[u8], mut offset: usize) -> Result<(String, usize)> {
             }
             let pointer = u16::from_be_bytes([(length & 0x3F) as u8, data[offset]]) as usize;
             offset += 1;
-            
+
             if !jumped {
                 // Only jump once to avoid infinite loops (checked in else branch on re-entry)
                 jumped = true;

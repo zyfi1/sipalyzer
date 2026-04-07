@@ -48,7 +48,8 @@ pub fn calculate_mos(input: MosInput) -> MosResult {
     // Effective equipment impairment (Ie_eff)
     // Accounts for codec impairment + packet loss
     let bpl = 25.0; // Packet loss robustness factor (codec dependent, ~25 for G.711)
-    let ie_eff = codec_ie + (95.0 - codec_ie) * (input.packet_loss_pct / (input.packet_loss_pct + bpl));
+    let ie_eff =
+        codec_ie + (95.0 - codec_ie) * (input.packet_loss_pct / (input.packet_loss_pct + bpl));
 
     // R-factor
     let mut r = r0 - id - ie_eff;
@@ -85,7 +86,11 @@ pub fn calculate_mos(input: MosInput) -> MosResult {
 }
 
 fn step(x: f64) -> f64 {
-    if x > 0.0 { 1.0 } else { 0.0 }
+    if x > 0.0 {
+        1.0
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]

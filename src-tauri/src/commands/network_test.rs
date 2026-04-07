@@ -1,7 +1,7 @@
 use crate::network_test::{
-    ping, jitter, packet_loss, bandwidth, mos, traceroute, mtr, mtu, dscp,
-    port_scan, dns, stun, turn, rtp_sim, net_info, wifi, monitor, sip_probe,
-    stun_quality, speed_test, ntp, nat_detect, snmp,
+    bandwidth, dns, dscp, jitter, monitor, mos, mtr, mtu, nat_detect, net_info, ntp, packet_loss,
+    ping, port_scan, rtp_sim, sip_probe, snmp, speed_test, stun, stun_quality, traceroute, turn,
+    wifi,
 };
 use std::process::Command;
 use tauri::Emitter;
@@ -112,7 +112,11 @@ pub async fn network_health_check() -> Result<HealthCheckResult, String> {
                 timeout_ms: 2000,
             };
             let result = ping::run_ping(config).await;
-            HealthPingEntry { host: h, label: l, result }
+            HealthPingEntry {
+                host: h,
+                label: l,
+                result,
+            }
         }));
     }
 
@@ -126,7 +130,11 @@ pub async fn network_health_check() -> Result<HealthCheckResult, String> {
                 timeout_ms: 1000,
             };
             let result = ping::run_ping(config).await;
-            Some(HealthPingEntry { host: gw, label: "Default Gateway".into(), result })
+            Some(HealthPingEntry {
+                host: gw,
+                label: "Default Gateway".into(),
+                result,
+            })
         } else {
             None
         }
@@ -139,14 +147,20 @@ pub async fn network_health_check() -> Result<HealthCheckResult, String> {
     }
 
     let gateway_entry = gw_handle.await.ok().flatten();
-    let gateway_reachable = gateway_entry.as_ref().map(|e| e.result.success).unwrap_or(false);
+    let gateway_reachable = gateway_entry
+        .as_ref()
+        .map(|e| e.result.success)
+        .unwrap_or(false);
     if let Some(gw) = gateway_entry {
         pings.insert(0, gw);
     }
 
-    let internet_reachable = pings.iter().any(|p| p.label != "Default Gateway" && p.result.success);
+    let internet_reachable = pings
+        .iter()
+        .any(|p| p.label != "Default Gateway" && p.result.success);
 
-    let successful: Vec<&HealthPingEntry> = pings.iter()
+    let successful: Vec<&HealthPingEntry> = pings
+        .iter()
         .filter(|p| p.result.success && p.label != "Default Gateway")
         .collect();
 
@@ -156,12 +170,19 @@ pub async fn network_health_check() -> Result<HealthCheckResult, String> {
         None
     };
 
-    let best_latency = successful.iter().map(|p| p.result.min_ms).fold(None, |acc, v| {
-        Some(acc.map_or(v, |a: f64| a.min(v)))
-    });
+    let best_latency = successful
+        .iter()
+        .map(|p| p.result.min_ms)
+        .fold(None, |acc, v| Some(acc.map_or(v, |a: f64| a.min(v))));
 
     let avg_loss = if !successful.is_empty() {
-        Some(successful.iter().map(|p| p.result.packet_loss_pct).sum::<f64>() / successful.len() as f64)
+        Some(
+            successful
+                .iter()
+                .map(|p| p.result.packet_loss_pct)
+                .sum::<f64>()
+                / successful.len() as f64,
+        )
     } else {
         None
     };
@@ -180,7 +201,11 @@ pub async fn network_health_check() -> Result<HealthCheckResult, String> {
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn network_ping(host: String, count: Option<u32>, timeout_ms: Option<u64>) -> Result<ping::PingResult, String> {
+pub async fn network_ping(
+    host: String,
+    count: Option<u32>,
+    timeout_ms: Option<u64>,
+) -> Result<ping::PingResult, String> {
     let config = ping::PingConfig {
         host,
         count: count.unwrap_or(10),
@@ -304,9 +329,12 @@ pub async fn network_traceroute(
         allow_shell_fallback: allow_shell_fallback.unwrap_or(false),
     };
     let progress_window = window.clone();
-    Ok(traceroute::run_traceroute_with_progress(config, move |hop| {
-        let _ = progress_window.emit("network-traceroute-hop", hop.clone());
-    }).await)
+    Ok(
+        traceroute::run_traceroute_with_progress(config, move |hop| {
+            let _ = progress_window.emit("network-traceroute-hop", hop.clone());
+        })
+        .await,
+    )
 }
 
 #[tauri::command]
@@ -546,11 +574,15 @@ pub async fn network_mtr(
     };
     let progress_window = window.clone();
     Ok(mtr::run_mtr_with_progress(config, move |round, hops| {
-        let _ = progress_window.emit("network-mtr-progress", MtrProgressEvent {
-            round,
-            hops: hops.clone(),
-        });
-    }).await)
+        let _ = progress_window.emit(
+            "network-mtr-progress",
+            MtrProgressEvent {
+                round,
+                hops: hops.clone(),
+            },
+        );
+    })
+    .await)
 }
 
 #[tauri::command]
@@ -575,11 +607,13 @@ pub async fn network_ntp_check(
     timeout_ms: Option<u64>,
 ) -> Result<ntp::NtpCheckResult, String> {
     let config = ntp::NtpConfig {
-        servers: servers.unwrap_or_else(|| vec![
-            "pool.ntp.org".into(),
-            "time.google.com".into(),
-            "time.cloudflare.com".into(),
-        ]),
+        servers: servers.unwrap_or_else(|| {
+            vec![
+                "pool.ntp.org".into(),
+                "time.google.com".into(),
+                "time.cloudflare.com".into(),
+            ]
+        }),
         timeout_ms: timeout_ms.unwrap_or(3000),
     };
     Ok(ntp::run_ntp_check(config).await)

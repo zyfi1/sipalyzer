@@ -6,31 +6,31 @@ use std::net::IpAddr;
 /// Audio types per RFC 3551 Table 4; Video types per RFC 3551 Table 5.
 fn get_clock_rate(payload_type: u8) -> u32 {
     match payload_type {
-        0 | 8 => 8000,   // PCMU, PCMA
-        3 => 8000,       // GSM
-        4 => 8000,       // G.723 (RFC 3551 Table 4: 8000 Hz)
-        5 => 8000,       // DVI4 8kHz
-        6 => 16000,      // DVI4 16kHz
-        7 => 8000,       // LPC
-        9 => 8000,       // G.722 (RFC 3551: clock rate listed as 8000 despite 16kHz bandwidth)
-        10 => 44100,     // L16 stereo
-        11 => 44100,     // L16 mono
-        12 => 8000,      // QCELP
-        13 => 8000,      // CN (comfort noise)
-        14 => 90000,     // MPA (RFC 3551 Table 4: 90000 Hz)
-        15 => 8000,      // G.728 (RFC 3551 Table 4: 8000 Hz)
-        16 => 11025,     // DVI4 11025Hz (RFC 3551 Table 4)
-        17 => 22050,     // DVI4 22050Hz (RFC 3551 Table 4)
-        18 => 8000,      // G.729
-        25 => 90000,     // CelB (video)
-        26 => 90000,     // JPEG (video)
-        28 => 90000,     // nv (video)
-        31 => 90000,     // H.261 (video)
-        32 => 90000,     // MPV (video)
-        33 => 90000,     // MP2T (video)
-        34 => 90000,     // H.263 (video)
+        0 | 8 => 8000,    // PCMU, PCMA
+        3 => 8000,        // GSM
+        4 => 8000,        // G.723 (RFC 3551 Table 4: 8000 Hz)
+        5 => 8000,        // DVI4 8kHz
+        6 => 16000,       // DVI4 16kHz
+        7 => 8000,        // LPC
+        9 => 8000,        // G.722 (RFC 3551: clock rate listed as 8000 despite 16kHz bandwidth)
+        10 => 44100,      // L16 stereo
+        11 => 44100,      // L16 mono
+        12 => 8000,       // QCELP
+        13 => 8000,       // CN (comfort noise)
+        14 => 90000,      // MPA (RFC 3551 Table 4: 90000 Hz)
+        15 => 8000,       // G.728 (RFC 3551 Table 4: 8000 Hz)
+        16 => 11025,      // DVI4 11025Hz (RFC 3551 Table 4)
+        17 => 22050,      // DVI4 22050Hz (RFC 3551 Table 4)
+        18 => 8000,       // G.729
+        25 => 90000,      // CelB (video)
+        26 => 90000,      // JPEG (video)
+        28 => 90000,      // nv (video)
+        31 => 90000,      // H.261 (video)
+        32 => 90000,      // MPV (video)
+        33 => 90000,      // MP2T (video)
+        34 => 90000,      // H.263 (video)
         96..=127 => 8000, // dynamic — default to 8000 (VoIP audio more common than video)
-        _ => 8000,       // default for audio
+        _ => 8000,        // default for audio
     }
 }
 
@@ -167,7 +167,9 @@ impl HistoryAccumulator {
     fn flush_and_advance(&mut self, new_second: i64, jitter: f64, loss_percent: f64) {
         if self.current_second > 0 && (self.packets_this_second > 0 || self.lost_this_second > 0) {
             let bucket_loss = if self.packets_this_second + self.lost_this_second > 0 {
-                (self.lost_this_second as f64) / ((self.packets_this_second + self.lost_this_second) as f64) * 100.0
+                (self.lost_this_second as f64)
+                    / ((self.packets_this_second + self.lost_this_second) as f64)
+                    * 100.0
             } else {
                 loss_percent
             };
@@ -211,7 +213,10 @@ impl HistoryAccumulator {
 ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 pub fn parse_rtp_header(data: &[u8]) -> Result<RtpHeader> {
     if data.len() < 12 {
-        return Err(anyhow::anyhow!("RTP header too short: {} bytes", data.len()));
+        return Err(anyhow::anyhow!(
+            "RTP header too short: {} bytes",
+            data.len()
+        ));
     }
 
     let version = (data[0] >> 6) & 0x03;
@@ -230,7 +235,9 @@ pub fn parse_rtp_header(data: &[u8]) -> Result<RtpHeader> {
     if data.len() < min_header_len {
         return Err(anyhow::anyhow!(
             "RTP packet too short for CC={}: need {} bytes, have {}",
-            csrc_count, min_header_len, data.len()
+            csrc_count,
+            min_header_len,
+            data.len()
         ));
     }
 
@@ -238,7 +245,12 @@ pub fn parse_rtp_header(data: &[u8]) -> Result<RtpHeader> {
     let mut offset = 12;
     for i in 0..csrc_count as usize {
         let o = offset + i * 4;
-        csrc.push(u32::from_be_bytes([data[o], data[o + 1], data[o + 2], data[o + 3]]));
+        csrc.push(u32::from_be_bytes([
+            data[o],
+            data[o + 1],
+            data[o + 2],
+            data[o + 3],
+        ]));
     }
     offset += csrc_len;
 
@@ -249,17 +261,20 @@ pub fn parse_rtp_header(data: &[u8]) -> Result<RtpHeader> {
         if data.len() < offset + 4 {
             return Err(anyhow::anyhow!(
                 "RTP extension header indicated (X=1) but packet too short: need {} bytes, have {}",
-                offset + 4, data.len()
+                offset + 4,
+                data.len()
             ));
         }
         let ext_len_words = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
         let ext_total_bytes = 4u32 + (ext_len_words as u32) * 4; // profile(2) + length(2) + payload
-        // Validate that the extension fits within the packet
+                                                                 // Validate that the extension fits within the packet
         let ext_end = offset as u32 + ext_total_bytes;
         if ext_end > data.len() as u32 {
             return Err(anyhow::anyhow!(
                 "RTP extension header length ({} words = {} bytes) exceeds packet size ({})",
-                ext_len_words, ext_total_bytes, data.len() - offset
+                ext_len_words,
+                ext_total_bytes,
+                data.len() - offset
             ));
         }
         extension_length = Some((ext_total_bytes.min(u16::MAX as u32)) as u16);
@@ -302,7 +317,13 @@ pub fn parse_dtmf_event(rtp_payload: &[u8]) -> Option<DtmfEvent> {
         16 => "Flash".to_string(),
         _ => format!("Event{}", event),
     };
-    Some(DtmfEvent { event, digit, end_of_event, volume, duration })
+    Some(DtmfEvent {
+        event,
+        digit,
+        end_of_event,
+        volume,
+        duration,
+    })
 }
 
 pub struct RtpStreamTracker {
@@ -331,8 +352,10 @@ impl RtpStreamTracker {
         let header = parse_rtp_header(data)?;
 
         // Get or create stream
-        let stream = self.streams.entry(header.ssrc).or_insert_with(|| {
-            RtpStream {
+        let stream = self
+            .streams
+            .entry(header.ssrc)
+            .or_insert_with(|| RtpStream {
                 ssrc: header.ssrc,
                 src_ip,
                 src_port,
@@ -351,8 +374,7 @@ impl RtpStreamTracker {
                 last_arrival_time: Some(timestamp),
                 validated: false,
                 sequential_count: 0,
-            }
-        });
+            });
 
         // Update stream statistics
         stream.packet_count += 1;
@@ -360,7 +382,9 @@ impl RtpStreamTracker {
         stream.last_packet_time = timestamp;
 
         // Check for lost packets and validate sequence progression
-        let seq_diff = header.sequence_number.wrapping_sub(stream.expected_sequence);
+        let seq_diff = header
+            .sequence_number
+            .wrapping_sub(stream.expected_sequence);
         if seq_diff > 0 && seq_diff < 32768 {
             // Normal progression (possibly with small gap)
             if seq_diff > 1 {
@@ -388,7 +412,8 @@ impl RtpStreamTracker {
         if let Some(last_arrival) = stream.last_arrival_time {
             let d = (timestamp - last_arrival).num_milliseconds() as f64; // arrival delta in ms
             let clock = get_clock_rate(header.payload_type) as f64;
-            let s_ms = (header.timestamp as i64 - stream.last_timestamp as i64) as f64 / clock * 1000.0; // RTP timestamp delta in ms
+            let s_ms =
+                (header.timestamp as i64 - stream.last_timestamp as i64) as f64 / clock * 1000.0; // RTP timestamp delta in ms
             let d_s = d - s_ms;
             stream.jitter += (d_s.abs() - stream.jitter) / 16.0;
         }
@@ -398,7 +423,10 @@ impl RtpStreamTracker {
 
         // --- History accumulation ---
         let pkt_second = timestamp.timestamp(); // Unix seconds
-        let hist = self.history.entry(header.ssrc).or_insert_with(HistoryAccumulator::new);
+        let hist = self
+            .history
+            .entry(header.ssrc)
+            .or_insert_with(HistoryAccumulator::new);
         if hist.current_second == 0 {
             // First packet for this stream
             hist.current_second = pkt_second;
@@ -455,7 +483,11 @@ impl RtpStreamTracker {
 
     /// Get time-series history for a specific stream by SSRC.
     /// Optionally pass an SDP codec map to resolve dynamic payload types.
-    pub fn get_stream_history(&self, ssrc: u32, sdp_map: Option<&HashMap<u8, String>>) -> Option<RtpStreamHistory> {
+    pub fn get_stream_history(
+        &self,
+        ssrc: u32,
+        sdp_map: Option<&HashMap<u8, String>>,
+    ) -> Option<RtpStreamHistory> {
         let stream = self.streams.get(&ssrc)?;
         let hist = self.history.get(&ssrc)?;
         let codec_name = match sdp_map {
@@ -475,7 +507,10 @@ impl RtpStreamTracker {
 
     /// Get time-series history for all streams.
     /// Optionally pass an SDP codec map to resolve dynamic payload types.
-    pub fn get_all_stream_histories(&self, sdp_map: Option<&HashMap<u8, String>>) -> Vec<RtpStreamHistory> {
+    pub fn get_all_stream_histories(
+        &self,
+        sdp_map: Option<&HashMap<u8, String>>,
+    ) -> Vec<RtpStreamHistory> {
         self.streams
             .keys()
             .filter_map(|ssrc| self.get_stream_history(*ssrc, sdp_map))
@@ -516,7 +551,7 @@ pub fn calculate_mos(jitter: f64, loss_percentage: f64) -> f64 {
 pub fn get_codec_name(payload_type: u8) -> String {
     match payload_type {
         0 => "PCMU".into(),
-        1 => "1016".into(),       // reserved / FS-1016
+        1 => "1016".into(), // reserved / FS-1016
         2 => "G.721".into(),
         3 => "GSM".into(),
         4 => "G.723".into(),
@@ -525,11 +560,11 @@ pub fn get_codec_name(payload_type: u8) -> String {
         7 => "LPC".into(),
         8 => "PCMA".into(),
         9 => "G.722".into(),
-        10 => "L16/S".into(),     // L16 stereo
-        11 => "L16/M".into(),     // L16 mono
+        10 => "L16/S".into(), // L16 stereo
+        11 => "L16/M".into(), // L16 mono
         12 => "QCELP".into(),
-        13 => "CN".into(),        // comfort noise
-        14 => "MPA".into(),       // MPEG audio
+        13 => "CN".into(),  // comfort noise
+        14 => "MPA".into(), // MPEG audio
         15 => "G.728".into(),
         16 => "DVI4/11K".into(),
         17 => "DVI4/22K".into(),

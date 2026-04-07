@@ -10,7 +10,10 @@
 //! - ITU-T V.29: 9600/7200 bps modulation  
 //! - ITU-T V.27ter: 4800/2400 bps modulation
 //! - G.711 µ-law (PCMU) and A-law (PCMA) codec support
-#![cfg_attr(not(feature = "spandsp-native"), allow(unused_imports, unused_variables, dead_code))]
+#![cfg_attr(
+    not(feature = "spandsp-native"),
+    allow(unused_imports, unused_variables, dead_code)
+)]
 
 use serde::{Deserialize, Serialize};
 use std::ffi::CString;
@@ -69,7 +72,7 @@ impl ModemType {
             ModemType::V34 => T30_SUPPORT_STANDARD | T30_SUPPORT_V34,
         }
     }
-    
+
     /// Get maximum baud rate for this modem type
     pub fn max_baud_rate(&self) -> u32 {
         match self {
@@ -104,7 +107,9 @@ pub enum FaxResolutionOption {
 }
 
 impl Default for FaxResolutionOption {
-    fn default() -> Self { Self::Fine }
+    fn default() -> Self {
+        Self::Fine
+    }
 }
 
 impl FaxResolutionOption {
@@ -133,43 +138,43 @@ pub struct FaxSendOptions {
     /// Transmission mode (T.38 or G.711 passthrough)
     #[serde(default)]
     pub mode: FaxMode,
-    
+
     /// Enable Error Correction Mode (ECM) - ITU-T T.30 Annex A
     /// ECM provides automatic error detection and retransmission
     #[serde(default = "default_ecm")]
     pub ecm: bool,
-    
+
     /// Maximum baud rate: 2400, 4800, 7200, 9600, 12000, 14400, 33600
     /// Will be capped to modem_type maximum if higher
     #[serde(default = "default_baud_rate")]
     pub baud_rate: u32,
-    
+
     /// Modem type selection (V.27ter, V.29, V.17, V.34)
     #[serde(default)]
     pub modem_type: ModemType,
-    
+
     /// G.711 codec variant for audio passthrough mode
     #[serde(default)]
     pub g711_variant: G711Variant,
-    
+
     /// Transmitting Station Identifier (TSI) - up to 20 characters per T.30
     pub station_id: Option<String>,
-    
+
     /// Header info to print on each page (timestamp + this text)
     pub header_info: Option<String>,
-    
+
     /// Number of retries on transmission failure (T.30 protocol level)
     #[serde(default = "default_retries")]
     pub retries: u32,
-    
+
     /// Timeout in seconds for the entire fax transmission
     #[serde(default = "default_timeout")]
     pub timeout_secs: u32,
-    
+
     /// Force T.38 without fallback to G.711 (fail if T.38 rejected)
     #[serde(default)]
     pub force_t38: bool,
-    
+
     /// Force G.711 passthrough without attempting T.38
     #[serde(default)]
     pub force_g711: bool,
@@ -179,10 +184,18 @@ pub struct FaxSendOptions {
     pub resolution: FaxResolutionOption,
 }
 
-fn default_ecm() -> bool { true }
-fn default_baud_rate() -> u32 { 14400 }
-fn default_retries() -> u32 { 2 }
-fn default_timeout() -> u32 { 300 } // 5 minutes
+fn default_ecm() -> bool {
+    true
+}
+fn default_baud_rate() -> u32 {
+    14400
+}
+fn default_retries() -> u32 {
+    2
+}
+fn default_timeout() -> u32 {
+    300
+} // 5 minutes
 
 impl Default for FaxSendOptions {
     fn default() -> Self {
@@ -212,7 +225,7 @@ impl FaxSendOptions {
             ..Default::default()
         }
     }
-    
+
     /// Create options for G.711 µ-law passthrough mode
     pub fn g711_mulaw() -> Self {
         Self {
@@ -222,7 +235,7 @@ impl FaxSendOptions {
             ..Default::default()
         }
     }
-    
+
     /// Create options for maximum compatibility (lower baud, V.27ter only)
     pub fn max_compatibility() -> Self {
         Self {
@@ -233,29 +246,29 @@ impl FaxSendOptions {
             ..Default::default()
         }
     }
-    
+
     /// Get the effective baud rate (capped to modem type max)
     pub fn effective_baud_rate(&self) -> u32 {
         self.baud_rate.min(self.modem_type.max_baud_rate())
     }
-    
+
     /// Validate and fix options
     pub fn validate(&mut self) {
         // Cap baud rate to modem type maximum
         self.baud_rate = self.effective_baud_rate();
-        
+
         // Truncate station ID to 20 characters per T.30
         if let Some(ref mut sid) = self.station_id {
             if sid.len() > 20 {
                 *sid = sid.chars().take(20).collect();
             }
         }
-        
+
         // Can't force both T.38 and G.711
         if self.force_t38 && self.force_g711 {
             self.force_g711 = false;
         }
-        
+
         // If forcing G.711, set mode accordingly
         if self.force_g711 {
             self.mode = FaxMode::AudioPassthrough;
@@ -371,7 +384,7 @@ impl T30Error {
             _ => T30Error::Unknown,
         }
     }
-    
+
     pub fn description(&self) -> &'static str {
         match self {
             T30Error::Ok => "Success",
@@ -432,40 +445,40 @@ impl T30Error {
 pub struct FaxResult {
     /// Whether the fax was sent successfully
     pub success: bool,
-    
+
     /// Number of pages sent
     pub pages_sent: u32,
-    
+
     /// Total duration in milliseconds
     pub duration_ms: u64,
-    
+
     /// Error message if failed
     pub error: Option<String>,
-    
+
     /// T.30 error code (for detailed diagnostics)
     pub t30_error_code: Option<i32>,
-    
+
     /// T.30 error description
     pub t30_error_description: Option<String>,
-    
+
     /// Remote station ID (CSI) received from the remote fax
     pub remote_station_id: Option<String>,
-    
+
     /// Negotiated baud rate used
     pub negotiated_baud_rate: Option<u32>,
-    
+
     /// Whether ECM was used
     pub ecm_used: Option<bool>,
-    
+
     /// Transport used: "T.38" or "G.711"
     pub transport: Option<String>,
-    
+
     /// Image resolution used (e.g., "204x98", "204x196")
     pub resolution: Option<String>,
-    
+
     /// Total bytes transmitted
     pub bytes_transmitted: Option<u64>,
-    
+
     /// Number of retransmissions (ECM only)
     pub ecm_retransmissions: Option<u32>,
 }
@@ -489,7 +502,7 @@ impl FaxResult {
             ecm_retransmissions: None,
         }
     }
-    
+
     /// Create a failed result
     pub fn failure(error: impl Into<String>, duration_ms: u64) -> Self {
         Self {
@@ -508,7 +521,7 @@ impl FaxResult {
             ecm_retransmissions: None,
         }
     }
-    
+
     /// Create a failed result with T.30 error code
     pub fn failure_with_code(t30_code: i32, duration_ms: u64) -> Self {
         let t30_error = T30Error::from_code(t30_code);
@@ -540,57 +553,57 @@ struct PhaseEState {
 }
 
 /// SpanDSP fax session
-/// 
+///
 /// This wraps SpanDSP's fax_state_t for safe use from Rust.
 /// For G.711 mode, it manages the modulation/demodulation of fax signals.
-/// 
+///
 /// ## Usage
 /// ```ignore
 /// let options = FaxSendOptions::default();
 /// let mut session = FaxSession::new_send("document.tiff", &options)?;
 /// session.start()?;
-/// 
+///
 /// // Feed audio samples in a loop
 /// while !session.is_completed() {
 ///     let samples = session.get_audio(&mut buffer)?;
 ///     // ... send via RTP
 /// }
-/// 
+///
 /// let result = session.stop();
 /// ```
 #[allow(dead_code)]
 pub struct FaxSession {
     /// Session ID for tracking
     id: String,
-    
+
     /// Whether this is a calling (sending) or called (receiving) party
     is_calling: bool,
-    
+
     /// Current mode
     mode: FaxMode,
-    
+
     /// Options used for this session
     options: FaxSendOptions,
-    
+
     /// Path to TIFF file
     tiff_path: String,
-    
+
     /// Whether the session is active
     active: bool,
-    
+
     /// SpanDSP fax state (only valid when spandsp-native is enabled)
     #[cfg(feature = "spandsp-native")]
     fax_state: *mut bindings::fax_state_t,
-    
+
     /// Per-session state for FFI callbacks (Pin<Box<>> for address stability)
     phase_e_state: Pin<Box<PhaseEState>>,
-    
+
     /// Station ID (kept alive for SpanDSP)
     station_id: Option<CString>,
-    
+
     /// Header info (kept alive for SpanDSP)
     header_info: Option<CString>,
-    
+
     /// Start time for duration tracking
     start_time: Option<std::time::Instant>,
 }
@@ -602,46 +615,50 @@ impl FaxSession {
     /// Create a new fax session for sending
     pub fn new_send(tiff_path: &str, options: &FaxSendOptions) -> Result<Self, String> {
         let id = uuid::Uuid::new_v4().to_string();
-        
+
         // Validate TIFF file exists
         if !std::path::Path::new(tiff_path).exists() {
             return Err(format!("TIFF file not found: {}", tiff_path));
         }
-        
+
         // Validate options
         let mut opts = options.clone();
         opts.validate();
-        
+
         let phase_e_state = Box::pin(PhaseEState {
             completed: AtomicBool::new(false),
             completion_code: AtomicI32::new(-1),
             pages_transferred: AtomicI32::new(0),
             session_id: id.clone(),
         });
-        
-        let station_id = opts.station_id.as_ref()
+
+        let station_id = opts
+            .station_id
+            .as_ref()
             .and_then(|s| CString::new(s.as_str()).ok());
-        
-        let header_info = opts.header_info.as_ref()
+
+        let header_info = opts
+            .header_info
+            .as_ref()
             .and_then(|s| CString::new(s.as_str()).ok());
-        
+
         // Get raw pointer to pinned state for FFI callbacks
         #[cfg(feature = "spandsp-native")]
         let state_ptr = &*phase_e_state as *const PhaseEState as *mut c_void;
-        
+
         #[cfg(feature = "spandsp-native")]
         let fax_state = unsafe {
             let state = bindings::fax_init(ptr::null_mut(), 1);
             if state.is_null() {
                 return Err("Failed to initialize SpanDSP fax state".to_string());
             }
-            
+
             let t30 = bindings::fax_get_t30_state(state);
             if t30.is_null() {
                 bindings::fax_free(state);
                 return Err("Failed to get T.30 state".to_string());
             }
-            
+
             // Station ID (TSI)
             if let Some(ref sid) = station_id {
                 bindings::t30_set_tx_ident(t30, sid.as_ptr());
@@ -649,34 +666,40 @@ impl FaxSession {
                 let default_id = CString::new("SIPalyzer Fax").unwrap();
                 bindings::t30_set_tx_ident(t30, default_id.as_ptr());
             }
-            
+
             // Modem type from user options
             let modem_flags = opts.modem_type.to_spandsp_flags();
             bindings::t30_set_supported_modems(t30, modem_flags);
-            
+
             // ECM from user options
             bindings::t30_set_ecm_capability(t30, if opts.ecm { 1 } else { 0 });
-            
+
             // Resolution support (driven by user setting)
             bindings::t30_set_supported_resolutions(t30, opts.resolution.to_spandsp_flags());
-            
+
             // TX file
             let tiff_cstr = CString::new(tiff_path).map_err(|e| e.to_string())?;
             bindings::t30_set_tx_file(t30, tiff_cstr.as_ptr(), -1, -1);
-            
+
             // Phase handlers using pinned state pointer (no Arc::into_raw)
             bindings::t30_set_phase_b_handler(t30, Some(phase_b_callback), state_ptr);
             bindings::t30_set_phase_d_handler(t30, Some(phase_d_callback), state_ptr);
             bindings::t30_set_phase_e_handler(t30, Some(phase_e_callback), state_ptr);
-            
+
             bindings::fax_set_transmit_on_idle(state, 1);
-            
-            tracing::info!("[SpanDSP:{}] Init: modem={:?} (0x{:02x}), ecm={}, baud={}",
-                     &id[..8], opts.modem_type, modem_flags, opts.ecm, opts.effective_baud_rate());
-            
+
+            tracing::info!(
+                "[SpanDSP:{}] Init: modem={:?} (0x{:02x}), ecm={}, baud={}",
+                &id[..8],
+                opts.modem_type,
+                modem_flags,
+                opts.ecm,
+                opts.effective_baud_rate()
+            );
+
             state
         };
-        
+
         Ok(Self {
             id,
             is_calling: true,
@@ -692,68 +715,75 @@ impl FaxSession {
             start_time: None,
         })
     }
-    
+
     /// Get the options used for this session
     pub fn options(&self) -> &FaxSendOptions {
         &self.options
     }
-    
+
     /// Create a new fax session for receiving
     #[allow(dead_code)]
     pub fn new_receive(output_tiff_path: &str, options: &FaxSendOptions) -> Result<Self, String> {
         let id = uuid::Uuid::new_v4().to_string();
-        
+
         let mut opts = options.clone();
         opts.validate();
-        
+
         let phase_e_state = Box::pin(PhaseEState {
             completed: AtomicBool::new(false),
             completion_code: AtomicI32::new(-1),
             pages_transferred: AtomicI32::new(0),
             session_id: id.clone(),
         });
-        
-        let station_id = opts.station_id.as_ref()
+
+        let station_id = opts
+            .station_id
+            .as_ref()
             .and_then(|s| CString::new(s.as_str()).ok());
-        
+
         #[cfg(feature = "spandsp-native")]
         let state_ptr = &*phase_e_state as *const PhaseEState as *mut c_void;
-        
+
         #[cfg(feature = "spandsp-native")]
         let fax_state = unsafe {
             let state = bindings::fax_init(ptr::null_mut(), 0);
             if state.is_null() {
                 return Err("Failed to initialize SpanDSP fax state".to_string());
             }
-            
+
             let t30 = bindings::fax_get_t30_state(state);
             if t30.is_null() {
                 bindings::fax_free(state);
                 return Err("Failed to get T.30 state".to_string());
             }
-            
+
             // Configure receive T.30 properly
             let tiff_cstr = CString::new(output_tiff_path).map_err(|e| e.to_string())?;
             bindings::t30_set_rx_file(t30, tiff_cstr.as_ptr(), -1);
-            
+
             if let Some(ref sid) = station_id {
                 bindings::t30_set_tx_ident(t30, sid.as_ptr());
             }
-            
+
             let modem_flags = opts.modem_type.to_spandsp_flags();
             bindings::t30_set_supported_modems(t30, modem_flags);
             bindings::t30_set_ecm_capability(t30, if opts.ecm { 1 } else { 0 });
             bindings::t30_set_supported_resolutions(t30, opts.resolution.to_spandsp_flags());
-            
+
             bindings::t30_set_phase_b_handler(t30, Some(phase_b_callback), state_ptr);
             bindings::t30_set_phase_d_handler(t30, Some(phase_d_callback), state_ptr);
             bindings::t30_set_phase_e_handler(t30, Some(phase_e_callback), state_ptr);
-            
-            tracing::info!("[SpanDSP:{}] Init receive: modem=0x{:02x}, ecm={}", &id[..8], modem_flags, opts.ecm);
-            
+
+            tracing::info!(
+                "[SpanDSP:{}] Init receive: modem=0x{:02x}, ecm={}",
+                &id[..8],
+                modem_flags,
+                opts.ecm
+            );
+
             state
         };
-        
+
         Ok(Self {
             id,
             is_calling: false,
@@ -769,46 +799,49 @@ impl FaxSession {
             start_time: None,
         })
     }
-    
+
     /// Get the session ID
     #[allow(dead_code)]
     pub fn id(&self) -> &str {
         &self.id
     }
-    
+
     /// Get the current mode
     #[allow(dead_code)]
     pub fn mode(&self) -> FaxMode {
         self.mode
     }
-    
+
     /// Check if the session is active
     #[allow(dead_code)]
     pub fn is_active(&self) -> bool {
         self.active
     }
-    
+
     /// Check if the fax session has completed (phase E reached)
     pub fn is_completed(&self) -> bool {
         self.phase_e_state.completed.load(Ordering::SeqCst)
     }
-    
+
     /// Get the completion code (T30_ERR_* value)
     pub fn completion_code(&self) -> i32 {
         self.phase_e_state.completion_code.load(Ordering::SeqCst)
     }
-    
+
     /// Start the fax session
     pub fn start(&mut self) -> Result<(), String> {
         if self.active {
             return Err("Session already active".to_string());
         }
-        
+
         #[cfg(not(feature = "spandsp-native"))]
         {
-            return Err("SpanDSP native support not available. Install SpanDSP: brew install spandsp".to_string());
+            return Err(
+                "SpanDSP native support not available. Install SpanDSP: brew install spandsp"
+                    .to_string(),
+            );
         }
-        
+
         #[cfg(feature = "spandsp-native")]
         {
             if self.fax_state.is_null() {
@@ -820,60 +853,57 @@ impl FaxSession {
             Ok(())
         }
     }
-    
+
     /// Get elapsed time since session started
     pub fn elapsed_ms(&self) -> u64 {
         self.start_time
             .map(|t| t.elapsed().as_millis() as u64)
             .unwrap_or(0)
     }
-    
+
     /// Get audio samples to transmit (for G.711 mode)
-    /// 
+    ///
     /// Returns the number of samples written to the buffer.
     /// For sending, these samples should be encoded as G.711 and sent via RTP.
     pub fn get_audio(&mut self, samples: &mut [i16]) -> Result<usize, String> {
         if !self.active {
             return Err("Session not active".to_string());
         }
-        
+
         #[cfg(not(feature = "spandsp-native"))]
         {
             // Return silence
             samples.fill(0);
             return Ok(samples.len());
         }
-        
+
         #[cfg(feature = "spandsp-native")]
         unsafe {
-            let count = bindings::fax_tx(
-                self.fax_state,
-                samples.as_mut_ptr(),
-                samples.len() as c_int,
-            );
-            
+            let count =
+                bindings::fax_tx(self.fax_state, samples.as_mut_ptr(), samples.len() as c_int);
+
             if count < 0 {
                 return Err("fax_tx failed".to_string());
             }
-            
+
             Ok(count as usize)
         }
     }
-    
+
     /// Process received audio samples (for G.711 mode)
-    /// 
+    ///
     /// For receiving, decode the G.711 RTP payload and pass the PCM samples here.
     pub fn process_audio(&mut self, samples: &[i16]) -> Result<(), String> {
         if !self.active {
             return Err("Session not active".to_string());
         }
-        
+
         #[cfg(not(feature = "spandsp-native"))]
         {
             let _ = samples;
             return Ok(());
         }
-        
+
         #[cfg(feature = "spandsp-native")]
         unsafe {
             // Note: fax_rx takes a const pointer but bindgen generated it as *mut
@@ -883,123 +913,127 @@ impl FaxSession {
                 samples.as_ptr() as *mut i16,
                 samples.len() as c_int,
             );
-            
+
             if result < 0 {
                 return Err("fax_rx failed".to_string());
             }
-            
+
             Ok(())
         }
     }
-    
+
     /// Fill in missing audio samples (for packet loss)
     pub fn fill_audio(&mut self, num_samples: usize) -> Result<(), String> {
         if !self.active {
             return Err("Session not active".to_string());
         }
-        
+
         #[cfg(not(feature = "spandsp-native"))]
         {
             let _ = num_samples;
             return Ok(());
         }
-        
+
         #[cfg(feature = "spandsp-native")]
         unsafe {
             bindings::fax_rx_fillin(self.fax_state, num_samples as c_int);
             Ok(())
         }
     }
-    
+
     /// Get transfer statistics
     #[cfg(feature = "spandsp-native")]
     pub fn get_statistics(&self) -> Option<bindings::t30_stats_t> {
         if self.fax_state.is_null() {
             return None;
         }
-        
+
         unsafe {
             let t30 = bindings::fax_get_t30_state(self.fax_state);
             if t30.is_null() {
                 return None;
             }
-            
+
             let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
             bindings::t30_get_transfer_statistics(t30, &mut stats);
             Some(stats)
         }
     }
-    
+
     /// Get the remote station ID (after fax completion)
     #[cfg(feature = "spandsp-native")]
     pub fn get_remote_station_id(&self) -> Option<String> {
         if self.fax_state.is_null() {
             return None;
         }
-        
+
         unsafe {
             let t30 = bindings::fax_get_t30_state(self.fax_state);
             if t30.is_null() {
                 return None;
             }
-            
+
             let ident = bindings::t30_get_rx_ident(t30);
             if ident.is_null() {
                 return None;
             }
-            
+
             std::ffi::CStr::from_ptr(ident)
                 .to_str()
                 .ok()
                 .map(|s| s.to_string())
         }
     }
-    
+
     /// Stop the fax session and get the result
     pub fn stop(&mut self) -> FaxResult {
         let duration_ms = self.elapsed_ms();
-        
+
         if !self.active {
             return FaxResult::failure("Session was not active", duration_ms);
         }
-        
+
         self.active = false;
-        
+
         #[cfg(not(feature = "spandsp-native"))]
         {
             return FaxResult::failure("SpanDSP not available", duration_ms);
         }
-        
+
         #[cfg(feature = "spandsp-native")]
         unsafe {
             if self.fax_state.is_null() {
                 return FaxResult::failure("No fax state", duration_ms);
             }
-            
+
             // Terminate the T.30 session if not already completed
             let t30 = bindings::fax_get_t30_state(self.fax_state);
             if !t30.is_null() && !self.is_completed() {
                 bindings::t30_terminate(t30);
             }
-            
+
             let completion_code = self.completion_code();
             let success = completion_code == bindings::T30_ERR_OK as i32;
             let t30_error = T30Error::from_code(completion_code);
-            
+
             // Get statistics
             let stats = self.get_statistics();
             let pages_sent = stats.as_ref().map(|s| s.pages_tx as u32).unwrap_or(0);
             let pages_received = stats.as_ref().map(|s| s.pages_rx as u32).unwrap_or(0);
-            let total_pages = if self.is_calling { pages_sent } else { pages_received };
+            let total_pages = if self.is_calling {
+                pages_sent
+            } else {
+                pages_received
+            };
             let baud_rate = stats.as_ref().map(|s| s.bit_rate as u32);
             let ecm_used = stats.as_ref().map(|s| s.error_correcting_mode != 0);
             let image_size = stats.as_ref().map(|s| s.image_size as u64);
-            let resolution = stats.as_ref().map(|s| {
-                format!("{}x{}", s.x_resolution, s.y_resolution)
-            });
-            
+            let resolution = stats
+                .as_ref()
+                .map(|s| format!("{}x{}", s.x_resolution, s.y_resolution));
+
             let remote_id = self.get_remote_station_id();
-            
+
             let transport = match self.mode {
                 FaxMode::T38Udptl => "T.38",
                 FaxMode::AudioPassthrough => match self.options.g711_variant {
@@ -1007,14 +1041,25 @@ impl FaxSession {
                     G711Variant::ALaw => "G.711 A-law",
                 },
             };
-            
-            tracing::error!("Session {} stopped: success={}, pages={}, code={} ({})", transport, success, total_pages, completion_code, t30_error.description());
-            
+
+            tracing::error!(
+                "Session {} stopped: success={}, pages={}, code={} ({})",
+                transport,
+                success,
+                total_pages,
+                completion_code,
+                t30_error.description()
+            );
+
             FaxResult {
                 success,
                 pages_sent: total_pages,
                 duration_ms,
-                error: if success { None } else { Some(t30_error.description().to_string()) },
+                error: if success {
+                    None
+                } else {
+                    Some(t30_error.description().to_string())
+                },
                 t30_error_code: Some(completion_code),
                 t30_error_description: Some(t30_error.description().to_string()),
                 remote_station_id: remote_id,
@@ -1027,7 +1072,7 @@ impl FaxSession {
             }
         }
     }
-    
+
     /// Get number of pages transferred so far
     pub fn pages_transferred(&self) -> i32 {
         self.phase_e_state.pages_transferred.load(Ordering::SeqCst)
@@ -1039,7 +1084,7 @@ impl Drop for FaxSession {
         if self.active {
             let _ = self.stop();
         }
-        
+
         #[cfg(feature = "spandsp-native")]
         unsafe {
             if !self.fax_state.is_null() {
@@ -1062,14 +1107,19 @@ unsafe extern "C" fn phase_b_callback(
     if user_data.is_null() || s.is_null() {
         return 0;
     }
-    
+
     let state = &*(user_data as *const PhaseEState);
-    
+
     let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
     bindings::t30_get_transfer_statistics(s, &mut stats);
-    tracing::error!("[SpanDSP:{}] Phase B: result={}, rate={}, ecm={}",
-             &state.session_id[..8], result, stats.bit_rate, stats.error_correcting_mode);
-    
+    tracing::error!(
+        "[SpanDSP:{}] Phase B: result={}, rate={}, ecm={}",
+        &state.session_id[..8],
+        result,
+        stats.bit_rate,
+        stats.error_correcting_mode
+    );
+
     0 // Always return 0 to proceed with fax transmission
 }
 
@@ -1085,11 +1135,16 @@ unsafe extern "C" fn phase_d_callback(
     if user_data.is_null() {
         return 0;
     }
-    
+
     let state = &*(user_data as *const PhaseEState);
     let pages = state.pages_transferred.fetch_add(1, Ordering::SeqCst) + 1;
-    tracing::info!("[SpanDSP:{}] Phase D: page {} (result={})", &state.session_id[..8], pages, result);
-    
+    tracing::info!(
+        "[SpanDSP:{}] Phase D: page {} (result={})",
+        &state.session_id[..8],
+        pages,
+        result
+    );
+
     0 // Always return 0 to continue to next page
 }
 
@@ -1104,19 +1159,32 @@ unsafe extern "C" fn phase_e_callback(
     if user_data.is_null() {
         return;
     }
-    
+
     let state = &*(user_data as *const PhaseEState);
-    state.completion_code.store(completion_code, Ordering::SeqCst);
+    state
+        .completion_code
+        .store(completion_code, Ordering::SeqCst);
     state.completed.store(true, Ordering::SeqCst);
-    
+
     let t30_error = T30Error::from_code(completion_code);
-    tracing::error!("[SpanDSP:{}] Phase E: code={} ({})", &state.session_id[..8], completion_code, t30_error.description());
-    
+    tracing::error!(
+        "[SpanDSP:{}] Phase E: code={} ({})",
+        &state.session_id[..8],
+        completion_code,
+        t30_error.description()
+    );
+
     if !s.is_null() {
         let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
         bindings::t30_get_transfer_statistics(s, &mut stats);
-        tracing::error!("[SpanDSP:{}] Final: pages_tx={}, pages_rx={}, rate={}, ecm={}",
-                 &state.session_id[..8], stats.pages_tx, stats.pages_rx, stats.bit_rate, stats.error_correcting_mode);
+        tracing::error!(
+            "[SpanDSP:{}] Final: pages_tx={}, pages_rx={}, rate={}, ecm={}",
+            &state.session_id[..8],
+            stats.pages_tx,
+            stats.pages_rx,
+            stats.bit_rate,
+            stats.error_correcting_mode
+        );
     }
 }
 
@@ -1128,7 +1196,7 @@ unsafe extern "C" fn phase_e_callback(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_fax_send_options_default() {
         let opts = FaxSendOptions::default();
@@ -1136,7 +1204,7 @@ mod tests {
         assert_eq!(opts.baud_rate, 14400);
         assert_eq!(opts.mode, FaxMode::T38Udptl);
     }
-    
+
     #[test]
     fn test_fax_result_success() {
         let result = FaxResult::success(2, 45000);
@@ -1145,7 +1213,7 @@ mod tests {
         assert_eq!(result.duration_ms, 45000);
         assert!(result.error.is_none());
     }
-    
+
     #[test]
     fn test_fax_result_failure() {
         let result = FaxResult::failure("Connection lost", 5000);

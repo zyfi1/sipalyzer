@@ -1,14 +1,12 @@
 //! IGMP query/report parsing and snooping verification for SIPalyzer.
 
+use super::types::{IgmpQueryResult, MulticastGroupReport, SnoopingVerifyResult};
 use socket2::{Domain, Protocol, Socket, Type};
 use std::mem::MaybeUninit;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use std::time::Instant;
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
-use super::types::{
-    IgmpQueryResult, MulticastGroupReport, SnoopingVerifyResult,
-};
+use std::time::Instant;
 
 const IGMP_MEMBERSHIP_QUERY: u8 = 0x11;
 const IGMP_V1_MEMBERSHIP_REPORT: u8 = 0x12;
@@ -93,12 +91,19 @@ fn build_igmp_query_packet(source_ip: Ipv4Addr) -> Vec<u8> {
 
     let total_len = 20 + 8u16;
     let mut ip_header = vec![
-        0x45u8, 0u8,
-        (total_len >> 8) as u8, (total_len & 0xFF) as u8,
-        0, 0, 0, 0, 0,
-        1u8,  // TTL
-        2u8,  // Protocol IGMP
-        0, 0, // checksum placeholder
+        0x45u8,
+        0u8,
+        (total_len >> 8) as u8,
+        (total_len & 0xFF) as u8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1u8, // TTL
+        2u8, // Protocol IGMP
+        0,
+        0, // checksum placeholder
     ];
     ip_header.extend_from_slice(&source_ip.octets());
     ip_header.extend_from_slice(&ALL_HOSTS_GROUP.octets());
@@ -129,9 +134,7 @@ fn parse_ip_and_igmp(packet: &[u8]) -> Option<(Ipv4Addr, &[u8])> {
     if protocol != 2 {
         return None;
     }
-    let source = Ipv4Addr::new(
-        packet[12], packet[13], packet[14], packet[15],
-    );
+    let source = Ipv4Addr::new(packet[12], packet[13], packet[14], packet[15]);
     let igmp = &packet[ip_header_len..ip_header_len + 8];
     Some((source, igmp))
 }
@@ -150,8 +153,8 @@ fn igmp_type_to_version(ty: u8) -> u8 {
 fn do_send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String> {
     let source_ip = resolve_interface_addr(interface);
 
-    let socket = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(2)))
-        .map_err(|e| e.to_string())?;
+    let socket =
+        Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(2))).map_err(|e| e.to_string())?;
 
     #[cfg(unix)]
     {
@@ -167,11 +170,15 @@ fn do_send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String
             )
         };
         if r != 0 {
-            return Err(format!("setsockopt IP_HDRINCL: {}", std::io::Error::last_os_error()));
+            return Err(format!(
+                "setsockopt IP_HDRINCL: {}",
+                std::io::Error::last_os_error()
+            ));
         }
     }
 
-    socket.set_read_timeout(Some(std::time::Duration::from_secs(11)))
+    socket
+        .set_read_timeout(Some(std::time::Duration::from_secs(11)))
         .map_err(|e| e.to_string())?;
     socket.set_nonblocking(false).map_err(|e| e.to_string())?;
 
@@ -191,7 +198,10 @@ fn do_send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String
     while start.elapsed().as_secs_f64() < 11.0 {
         match socket.recv_from(&mut buf) {
             Ok((n, _from)) => {
-                let data: Vec<u8> = buf[..n].iter().map(|b| unsafe { b.assume_init() }).collect();
+                let data: Vec<u8> = buf[..n]
+                    .iter()
+                    .map(|b| unsafe { b.assume_init() })
+                    .collect();
                 if let Some((src_ip, igmp)) = parse_ip_and_igmp(&data) {
                     let ty = igmp[0];
                     let version = igmp_type_to_version(ty);
@@ -202,9 +212,7 @@ fn do_send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String
                         max_version = version;
                     }
                     responder_ips.insert(src_ip);
-                    let group = Ipv4Addr::new(
-                        igmp[4], igmp[5], igmp[6], igmp[7],
-                    );
+                    let group = Ipv4Addr::new(igmp[4], igmp[5], igmp[6], igmp[7]);
                     let group_str = group.to_string();
                     let compatibility = match version {
                         1 => "v1".to_string(),
@@ -226,8 +234,12 @@ fn do_send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String
                     }
                 }
             }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock
-                || e.kind() == std::io::ErrorKind::TimedOut => break,
+            Err(e)
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                break
+            }
             Err(e) => return Err(e.to_string()),
         }
     }
@@ -244,9 +256,7 @@ fn do_send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String
 }
 
 /// Sends an IGMP General Membership Query and collects Membership Reports.
-pub async fn send_igmp_query(
-    interface: Option<&str>,
-) -> Result<IgmpQueryResult, String> {
+pub async fn send_igmp_query(interface: Option<&str>) -> Result<IgmpQueryResult, String> {
     let iface = interface.map(String::from);
     tokio::task::spawn_blocking(move || do_send_igmp_query(iface.as_deref()))
         .await
@@ -271,13 +281,15 @@ pub async fn verify_snooping(
 
     details.push("Step 1: Joining multicast group".to_string());
     let join_start = Instant::now();
-    super::join::join_group(group, test_port, interface).await
+    super::join::join_group(group, test_port, interface)
+        .await
         .map_err(|e| e.to_string())?;
     let join_latency_ms = join_start.elapsed().as_secs_f64() * 1000.0;
     details.push(format!("Joined {} in {:.2} ms", group, join_latency_ms));
 
     details.push("Step 2: Sending test packet to group".to_string());
-    super::join::send_test(group, test_port, 1, 0, Some(64)).await
+    super::join::send_test(group, test_port, 1, 0, Some(64))
+        .await
         .map_err(|e| e.to_string())?;
     details.push("Test packet sent".to_string());
 
@@ -286,18 +298,22 @@ pub async fn verify_snooping(
     details.push("Receive path active (listener attached)".to_string());
 
     details.push("Step 4: Leaving multicast group".to_string());
-    super::join::leave_group_exact(group, test_port).await.map_err(|e| e.to_string())?;
+    super::join::leave_group_exact(group, test_port)
+        .await
+        .map_err(|e| e.to_string())?;
     details.push("Left group".to_string());
 
     details.push("Step 5: Send after leave — verify no receive".to_string());
-    super::join::send_test(group, test_port, 1, 0, Some(64)).await
+    super::join::send_test(group, test_port, 1, 0, Some(64))
+        .await
         .map_err(|e| e.to_string())?;
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     let leave_verified = true;
     details.push("Leave completed; no listener to confirm drop (best-effort)".to_string());
 
     details.push("Step 6: TTL=1 boundary check".to_string());
-    super::join::send_test(group, test_port, 1, 0, Some(1)).await
+    super::join::send_test(group, test_port, 1, 0, Some(1))
+        .await
         .map_err(|e| e.to_string())?;
     let ttl_check = true;
     details.push("TTL=1 packet sent (local segment only in normal conditions)".to_string());

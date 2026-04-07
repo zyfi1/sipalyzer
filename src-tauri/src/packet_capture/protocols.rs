@@ -94,10 +94,12 @@ impl Protocol {
         // SIP messages start with method or "SIP/"
         // Try to find the start of the SIP message (skip any leading whitespace/null bytes)
         let mut start_idx = 0;
-        while start_idx < data.len().min(10) && (data[start_idx] == 0 || data[start_idx].is_ascii_whitespace()) {
+        while start_idx < data.len().min(10)
+            && (data[start_idx] == 0 || data[start_idx].is_ascii_whitespace())
+        {
             start_idx += 1;
         }
-        
+
         if start_idx >= data.len() {
             return false;
         }
@@ -122,17 +124,18 @@ impl Protocol {
             || start_upper.starts_with("SUBSCRIBE ")
             || start_upper.starts_with("PUBLISH ")
             || start_upper.starts_with("MESSAGE ");
-        
+
         // SIP responses
         let is_sip_response = start_upper.starts_with("SIP/2.0");
-        
+
         // More lenient checks for SIP headers (check anywhere in first 200 bytes)
         let has_sip_headers = (start_upper.contains("VIA:") && start_upper.contains("SIP/2.0"))
             || (start_upper.contains("FROM:") && start_upper.contains("TO:"))
             || (start_upper.contains("CALL-ID:") || start_upper.contains("CALLID:"))
             || (start_upper.contains("CONTACT:") && start_upper.contains("SIP/2.0"))
-            || (start_upper.contains("CSEQ:") && (start_upper.contains("REGISTER") || start_upper.contains("INVITE")));
-        
+            || (start_upper.contains("CSEQ:")
+                && (start_upper.contains("REGISTER") || start_upper.contains("INVITE")));
+
         is_sip_method || is_sip_response || has_sip_headers
     }
 
@@ -267,29 +270,58 @@ impl PacketInfo {
                 crate::packet_capture::ApplicationLayer::Sip(sip) => {
                     // Use parsed SIP data
                     if let Some(ref method) = sip.method {
-                        format!("SIP {} {}:{} -> {}:{}", method, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "SIP {} {}:{} -> {}:{}",
+                            method, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     } else if let Some(code) = sip.response_code {
                         let reason = sip.response_text.as_deref().unwrap_or("");
-                        format!("SIP {} {} {}:{} -> {}:{}", code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "SIP {} {} {}:{} -> {}:{}",
+                            code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     } else {
-                        format!("SIP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "SIP {}:{} -> {}:{}",
+                            self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     }
                 }
                 crate::packet_capture::ApplicationLayer::Rtp(rtp) => {
                     if let Some(ref dtmf) = rtp.dtmf_event {
-                        format!("RTP DTMF '{}' {} PT:{} SSRC:0x{:08x} {}:{} -> {}:{}",
+                        format!(
+                            "RTP DTMF '{}' {} PT:{} SSRC:0x{:08x} {}:{} -> {}:{}",
                             dtmf.digit,
                             if dtmf.end_of_event { "(end)" } else { "" },
-                            rtp.payload_type, rtp.ssrc,
-                            self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                            rtp.payload_type,
+                            rtp.ssrc,
+                            self.src_ip,
+                            self.src_port,
+                            self.dst_ip,
+                            self.dst_port
+                        )
                     } else {
-                        format!("RTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}", 
-                            rtp.payload_type, rtp.ssrc, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "RTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}",
+                            rtp.payload_type,
+                            rtp.ssrc,
+                            self.src_ip,
+                            self.src_port,
+                            self.dst_ip,
+                            self.dst_port
+                        )
                     }
                 }
                 crate::packet_capture::ApplicationLayer::Srtp(rtp) => {
-                    format!("SRTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}", 
-                        rtp.payload_type, rtp.ssrc, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SRTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}",
+                        rtp.payload_type,
+                        rtp.ssrc,
+                        self.src_ip,
+                        self.src_port,
+                        self.dst_ip,
+                        self.dst_port
+                    )
                 }
                 crate::packet_capture::ApplicationLayer::Rtcp(rtcp) => {
                     // Show RTCP type(s) and SSRC from first packet
@@ -305,38 +337,73 @@ impl PacketInfo {
                             207 => "XR",
                             _ => "RTCP",
                         };
-                        format!("RTCP {} SSRC:0x{:08x} {}:{} -> {}:{}", 
-                            type_name, first.ssrc, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "RTCP {} SSRC:0x{:08x} {}:{} -> {}:{}",
+                            type_name,
+                            first.ssrc,
+                            self.src_ip,
+                            self.src_port,
+                            self.dst_ip,
+                            self.dst_port
+                        )
                     } else {
-                        format!("RTCP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "RTCP {}:{} -> {}:{}",
+                            self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     }
                 }
                 crate::packet_capture::ApplicationLayer::Dns(dns) => {
                     if dns.queries.is_empty() {
-                        format!("DNS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "DNS {}:{} -> {}:{}",
+                            self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     } else {
-                        let query_names: Vec<String> = dns.queries.iter().map(|q| q.name.clone()).collect();
-                        format!("DNS {} {}:{} -> {}:{}", 
-                            query_names.join(","), self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        let query_names: Vec<String> =
+                            dns.queries.iter().map(|q| q.name.clone()).collect();
+                        format!(
+                            "DNS {} {}:{} -> {}:{}",
+                            query_names.join(","),
+                            self.src_ip,
+                            self.src_port,
+                            self.dst_ip,
+                            self.dst_port
+                        )
                     }
                 }
                 crate::packet_capture::ApplicationLayer::T38(t38) => {
                     let ifp = t38.ifp_type.as_deref().unwrap_or("UDPTL");
-                    format!("T.38 {} seq {} {}:{} -> {}:{}", ifp, t38.seq, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "T.38 {} seq {} {}:{} -> {}:{}",
+                        ifp, t38.seq, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 }
                 crate::packet_capture::ApplicationLayer::SipOverWs { sip, .. } => {
                     // SIP over WebSocket
                     if let Some(ref method) = sip.method {
-                        format!("SIP/WS {} {}:{} -> {}:{}", method, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "SIP/WS {} {}:{} -> {}:{}",
+                            method, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     } else if let Some(code) = sip.response_code {
                         let reason = sip.response_text.as_deref().unwrap_or("");
-                        format!("SIP/WS {} {} {}:{} -> {}:{}", code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "SIP/WS {} {} {}:{} -> {}:{}",
+                            code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     } else {
-                        format!("SIP/WS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                        format!(
+                            "SIP/WS {}:{} -> {}:{}",
+                            self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                        )
                     }
                 }
                 crate::packet_capture::ApplicationLayer::WebSocket(ws) => {
-                    format!("WebSocket {} {}:{} -> {}:{}", ws.opcode_name, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "WebSocket {} {}:{} -> {}:{}",
+                        ws.opcode_name, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 }
                 crate::packet_capture::ApplicationLayer::Unknown(_) => {
                     // For Unknown, just show protocol and addresses - never try to display binary data
@@ -353,34 +420,64 @@ impl PacketInfo {
         // Always show protocol and addresses, never try to display binary data
         match self.protocol {
             Protocol::SIP => {
-                format!("SIP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "SIP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::RTP => {
-                format!("RTP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "RTP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::SRTP => {
-                format!("SRTP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "SRTP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::RTCP => {
-                format!("RTCP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "RTCP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::FAX => {
-                format!("FAX {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "FAX {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::TCP => {
-                format!("TCP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "TCP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::UDP => {
-                format!("UDP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "UDP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::HTTP => {
-                format!("HTTP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "HTTP {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::HTTPS => {
-                format!("HTTPS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "HTTPS {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::DNS => {
-                format!("DNS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "DNS {}:{} -> {}:{}",
+                    self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             Protocol::ICMP => {
                 format!("ICMP {} -> {}", self.src_ip, self.dst_ip)
@@ -393,5 +490,4 @@ impl PacketInfo {
             }
         }
     }
-
 }

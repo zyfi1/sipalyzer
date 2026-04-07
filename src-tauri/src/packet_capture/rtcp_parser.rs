@@ -10,12 +10,12 @@
 use anyhow::Result;
 
 /// RTCP packet type constants per RFC 3550
-pub const RTCP_SR: u8 = 200;   // Sender Report
-pub const RTCP_RR: u8 = 201;   // Receiver Report
+pub const RTCP_SR: u8 = 200; // Sender Report
+pub const RTCP_RR: u8 = 201; // Receiver Report
 pub const RTCP_SDES: u8 = 202; // Source Description
-pub const RTCP_BYE: u8 = 203;  // Goodbye
-pub const RTCP_APP: u8 = 204;  // Application-defined
-pub const RTCP_XR: u8 = 207;   // Extended Report (RFC 3611)
+pub const RTCP_BYE: u8 = 203; // Goodbye
+pub const RTCP_APP: u8 = 204; // Application-defined
+pub const RTCP_XR: u8 = 207; // Extended Report (RFC 3611)
 
 /// SDES item type constants
 pub const SDES_END: u8 = 0;
@@ -223,12 +223,16 @@ fn parse_rtcp_packet(data: &[u8]) -> Result<(RtcpPacket, usize)> {
 
     let packet_type = data[1];
     let length = u16::from_be_bytes([data[2], data[3]]);
-    
+
     // Length is in 32-bit words minus 1, so total packet size is (length + 1) * 4
     let packet_size = ((length as usize) + 1) * 4;
-    
+
     if data.len() < packet_size {
-        anyhow::bail!("RTCP packet truncated: expected {} bytes, got {}", packet_size, data.len());
+        anyhow::bail!(
+            "RTCP packet truncated: expected {} bytes, got {}",
+            packet_size,
+            data.len()
+        );
     }
 
     // SSRC is at bytes 4-7
@@ -301,7 +305,12 @@ fn parse_rtcp_packet(data: &[u8]) -> Result<(RtcpPacket, usize)> {
                     break;
                 }
                 // Each chunk starts with SSRC
-                let chunk_ssrc = u32::from_be_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+                let chunk_ssrc = u32::from_be_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]);
                 offset += 4;
 
                 // Parse SDES items until END (type 0)
@@ -322,7 +331,8 @@ fn parse_rtcp_packet(data: &[u8]) -> Result<(RtcpPacket, usize)> {
                     if offset + 2 + item_len > packet_size {
                         break;
                     }
-                    let value = String::from_utf8_lossy(&data[offset + 2..offset + 2 + item_len]).to_string();
+                    let value = String::from_utf8_lossy(&data[offset + 2..offset + 2 + item_len])
+                        .to_string();
                     packet.sdes_items.push(SdesItem {
                         ssrc: chunk_ssrc,
                         item_type,
@@ -340,7 +350,12 @@ fn parse_rtcp_packet(data: &[u8]) -> Result<(RtcpPacket, usize)> {
                 if offset + 4 > packet_size {
                     break;
                 }
-                let bye_ssrc = u32::from_be_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+                let bye_ssrc = u32::from_be_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]);
                 packet.bye_ssrcs.push(bye_ssrc);
                 offset += 4;
             }
@@ -348,7 +363,10 @@ fn parse_rtcp_packet(data: &[u8]) -> Result<(RtcpPacket, usize)> {
             if offset < packet_size {
                 let reason_len = data[offset] as usize;
                 if offset + 1 + reason_len <= packet_size {
-                    packet.bye_reason = Some(String::from_utf8_lossy(&data[offset + 1..offset + 1 + reason_len]).to_string());
+                    packet.bye_reason = Some(
+                        String::from_utf8_lossy(&data[offset + 1..offset + 1 + reason_len])
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -359,7 +377,8 @@ fn parse_rtcp_packet(data: &[u8]) -> Result<(RtcpPacket, usize)> {
             let mut xr_offset = 8;
             while xr_offset + 4 <= packet_size {
                 let block_type = data[xr_offset];
-                let block_length = u16::from_be_bytes([data[xr_offset + 2], data[xr_offset + 3]]) as usize * 4 + 4;
+                let block_length =
+                    u16::from_be_bytes([data[xr_offset + 2], data[xr_offset + 3]]) as usize * 4 + 4;
                 if block_type == 7 && xr_offset + 36 <= packet_size {
                     let d = &data[xr_offset..];
                     packet.voip_metrics = Some(VoipMetricsBlock {

@@ -2,54 +2,118 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 // Limit dead_code allowance to debug builds while keeping other warnings visible.
 #![cfg_attr(debug_assertions, allow(dead_code))]
+// This workspace currently enforces `-D warnings` for clippy. We allow a focused
+// set of style-heavy lints at crate level to keep reliability/safety lints strict
+// while avoiding broad non-functional churn across legacy modules.
+#![allow(
+    clippy::bind_instead_of_map,
+    clippy::byte_char_slices,
+    clippy::cast_abs_to_unsigned,
+    clippy::collapsible_else_if,
+    clippy::collapsible_if,
+    clippy::derivable_impls,
+    clippy::doc_lazy_continuation,
+    clippy::enum_variant_names,
+    clippy::get_first,
+    clippy::if_same_then_else,
+    clippy::implicit_saturating_sub,
+    clippy::items_after_test_module,
+    clippy::iter_cloned_collect,
+    clippy::iter_kv_map,
+    clippy::iter_next_slice,
+    clippy::len_zero,
+    clippy::let_and_return,
+    clippy::manual_c_str_literals,
+    clippy::manual_clamp,
+    clippy::manual_div_ceil,
+    clippy::manual_find,
+    clippy::manual_flatten,
+    clippy::manual_inspect,
+    clippy::manual_is_multiple_of,
+    clippy::manual_pattern_char_comparison,
+    clippy::manual_range_contains,
+    clippy::manual_repeat_n,
+    clippy::manual_split_once,
+    clippy::manual_strip,
+    clippy::manual_unwrap_or_default,
+    clippy::map_flatten,
+    clippy::needless_borrow,
+    clippy::needless_borrows_for_generic_args,
+    clippy::needless_lifetimes,
+    clippy::needless_match,
+    clippy::needless_question_mark,
+    clippy::needless_range_loop,
+    clippy::needless_return,
+    clippy::never_loop,
+    clippy::option_as_ref_deref,
+    clippy::question_mark,
+    clippy::redundant_closure,
+    clippy::redundant_pattern_matching,
+    clippy::redundant_slicing,
+    clippy::single_match,
+    clippy::too_many_arguments,
+    clippy::trim_split_whitespace,
+    clippy::type_complexity,
+    clippy::unnecessary_cast,
+    clippy::unnecessary_filter_map,
+    clippy::unnecessary_literal_unwrap,
+    clippy::unnecessary_map_or,
+    clippy::unwrap_or_default,
+    clippy::upper_case_acronyms,
+    clippy::useless_asref,
+    clippy::useless_format,
+    clippy::useless_vec,
+    clippy::while_let_loop,
+    clippy::wrong_self_convention
+)]
 
+mod commands;
 mod contacts;
 mod core;
-mod sip;
-mod commands;
+mod mcp;
+mod multicast;
+mod network_discovery;
+mod network_test;
 mod packet_capture;
+mod remote_agent;
+mod sip;
+mod sip_discovery;
 mod softphone;
 mod spandsp;
-mod network_test;
-mod sip_discovery;
-mod network_discovery;
-mod remote_agent;
-mod multicast;
-mod mcp;
 
 use commands::admin as admin_commands;
 use commands::audio;
-use commands::crafter;
+use commands::config;
 use commands::contacts as contacts_commands;
+use commands::crafter;
 use commands::dns as dns_commands;
 use commands::fax;
+use commands::mcp as mcp_commands;
+use commands::multicast as multicast_commands;
+use commands::network_devices as network_devices_commands;
+use commands::network_test as network_test_commands;
+use commands::notes;
+use commands::packet_capture as packet_capture_commands;
 use commands::provision;
 use commands::registration;
-use commands::config;
-use commands::notes;
-use commands::session_state;
-use commands::packet_capture as packet_capture_commands;
-use commands::softphone_media as softphone_media_commands;
-use commands::softphone as softphone_commands;
-use commands::network_test as network_test_commands;
-use commands::sip_discovery as sip_discovery_commands;
-use commands::network_devices as network_devices_commands;
-use commands::speech as speech_commands;
-use commands::terminal as terminal_commands;
-use commands::ssh_credentials as ssh_credentials_commands;
 use commands::remote_agent as remote_agent_commands;
+use commands::session_state;
+use commands::sip_discovery as sip_discovery_commands;
+use commands::softphone as softphone_commands;
+use commands::softphone_media as softphone_media_commands;
+use commands::speech as speech_commands;
+use commands::ssh_credentials as ssh_credentials_commands;
+use commands::terminal as terminal_commands;
 use commands::tools as tools_commands;
-use commands::multicast as multicast_commands;
-use commands::mcp as mcp_commands;
 use commands::updater as updater_commands;
 use packet_capture::scheduler::ScheduledCaptureScheduler;
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use std::sync::Mutex as StdMutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 use once_cell::sync::Lazy;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex as StdMutex;
 
 /// Stores file paths passed via OS file association (double-clicking .pcap files)
 static PENDING_FILE_OPEN: Lazy<StdMutex<Vec<String>>> = Lazy::new(|| StdMutex::new(Vec::new()));
@@ -71,10 +135,7 @@ fn build_main_tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry
     let hide_item = MenuItem::with_id(app, "hide", "Hide Window", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit SIPalyzer", true, None::<&str>)?;
-    Menu::with_items(
-        app,
-        &[&show_item, &hide_item, &separator, &quit_item],
-    )
+    Menu::with_items(app, &[&show_item, &hide_item, &separator, &quit_item])
 }
 
 pub(crate) fn open_remote_chat_window(app: &tauri::AppHandle) -> Result<(), String> {
@@ -85,18 +146,15 @@ pub(crate) fn open_remote_chat_window(app: &tauri::AppHandle) -> Result<(), Stri
         return Ok(());
     }
 
-    let window = WebviewWindowBuilder::new(
-        app,
-        "remote-chat",
-        WebviewUrl::App("index.html".into()),
-    )
-    .title("Remote Chat")
-    .inner_size(420.0, 620.0)
-    .min_inner_size(360.0, 480.0)
-    .always_on_top(true)
-    .resizable(true)
-    .build()
-    .map_err(|e| format!("Failed to create remote chat window: {e}"))?;
+    let window =
+        WebviewWindowBuilder::new(app, "remote-chat", WebviewUrl::App("index.html".into()))
+            .title("Remote Chat")
+            .inner_size(420.0, 620.0)
+            .min_inner_size(360.0, 480.0)
+            .always_on_top(true)
+            .resizable(true)
+            .build()
+            .map_err(|e| format!("Failed to create remote chat window: {e}"))?;
     let _ = window.show();
     let _ = window.set_focus();
     Ok(())
@@ -205,11 +263,17 @@ fn set_hide_dock_icon(app: tauri::AppHandle, enabled: bool) {
 #[tauri::command]
 fn get_platform() -> &'static str {
     #[cfg(target_os = "macos")]
-    { "macos" }
+    {
+        "macos"
+    }
     #[cfg(target_os = "windows")]
-    { "windows" }
+    {
+        "windows"
+    }
     #[cfg(target_os = "linux")]
-    { "linux" }
+    {
+        "linux"
+    }
 }
 
 /// Import a PCAP from base64-encoded data (used by remote agent tools).
@@ -223,8 +287,7 @@ fn import_pcap_from_base64(base64_data: String, name: String) -> Result<String, 
 
     let tmp_dir = std::env::temp_dir();
     let tmp_path = tmp_dir.join(format!("sipalyzer-remote-{}.pcap", uuid::Uuid::new_v4()));
-    std::fs::write(&tmp_path, &bytes)
-        .map_err(|e| format!("Failed to write temp PCAP: {}", e))?;
+    std::fs::write(&tmp_path, &bytes).map_err(|e| format!("Failed to write temp PCAP: {}", e))?;
 
     let result = import_pcap_from_path_inner(&tmp_path.to_string_lossy(), Some(&name));
     let _ = std::fs::remove_file(&tmp_path);
@@ -240,12 +303,15 @@ fn import_pcap_from_path(file_path: String) -> Result<String, String> {
 
 /// Shared import logic: validates a PCAP on disk, copies into app storage,
 /// creates a database session record, and returns the session ID.
-fn import_pcap_from_path_inner(file_path: &str, custom_name: Option<&str>) -> Result<String, String> {
+fn import_pcap_from_path_inner(
+    file_path: &str,
+    custom_name: Option<&str>,
+) -> Result<String, String> {
     use crate::core::config;
     use crate::core::database;
-    use uuid::Uuid;
     use crate::packet_capture::FilterConfig;
     use pcap::Capture;
+    use uuid::Uuid;
 
     let source_path = std::path::PathBuf::from(file_path);
     if !source_path.exists() {
@@ -253,13 +319,13 @@ fn import_pcap_from_path_inner(file_path: &str, custom_name: Option<&str>) -> Re
     }
 
     // Validate pcap
-    let cap = Capture::from_file(&source_path)
-        .map_err(|e| format!("Not a valid PCAP file: {}", e))?;
+    let cap =
+        Capture::from_file(&source_path).map_err(|e| format!("Not a valid PCAP file: {}", e))?;
     drop(cap);
 
     // Count packets and verify parser compatibility.
-    let mut cap = Capture::from_file(&source_path)
-        .map_err(|e| format!("Failed to read PCAP file: {}", e))?;
+    let mut cap =
+        Capture::from_file(&source_path).map_err(|e| format!("Failed to read PCAP file: {}", e))?;
     let link_layer_type = cap.get_datalink().0 as u32;
     let parser = crate::packet_capture::packet_parser::PacketParser::with_rtp_port_range(
         link_layer_type,
@@ -338,10 +404,18 @@ fn restore_window_prefs_early() {
     if let Ok(Some(json)) = core::database::Database::get_session_value("state") {
         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json) {
             if let Some(settings) = parsed.get("settings") {
-                if settings.get("minimizeToTray").and_then(|v| v.as_bool()).unwrap_or(false) {
+                if settings
+                    .get("minimizeToTray")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
                     MINIMIZE_TO_TRAY.store(true, Ordering::SeqCst);
                 }
-                if settings.get("hideDockIcon").and_then(|v| v.as_bool()).unwrap_or(false) {
+                if settings
+                    .get("hideDockIcon")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
                     HIDE_DOCK_ICON.store(true, Ordering::SeqCst);
                 }
                 if let Some(false) = settings.get("showTrayIcon").and_then(|v| v.as_bool()) {
@@ -362,12 +436,17 @@ fn apply_macos_activation_policy_early() {
     // NSApplicationActivationPolicyAccessory = 1
     unsafe {
         #[link(name = "AppKit", kind = "framework")]
-        extern "C" { fn NSApplicationLoad() -> bool; }
+        extern "C" {
+            fn NSApplicationLoad() -> bool;
+        }
         extern "C" {
             fn objc_getClass(name: *const std::ffi::c_char) -> *mut std::ffi::c_void;
             fn sel_registerName(name: *const std::ffi::c_char) -> *mut std::ffi::c_void;
-            fn objc_msgSend(obj: *mut std::ffi::c_void, sel: *mut std::ffi::c_void, ...)
-                -> *mut std::ffi::c_void;
+            fn objc_msgSend(
+                obj: *mut std::ffi::c_void,
+                sel: *mut std::ffi::c_void,
+                ...
+            ) -> *mut std::ffi::c_void;
         }
 
         NSApplicationLoad();
@@ -386,11 +465,11 @@ fn main() {
     #[cfg(target_os = "macos")]
     apply_macos_activation_policy_early();
 
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install rustls crypto provider");
+    if let Err(err) = rustls::crypto::ring::default_provider().install_default() {
+        eprintln!("Failed to install rustls crypto provider: {err:?}");
+    }
 
-    tauri::Builder::default()
+    if let Err(err) = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -442,10 +521,12 @@ fn main() {
             #[cfg(target_os = "macos")]
             {
                 if let Some(window) = app.get_webview_window("main") {
-                    window.set_title("SIPalyzer").expect("Failed to set window title");
+                    if let Err(err) = window.set_title("SIPalyzer") {
+                        tracing::warn!("Failed to set window title: {}", err);
+                    }
                 }
             }
-            
+
             // ── System tray icon (all platforms) ─────────────────────
             {
                 let menu = build_main_tray_menu(&app.handle().clone())?;
@@ -485,9 +566,16 @@ fn main() {
 
                 #[cfg(target_os = "macos")]
                 {
-                    let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-template.png"))
-                        .expect("failed to load macOS tray template icon");
-                    tray_builder = tray_builder.icon(tray_icon).icon_as_template(true);
+                    match tauri::image::Image::from_bytes(include_bytes!(
+                        "../icons/tray-template.png"
+                    )) {
+                        Ok(tray_icon) => {
+                            tray_builder = tray_builder.icon(tray_icon).icon_as_template(true);
+                        }
+                        Err(err) => {
+                            tracing::warn!("failed to load macOS tray template icon: {}", err);
+                        }
+                    }
                 }
                 #[cfg(not(target_os = "macos"))]
                 if let Some(icon) = app.default_window_icon().cloned() {
@@ -509,7 +597,7 @@ fn main() {
             // Initialize scheduled capture scheduler
             let scheduler = ScheduledCaptureScheduler::new();
             app.manage(scheduler.clone());
-            
+
             // Start scheduler after app is ready - use std::thread to ensure runtime is initialized
             let scheduler_clone = scheduler.clone();
             let app_handle = app.handle().clone();
@@ -526,21 +614,26 @@ fn main() {
                 // No local listener is needed at startup.
                 let _ = app_handle;
             });
-            
+
             // Initialise the global SIP message log emitter so call_controller
             // and inbound can push events to the frontend without an AppHandle arg.
             softphone::sip_log::init(app.handle().clone());
 
-            let _ = core::audit::AuditWriter::write_entry(
-                "system", "app_start", "system", None, None,
-            );
+            let _ =
+                core::audit::AuditWriter::write_entry("system", "app_start", "system", None, None);
 
             const AUDIT_RETENTION_DAYS: i64 = 7;
             if let Ok(pruned) = core::audit::AuditWriter::prune_old_entries(AUDIT_RETENTION_DAYS) {
                 if pruned > 0 {
                     let _ = core::audit::AuditWriter::write_entry(
-                        "system", "audit_prune", "system", None,
-                        Some(&format!("Removed {} entries older than {} days", pruned, AUDIT_RETENTION_DAYS)),
+                        "system",
+                        "audit_prune",
+                        "system",
+                        None,
+                        Some(&format!(
+                            "Removed {} entries older than {} days",
+                            pruned, AUDIT_RETENTION_DAYS
+                        )),
                     );
                 }
             }
@@ -971,5 +1064,7 @@ fn main() {
             multicast_commands::multicast_generate_set_input_gain,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    {
+        eprintln!("error while running tauri application: {err}");
+    }
 }

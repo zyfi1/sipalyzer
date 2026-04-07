@@ -3,9 +3,9 @@
 //!
 //! Results stream to the frontend in real time via `sip-discovery-progress` events.
 
+use crate::core::user_agent;
 use crate::sip_discovery::fingerprint::{fingerprint_device, DeviceFingerprint};
 use crate::sip_discovery::ip_range;
-use crate::core::user_agent;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -178,7 +178,8 @@ fn build_sip_options(
         generate_tag(),
         target_host,
         target_port,
-        call_id, effective_user_agent,
+        call_id,
+        effective_user_agent,
     )
 }
 
@@ -247,7 +248,8 @@ fn build_sip_invite(
         generate_tag(),
         target_host,
         target_port,
-        call_id, effective_user_agent,
+        call_id,
+        effective_user_agent,
     )
 }
 
@@ -272,12 +274,7 @@ fn parse_sip_response(data: &[u8]) -> Option<ParsedResponse> {
             if line_lower.starts_with(&format!("{}:", name_lower))
                 || line_lower.starts_with(&format!("{} :", name_lower))
             {
-                return line
-                    .splitn(2, ':')
-                    .nth(1)
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+                return line.splitn(2, ':').nth(1).unwrap_or("").trim().to_string();
             }
         }
         String::new()
@@ -326,15 +323,30 @@ async fn probe_single(
     let branch = generate_branch();
 
     let request = match method {
-        ScanMethod::Options => {
-            build_sip_options(&ip.to_string(), port, &local_ip, local_port, &call_id, &branch)
-        }
-        ScanMethod::Register => {
-            build_sip_register(&ip.to_string(), port, &local_ip, local_port, &call_id, &branch)
-        }
-        ScanMethod::Invite => {
-            build_sip_invite(&ip.to_string(), port, &local_ip, local_port, &call_id, &branch)
-        }
+        ScanMethod::Options => build_sip_options(
+            &ip.to_string(),
+            port,
+            &local_ip,
+            local_port,
+            &call_id,
+            &branch,
+        ),
+        ScanMethod::Register => build_sip_register(
+            &ip.to_string(),
+            port,
+            &local_ip,
+            local_port,
+            &call_id,
+            &branch,
+        ),
+        ScanMethod::Invite => build_sip_invite(
+            &ip.to_string(),
+            port,
+            &local_ip,
+            local_port,
+            &call_id,
+            &branch,
+        ),
     };
 
     let start = Instant::now();

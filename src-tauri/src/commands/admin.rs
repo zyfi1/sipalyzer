@@ -1,8 +1,8 @@
-use serde::Serialize;
 use crate::core::admin::AdminAuth;
-use crate::core::audit::{AuditWriter, AuditQueryFilters, AuditQueryResult, AuditStats};
+use crate::core::audit::{AuditQueryFilters, AuditQueryResult, AuditStats, AuditWriter};
 use crate::core::process_registry::{self, ManagedProcess};
 use once_cell::sync::Lazy;
+use serde::Serialize;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -45,9 +45,8 @@ fn enforce_audit_write_rate_limit() -> Result<(), String> {
 }
 
 fn require_admin_auth() -> Result<(), String> {
-    AdminAuth::require_authenticated().map_err(|_| {
-        "Admin authentication required. Verify your admin password first.".to_string()
-    })
+    AdminAuth::require_authenticated()
+        .map_err(|_| "Admin authentication required. Verify your admin password first.".to_string())
 }
 
 // ── Password commands ──
@@ -75,7 +74,11 @@ pub fn admin_verify_password(password: String) -> Result<bool, String> {
     if result {
         AdminAuth::begin_authenticated_session();
         let _ = crate::core::audit::AuditWriter::write_entry(
-            "admin", "admin_access", "user", None, None,
+            "admin",
+            "admin_access",
+            "user",
+            None,
+            None,
         );
     } else {
         AdminAuth::clear_authenticated_session();
@@ -243,7 +246,11 @@ pub fn admin_kill_process(id: String) -> bool {
     let killed = process_registry::kill(&id);
     if killed {
         let _ = crate::core::audit::AuditWriter::write_entry(
-            "admin", "kill_process", "user", Some(&id), None,
+            "admin",
+            "kill_process",
+            "user",
+            Some(&id),
+            None,
         );
     }
     killed
@@ -354,9 +361,14 @@ pub fn admin_list_tables() -> Result<Vec<TableInfo>, String> {
     let mut result = Vec::new();
     for name in tables {
         let count: i64 = conn
-            .query_row(&format!("SELECT COUNT(*) FROM \"{}\"", name), [], |row| row.get(0))
+            .query_row(&format!("SELECT COUNT(*) FROM \"{}\"", name), [], |row| {
+                row.get(0)
+            })
             .unwrap_or(0);
-        result.push(TableInfo { name, row_count: count });
+        result.push(TableInfo {
+            name,
+            row_count: count,
+        });
     }
     Ok(result)
 }
@@ -367,13 +379,18 @@ pub fn admin_run_query(sql: String) -> Result<QueryResult, String> {
     require_admin_auth()?;
     use crate::core::database::Database;
     let trimmed = sql.trim().to_uppercase();
-    if !trimmed.starts_with("SELECT") && !trimmed.starts_with("PRAGMA") && !trimmed.starts_with("EXPLAIN") {
+    if !trimmed.starts_with("SELECT")
+        && !trimmed.starts_with("PRAGMA")
+        && !trimmed.starts_with("EXPLAIN")
+    {
         return Err("Only SELECT, PRAGMA, and EXPLAIN queries are allowed".to_string());
     }
     let conn = Database::get_connection().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let col_count = stmt.column_count();
-    let columns: Vec<String> = (0..col_count).map(|i| stmt.column_name(i).unwrap_or("?").to_string()).collect();
+    let columns: Vec<String> = (0..col_count)
+        .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
+        .collect();
 
     let rows: Vec<Vec<serde_json::Value>> = stmt
         .query_map([], |row| {
@@ -385,7 +402,9 @@ pub fn admin_run_query(sql: String) -> Result<QueryResult, String> {
                     rusqlite::types::Value::Integer(n) => serde_json::json!(n),
                     rusqlite::types::Value::Real(f) => serde_json::json!(f),
                     rusqlite::types::Value::Text(s) => serde_json::Value::String(s),
-                    rusqlite::types::Value::Blob(b) => serde_json::Value::String(format!("<blob {} bytes>", b.len())),
+                    rusqlite::types::Value::Blob(b) => {
+                        serde_json::Value::String(format!("<blob {} bytes>", b.len()))
+                    }
                 };
                 vals.push(json_val);
             }
@@ -396,7 +415,11 @@ pub fn admin_run_query(sql: String) -> Result<QueryResult, String> {
         .collect();
 
     let row_count = rows.len();
-    Ok(QueryResult { columns, rows, row_count })
+    Ok(QueryResult {
+        columns,
+        rows,
+        row_count,
+    })
 }
 
 #[tauri::command]
@@ -417,14 +440,30 @@ pub fn admin_get_db_info() -> Result<DbInfo, String> {
     let file_size_bytes = Database::get_db_size().unwrap_or(0);
     let conn = Database::get_connection().map_err(|e| e.to_string())?;
 
-    let page_count: i64 = conn.query_row("PRAGMA page_count", [], |r| r.get(0)).unwrap_or(0);
-    let page_size: i64 = conn.query_row("PRAGMA page_size", [], |r| r.get(0)).unwrap_or(0);
-    let journal: String = conn.query_row("PRAGMA journal_mode", [], |r| r.get(0)).unwrap_or_else(|_| "unknown".to_string());
+    let page_count: i64 = conn
+        .query_row("PRAGMA page_count", [], |r| r.get(0))
+        .unwrap_or(0);
+    let page_size: i64 = conn
+        .query_row("PRAGMA page_size", [], |r| r.get(0))
+        .unwrap_or(0);
+    let journal: String = conn
+        .query_row("PRAGMA journal_mode", [], |r| r.get(0))
+        .unwrap_or_else(|_| "unknown".to_string());
 
-    let mut stmt = conn.prepare("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        )
+        .map_err(|e| e.to_string())?;
     let table_count: usize = stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap_or(0) as usize;
 
-    Ok(DbInfo { file_size_bytes, page_count, page_size, wal_mode: journal, table_count })
+    Ok(DbInfo {
+        file_size_bytes,
+        page_count,
+        page_size,
+        wal_mode: journal,
+        table_count,
+    })
 }
 
 // ── Feature flags commands ──
@@ -517,8 +556,8 @@ pub struct SystemHealth {
 #[tracing::instrument(skip_all)]
 pub fn admin_get_system_health() -> Result<SystemHealth, String> {
     require_admin_auth()?;
-    use sysinfo::System;
     use crate::core::database::Database;
+    use sysinfo::System;
 
     let mut sys = System::new();
     sys.refresh_memory();

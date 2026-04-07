@@ -44,13 +44,13 @@ fn get_info_blocking() -> NetInfoResult {
     // Get default interface info
     let default_iface = default_net::get_default_interface().ok();
     let default_name = default_iface.as_ref().map(|i| i.name.clone());
-    let default_gw = default_iface.as_ref().and_then(|i| {
-        i.gateway.as_ref().map(|g| g.ip_addr.to_string())
-    });
+    let default_gw = default_iface
+        .as_ref()
+        .and_then(|i| i.gateway.as_ref().map(|g| g.ip_addr.to_string()));
     // Extract local IP directly from the default interface (most reliable source)
-    let local_ip = default_iface.as_ref().and_then(|i| {
-        i.ipv4.first().map(|ip| ip.addr.to_string())
-    });
+    let local_ip = default_iface
+        .as_ref()
+        .and_then(|i| i.ipv4.first().map(|ip| ip.addr.to_string()));
 
     // List all interfaces
     let all_interfaces = default_net::get_interfaces();
@@ -58,18 +58,13 @@ fn get_info_blocking() -> NetInfoResult {
         let is_default = default_name.as_deref() == Some(&iface.name);
         let mac = iface.mac_addr.map(|m| m.to_string());
 
-        let ipv4: Vec<String> = iface
-            .ipv4
-            .iter()
-            .map(|ip| ip.addr.to_string())
-            .collect();
-        let ipv6: Vec<String> = iface
-            .ipv6
-            .iter()
-            .map(|ip| ip.addr.to_string())
-            .collect();
+        let ipv4: Vec<String> = iface.ipv4.iter().map(|ip| ip.addr.to_string()).collect();
+        let ipv6: Vec<String> = iface.ipv6.iter().map(|ip| ip.addr.to_string()).collect();
 
-        let iface_type = guess_interface_type(&iface.name, &iface.friendly_name.clone().unwrap_or_default());
+        let iface_type = guess_interface_type(
+            &iface.name,
+            &iface.friendly_name.clone().unwrap_or_default(),
+        );
         let gateway = iface.gateway.as_ref().map(|g| g.ip_addr.to_string());
 
         interfaces.push(NetworkInterface {

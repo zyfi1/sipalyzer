@@ -9,6 +9,41 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  cross-os-smoke:
+    name: Cross-OS Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Frontend smoke checks
+        run: npm run typecheck && npm run test && npm run build
+
+      - name: Setup bundled Go toolchain
+        run: npm run setup:go-toolchain
+
+      - name: Full OS parity suite (feature-level)
+        run: npm run check:os-parity
+
+      - name: Rust app compile check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+
   strict-host-agnostic:
     name: Strict Host-Agnostic Build
     runs-on: ubuntu-latest

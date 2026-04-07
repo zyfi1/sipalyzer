@@ -126,7 +126,11 @@ impl NativeUdptl {
             bindings::udptl_set_local_max_datagram(state, MAX_UDPTL_PACKET_SIZE as c_int);
         }
 
-        tracing::info!("Initialized native SpanDSP UDPTL: ec={:?}, entries={}", ec_mode, redundancy_entries);
+        tracing::info!(
+            "Initialized native SpanDSP UDPTL: ec={:?}, entries={}",
+            ec_mode,
+            redundancy_entries
+        );
 
         Ok(Self {
             state,
@@ -189,7 +193,11 @@ impl NativeUdptl {
 
         if result != 0 {
             if self.rx_count < 5 {
-                tracing::error!("udptl_rx_packet failed (result={}), len={}", result, udptl_packet.len());
+                tracing::error!(
+                    "udptl_rx_packet failed (result={}), len={}",
+                    result,
+                    udptl_packet.len()
+                );
             }
             return Vec::new();
         }

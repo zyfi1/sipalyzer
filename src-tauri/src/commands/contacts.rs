@@ -31,12 +31,16 @@ impl From<LdapConfigInput> for ldap::LdapConfig {
 #[tauri::command]
 #[tracing::instrument(skip_all)]
 pub async fn ldap_test_connection(config: LdapConfigInput) -> Result<String, String> {
-    ldap::test_connection(&config.into()).await.map_err(|e| e.to_string())
+    ldap::test_connection(&config.into())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Fetch contacts from LDAP
 #[tauri::command]
 #[tracing::instrument(skip_all)]
 pub async fn ldap_fetch_contacts(config: LdapConfigInput) -> Result<Vec<ImportedContact>, String> {
-    ldap::fetch_contacts(&config.into()).await.map_err(|e| e.to_string())
+    ldap::fetch_contacts(&config.into())
+        .await
+        .map_err(|e| e.to_string())
 }

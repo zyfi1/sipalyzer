@@ -57,7 +57,10 @@ pub async fn start_listener(
         .parse()
         .map_err(|e: std::net::AddrParseError| e.to_string())?;
     if !group_addr.is_multicast() {
-        let msg = format!("[multicast listener] {} is not a multicast IPv4 address", group);
+        let msg = format!(
+            "[multicast listener] {} is not a multicast IPv4 address",
+            group
+        );
         let _ = ready_tx.send(Err(msg.clone()));
         return Err(msg);
     }
@@ -69,9 +72,13 @@ pub async fn start_listener(
     )
     .map_err(|e| format!("[multicast listener] socket create: {}", e))?;
 
-    socket.set_reuse_address(true).map_err(|e| format!("[multicast listener] reuse_addr: {}", e))?;
+    socket
+        .set_reuse_address(true)
+        .map_err(|e| format!("[multicast listener] reuse_addr: {}", e))?;
     #[cfg(unix)]
-    socket.set_reuse_port(true).map_err(|e| format!("[multicast listener] reuse_port: {}", e))?;
+    socket
+        .set_reuse_port(true)
+        .map_err(|e| format!("[multicast listener] reuse_port: {}", e))?;
 
     let bind_addr = std::net::SocketAddrV4::new(std::net::Ipv4Addr::UNSPECIFIED, port);
     if let Err(e) = socket.bind(&socket2::SockAddr::from(bind_addr)) {
@@ -113,7 +120,9 @@ pub async fn start_listener(
         unsafe { std::net::UdpSocket::from_raw_socket(raw) }
     };
 
-    std_socket.set_nonblocking(true).map_err(|e| e.to_string())?;
+    std_socket
+        .set_nonblocking(true)
+        .map_err(|e| e.to_string())?;
     let udp = UdpSocket::from_std(std_socket).map_err(|e| e.to_string())?;
 
     let key = format!("{}:{}", group, port);
@@ -124,11 +133,13 @@ pub async fn start_listener(
     let start = Instant::now();
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    let mut packet_batch_interval = tokio::time::interval(std::time::Duration::from_millis(PACKET_BATCH_INTERVAL_MS));
+    let mut packet_batch_interval =
+        tokio::time::interval(std::time::Duration::from_millis(PACKET_BATCH_INTERVAL_MS));
     packet_batch_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut packets_this_sec: u64 = 0;
     let mut bytes_this_sec: u64 = 0;
-    let mut pending_packet_events: Vec<MulticastPacketEvent> = Vec::with_capacity(PACKET_BATCH_MAX * 2);
+    let mut pending_packet_events: Vec<MulticastPacketEvent> =
+        Vec::with_capacity(PACKET_BATCH_MAX * 2);
 
     loop {
         tokio::select! {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
-use socket2::{Domain, Socket, Type, Protocol};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MtuConfig {
@@ -45,11 +45,9 @@ pub async fn run_mtu_discovery(config: MtuConfig) -> MtuResult {
     let timeout_ms = config.timeout_ms;
     let host = config.host.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
-        discover_mtu_blocking(ip, timeout_ms)
-    })
-    .await
-    .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
+    let result = tokio::task::spawn_blocking(move || discover_mtu_blocking(ip, timeout_ms))
+        .await
+        .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
 
     match result {
         Ok(mtu) => MtuResult {
@@ -68,7 +66,11 @@ pub async fn run_mtu_discovery(config: MtuConfig) -> MtuResult {
 }
 
 fn discover_mtu_blocking(ip: IpAddr, timeout_ms: u64) -> Result<u32, String> {
-    let domain = if ip.is_ipv4() { Domain::IPV4 } else { Domain::IPV6 };
+    let domain = if ip.is_ipv4() {
+        Domain::IPV4
+    } else {
+        Domain::IPV6
+    };
     let timeout = Duration::from_millis(timeout_ms);
 
     // Binary search between 68 (minimum IPv4 MTU) and 1500 (typical Ethernet MTU)
@@ -87,7 +89,9 @@ fn discover_mtu_blocking(ip: IpAddr, timeout_ms: u64) -> Result<u32, String> {
             last_success = mid;
             low = mid + 1;
         } else {
-            if mid == 0 { break; }
+            if mid == 0 {
+                break;
+            }
             high = mid - 1;
         }
     }

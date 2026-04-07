@@ -42,4 +42,3 @@ pub fn delete_ssh_connection_password(connection_id: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to delete SSH password: {}", e))?;
     Ok(())
 }
-

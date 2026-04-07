@@ -218,20 +218,10 @@ fn parse_system_profiler_details(output: &str, info: &mut WifiInfo) {
                 "Signal / Noise" => {
                     let parts: Vec<&str> = val.split('/').collect();
                     if let Some(signal_str) = parts.first() {
-                        info.rssi_dbm = signal_str
-                            .trim()
-                            .replace("dBm", "")
-                            .trim()
-                            .parse()
-                            .ok();
+                        info.rssi_dbm = signal_str.trim().replace("dBm", "").trim().parse().ok();
                     }
                     if let Some(noise_str) = parts.get(1) {
-                        info.noise_dbm = noise_str
-                            .trim()
-                            .replace("dBm", "")
-                            .trim()
-                            .parse()
-                            .ok();
+                        info.noise_dbm = noise_str.trim().replace("dBm", "").trim().parse().ok();
                     }
                 }
                 "Transmit Rate" => {
@@ -326,7 +316,9 @@ fn try_iw_linux(info: &mut WifiInfo) -> bool {
 
 #[cfg(target_os = "linux")]
 fn try_iwconfig_linux(info: &mut WifiInfo) {
-    let Ok(out) = Command::new("iwconfig").output() else { return };
+    let Ok(out) = Command::new("iwconfig").output() else {
+        return;
+    };
     let stdout = String::from_utf8_lossy(&out.stdout);
 
     for line in stdout.lines() {

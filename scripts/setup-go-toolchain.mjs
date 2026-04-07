@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { createWriteStream, existsSync, mkdtempSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const GO_VERSION = "1.24.0";
@@ -22,6 +22,59 @@ function run(command, args, options = {}) {
       else reject(new Error(`${command} exited with code ${code}`));
     });
   });
+}
+
+function commandExists(command) {
+  const result = spawnSync(command, ["--version"], { stdio: "ignore", shell: false });
+  if (!result.error) return true;
+  const fallback = spawnSync(command, ["-version"], { stdio: "ignore", shell: false });
+  return !fallback.error;
+}
+
+function resolvePowerShell() {
+  if (process.platform !== "win32") return null;
+  if (commandExists("pwsh")) return "pwsh";
+  if (commandExists("powershell")) return "powershell";
+  throw new Error("Neither pwsh nor powershell is available on PATH");
+}
+
+function ensureCommand(command, message) {
+  if (!commandExists(command)) {
+    throw new Error(message);
+  }
+}
+
+function promoteStagedDirectory(stagedDir, destDir) {
+  const parent = dirname(destDir);
+  const backupDir = join(parent, `.go-toolchain-backup-${process.pid}-${Date.now()}`);
+  const destExists = existsSync(destDir);
+  let movedToBackup = false;
+  try {
+    if (destExists) {
+      renameSync(destDir, backupDir);
+      movedToBackup = true;
+    }
+    renameSync(stagedDir, destDir);
+    if (movedToBackup) {
+      rmSync(backupDir, { recursive: true, force: true });
+    }
+  } catch (error) {
+    try {
+      if (existsSync(destDir)) {
+        rmSync(destDir, { recursive: true, force: true });
+      }
+      if (movedToBackup) {
+        renameSync(backupDir, destDir);
+      }
+    } catch {
+      // Preserve original failure below.
+    }
+    throw error;
+  } finally {
+    if (existsSync(stagedDir)) {
+      rmSync(stagedDir, { recursive: true, force: true });
+    }
+  }
 }
 
 function resolveTarget() {
@@ -52,36 +105,41 @@ async function main() {
   const archivePath = join(tmpDir, archiveName);
 
   mkdirSync(tmpDir, { recursive: true });
-  rmSync(TOOLCHAIN_DIR, { recursive: true, force: true });
-  mkdirSync(TOOLCHAIN_DIR, { recursive: true });
+  const stagedToolchainDir = mkdtempSync(join(tmpDir, "go-toolchain-staged-"));
+  if (ext === "tar.gz") {
+    ensureCommand("tar", "Missing required command: tar");
+  }
+  const powerShellCommand = ext === "zip" ? resolvePowerShell() : null;
 
   console.log(`==> Downloading Go ${GO_VERSION} for ${goos}/${goarch}`);
   console.log(`    URL: ${url}`);
   await download(url, archivePath);
 
   if (ext === "tar.gz") {
-    await run("tar", ["-xzf", archivePath, "-C", TOOLCHAIN_DIR, "--strip-components=1"]);
+    await run("tar", ["-xzf", archivePath, "-C", stagedToolchainDir, "--strip-components=1"]);
   } else {
     await run(
-      "powershell",
+      powerShellCommand,
       [
         "-NoProfile",
         "-Command",
-        `Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${TOOLCHAIN_DIR}" -Force`,
+        `Expand-Archive -LiteralPath "${archivePath}" -DestinationPath "${stagedToolchainDir}" -Force`,
       ],
       { shell: false },
     );
-    const nested = join(TOOLCHAIN_DIR, "go");
+    const nested = join(stagedToolchainDir, "go");
     if (existsSync(nested)) {
       for (const item of readdirSync(nested)) {
         const from = join(nested, item);
-        const to = join(TOOLCHAIN_DIR, item);
+        const to = join(stagedToolchainDir, item);
         rmSync(to, { force: true, recursive: true });
         renameSync(from, to);
       }
       rmSync(nested, { recursive: true, force: true });
     }
   }
+
+  promoteStagedDirectory(stagedToolchainDir, TOOLCHAIN_DIR);
 
   const goBin = process.platform === "win32"
     ? join(TOOLCHAIN_DIR, "bin", "go.exe")

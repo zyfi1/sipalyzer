@@ -51,7 +51,7 @@ impl Default for StunQualityConfig {
         Self {
             server: "stun.l.google.com".to_string(),
             port: 19302,
-            count: 100,     // 2 seconds at 50pps
+            count: 100,      // 2 seconds at 50pps
             interval_ms: 20, // G.711 RTP rate
             timeout_ms: 2000,
         }
@@ -135,7 +135,10 @@ fn is_stun_response(data: &[u8], expected_txn_id: &[u8; 12]) -> bool {
         return false;
     }
     // Check magic cookie
-    let cookie = ((data[4] as u32) << 24) | ((data[5] as u32) << 16) | ((data[6] as u32) << 8) | data[7] as u32;
+    let cookie = ((data[4] as u32) << 24)
+        | ((data[5] as u32) << 16)
+        | ((data[6] as u32) << 8)
+        | data[7] as u32;
     if cookie != STUN_MAGIC_COOKIE {
         return false;
     }
@@ -145,7 +148,10 @@ fn is_stun_response(data: &[u8], expected_txn_id: &[u8; 12]) -> bool {
 
 fn generate_txn_id() -> [u8; 12] {
     let mut id = [0u8; 12];
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos() as u64;
+    let t = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
     use std::sync::atomic::{AtomicU64, Ordering};
     static CTR: AtomicU64 = AtomicU64::new(0);
     let c = CTR.fetch_add(1, Ordering::Relaxed);
@@ -180,12 +186,24 @@ pub async fn run_stun_quality_probe(
         Ok(addr) => addr,
         Err(e) => {
             return StunQualityResult {
-                server: config.server, resolved_ip: String::new(), port: config.port,
-                avg_rtt_ms: 0.0, min_rtt_ms: 0.0, max_rtt_ms: 0.0, stddev_rtt_ms: 0.0,
-                avg_jitter_ms: 0.0, max_jitter_ms: 0.0,
-                packets_sent: 0, packets_received: 0, packet_loss_pct: 100.0,
-                mos: 1.0, r_factor: 0.0, quality: "Failed".into(),
-                probe_rtts: vec![], success: false, error: Some(e),
+                server: config.server,
+                resolved_ip: String::new(),
+                port: config.port,
+                avg_rtt_ms: 0.0,
+                min_rtt_ms: 0.0,
+                max_rtt_ms: 0.0,
+                stddev_rtt_ms: 0.0,
+                avg_jitter_ms: 0.0,
+                max_jitter_ms: 0.0,
+                packets_sent: 0,
+                packets_received: 0,
+                packet_loss_pct: 100.0,
+                mos: 1.0,
+                r_factor: 0.0,
+                quality: "Failed".into(),
+                probe_rtts: vec![],
+                success: false,
+                error: Some(e),
             };
         }
     };
@@ -201,12 +219,24 @@ pub async fn run_stun_quality_probe(
         Ok(s) => s,
         Err(e) => {
             return StunQualityResult {
-                server: config.server, resolved_ip: ip_str, port: config.port,
-                avg_rtt_ms: 0.0, min_rtt_ms: 0.0, max_rtt_ms: 0.0, stddev_rtt_ms: 0.0,
-                avg_jitter_ms: 0.0, max_jitter_ms: 0.0,
-                packets_sent: 0, packets_received: 0, packet_loss_pct: 100.0,
-                mos: 1.0, r_factor: 0.0, quality: "Failed".into(),
-                probe_rtts: vec![], success: false, error: Some(format!("Bind error: {}", e)),
+                server: config.server,
+                resolved_ip: ip_str,
+                port: config.port,
+                avg_rtt_ms: 0.0,
+                min_rtt_ms: 0.0,
+                max_rtt_ms: 0.0,
+                stddev_rtt_ms: 0.0,
+                avg_jitter_ms: 0.0,
+                max_jitter_ms: 0.0,
+                packets_sent: 0,
+                packets_received: 0,
+                packet_loss_pct: 100.0,
+                mos: 1.0,
+                r_factor: 0.0,
+                quality: "Failed".into(),
+                probe_rtts: vec![],
+                success: false,
+                error: Some(format!("Bind error: {}", e)),
             };
         }
     };
@@ -254,9 +284,21 @@ pub async fn run_stun_quality_probe(
         probe_rtts.push(rtt_ms);
 
         // Running stats for live event
-        let running_loss = if sent > 0 { ((sent - received) as f64 / sent as f64) * 100.0 } else { 100.0 };
-        let running_avg = if received > 0 { rtt_sum / received as f64 } else { 0.0 };
-        let running_jitter = if jitter_count > 0 { jitter_sum / jitter_count as f64 } else { 0.0 };
+        let running_loss = if sent > 0 {
+            ((sent - received) as f64 / sent as f64) * 100.0
+        } else {
+            100.0
+        };
+        let running_avg = if received > 0 {
+            rtt_sum / received as f64
+        } else {
+            0.0
+        };
+        let running_jitter = if jitter_count > 0 {
+            jitter_sum / jitter_count as f64
+        } else {
+            0.0
+        };
 
         // Running MOS
         let running_mos = calculate_mos(MosInput {
@@ -264,14 +306,23 @@ pub async fn run_stun_quality_probe(
             jitter_ms: running_jitter,
             packet_loss_pct: running_loss,
             codec_ie: None,
-        }).mos;
+        })
+        .mos;
 
-        let _ = window.emit("stun-quality-packet", StunQualityPacketEvent {
-            seq, total: config.count, rtt_ms,
-            running_sent: sent, running_received: received,
-            running_loss_pct: running_loss, running_avg_rtt_ms: running_avg,
-            running_jitter_ms: running_jitter, running_mos,
-        });
+        let _ = window.emit(
+            "stun-quality-packet",
+            StunQualityPacketEvent {
+                seq,
+                total: config.count,
+                rtt_ms,
+                running_sent: sent,
+                running_received: received,
+                running_loss_pct: running_loss,
+                running_avg_rtt_ms: running_avg,
+                running_jitter_ms: running_jitter,
+                running_mos,
+            },
+        );
 
         if seq + 1 < config.count {
             tokio::time::sleep(interval).await;
@@ -294,14 +345,23 @@ pub async fn run_stun_quality_probe(
 
     let (avg_jitter, max_jitter) = if rtts.len() >= 2 {
         let mut js: Vec<f64> = Vec::new();
-        for i in 1..rtts.len() { js.push((rtts[i] - rtts[i - 1]).abs()); }
+        for i in 1..rtts.len() {
+            js.push((rtts[i] - rtts[i - 1]).abs());
+        }
         let sum: f64 = js.iter().sum();
-        (sum / js.len() as f64, js.iter().cloned().fold(0.0f64, f64::max))
+        (
+            sum / js.len() as f64,
+            js.iter().cloned().fold(0.0f64, f64::max),
+        )
     } else {
         (0.0, 0.0)
     };
 
-    let loss = if sent > 0 { ((sent - received) as f64 / sent as f64) * 100.0 } else { 100.0 };
+    let loss = if sent > 0 {
+        ((sent - received) as f64 / sent as f64) * 100.0
+    } else {
+        100.0
+    };
 
     let mos_result = calculate_mos(MosInput {
         latency_ms: avg,

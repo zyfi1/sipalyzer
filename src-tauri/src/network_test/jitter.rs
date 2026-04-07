@@ -124,10 +124,17 @@ pub async fn run_jitter_test(config: JitterConfig) -> JitterResult {
 
     let (avg_jitter, max_jitter, min_jitter, stddev) = if !jitter_samples.is_empty() {
         let min = jitter_samples.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max = jitter_samples.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max = jitter_samples
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
         let sum: f64 = jitter_samples.iter().sum();
         let avg = sum / jitter_samples.len() as f64;
-        let var = jitter_samples.iter().map(|v| (v - avg).powi(2)).sum::<f64>() / jitter_samples.len() as f64;
+        let var = jitter_samples
+            .iter()
+            .map(|v| (v - avg).powi(2))
+            .sum::<f64>()
+            / jitter_samples.len() as f64;
         (avg, max, min, var.sqrt())
     } else {
         (0.0, 0.0, 0.0, 0.0)

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, UdpSocket, ToSocketAddrs};
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,11 +37,9 @@ pub async fn run_turn_test(config: TurnConfig) -> TurnResult {
     let server = config.server.clone();
     let port = config.port;
 
-    let result = tokio::task::spawn_blocking(move || {
-        turn_allocate_test(&server, port)
-    })
-    .await
-    .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
+    let result = tokio::task::spawn_blocking(move || turn_allocate_test(&server, port))
+        .await
+        .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
 
     match result {
         Ok(r) => r,
@@ -58,18 +56,15 @@ pub async fn run_turn_test(config: TurnConfig) -> TurnResult {
 
 fn turn_allocate_test(server: &str, port: u16) -> Result<TurnResult, String> {
     let addr_str = format!("{}:{}", server, port);
-    let dest: SocketAddr = addr_str
-        .parse()
-        .or_else(|_| {
-            addr_str
-                .to_socket_addrs()
-                .map_err(|e| format!("DNS error: {}", e))?
-                .next()
-                .ok_or_else(|| "No address found".to_string())
-        })?;
+    let dest: SocketAddr = addr_str.parse().or_else(|_| {
+        addr_str
+            .to_socket_addrs()
+            .map_err(|e| format!("DNS error: {}", e))?
+            .next()
+            .ok_or_else(|| "No address found".to_string())
+    })?;
 
-    let socket = UdpSocket::bind("0.0.0.0:0")
-        .map_err(|e| format!("Bind error: {}", e))?;
+    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| format!("Bind error: {}", e))?;
     socket
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|e| format!("Timeout error: {}", e))?;

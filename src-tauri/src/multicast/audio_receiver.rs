@@ -15,9 +15,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use once_cell::sync::Lazy;
 use tauri::Emitter;
 
-use crate::softphone::codecs::{
-    codec_from_pt, AudioCodec, G711Codec, G722Codec, SAMPLE_RATE_16K,
-};
+use crate::softphone::codecs::{codec_from_pt, AudioCodec, G711Codec, G722Codec, SAMPLE_RATE_16K};
 use crate::softphone::jitter_buffer::JitterBuffer;
 use crate::softphone::rtp::RtpPacket;
 
@@ -109,7 +107,9 @@ impl WaveformRing {
             return vec![];
         }
         let start = (self.write_pos + self.cap - self.len) % self.cap;
-        (0..self.len).map(|i| self.buf[(start + i) % self.cap]).collect()
+        (0..self.len)
+            .map(|i| self.buf[(start + i) % self.cap])
+            .collect()
     }
 
     fn peak_rms(samples: &[f32]) -> (f32, f32) {
@@ -161,9 +161,8 @@ pub fn start(
     let ssrc = Arc::new(AtomicU32::new(0));
     let source_ip = Arc::new(Mutex::new(String::new()));
 
-    let codec: Arc<Mutex<Option<Box<dyn AudioCodec>>>> = Arc::new(Mutex::new(
-        codec_override.and_then(|n| codec_from_name(n)),
-    ));
+    let codec: Arc<Mutex<Option<Box<dyn AudioCodec>>>> =
+        Arc::new(Mutex::new(codec_override.and_then(|n| codec_from_name(n))));
     if codec_override.is_some() && codec.lock().map(|g| g.is_none()).unwrap_or(true) {
         return Err(format!("Invalid codec override: {:?}", codec_override));
     }
@@ -177,10 +176,16 @@ pub fn start(
     let (tx_playout, rx_playout) = mpsc::sync_channel::<Vec<i16>>(128);
 
     let codec_sample_rate: Arc<Mutex<u32>> = Arc::new(Mutex::new(
-        codec_override.and_then(|n| codec_from_name(n).map(|c| c.sample_rate())).unwrap_or(0),
+        codec_override
+            .and_then(|n| codec_from_name(n).map(|c| c.sample_rate()))
+            .unwrap_or(0),
     ));
 
-    tracing::info!("Audio receiver started for {}:{} (broadcast subscriber)", group, port);
+    tracing::info!(
+        "Audio receiver started for {}:{} (broadcast subscriber)",
+        group,
+        port
+    );
 
     let group_owned = group.to_string();
     let app_recv = app.clone();
@@ -289,7 +294,10 @@ pub fn start(
                         playing: true,
                         muted: muted_recv.load(Ordering::Relaxed),
                         volume: f32::from_bits(volume_recv.load(Ordering::Relaxed)),
-                        codec_name: codec_name_recv.lock().map(|g| g.clone()).unwrap_or_default(),
+                        codec_name: codec_name_recv
+                            .lock()
+                            .map(|g| g.clone())
+                            .unwrap_or_default(),
                         sample_rate: codec_sample_rate_recv.lock().map(|g| *g).unwrap_or(0),
                         ssrc: pkt.ssrc,
                         source_ip: source_ip_recv.lock().map(|g| g.clone()).unwrap_or_default(),
@@ -354,12 +362,8 @@ pub fn start(
                     .collect();
 
                 if let Ok(mut m) = metrics_play.lock() {
-                    let peak = out
-                        .iter()
-                        .map(|&s| (s as i32).abs())
-                        .max()
-                        .unwrap_or(0) as f32
-                        / 32768.0;
+                    let peak =
+                        out.iter().map(|&s| (s as i32).abs()).max().unwrap_or(0) as f32 / 32768.0;
                     m.peak = m.peak.max(peak);
                 }
 
@@ -495,7 +499,9 @@ pub fn stop(group: &str) -> Result<(), String> {
 fn stop_by_key(key: &str) -> Result<(), String> {
     let receiver = {
         let mut guard = ACTIVE_RECEIVERS.lock().map_err(|e| e.to_string())?;
-        guard.remove(key).ok_or_else(|| format!("No active receiver for key {}", key))?
+        guard
+            .remove(key)
+            .ok_or_else(|| format!("No active receiver for key {}", key))?
     };
     let _ = receiver.cancel_tx.send(true);
     Ok(())
@@ -509,7 +515,9 @@ pub fn set_volume(group: &str, volume: f32) -> Result<(), String> {
         .find(|k| k.starts_with(&format!("{}:", group)))
         .cloned()
         .ok_or_else(|| format!("No active receiver for group {}", group))?;
-    let r = guard.get(&key).ok_or_else(|| format!("No active receiver for group {}", group))?;
+    let r = guard
+        .get(&key)
+        .ok_or_else(|| format!("No active receiver for group {}", group))?;
     r.volume.store(volume.to_bits(), Ordering::Relaxed);
     Ok(())
 }
@@ -522,7 +530,9 @@ pub fn set_muted(group: &str, muted: bool) -> Result<(), String> {
         .find(|k| k.starts_with(&format!("{}:", group)))
         .cloned()
         .ok_or_else(|| format!("No active receiver for group {}", group))?;
-    let r = guard.get(&key).ok_or_else(|| format!("No active receiver for group {}", group))?;
+    let r = guard
+        .get(&key)
+        .ok_or_else(|| format!("No active receiver for group {}", group))?;
     r.muted.store(muted, Ordering::Relaxed);
     Ok(())
 }
@@ -535,15 +545,13 @@ pub fn get_waveform(group: &str) -> Result<super::types::AudioWaveform, String> 
         .find(|k| k.starts_with(&format!("{}:", group)))
         .cloned()
         .ok_or_else(|| format!("No active receiver for group {}", group))?;
-    let r = guard.get(&key).ok_or_else(|| format!("No active receiver for group {}", group))?;
+    let r = guard
+        .get(&key)
+        .ok_or_else(|| format!("No active receiver for group {}", group))?;
     let w = r.waveform.lock().map_err(|e| e.to_string())?;
     let samples = w.get_copy();
     let (peak, rms) = WaveformRing::peak_rms(&samples);
-    Ok(AudioWaveform {
-        samples,
-        peak,
-        rms,
-    })
+    Ok(AudioWaveform { samples, peak, rms })
 }
 
 /// Get metrics for the receiver.
@@ -554,7 +562,9 @@ pub fn get_metrics(group: &str) -> Result<super::types::AudioStreamMetrics, Stri
         .find(|k| k.starts_with(&format!("{}:", group)))
         .cloned()
         .ok_or_else(|| format!("No active receiver for group {}", group))?;
-    let r = guard.get(&key).ok_or_else(|| format!("No active receiver for group {}", group))?;
+    let r = guard
+        .get(&key)
+        .ok_or_else(|| format!("No active receiver for group {}", group))?;
     let m = r.metrics.lock().map_err(|e| e.to_string())?;
     let duration_secs = m.start_time.elapsed().as_secs_f64();
     let loss_percent = if m.packets_received > 0 {

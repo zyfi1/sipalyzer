@@ -52,7 +52,11 @@ pub async fn run_nat_detect(config: NatDetectConfig) -> NatDetectResult {
 fn run_nat_detect_blocking(config: NatDetectConfig) -> NatDetectResult {
     let start = Instant::now();
     let server_addr = format!("{}:{}", config.stun_server, config.stun_port);
-    let resolved_server = match server_addr.to_socket_addrs().ok().and_then(|mut it| it.next()) {
+    let resolved_server = match server_addr
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut it| it.next())
+    {
         Some(addr) => addr,
         None => {
             return NatDetectResult {
@@ -85,7 +89,9 @@ fn run_nat_detect_blocking(config: NatDetectConfig) -> NatDetectResult {
             Some(addr.ip())
         }
     });
-    let local_ip = meaningful_local_ip.map(|ip| ip.to_string()).unwrap_or_default();
+    let local_ip = meaningful_local_ip
+        .map(|ip| ip.to_string())
+        .unwrap_or_default();
     let local_port = local_addr.map(|a| a.port()).unwrap_or(0);
 
     // STUN Binding Request
@@ -170,10 +176,14 @@ impl Default for NatDetectResult {
 fn stun_binding(socket: &UdpSocket, server: &str) -> Option<(String, u16)> {
     // STUN header: Type(2) + Length(2) + Magic Cookie(4) + Transaction ID(12) = 20 bytes
     let mut req = [0u8; 20];
-    req[0] = 0x00; req[1] = 0x01; // Binding Request
-    // Length = 0 (no attributes)
-    // Magic Cookie
-    req[4] = 0x21; req[5] = 0x12; req[6] = 0xA4; req[7] = 0x42;
+    req[0] = 0x00;
+    req[1] = 0x01; // Binding Request
+                   // Length = 0 (no attributes)
+                   // Magic Cookie
+    req[4] = 0x21;
+    req[5] = 0x12;
+    req[6] = 0xA4;
+    req[7] = 0x42;
     // Random transaction ID
     for i in 8..20 {
         req[i] = (i as u8).wrapping_mul(37).wrapping_add(7);

@@ -30,6 +30,7 @@
     "tauri:dev:watch": "node ./scripts/run-tauri-dev-stable.mjs",
     "tauri:run": "npm run validate:release-bundle && npm run build && tauri build",
     "test:packet-fidelity": "node ./scripts/run-packet-fidelity-checks.mjs",
+    "check:os-parity": "node ./scripts/run-os-parity-checks.mjs",
     "setup:go-toolchain": "node ./scripts/setup-go-toolchain.mjs",
     "validate:native-artifacts": "node ./scripts/validate-native-artifacts.mjs",
     "validate:native-artifacts:strict": "node ./scripts/validate-native-artifacts.mjs --strict",

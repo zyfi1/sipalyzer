@@ -33,7 +33,8 @@ pub struct MwiState {
 }
 
 /// Global MWI state per registrar.
-static MWI_STATES: Lazy<Mutex<HashMap<String, MwiState>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static MWI_STATES: Lazy<Mutex<HashMap<String, MwiState>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Background subscription threads; key = registrar_id, value = stop flag.
 static MWI_THREADS: Lazy<Mutex<HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>>> =
@@ -72,12 +73,16 @@ pub fn parse_message_summary(body: &str) -> MwiState {
                 }
                 "voice-message" => {
                     // Format: new/old or new/old (urgent_new/urgent_old)
-                    let (counts_part, urgent_part): (&str, Option<&str>) = if let Some(paren_start) = val.find('(') {
-                        let paren_end = val.find(')').unwrap_or(val.len());
-                        (val[..paren_start].trim(), Some(&val[paren_start + 1..paren_end]))
-                    } else {
-                        (val, None)
-                    };
+                    let (counts_part, urgent_part): (&str, Option<&str>) =
+                        if let Some(paren_start) = val.find('(') {
+                            let paren_end = val.find(')').unwrap_or(val.len());
+                            (
+                                val[..paren_start].trim(),
+                                Some(&val[paren_start + 1..paren_end]),
+                            )
+                        } else {
+                            (val, None)
+                        };
                     let parts: Vec<&str> = counts_part.split('/').collect();
                     if parts.len() >= 2 {
                         new_count = parts[0].trim().parse().unwrap_or(0);
@@ -153,7 +158,10 @@ pub fn handle_mwi_notify(
     let mut state = parse_message_summary(body);
 
     // Try to find the registrar from the To header (our AOR)
-    let to_header = msg.get_header("To").map(|s| s.to_string()).unwrap_or_default();
+    let to_header = msg
+        .get_header("To")
+        .map(|s| s.to_string())
+        .unwrap_or_default();
     let to_aor = to_header.trim().trim_matches('"').trim_start_matches('<');
     let to_clean = to_aor.split('>').next().unwrap_or(to_aor);
     let to_user_domain: Vec<&str> = to_clean
@@ -175,7 +183,11 @@ pub fn handle_mwi_notify(
 
     tracing::info!(
         "[MWI] State: waiting={}, new={}, old={}, registrar={}",
-        state.messages_waiting, state.new_count, state.old_count, state.registrar_id);
+        state.messages_waiting,
+        state.new_count,
+        state.old_count,
+        state.registrar_id
+    );
 
     // Store and emit
     if !state.registrar_id.is_empty() {
@@ -263,7 +275,11 @@ fn mwi_subscription_loop(
             Ok(state) => {
                 tracing::info!(
                     "[MWI] SUBSCRIBE OK for {}: waiting={}, new={}, old={}",
-                    registrar_id, state.messages_waiting, state.new_count, state.old_count);
+                    registrar_id,
+                    state.messages_waiting,
+                    state.new_count,
+                    state.old_count
+                );
                 let mut full_state = state;
                 full_state.registrar_id = registrar_id.to_string();
 
@@ -283,7 +299,9 @@ fn mwi_subscription_loop(
                 let _ = app_handle.emit("softphone:mwi_update", payload);
 
                 // Wait for re-subscribe (refresh a bit before expiry)
-                let wait = subscribe_interval.checked_sub(Duration::from_secs(60)).unwrap_or(subscribe_interval);
+                let wait = subscribe_interval
+                    .checked_sub(Duration::from_secs(60))
+                    .unwrap_or(subscribe_interval);
                 let start = Instant::now();
                 while start.elapsed() < wait {
                     if stop.load(std::sync::atomic::Ordering::SeqCst) {
@@ -312,8 +330,7 @@ fn mwi_subscription_loop(
 /// Send a SIP SUBSCRIBE for message-summary and parse the initial NOTIFY if piggybacked.
 fn send_subscribe(config: &RegistrarConfig, expires: u32) -> Result<MwiState, String> {
     let local_port = config.local_port.unwrap_or(5060);
-    let registrar_uri =
-        SipUri::parse(&config.domain).map_err(|e| format!("Bad domain: {}", e))?;
+    let registrar_uri = SipUri::parse(&config.domain).map_err(|e| format!("Bad domain: {}", e))?;
     let registrar_port = registrar_uri.port.unwrap_or(config.remote_port);
     let registrar_host = registrar_uri.host_for_resolution();
 
@@ -353,16 +370,10 @@ fn send_subscribe(config: &RegistrarConfig, expires: u32) -> Result<MwiState, St
         ),
     );
     request.add_header("Max-Forwards", "70");
-    request.add_header(
-        "To",
-        &format!("<sip:{}@{}>", config.username, aor_domain),
-    );
+    request.add_header("To", &format!("<sip:{}@{}>", config.username, aor_domain));
     request.add_header(
         "From",
-        &format!(
-            "<sip:{}@{}>;tag={}",
-            config.username, aor_domain, from_tag
-        ),
+        &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag),
     );
     request.add_header("Call-ID", &call_id);
     request.add_header("CSeq", "1 SUBSCRIBE");
@@ -373,10 +384,7 @@ fn send_subscribe(config: &RegistrarConfig, expires: u32) -> Result<MwiState, St
     request.add_header("Event", "message-summary");
     request.add_header("Accept", "application/simple-message-summary");
     request.add_header("Expires", &expires.to_string());
-    request.add_header(
-        "User-Agent",
-        &user_agent::get_effective_user_agent(),
-    );
+    request.add_header("User-Agent", &user_agent::get_effective_user_agent());
 
     let request_bytes = request.to_bytes().map_err(|e| e.to_string())?;
 
@@ -384,21 +392,14 @@ fn send_subscribe(config: &RegistrarConfig, expires: u32) -> Result<MwiState, St
 
     let timeout = Duration::from_secs(config.timeout_seconds);
     let response_bytes = transport.receive(timeout).map_err(|e| e.to_string())?;
-    let response =
-        SipMessage::from_bytes(&response_bytes).map_err(|e| e.to_string())?;
+    let response = SipMessage::from_bytes(&response_bytes).map_err(|e| e.to_string())?;
 
     let status_code = response.status_code.unwrap_or(0);
 
     // Handle auth challenge
     if status_code == 401 || status_code == 407 {
         return handle_subscribe_auth(
-            &transport,
-            &request,
-            &response,
-            config,
-            &call_id,
-            &from_tag,
-            timeout,
+            &transport, &request, &response, config, &call_id, &from_tag, timeout,
         );
     }
 
@@ -479,8 +480,7 @@ fn handle_subscribe_auth(
     let username = config.auth_username.as_ref().unwrap_or(&config.username);
     let password = &config.password;
 
-    let registrar_uri =
-        SipUri::parse(&config.domain).map_err(|e| format!("Bad domain: {}", e))?;
+    let registrar_uri = SipUri::parse(&config.domain).map_err(|e| format!("Bad domain: {}", e))?;
     let aor_domain = registrar_uri.host.clone();
     let request_uri = format!("sip:{}@{}", config.username, aor_domain);
 
@@ -494,8 +494,13 @@ fn handle_subscribe_auth(
     }
     auth_request.add_header("CSeq", "2 SUBSCRIBE");
 
-    let auth_value =
-        auth::build_digest_authorization("SUBSCRIBE", &request_uri, username, password, &auth_challenge);
+    let auth_value = auth::build_digest_authorization(
+        "SUBSCRIBE",
+        &request_uri,
+        username,
+        password,
+        &auth_challenge,
+    );
 
     if challenge.status_code == Some(401) {
         auth_request.add_header("Authorization", &auth_value);

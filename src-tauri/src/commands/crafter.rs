@@ -6,9 +6,9 @@ use std::time::{Duration, Instant};
 
 use crate::core::config::TransportType;
 use crate::core::user_agent;
-use crate::sip::auth::{parse_auth_challenge, build_digest_authorization};
-use crate::sip::stack::{SipMessage, generate_call_id, generate_tag};
-use crate::sip::transport::{Transport, find_available_port};
+use crate::sip::auth::{build_digest_authorization, parse_auth_challenge};
+use crate::sip::stack::{generate_call_id, generate_tag, SipMessage};
+use crate::sip::transport::{find_available_port, Transport};
 use crate::sip::uri::SipUri;
 
 // ── SIP Crafter ────────────────────────────────────────────────────────────
@@ -68,7 +68,10 @@ fn parse_sip_response(raw: &[u8]) -> Result<SipResponsePart> {
 
     let mut headers_vec = Vec::new();
     for (k, v) in &msg.headers {
-        headers_vec.push(SipResponseHeader { key: k.clone(), value: v.clone() });
+        headers_vec.push(SipResponseHeader {
+            key: k.clone(),
+            value: v.clone(),
+        });
     }
 
     Ok(SipResponsePart {
@@ -108,24 +111,22 @@ fn crafter_send_sip_impl(input: CrafterSendSipInput) -> Result<CrafterSipRespons
     };
 
     // Parse URI for target host/port
-    let uri_parsed = SipUri::parse(&input.uri)
-        .context("Invalid SIP URI")?;
-    let target_host = input.target_host
-        .unwrap_or_else(|| uri_parsed.host.clone());
-    let target_port = input.target_port
-        .or(uri_parsed.port)
-        .unwrap_or(if uri_parsed.scheme == "sips" { 5061 } else { 5060 });
+    let uri_parsed = SipUri::parse(&input.uri).context("Invalid SIP URI")?;
+    let target_host = input.target_host.unwrap_or_else(|| uri_parsed.host.clone());
+    let target_port =
+        input
+            .target_port
+            .or(uri_parsed.port)
+            .unwrap_or(if uri_parsed.scheme == "sips" {
+                5061
+            } else {
+                5060
+            });
 
     // Bind to ephemeral port
-    let local_port = find_available_port(5062)
-        .context("No available local port")?;
+    let local_port = find_available_port(5062).context("No available local port")?;
 
-    let transport = Transport::new(
-        transport_type,
-        local_port,
-        &target_host,
-        target_port,
-    )?;
+    let transport = Transport::new(transport_type, local_port, &target_host, target_port)?;
 
     let mut msg = SipMessage::new_request(&input.method, &input.uri);
 
@@ -137,12 +138,28 @@ fn crafter_send_sip_impl(input: CrafterSendSipInput) -> Result<CrafterSipRespons
     // Ensure required headers exist (use defaults if missing)
     if msg.get_header("Via").is_none() {
         let local_ip = transport.get_local_ip_address();
-        let branch = format!("z9hG4bK{}", &uuid::Uuid::new_v4().to_string().replace('-', "")[..12]);
-        msg.add_header("Via", &format!("SIP/2.0/{} {}:{};branch={}", proto, local_ip, local_port, branch));
+        let branch = format!(
+            "z9hG4bK{}",
+            &uuid::Uuid::new_v4().to_string().replace('-', "")[..12]
+        );
+        msg.add_header(
+            "Via",
+            &format!(
+                "SIP/2.0/{} {}:{};branch={}",
+                proto, local_ip, local_port, branch
+            ),
+        );
     }
     if msg.get_header("From").is_none() {
         let tag = generate_tag();
-        msg.add_header("From", &format!("<sip:sipalyzer@{}>;tag={}", transport.get_local_ip_address(), tag));
+        msg.add_header(
+            "From",
+            &format!(
+                "<sip:sipalyzer@{}>;tag={}",
+                transport.get_local_ip_address(),
+                tag
+            ),
+        );
     }
     if msg.get_header("To").is_none() {
         msg.add_header("To", &format!("<{}>", input.uri));
@@ -158,7 +175,10 @@ fn crafter_send_sip_impl(input: CrafterSendSipInput) -> Result<CrafterSipRespons
     }
     if msg.get_header("Contact").is_none() {
         let local_ip = transport.get_local_ip_address();
-        msg.add_header("Contact", &format!("<sip:sipalyzer@{}:{}>", local_ip, local_port));
+        msg.add_header(
+            "Contact",
+            &format!("<sip:sipalyzer@{}:{}>", local_ip, local_port),
+        );
     }
     if msg.get_header("User-Agent").is_none() {
         let effective_user_agent = user_agent::get_effective_user_agent();
@@ -190,11 +210,19 @@ fn crafter_send_sip_impl(input: CrafterSendSipInput) -> Result<CrafterSipRespons
 
                 // Check for 401/407 to potentially retry with auth
                 if part.status_code == Some(401) {
-                    if let Some(h) = part.headers.iter().find(|h| h.key.eq_ignore_ascii_case("WWW-Authenticate")) {
+                    if let Some(h) = part
+                        .headers
+                        .iter()
+                        .find(|h| h.key.eq_ignore_ascii_case("WWW-Authenticate"))
+                    {
                         auth_challenge = Some((h.value.clone(), "Authorization".to_string()));
                     }
                 } else if part.status_code == Some(407) {
-                    if let Some(h) = part.headers.iter().find(|h| h.key.eq_ignore_ascii_case("Proxy-Authenticate")) {
+                    if let Some(h) = part
+                        .headers
+                        .iter()
+                        .find(|h| h.key.eq_ignore_ascii_case("Proxy-Authenticate"))
+                    {
                         auth_challenge = Some((h.value.clone(), "Proxy-Authorization".to_string()));
                     }
                 }
@@ -214,18 +242,15 @@ fn crafter_send_sip_impl(input: CrafterSendSipInput) -> Result<CrafterSipRespons
     // If we got 401/407 and have auth credentials, retry with digest
     if let Some((challenge_value, auth_header_name)) = auth_challenge {
         if let Some(ref auth) = input.auth {
-            if let (Some(ref user), Some(ref pass)) = (auth.username.as_ref(), auth.password.as_ref()) {
+            if let (Some(ref user), Some(ref pass)) =
+                (auth.username.as_ref(), auth.password.as_ref())
+            {
                 let realm = auth.realm.as_deref().unwrap_or("");
                 let challenge = parse_auth_challenge(&challenge_value, realm)
                     .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-                let auth_value = build_digest_authorization(
-                    &input.method,
-                    &input.uri,
-                    user,
-                    pass,
-                    &challenge,
-                );
+                let auth_value =
+                    build_digest_authorization(&input.method, &input.uri, user, pass, &challenge);
 
                 let mut retry_msg = SipMessage::new_request(&input.method, &input.uri);
                 for kv in &input.headers {
@@ -244,7 +269,8 @@ fn crafter_send_sip_impl(input: CrafterSendSipInput) -> Result<CrafterSipRespons
                 if let Some(v) = msg.get_header("Call-ID") {
                     retry_msg.add_header("Call-ID", v);
                 }
-                let cseq = msg.get_header("CSeq")
+                let cseq = msg
+                    .get_header("CSeq")
                     .map(|s| {
                         let parts: Vec<&str> = s.splitn(2, ' ').collect();
                         if parts.len() >= 2 {
@@ -356,7 +382,11 @@ fn crafter_send_http_impl(input: CrafterSendHttpInput) -> Result<CrafterHttpResp
 
     let client = Client::builder()
         .redirect(redirect_policy)
-        .timeout(Duration::from_millis(if input.timeout_ms > 0 { input.timeout_ms } else { 30000 }))
+        .timeout(Duration::from_millis(if input.timeout_ms > 0 {
+            input.timeout_ms
+        } else {
+            30000
+        }))
         .build()
         .context("Failed to create HTTP client")?;
 
@@ -402,7 +432,8 @@ fn crafter_send_http_impl(input: CrafterSendHttpInput) -> Result<CrafterHttpResp
         req.send()
     } else {
         req.body(body).send()
-    }.context("HTTP request failed")?;
+    }
+    .context("HTTP request failed")?;
 
     let timing_ms = start.elapsed().as_millis() as u64;
     let status = resp.status();
@@ -412,7 +443,10 @@ fn crafter_send_http_impl(input: CrafterSendHttpInput) -> Result<CrafterHttpResp
     let mut headers_vec = Vec::new();
     for (k, v) in resp.headers() {
         if let Ok(vs) = v.to_str() {
-            headers_vec.push(SipResponseHeader { key: k.as_str().to_string(), value: vs.to_string() });
+            headers_vec.push(SipResponseHeader {
+                key: k.as_str().to_string(),
+                value: vs.to_string(),
+            });
         }
     }
 

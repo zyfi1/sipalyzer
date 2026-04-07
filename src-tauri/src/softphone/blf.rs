@@ -30,7 +30,8 @@ pub struct BlfState {
     pub remote_party: Option<String>,
 }
 
-static BLF_STATES: Lazy<Mutex<HashMap<String, BlfState>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static BLF_STATES: Lazy<Mutex<HashMap<String, BlfState>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Key = "registrar_id:extension", value = stop flag
 static BLF_THREADS: Lazy<Mutex<HashMap<String, Arc<AtomicBool>>>> =
@@ -98,7 +99,10 @@ pub fn unsubscribe_all() {
 /// Get the current BLF state for an extension.
 pub fn get_blf_state(registrar_id: &str, extension: &str) -> Option<BlfState> {
     let key = format!("{}:{}", registrar_id, extension);
-    BLF_STATES.lock().ok().and_then(|map| map.get(&key).cloned())
+    BLF_STATES
+        .lock()
+        .ok()
+        .and_then(|map| map.get(&key).cloned())
 }
 
 /// Handle an incoming NOTIFY with Event: dialog on the inbound listener.
@@ -110,18 +114,31 @@ pub fn handle_dialog_notify(
     app_handle: &tauri::AppHandle,
 ) -> bool {
     let event_header = msg.get_header("Event").map(|s| s.to_lowercase());
-    let is_dialog = event_header.as_deref().map(|e| e.starts_with("dialog")).unwrap_or(false);
+    let is_dialog = event_header
+        .as_deref()
+        .map(|e| e.starts_with("dialog"))
+        .unwrap_or(false);
     if !is_dialog {
         return false;
     }
 
     // Send 200 OK
     let mut ok = SipMessage::new_response(200, "OK");
-    if let Some(v) = msg.get_header("Via") { ok.add_header("Via", v); }
-    if let Some(v) = msg.get_header("From") { ok.add_header("From", v); }
-    if let Some(v) = msg.get_header("To") { ok.add_header("To", v); }
-    if let Some(v) = msg.get_header("Call-ID") { ok.add_header("Call-ID", v); }
-    if let Some(v) = msg.get_header("CSeq") { ok.add_header("CSeq", v); }
+    if let Some(v) = msg.get_header("Via") {
+        ok.add_header("Via", v);
+    }
+    if let Some(v) = msg.get_header("From") {
+        ok.add_header("From", v);
+    }
+    if let Some(v) = msg.get_header("To") {
+        ok.add_header("To", v);
+    }
+    if let Some(v) = msg.get_header("Call-ID") {
+        ok.add_header("Call-ID", v);
+    }
+    if let Some(v) = msg.get_header("CSeq") {
+        ok.add_header("CSeq", v);
+    }
     if let Ok(bytes) = ok.to_bytes() {
         let _ = socket.send_to(&bytes, peer);
     }
@@ -140,8 +157,8 @@ pub fn handle_dialog_notify(
     let to_header = msg.get_header("To").cloned().unwrap_or_default();
     let to_domain = extract_domain_from_header(&to_header);
     let from_domain = extract_domain_from_header(&from_header);
-    let registrar_id = find_registrar_by_domain(&to_domain)
-        .or_else(|| find_registrar_by_domain(&from_domain));
+    let registrar_id =
+        find_registrar_by_domain(&to_domain).or_else(|| find_registrar_by_domain(&from_domain));
 
     if let Some(ref rid) = registrar_id {
         let key = format!("{}:{}", rid, extension);
@@ -228,8 +245,18 @@ fn extract_xml_value(xml: &str, start_tag: &str, end_tag: &str) -> Option<String
 }
 
 fn extract_user_from_header(header: &str) -> String {
-    let cleaned = header.trim().trim_start_matches('<').trim_start_matches("sip:");
-    cleaned.split('@').next().unwrap_or("").split('>').next().unwrap_or("").to_string()
+    let cleaned = header
+        .trim()
+        .trim_start_matches('<')
+        .trim_start_matches("sip:");
+    cleaned
+        .split('@')
+        .next()
+        .unwrap_or("")
+        .split('>')
+        .next()
+        .unwrap_or("")
+        .to_string()
 }
 
 fn extract_domain_from_header(header: &str) -> String {
@@ -245,9 +272,14 @@ fn extract_domain_from_header(header: &str) -> String {
 }
 
 fn find_registrar_by_domain(domain: &str) -> Option<String> {
-    if domain.is_empty() { return None; }
+    if domain.is_empty() {
+        return None;
+    }
     let registrars = Database::load_registrars().ok()?;
-    registrars.iter().find(|r| r.domain == domain).map(|r| r.id.clone())
+    registrars
+        .iter()
+        .find(|r| r.domain == domain)
+        .map(|r| r.id.clone())
 }
 
 fn blf_subscription_loop(
@@ -261,11 +293,18 @@ fn blf_subscription_loop(
     let retry_delay = Duration::from_secs(30);
 
     loop {
-        if stop.load(Ordering::SeqCst) { break; }
+        if stop.load(Ordering::SeqCst) {
+            break;
+        }
 
         match send_blf_subscribe(config, extension, 3600) {
             Ok(initial_state) => {
-                tracing::info!("SUBSCRIBE OK for {}@{}: state={}", extension, registrar_id, initial_state);
+                tracing::info!(
+                    "SUBSCRIBE OK for {}@{}: state={}",
+                    extension,
+                    registrar_id,
+                    initial_state
+                );
                 let key = format!("{}:{}", registrar_id, extension);
                 let blf_state = BlfState {
                     extension: extension.to_string(),
@@ -284,7 +323,9 @@ fn blf_subscription_loop(
                 });
                 let _ = app_handle.emit("softphone:blf_update", payload);
 
-                let wait = subscribe_interval.checked_sub(Duration::from_secs(60)).unwrap_or(subscribe_interval);
+                let wait = subscribe_interval
+                    .checked_sub(Duration::from_secs(60))
+                    .unwrap_or(subscribe_interval);
                 let start = Instant::now();
                 while start.elapsed() < wait {
                     if stop.load(Ordering::SeqCst) {
@@ -298,7 +339,9 @@ fn blf_subscription_loop(
                 tracing::error!("SUBSCRIBE failed for {}@{}: {}", extension, registrar_id, e);
                 let start = Instant::now();
                 while start.elapsed() < retry_delay {
-                    if stop.load(Ordering::SeqCst) { return; }
+                    if stop.load(Ordering::SeqCst) {
+                        return;
+                    }
                     std::thread::sleep(Duration::from_secs(2));
                 }
             }
@@ -306,19 +349,30 @@ fn blf_subscription_loop(
     }
 }
 
-fn send_blf_subscribe(config: &RegistrarConfig, extension: &str, expires: u32) -> Result<String, String> {
+fn send_blf_subscribe(
+    config: &RegistrarConfig,
+    extension: &str,
+    expires: u32,
+) -> Result<String, String> {
     let local_port = config.local_port.unwrap_or(5060);
     let registrar_uri = SipUri::parse(&config.domain).map_err(|e| format!("Bad domain: {}", e))?;
     let registrar_port = registrar_uri.port.unwrap_or(config.remote_port);
     let registrar_host = registrar_uri.host_for_resolution();
 
-    let mut transport = Transport::new(config.transport.clone(), local_port, registrar_host, registrar_port)
-        .map_err(|e| e.to_string())?;
+    let mut transport = Transport::new(
+        config.transport.clone(),
+        local_port,
+        registrar_host,
+        registrar_port,
+    )
+    .map_err(|e| e.to_string())?;
     transport.update_local_ip().map_err(|e| e.to_string())?;
     let local_ip = transport.get_local_ip_address();
 
     // Contact port must be the inbound listener port so NOTIFYs reach the right socket
-    let contact_port = config.listening_port.unwrap_or(config.local_port.unwrap_or(5060));
+    let contact_port = config
+        .listening_port
+        .unwrap_or(config.local_port.unwrap_or(5060));
 
     let call_id = generate_call_id();
     let from_tag = generate_tag();
@@ -335,13 +389,25 @@ fn send_blf_subscribe(config: &RegistrarConfig, extension: &str, expires: u32) -
     };
 
     let mut req = SipMessage::new_request("SUBSCRIBE", &request_uri);
-    req.add_header("Via", &format!("SIP/2.0/{} {}:{};rport;branch={}", via_transport, local_ip, contact_port, branch));
+    req.add_header(
+        "Via",
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch={}",
+            via_transport, local_ip, contact_port, branch
+        ),
+    );
     req.add_header("Max-Forwards", "70");
-    req.add_header("From", &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag));
+    req.add_header(
+        "From",
+        &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag),
+    );
     req.add_header("To", &format!("<sip:{}@{}>", extension, aor_domain));
     req.add_header("Call-ID", &call_id);
     req.add_header("CSeq", "1 SUBSCRIBE");
-    req.add_header("Contact", &format!("<sip:{}@{}:{}>", config.username, local_ip, contact_port));
+    req.add_header(
+        "Contact",
+        &format!("<sip:{}@{}:{}>", config.username, local_ip, contact_port),
+    );
     req.add_header("Event", "dialog");
     req.add_header("Accept", "application/dialog-info+xml");
     req.add_header("Expires", &expires.to_string());
@@ -351,32 +417,57 @@ fn send_blf_subscribe(config: &RegistrarConfig, extension: &str, expires: u32) -
     transport.send(&req_bytes).map_err(|e| e.to_string())?;
 
     // Read response
-    let mut response = transport.receive(Duration::from_secs(5)).map_err(|e| e.to_string())?;
+    let mut response = transport
+        .receive(Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
     let mut resp_msg = SipMessage::from_bytes(&response).map_err(|e| e.to_string())?;
     let code = resp_msg.status_code.unwrap_or(0);
 
     // Handle 401/407 auth challenge
     if code == 401 || code == 407 {
-        let auth_header_name = if code == 401 { "WWW-Authenticate" } else { "Proxy-Authenticate" };
-        let challenge_str = resp_msg.get_header(auth_header_name)
+        let auth_header_name = if code == 401 {
+            "WWW-Authenticate"
+        } else {
+            "Proxy-Authenticate"
+        };
+        let challenge_str = resp_msg
+            .get_header(auth_header_name)
             .cloned()
             .ok_or("No auth challenge header")?;
         let default_realm = config.realm.as_deref().unwrap_or(&config.domain);
-        let auth_challenge = auth::parse_auth_challenge(&challenge_str, default_realm)
-            .map_err(|e| e.to_string())?;
+        let auth_challenge =
+            auth::parse_auth_challenge(&challenge_str, default_realm).map_err(|e| e.to_string())?;
         let username = config.auth_username.as_ref().unwrap_or(&config.username);
         let password = &config.password;
-        let auth_value = auth::build_digest_authorization("SUBSCRIBE", &request_uri, username, password, &auth_challenge);
+        let auth_value = auth::build_digest_authorization(
+            "SUBSCRIBE",
+            &request_uri,
+            username,
+            password,
+            &auth_challenge,
+        );
 
         let branch2 = format!("z9hG4bK{}", generate_tag());
         let mut auth_req = SipMessage::new_request("SUBSCRIBE", &request_uri);
-        auth_req.add_header("Via", &format!("SIP/2.0/{} {}:{};rport;branch={}", via_transport, local_ip, contact_port, branch2));
+        auth_req.add_header(
+            "Via",
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch={}",
+                via_transport, local_ip, contact_port, branch2
+            ),
+        );
         auth_req.add_header("Max-Forwards", "70");
-        auth_req.add_header("From", &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag));
+        auth_req.add_header(
+            "From",
+            &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag),
+        );
         auth_req.add_header("To", &format!("<sip:{}@{}>", extension, aor_domain));
         auth_req.add_header("Call-ID", &call_id);
         auth_req.add_header("CSeq", "2 SUBSCRIBE");
-        auth_req.add_header("Contact", &format!("<sip:{}@{}:{}>", config.username, local_ip, contact_port));
+        auth_req.add_header(
+            "Contact",
+            &format!("<sip:{}@{}:{}>", config.username, local_ip, contact_port),
+        );
         auth_req.add_header("Event", "dialog");
         auth_req.add_header("Accept", "application/dialog-info+xml");
         auth_req.add_header("Expires", &expires.to_string());
@@ -389,13 +480,19 @@ fn send_blf_subscribe(config: &RegistrarConfig, extension: &str, expires: u32) -
 
         let auth_bytes = auth_req.to_bytes().map_err(|e| e.to_string())?;
         transport.send(&auth_bytes).map_err(|e| e.to_string())?;
-        response = transport.receive(Duration::from_secs(5)).map_err(|e| e.to_string())?;
+        response = transport
+            .receive(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
         resp_msg = SipMessage::from_bytes(&response).map_err(|e| e.to_string())?;
     }
 
     let final_code = resp_msg.status_code.unwrap_or(0);
     if final_code < 200 || final_code >= 300 {
-        return Err(format!("SUBSCRIBE failed: {} {}", final_code, resp_msg.status_text.as_deref().unwrap_or("")));
+        return Err(format!(
+            "SUBSCRIBE failed: {} {}",
+            final_code,
+            resp_msg.status_text.as_deref().unwrap_or("")
+        ));
     }
 
     // Try to read an immediate NOTIFY (some servers piggyback it)

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
+use dirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use dirs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -64,8 +64,7 @@ pub struct RegistrarConfig {
     pub sort_order: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TransportType {
     Udp,
     Tcp,
@@ -100,8 +99,7 @@ pub fn get_config_dir() -> Result<PathBuf> {
     let config_dir = base.join(CONFIG_DIR_NAME);
 
     if !config_dir.exists() {
-        fs::create_dir_all(&config_dir)
-            .context("Failed to create config directory")?;
+        fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
     }
 
     // One-time migration from legacy "strix" directory
@@ -155,7 +153,12 @@ fn migrate_legacy_dir(legacy: &std::path::Path, target: &std::path::Path) {
 
             if should_copy && src_size > 0 {
                 match fs::copy(&src, &dst) {
-                    Ok(_) => tracing::info!("copied {:?} ({} bytes -> replacing {} bytes)", name, src_size, dst_size),
+                    Ok(_) => tracing::info!(
+                        "copied {:?} ({} bytes -> replacing {} bytes)",
+                        name,
+                        src_size,
+                        dst_size
+                    ),
                     Err(e) => tracing::error!("failed to copy {:?}: {}", name, e),
                 }
             }
@@ -187,28 +190,25 @@ pub fn get_config_path() -> Result<PathBuf> {
 #[allow(dead_code)]
 pub fn load_config() -> Result<AppConfig> {
     let config_path = get_config_path()?;
-    
+
     if !config_path.exists() {
         return Ok(AppConfig::default());
     }
-    
-    let content = fs::read_to_string(&config_path)
-        .context("Failed to read config file")?;
-    
-    let config: AppConfig = serde_json::from_str(&content)
-        .context("Failed to parse config file")?;
-    
+
+    let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
+
+    let config: AppConfig =
+        serde_json::from_str(&content).context("Failed to parse config file")?;
+
     Ok(config)
 }
 
 #[allow(dead_code)]
 pub fn save_config(config: &AppConfig) -> Result<()> {
     let config_path = get_config_path()?;
-    let content = serde_json::to_string_pretty(config)
-        .context("Failed to serialize config")?;
-    
-    fs::write(&config_path, content)
-        .context("Failed to write config file")?;
-    
+    let content = serde_json::to_string_pretty(config).context("Failed to serialize config")?;
+
+    fs::write(&config_path, content).context("Failed to write config file")?;
+
     Ok(())
 }

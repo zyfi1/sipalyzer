@@ -119,8 +119,14 @@ pub fn parse_websocket_frame(data: &[u8]) -> Result<WebSocketFrame> {
             anyhow::bail!("WebSocket frame truncated (extended 64-bit length)");
         }
         payload_len = u64::from_be_bytes([
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
         ]);
         offset += 8;
     }
@@ -130,7 +136,12 @@ pub fn parse_websocket_frame(data: &[u8]) -> Result<WebSocketFrame> {
         if data.len() < offset + 4 {
             anyhow::bail!("WebSocket frame truncated (masking key)");
         }
-        let key = [data[offset], data[offset + 1], data[offset + 2], data[offset + 3]];
+        let key = [
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ];
         offset += 4;
         Some(key)
     } else {
@@ -176,7 +187,7 @@ pub fn is_websocket_frame(data: &[u8]) -> bool {
     let opcode = data[0] & 0x0F;
     // Valid opcodes: 0-2 (data), 8-10 (control)
     let valid_opcode = matches!(opcode, 0..=2 | 8..=10);
-    
+
     if !valid_opcode {
         return false;
     }

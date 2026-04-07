@@ -1,15 +1,15 @@
 //! Tauri commands for the comprehensive DNS testing suite.
 
 use crate::network_test::dns::{
+    diagnostics::{self, DigConfig, DnsQueryFlags, RawDnsResponse},
+    geoip::{self, AsnResult, BatchGeoIpResult, GeoIpResult},
     records::{self, DnsConfig, DnsRecordSet, DnsRecordType},
+    reverse::{self, BatchReverseDnsResult, ReverseDnsConfig, ReverseDnsResult},
     sip_resolution::{self, SipResolutionChain, SipResolutionConfig},
-    reverse::{self, ReverseDnsResult, ReverseDnsConfig, BatchReverseDnsResult},
-    diagnostics::{self, RawDnsResponse, DigConfig, DnsQueryFlags},
-    geoip::{self, GeoIpResult, AsnResult, BatchGeoIpResult},
 };
 use crate::remote_agent::manager::AGENT_MANAGER;
-use sipalyzer_core::protocol::AgentCommand;
 use serde::{Deserialize, Serialize};
+use sipalyzer_core::protocol::AgentCommand;
 
 // ── DNS Lookup (full record types, custom server) ───────────────────────
 
@@ -27,11 +27,13 @@ pub async fn dns_lookup(
         .and_then(DnsRecordType::from_str_loose)
         .unwrap_or(DnsRecordType::A);
 
-    let dns_transport = transport.as_deref().and_then(|t| match t.to_lowercase().as_str() {
-        "tcp" => Some(crate::network_test::dns::resolver::DnsTransport::Tcp),
-        "udp" => Some(crate::network_test::dns::resolver::DnsTransport::Udp),
-        _ => None,
-    });
+    let dns_transport = transport
+        .as_deref()
+        .and_then(|t| match t.to_lowercase().as_str() {
+            "tcp" => Some(crate::network_test::dns::resolver::DnsTransport::Tcp),
+            "udp" => Some(crate::network_test::dns::resolver::DnsTransport::Udp),
+            _ => None,
+        });
 
     let config = DnsConfig {
         domain,
@@ -95,7 +97,8 @@ pub async fn dns_reverse_batch(
         port,
         fcrdns.unwrap_or(true),
         concurrency.unwrap_or(10),
-    ).await)
+    )
+    .await)
 }
 
 // ── Dig-style raw query ─────────────────────────────────────────────────
@@ -201,9 +204,7 @@ pub struct MultiSiteDiscrepancy {
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn dns_multi_site(
-    config: MultiSiteConfig,
-) -> Result<MultiSiteDnsComparison, String> {
+pub async fn dns_multi_site(config: MultiSiteConfig) -> Result<MultiSiteDnsComparison, String> {
     let start = std::time::Instant::now();
     let mut results: Vec<SiteDnsResult> = Vec::new();
 
@@ -229,34 +230,33 @@ pub async fn dns_multi_site(
         let mgr = AGENT_MANAGER.lock().await;
         let connections = mgr.list_connections();
 
-        let target_agents: Vec<_> = if config.agent_ids.is_empty()
-            || config.agent_ids.iter().any(|id| id == "all")
-        {
-            connections.iter().collect()
-        } else {
-            connections
-                .iter()
-                .filter(|c| config.agent_ids.contains(&c.id))
-                .collect()
-        };
+        let target_agents: Vec<_> =
+            if config.agent_ids.is_empty() || config.agent_ids.iter().any(|id| id == "all") {
+                connections.iter().collect()
+            } else {
+                connections
+                    .iter()
+                    .filter(|c| config.agent_ids.contains(&c.id))
+                    .collect()
+            };
 
-        target_agents.iter().map(|agent| {
-            let command = build_agent_dns_command(&config);
-            let display_name = agent.name.clone().unwrap_or_else(|| agent.hostname.clone());
-            let agent_id = agent.id.clone();
-            let prepared = mgr.prepare_send(&agent.id, command);
-            (display_name, agent_id, prepared)
-        }).collect()
+        target_agents
+            .iter()
+            .map(|agent| {
+                let command = build_agent_dns_command(&config);
+                let display_name = agent.name.clone().unwrap_or_else(|| agent.hostname.clone());
+                let agent_id = agent.id.clone();
+                let prepared = mgr.prepare_send(&agent.id, command);
+                (display_name, agent_id, prepared)
+            })
+            .collect()
         // Lock is dropped here
     };
 
     for (display_name, agent_id, prepared) in prepared_sends {
         match prepared {
             Ok((msg_id, tx, msg)) => {
-                match tokio::time::timeout(
-                    std::time::Duration::from_secs(5),
-                    tx.send(msg),
-                ).await {
+                match tokio::time::timeout(std::time::Duration::from_secs(5), tx.send(msg)).await {
                     Ok(Ok(())) => {
                         results.push(SiteDnsResult {
                             source: display_name,
@@ -341,11 +341,7 @@ async fn run_local_dns_test(
             let result = records::lookup_records(&dns_config).await;
             let success = result.success;
             let error = result.error.clone();
-            (
-                serde_json::to_value(&result).ok(),
-                success,
-                error,
-            )
+            (serde_json::to_value(&result).ok(), success, error)
         }
         "sip_resolve" => {
             let sip_config = SipResolutionConfig {
@@ -356,11 +352,7 @@ async fn run_local_dns_test(
             let result = sip_resolution::resolve_sip_domain(sip_config).await;
             let success = result.success;
             let error = result.error.clone();
-            (
-                serde_json::to_value(&result).ok(),
-                success,
-                error,
-            )
+            (serde_json::to_value(&result).ok(), success, error)
         }
         "reverse" => {
             let rev_config = ReverseDnsConfig {
@@ -372,16 +364,15 @@ async fn run_local_dns_test(
             let result = reverse::reverse_dns_lookup(rev_config).await;
             let success = result.success;
             let error = result.error.clone();
-            (
-                serde_json::to_value(&result).ok(),
-                success,
-                error,
-            )
+            (serde_json::to_value(&result).ok(), success, error)
         }
         "dig" => {
             let dig_config = diagnostics::DigConfig {
                 domain: config.target.clone(),
-                record_type: config.record_type.clone().unwrap_or_else(|| "A".to_string()),
+                record_type: config
+                    .record_type
+                    .clone()
+                    .unwrap_or_else(|| "A".to_string()),
                 server: config.server.clone(),
                 port: None,
                 flags: None,
@@ -390,13 +381,13 @@ async fn run_local_dns_test(
             let result = diagnostics::run_dig(dig_config).await;
             let success = result.success;
             let error = result.error.clone();
-            (
-                serde_json::to_value(&result).ok(),
-                success,
-                error,
-            )
+            (serde_json::to_value(&result).ok(), success, error)
         }
-        _ => (None, false, Some(format!("Unknown test type: {}", config.test_type))),
+        _ => (
+            None,
+            false,
+            Some(format!("Unknown test type: {}", config.test_type)),
+        ),
     }
 }
 
@@ -406,15 +397,20 @@ fn build_agent_dns_command(config: &MultiSiteConfig) -> AgentCommand {
         "lookup" => AgentCommand::DnsLookup(sipalyzer_core::protocol::DnsLookupParams {
             hostname: config.target.clone(),
             server: config.server.clone(),
-            record_type: config.record_type.clone().unwrap_or_else(|| "A".to_string()),
+            record_type: config
+                .record_type
+                .clone()
+                .unwrap_or_else(|| "A".to_string()),
             transport: None,
             port: None,
         }),
-        "sip_resolve" => AgentCommand::DnsSipResolve(sipalyzer_core::protocol::DnsSipResolveParams {
-            domain: config.target.clone(),
-            server: config.server.clone(),
-            port: None,
-        }),
+        "sip_resolve" => {
+            AgentCommand::DnsSipResolve(sipalyzer_core::protocol::DnsSipResolveParams {
+                domain: config.target.clone(),
+                server: config.server.clone(),
+                port: None,
+            })
+        }
         "reverse" => AgentCommand::DnsReverse(sipalyzer_core::protocol::DnsReverseParams {
             ip: config.target.clone(),
             server: config.server.clone(),
@@ -423,7 +419,10 @@ fn build_agent_dns_command(config: &MultiSiteConfig) -> AgentCommand {
         }),
         "dig" => AgentCommand::DnsDig(sipalyzer_core::protocol::DnsDigParams {
             domain: config.target.clone(),
-            record_type: config.record_type.clone().unwrap_or_else(|| "A".to_string()),
+            record_type: config
+                .record_type
+                .clone()
+                .unwrap_or_else(|| "A".to_string()),
             server: config.server.clone(),
             port: None,
             use_tcp: false,

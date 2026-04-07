@@ -1,10 +1,10 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
-    password_hash::{SaltString, rand_core::OsRng},
 };
 use rusqlite::params;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -130,7 +130,10 @@ impl AdminAuth {
             .map_err(|e| anyhow!("Failed to hash admin password: {e}"))
     }
 
-    fn verify_against_stored_hash(password: &str, stored_hash: &str) -> Result<(bool, Option<String>)> {
+    fn verify_against_stored_hash(
+        password: &str,
+        stored_hash: &str,
+    ) -> Result<(bool, Option<String>)> {
         if stored_hash.starts_with("$argon2") {
             let parsed = PasswordHash::new(stored_hash)
                 .map_err(|e| anyhow!("Stored admin hash is invalid: {e}"))?;
@@ -157,7 +160,8 @@ mod tests {
     #[test]
     fn legacy_hash_still_verifies_and_requests_upgrade() {
         let legacy = AdminAuth::hash_legacy_password("hunter2");
-        let (ok, upgrade) = AdminAuth::verify_against_stored_hash("hunter2", &legacy).expect("verify");
+        let (ok, upgrade) =
+            AdminAuth::verify_against_stored_hash("hunter2", &legacy).expect("verify");
         assert!(ok);
         assert!(upgrade.is_some());
         assert!(upgrade.expect("upgrade").starts_with("$argon2"));
@@ -166,7 +170,8 @@ mod tests {
     #[test]
     fn argon2_hash_verifies_without_upgrade() {
         let hash = AdminAuth::hash_password("very-strong").expect("hash");
-        let (ok, upgrade) = AdminAuth::verify_against_stored_hash("very-strong", &hash).expect("verify");
+        let (ok, upgrade) =
+            AdminAuth::verify_against_stored_hash("very-strong", &hash).expect("verify");
         assert!(ok);
         assert!(upgrade.is_none());
     }

@@ -82,11 +82,7 @@ impl StreamingFilter {
     }
 
     /// Query packets matching the current filter with pagination.
-    pub fn query_packets(
-        &self,
-        offset: usize,
-        limit: usize,
-    ) -> Result<Vec<IndexedPacket>> {
+    pub fn query_packets(&self, offset: usize, limit: usize) -> Result<Vec<IndexedPacket>> {
         let config = self.config.read().clone();
         let mut query = self.to_query(&config);
         query.offset = Some(offset);
@@ -178,8 +174,10 @@ impl StreamingFilter {
 
         // Update last offset
         if let Some(last_packet) = results.last() {
-            self.last_offset
-                .store(last_packet.buffer_offset, std::sync::atomic::Ordering::SeqCst);
+            self.last_offset.store(
+                last_packet.buffer_offset,
+                std::sync::atomic::Ordering::SeqCst,
+            );
         }
 
         Ok(results)
@@ -377,7 +375,11 @@ mod tests {
             index
                 .index_packet(
                     &create_test_packet(
-                        if i % 2 == 0 { Protocol::SIP } else { Protocol::RTP },
+                        if i % 2 == 0 {
+                            Protocol::SIP
+                        } else {
+                            Protocol::RTP
+                        },
                         5060 + i,
                     ),
                     None,

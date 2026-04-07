@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{IpAddr, SocketAddr};
-use socket2::{Domain, Socket, Type, Protocol};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DscpConfig {
@@ -53,11 +53,9 @@ pub async fn run_dscp_test(config: DscpConfig) -> DscpResult {
     let timeout_ms = config.timeout_ms;
     let host = config.host.clone();
 
-    let result = tokio::task::spawn_blocking(move || {
-        send_dscp_packet(ip, port, dscp, timeout_ms)
-    })
-    .await
-    .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
+    let result = tokio::task::spawn_blocking(move || send_dscp_packet(ip, port, dscp, timeout_ms))
+        .await
+        .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
 
     match result {
         Ok(sent) => DscpResult {
@@ -80,7 +78,11 @@ pub async fn run_dscp_test(config: DscpConfig) -> DscpResult {
 }
 
 fn send_dscp_packet(ip: IpAddr, port: u16, dscp: u8, _timeout_ms: u64) -> Result<bool, String> {
-    let domain = if ip.is_ipv4() { Domain::IPV4 } else { Domain::IPV6 };
+    let domain = if ip.is_ipv4() {
+        Domain::IPV4
+    } else {
+        Domain::IPV6
+    };
     let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))
         .map_err(|e| format!("Socket error: {}", e))?;
 
@@ -100,7 +102,10 @@ fn send_dscp_packet(ip: IpAddr, port: u16, dscp: u8, _timeout_ms: u64) -> Result
                 std::mem::size_of::<libc::c_int>() as libc::socklen_t,
             );
             if ret != 0 {
-                return Err(format!("Failed to set TOS/DSCP: errno {}", std::io::Error::last_os_error()));
+                return Err(format!(
+                    "Failed to set TOS/DSCP: errno {}",
+                    std::io::Error::last_os_error()
+                ));
             }
         }
     }
@@ -108,7 +113,9 @@ fn send_dscp_packet(ip: IpAddr, port: u16, dscp: u8, _timeout_ms: u64) -> Result
     #[cfg(windows)]
     {
         // Windows IP_TOS = 3
-        socket.set_tos(tos).map_err(|e| format!("Failed to set TOS: {}", e))?;
+        socket
+            .set_tos(tos)
+            .map_err(|e| format!("Failed to set TOS: {}", e))?;
     }
 
     let dest = SocketAddr::new(ip, port);

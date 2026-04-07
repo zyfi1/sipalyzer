@@ -15,11 +15,9 @@ pub fn get_config_dir() -> Result<String, String> {
 #[tracing::instrument(skip_all)]
 pub fn load_config() -> Result<config::AppConfig, String> {
     // Load from encrypted database
-    let registrars = Database::load_registrars()
-        .map_err(|e| e.to_string())?;
-    let global_settings = Database::load_global_settings()
-        .map_err(|e| e.to_string())?;
-    
+    let registrars = Database::load_registrars().map_err(|e| e.to_string())?;
+    let global_settings = Database::load_global_settings().map_err(|e| e.to_string())?;
+
     Ok(config::AppConfig {
         registrars,
         global_settings,
@@ -29,12 +27,10 @@ pub fn load_config() -> Result<config::AppConfig, String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn save_config(app_config: config::AppConfig) -> Result<(), String> {
-    Database::save_global_settings(&app_config.global_settings)
-        .map_err(|e| e.to_string())?;
+    Database::save_global_settings(&app_config.global_settings).map_err(|e| e.to_string())?;
 
-    let _ = crate::core::audit::AuditWriter::write_entry(
-        "settings", "save_config", "user", None, None,
-    );
+    let _ =
+        crate::core::audit::AuditWriter::write_entry("settings", "save_config", "user", None, None);
 
     Ok(())
 }

@@ -4,13 +4,13 @@
 //! The implementation integrates with the softphone module for SIP call handling
 //! and will use SpanDSP for actual T.30 protocol processing when native bindings are enabled.
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tauri::{command, AppHandle, Emitter};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use once_cell::sync::Lazy;
-use uuid::Uuid;
+use tauri::{command, AppHandle, Emitter};
 use tokio::sync::mpsc as tokio_mpsc;
+use uuid::Uuid;
 
 use crate::softphone::port_allocator;
 
@@ -66,8 +66,9 @@ fn allocate_udptl_port(label: &str) -> Result<u16, String> {
 // ====== Active Job Tracking ======
 
 /// Active fax jobs for cancellation support
-static ACTIVE_JOBS: Lazy<Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>>> =
-    Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
+static ACTIVE_JOBS: Lazy<
+    Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>>,
+> = Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
 
 /// Register an active job for cancellation
 fn register_active_job(job_id: &str) -> std::sync::Arc<std::sync::atomic::AtomicBool> {
@@ -151,7 +152,7 @@ fn append_audit(entry: FaxAuditEntry) {
     }
 }
 
-use super::session::{ModemType, G711Variant};
+use super::session::{G711Variant, ModemType};
 
 /// Options for fax_send command (frontend-facing)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -159,39 +160,39 @@ pub struct SendFaxOptions {
     /// Fax mode: "t38", "g711", "g711u", "g711a", or "auto"
     #[serde(default)]
     pub mode: Option<String>,
-    
+
     /// Enable ECM (Error Correction Mode)
     #[serde(default)]
     pub ecm: Option<bool>,
-    
+
     /// Maximum baud rate: 2400, 4800, 7200, 9600, 12000, 14400, 33600
     #[serde(default)]
     pub baud_rate: Option<u32>,
-    
+
     /// Modem type: "v27ter", "v29", "v17", "v34"
     #[serde(default)]
     pub modem_type: Option<String>,
-    
+
     /// Transmitting Station ID (max 20 chars)
     #[serde(default)]
     pub station_id: Option<String>,
-    
+
     /// Header info for pages
     #[serde(default)]
     pub header_info: Option<String>,
-    
+
     /// Number of retries on failure
     #[serde(default)]
     pub retries: Option<u32>,
-    
+
     /// Timeout in seconds
     #[serde(default)]
     pub timeout_secs: Option<u32>,
-    
+
     /// Force T.38 only (fail if rejected)
     #[serde(default)]
     pub force_t38: Option<bool>,
-    
+
     /// Force G.711 only (skip T.38 attempt)
     #[serde(default)]
     pub force_g711: Option<bool>,
@@ -208,19 +209,19 @@ impl From<SendFaxOptions> for FaxSendOptions {
             Some("t38") => FaxMode::T38Udptl,
             _ => FaxMode::T38Udptl, // Default to T.38
         };
-        
+
         let g711_variant = match opts.mode.as_deref() {
             Some("g711a") => G711Variant::ALaw,
             _ => G711Variant::MuLaw, // Default to µ-law (PCMU)
         };
-        
+
         let modem_type = match opts.modem_type.as_deref() {
             Some("v27ter") | Some("V27ter") => ModemType::V27ter,
             Some("v29") | Some("V29") => ModemType::V29,
             Some("v34") | Some("V34") => ModemType::V34,
             _ => ModemType::V17, // Default to V.17 (standard)
         };
-        
+
         let resolution = match opts.resolution.as_deref() {
             Some("standard") => FaxResolutionOption::Standard,
             _ => FaxResolutionOption::Fine, // Default to fine
@@ -240,7 +241,7 @@ impl From<SendFaxOptions> for FaxSendOptions {
             force_g711: opts.force_g711.unwrap_or(false),
             resolution,
         };
-        
+
         // Validate options
         options.validate();
         options
@@ -284,12 +285,15 @@ pub async fn fax_send(
     let opts: FaxSendOptions = options.unwrap_or_default().into();
 
     // Emit progress: starting
-    let _ = app.emit("fax:send_progress", serde_json::json!({
-        "jobId": job_id,
-        "phase": "starting",
-        "target": target,
-    }));
-    
+    let _ = app.emit(
+        "fax:send_progress",
+        serde_json::json!({
+            "jobId": job_id,
+            "phase": "starting",
+            "target": target,
+        }),
+    );
+
     // Validate TIFF file
     if !std::path::Path::new(&tiff_path).exists() {
         let error = format!("TIFF file not found: {}", tiff_path);
@@ -323,10 +327,10 @@ pub async fn fax_send(
         });
         return Err(error);
     }
-    
+
     // Create progress channel for SIP responses
     let (progress_tx, mut progress_rx) = tokio_mpsc::unbounded_channel::<(u16, String)>();
-    
+
     // Clone values for the blocking task
     let registrar_id_clone = registrar_id.clone();
     let target_clone = target.clone();
@@ -335,7 +339,7 @@ pub async fn fax_send(
     let tiff_path_clone = tiff_path.clone();
     let mode = opts.mode;
     let opts_clone = opts.clone();
-    
+
     // Spawn task to forward progress events
     let progress_job_id = job_id.clone();
     let progress_app = app.clone();
@@ -358,28 +362,31 @@ pub async fn fax_send(
             });
             if is_auth_challenge {
                 if let Some(obj) = payload.as_object_mut() {
-                    obj.insert("detail".to_string(), serde_json::Value::String("Retrying with credentials...".to_string()));
+                    obj.insert(
+                        "detail".to_string(),
+                        serde_json::Value::String("Retrying with credentials...".to_string()),
+                    );
                 }
             }
             let _ = progress_app.emit("fax:send_progress", payload);
         }
     });
-    
+
     // Register active job for cancellation support
     let shutdown = register_active_job(&job_id);
     let shutdown_clone = shutdown.clone();
     let job_id_for_cleanup = job_id.clone();
     let retries = opts.retries;
-    
+
     // Run the fax call in a blocking task with retry logic
     let result = tokio::task::spawn_blocking(move || {
         let mut last_error = None;
-        
+
         for attempt in 0..=retries {
             if shutdown_clone.load(std::sync::atomic::Ordering::Relaxed) {
                 return Err("Fax cancelled".to_string());
             }
-            
+
             if attempt > 0 {
                 // Exponential backoff: 5s, 15s, 30s, 60s, ...
                 let backoff_secs = match attempt {
@@ -388,10 +395,15 @@ pub async fn fax_send(
                     3 => 30,
                     _ => 60,
                 };
-                tracing::warn!("Retry attempt {} of {} (backoff {}s)", attempt, retries, backoff_secs);
+                tracing::warn!(
+                    "Retry attempt {} of {} (backoff {}s)",
+                    attempt,
+                    retries,
+                    backoff_secs
+                );
                 std::thread::sleep(Duration::from_secs(backoff_secs));
             }
-            
+
             match run_fax_send_blocking(
                 registrar_id_clone.clone(),
                 target_clone.clone(),
@@ -405,7 +417,11 @@ pub async fn fax_send(
             ) {
                 Ok(result) if result.ok => return Ok(result),
                 Ok(result) => {
-                    last_error = Some(result.error_message.unwrap_or_else(|| "Unknown error".to_string()));
+                    last_error = Some(
+                        result
+                            .error_message
+                            .unwrap_or_else(|| "Unknown error".to_string()),
+                    );
                     // Don't retry certain errors
                     if result.sip_call_id.is_none() {
                         break; // Call setup failed, retrying won't help
@@ -416,16 +432,16 @@ pub async fn fax_send(
                 }
             }
         }
-        
+
         Err(last_error.unwrap_or_else(|| "Fax failed after all retries".to_string()))
     })
     .await
     .map_err(|e| format!("Fax task panicked: {}", e))?;
-    
+
     unregister_active_job(&job_id_for_cleanup);
-    
+
     let duration_ms = start_time.elapsed().as_millis() as u64;
-    
+
     match result {
         Ok(fax_result) => {
             let audit_id = Uuid::new_v4().to_string();
@@ -437,13 +453,21 @@ pub async fn fax_send(
                 "T.38 (SBC-initiated)".to_string()
             } else {
                 // Preserve the actual transport label (e.g. "G.711u", "G.711 µ-law")
-                fax_result.transport_used.clone().unwrap_or_else(|| "G.711u".to_string())
+                fax_result
+                    .transport_used
+                    .clone()
+                    .unwrap_or_else(|| "G.711u".to_string())
             };
-            
+
             append_audit(FaxAuditEntry {
                 id: audit_id.clone(),
                 timestamp_iso: chrono::Utc::now().to_rfc3339(),
-                action: if fax_result.ok { "send_completed" } else { "send_failed" }.to_string(),
+                action: if fax_result.ok {
+                    "send_completed"
+                } else {
+                    "send_failed"
+                }
+                .to_string(),
                 job_id: Some(job_id.clone()),
                 target: Some(target.clone()),
                 registrar_id: Some(registrar_id),
@@ -465,20 +489,27 @@ pub async fn fax_send(
                 page_count: fax_result.pages_sent,
                 baud_rate: Some(opts.baud_rate),
                 ecm: Some(opts.ecm),
-                codec: if transport.contains("G.711") { Some("PCMU".to_string()) } else { None },
+                codec: if transport.contains("G.711") {
+                    Some("PCMU".to_string())
+                } else {
+                    None
+                },
                 request_snippet: None,
                 response_snippet: None,
             });
-            
-            let _ = app.emit("fax:send_progress", serde_json::json!({
-                "jobId": job_id,
-                "phase": "complete",
-                "success": fax_result.ok,
-                "pagesSent": fax_result.pages_sent.unwrap_or(0),
-                "durationMs": duration_ms,
-                "transport": transport,
-            }));
-            
+
+            let _ = app.emit(
+                "fax:send_progress",
+                serde_json::json!({
+                    "jobId": job_id,
+                    "phase": "complete",
+                    "success": fax_result.ok,
+                    "pagesSent": fax_result.pages_sent.unwrap_or(0),
+                    "durationMs": duration_ms,
+                    "transport": transport,
+                }),
+            );
+
             Ok(SendFaxResult {
                 job_id,
                 ok: fax_result.ok,
@@ -523,13 +554,16 @@ pub async fn fax_send(
                 request_snippet: None,
                 response_snippet: None,
             });
-            
-            let _ = app.emit("fax:send_progress", serde_json::json!({
-                "jobId": job_id,
-                "phase": "error",
-                "error": error,
-            }));
-            
+
+            let _ = app.emit(
+                "fax:send_progress",
+                serde_json::json!({
+                    "jobId": job_id,
+                    "phase": "error",
+                    "error": error,
+                }),
+            );
+
             Err(error)
         }
     }
@@ -550,10 +584,13 @@ struct InternalFaxResult {
 /// Run the fax send operation in a blocking context.
 /// This function handles the SIP call setup, T.38 negotiation, and fax transmission.
 fn emit_fax_phase(app: &AppHandle, job_id: &str, phase: &str) {
-    let _ = app.emit("fax:send_progress", serde_json::json!({
-        "jobId": job_id,
-        "phase": phase,
-    }));
+    let _ = app.emit(
+        "fax:send_progress",
+        serde_json::json!({
+            "jobId": job_id,
+            "phase": phase,
+        }),
+    );
 }
 
 /// Emit a rich fax progress event with optional SIP/NAT diagnostic info for the activity UI.
@@ -589,8 +626,8 @@ fn run_fax_dialog_keepalive(
     media_shutdown: std::sync::Arc<std::sync::atomic::AtomicBool>,
     allow_t38_switch: bool,
 ) {
-    use crate::sip::stack::SipMessage;
     use crate::core::user_agent;
+    use crate::sip::stack::SipMessage;
 
     // Short read timeout so we check the shutdown flag regularly
     let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
@@ -598,23 +635,27 @@ fn run_fax_dialog_keepalive(
     let call_id_owned = call_id.to_string();
     let _from_tag_owned = from_tag.to_string();
     let _to_tag_owned = to_tag.to_string();
-    
+
     // RFC 3261 §13.2.1: 200 OK to INVITE MUST include Contact header.
     // Derive our Contact URI from the socket's local port and the public STUN IP.
     let local_sip_port = socket.local_addr().map(|a| a.port()).unwrap_or(5060);
     let contact_uri = format!("<sip:sipalyzer@{}:{}>", local_ip, local_sip_port);
-    
+
     // The dialog socket may have been connect()'d to the SBC during call setup.
     // On macOS, send_to() fails with EISCONN (os error 56) on a connected UDP socket.
     // Detect this and use send() (to the connected peer) instead.
     let socket_is_connected = socket.peer_addr().is_ok();
     let connected_peer = socket.peer_addr().ok();
     if socket_is_connected {
-        tracing::info!("[FaxDialog:{}] Socket is connect()'d to {} — will use send() instead of send_to()",
+        tracing::info!(
+            "[FaxDialog:{}] Socket is connect()'d to {} — will use send() instead of send_to()",
             &call_id[..8.min(call_id.len())],
-            connected_peer.map(|a| a.to_string()).unwrap_or_else(|| "?".to_string()));
+            connected_peer
+                .map(|a| a.to_string())
+                .unwrap_or_else(|| "?".to_string())
+        );
     }
-    
+
     // Helper: send bytes on the dialog socket, handling connected vs unconnected.
     // On macOS, send_to() on a connected UDP socket returns EISCONN (os error 56).
     let send_sip = |data: &[u8], dest: std::net::SocketAddr| -> std::io::Result<usize> {
@@ -625,7 +666,10 @@ fn run_fax_dialog_keepalive(
         }
     };
 
-    tracing::info!("[FaxDialog:{}] SIP keepalive thread started", &call_id_owned[..8.min(call_id_owned.len())]);
+    tracing::info!(
+        "[FaxDialog:{}] SIP keepalive thread started",
+        &call_id_owned[..8.min(call_id_owned.len())]
+    );
 
     // Track whether we've already accepted a T.38 re-INVITE. The SBC retransmits until ACK,
     // so we must respond 200 OK each time but only signal the G.711→T.38 switch ONCE.
@@ -634,23 +678,29 @@ fn run_fax_dialog_keepalive(
     while !shutdown.load(std::sync::atomic::Ordering::Relaxed) {
         match socket.recv_from(&mut buf) {
             Ok((len, peer)) => {
-                if len < 10 { continue; }
+                if len < 10 {
+                    continue;
+                }
                 let bytes = &buf[..len];
                 if let Ok(msg) = SipMessage::from_bytes(bytes) {
                     // Check if this message is for our dialog
-                    let msg_call_id = msg.get_header("Call-ID")
+                    let msg_call_id = msg
+                        .get_header("Call-ID")
                         .map(|s| s.trim().to_string())
                         .unwrap_or_default();
-                    
+
                     if msg.status_code.is_some() {
                         // It's a response — ignore (we're not sending requests)
                         continue;
                     }
-                    
+
                     let method = msg.method.to_uppercase();
                     match method.as_str() {
                         "BYE" => {
-                            tracing::info!("Received BYE for call {}", &call_id_owned[..8.min(call_id_owned.len())]);
+                            tracing::info!(
+                                "Received BYE for call {}",
+                                &call_id_owned[..8.min(call_id_owned.len())]
+                            );
                             // Respond with 200 OK
                             let via = msg.get_header("Via").unwrap_or(&String::new()).clone();
                             let from = msg.get_header("From").unwrap_or(&String::new()).clone();
@@ -690,7 +740,10 @@ fn run_fax_dialog_keepalive(
                         }
                         "INVITE" => {
                             // re-INVITE from SBC. Check if it's requesting T.38 switchover.
-                            let _content_type = msg.get_header("Content-Type").map(|s| s.to_string()).unwrap_or_default();
+                            let _content_type = msg
+                                .get_header("Content-Type")
+                                .map(|s| s.to_string())
+                                .unwrap_or_default();
                             let body_str = msg.body.as_ref().map(|b| b.clone()).unwrap_or_default();
                             let is_t38 = crate::softphone::sdp::is_t38_invite(&body_str);
 
@@ -702,9 +755,13 @@ fn run_fax_dialog_keepalive(
                             // Diagnostic: log the raw re-INVITE on first receipt
                             if !t38_already_accepted {
                                 let raw_invite = String::from_utf8_lossy(&buf[..len]);
-                                tracing::info!("[FaxDialog:{}] ← re-INVITE from {} ({} bytes):\n{}",
-                                    &call_id_owned[..8.min(call_id_owned.len())], peer, len,
-                                    &raw_invite[..raw_invite.len().min(1500)]);
+                                tracing::info!(
+                                    "[FaxDialog:{}] ← re-INVITE from {} ({} bytes):\n{}",
+                                    &call_id_owned[..8.min(call_id_owned.len())],
+                                    peer,
+                                    len,
+                                    &raw_invite[..raw_invite.len().min(1500)]
+                                );
                             }
 
                             if is_t38 && allow_t38_switch {
@@ -726,8 +783,11 @@ fn run_fax_dialog_keepalive(
                                                 }
                                             }
                                             Err(e) => {
-                                                tracing::error!("[FaxDialog:{}] ✗ 100 Trying send failed: {}",
-                                                    &call_id_owned[..8.min(call_id_owned.len())], e);
+                                                tracing::error!(
+                                                    "[FaxDialog:{}] ✗ 100 Trying send failed: {}",
+                                                    &call_id_owned[..8.min(call_id_owned.len())],
+                                                    e
+                                                );
                                             }
                                         }
                                     }
@@ -735,7 +795,10 @@ fn run_fax_dialog_keepalive(
 
                                 // Build our T.38 SDP answer (always respond with 200 OK for T.38 re-INVITE,
                                 // including retransmissions — the SBC expects a response every time).
-                                let t38_sdp = crate::softphone::sdp::build_t38_offer(&local_ip, local_udptl_port);
+                                let t38_sdp = crate::softphone::sdp::build_t38_offer(
+                                    &local_ip,
+                                    local_udptl_port,
+                                );
 
                                 let mut ok = SipMessage::new_response(200, "OK");
                                 ok.add_header("Via", &via);
@@ -746,24 +809,39 @@ fn run_fax_dialog_keepalive(
                                 // RFC 3261 §13.2.1: Contact is REQUIRED in 200 OK to INVITE.
                                 ok.add_header("Contact", &contact_uri);
                                 ok.add_header("Content-Type", "application/sdp");
-                                ok.add_header("User-Agent", &user_agent::get_effective_user_agent());
+                                ok.add_header(
+                                    "User-Agent",
+                                    &user_agent::get_effective_user_agent(),
+                                );
                                 ok.body = Some(t38_sdp.clone());
                                 if let Ok(ok_bytes) = ok.to_bytes() {
                                     if !t38_already_accepted {
                                         // Log the FULL raw 200 OK so we can diagnose SIP issues
                                         let raw_response = String::from_utf8_lossy(&ok_bytes);
-                                        tracing::info!("[FaxDialog:{}] → 200 OK ({} bytes) to {}:\n{}",
-                                            &call_id_owned[..8.min(call_id_owned.len())], ok_bytes.len(), peer,
-                                            &raw_response[..raw_response.len().min(1500)]);
+                                        tracing::info!(
+                                            "[FaxDialog:{}] → 200 OK ({} bytes) to {}:\n{}",
+                                            &call_id_owned[..8.min(call_id_owned.len())],
+                                            ok_bytes.len(),
+                                            peer,
+                                            &raw_response[..raw_response.len().min(1500)]
+                                        );
                                     }
                                     match send_sip(&ok_bytes, peer) {
                                         Ok(n) => {
                                             if !t38_already_accepted {
-                                                tracing::info!("[FaxDialog:{}] → 200 OK sent Ok({} bytes)", &call_id_owned[..8.min(call_id_owned.len())], n);
+                                                tracing::info!(
+                                                    "[FaxDialog:{}] → 200 OK sent Ok({} bytes)",
+                                                    &call_id_owned[..8.min(call_id_owned.len())],
+                                                    n
+                                                );
                                             }
                                         }
                                         Err(e) => {
-                                            tracing::error!("[FaxDialog:{}] ✗ 200 OK send failed: {}", &call_id_owned[..8.min(call_id_owned.len())], e);
+                                            tracing::error!(
+                                                "[FaxDialog:{}] ✗ 200 OK send failed: {}",
+                                                &call_id_owned[..8.min(call_id_owned.len())],
+                                                e
+                                            );
                                         }
                                     }
                                 }
@@ -773,20 +851,36 @@ fn run_fax_dialog_keepalive(
                                 // the G.711→T.38 switch on the FIRST re-INVITE.
                                 if !t38_already_accepted {
                                     t38_already_accepted = true;
-                                    let remote_udptl_port = crate::softphone::sdp::parse_t38_media(&body_str).unwrap_or(0);
-                                    let remote_udptl_ip = crate::softphone::sdp::parse_connection_for_image(&body_str)
-                                        .unwrap_or_else(|| crate::softphone::sdp::parse_connection(&body_str).unwrap_or_default());
+                                    let remote_udptl_port =
+                                        crate::softphone::sdp::parse_t38_media(&body_str)
+                                            .unwrap_or(0);
+                                    let remote_udptl_ip =
+                                        crate::softphone::sdp::parse_connection_for_image(
+                                            &body_str,
+                                        )
+                                        .unwrap_or_else(
+                                            || {
+                                                crate::softphone::sdp::parse_connection(&body_str)
+                                                    .unwrap_or_default()
+                                            },
+                                        );
 
                                     tracing::info!("[FaxDialog:{}] Accepting T.38 re-INVITE: remote UDPTL {}:{}, our UDPTL port {}",
                                         &call_id_owned[..8.min(call_id_owned.len())], remote_udptl_ip, remote_udptl_port, local_udptl_port);
 
                                     if remote_udptl_port > 0 && !remote_udptl_ip.is_empty() {
-                                        if let Ok(addr) = format!("{}:{}", remote_udptl_ip, remote_udptl_port).parse() {
+                                        if let Ok(addr) =
+                                            format!("{}:{}", remote_udptl_ip, remote_udptl_port)
+                                                .parse()
+                                        {
                                             if let Ok(mut guard) = t38_switch.lock() {
-                                                *guard = Some(T38SwitchInfo { remote_udptl_addr: addr });
+                                                *guard = Some(T38SwitchInfo {
+                                                    remote_udptl_addr: addr,
+                                                });
                                             }
                                             // Signal the G.711 media loop to stop — we're switching to T.38.
-                                            media_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                                            media_shutdown
+                                                .store(true, std::sync::atomic::Ordering::SeqCst);
                                             tracing::info!("[FaxDialog:{}] T.38 switch accepted — signaling G.711 loop to stop", &call_id_owned[..8.min(call_id_owned.len())]);
                                         }
                                     }
@@ -799,18 +893,31 @@ fn run_fax_dialog_keepalive(
                                 //   (stronger signal than 488; tells SBC "don't try T.38 again")
                                 // - Non-T.38 re-INVITE → 488 Not Acceptable Here
                                 let (code, text, reason) = if is_t38 {
-                                    (415, "Unsupported Media Type", "T.38 not supported (G.711 passthrough mode)")
+                                    (
+                                        415,
+                                        "Unsupported Media Type",
+                                        "T.38 not supported (G.711 passthrough mode)",
+                                    )
                                 } else {
                                     (488, "Not Acceptable Here", "re-INVITE not acceptable")
                                 };
-                                tracing::info!("[FaxDialog:{}] {} — responding {} {}", &call_id_owned[..8.min(call_id_owned.len())], reason, code, text);
+                                tracing::info!(
+                                    "[FaxDialog:{}] {} — responding {} {}",
+                                    &call_id_owned[..8.min(call_id_owned.len())],
+                                    reason,
+                                    code,
+                                    text
+                                );
                                 let mut reject = SipMessage::new_response(code, text);
                                 reject.add_header("Via", &via);
                                 reject.add_header("From", &from_hdr);
                                 reject.add_header("To", &to_hdr);
                                 reject.add_header("Call-ID", &msg_call_id);
                                 reject.add_header("CSeq", &cseq);
-                                reject.add_header("User-Agent", &user_agent::get_effective_user_agent());
+                                reject.add_header(
+                                    "User-Agent",
+                                    &user_agent::get_effective_user_agent(),
+                                );
                                 // RFC 3261 §20.3: Accept header tells SBC which content types we support
                                 if is_t38 {
                                     reject.add_header("Accept", "application/sdp");
@@ -837,7 +944,10 @@ fn run_fax_dialog_keepalive(
         }
     }
 
-    tracing::info!("[FaxDialog:{}] SIP keepalive thread exiting", &call_id_owned[..8.min(call_id_owned.len())]);
+    tracing::info!(
+        "[FaxDialog:{}] SIP keepalive thread exiting",
+        &call_id_owned[..8.min(call_id_owned.len())]
+    );
 }
 
 fn run_fax_send_blocking(
@@ -851,21 +961,21 @@ fn run_fax_send_blocking(
     job_id: String,
     shutdown: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<InternalFaxResult, String> {
-    use crate::softphone::call_controller::{place_call, send_t38_reinvite, end_call};
-    use crate::softphone::media_engine;
-    use crate::core::database::Database;
     use super::fax_media::{self};
     use super::session::FaxSession;
-    
+    use crate::core::database::Database;
+    use crate::softphone::call_controller::{end_call, place_call, send_t38_reinvite};
+    use crate::softphone::media_engine;
+
     // Normalize the target number to E.164 format before any SIP operations.
     // This ensures the INVITE Request-URI and To header always use proper E.164.
     let target = normalize_to_e164(&target);
     tracing::info!("Target normalized to E.164: {}", target);
-    
+
     // Per-attempt keepalive shutdown flag — stops the SIP keepalive thread when this
     // attempt finishes (success or failure) so it doesn't leak across retries.
     let keepalive_shutdown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    
+
     // ── Step 0: Match the softphone's proven approach exactly ─────────────
     // The softphone has working bidirectional RTP. The key to its success:
     //   1. It does NOT pre-bind the RTP socket before the INVITE
@@ -878,37 +988,52 @@ fn run_fax_send_blocking(
     // the idle socket could create stale state that interfered with real RTP.
     let (rtp_port, registrar_domain) = {
         let regs = Database::load_registrars().map_err(|e| e.to_string())?;
-        let reg = regs.iter().find(|r| r.id == registrar_id)
+        let reg = regs
+            .iter()
+            .find(|r| r.id == registrar_id)
             .ok_or_else(|| format!("Registrar '{}' not found", registrar_id))?;
         (reg.rtp_port.unwrap_or(10000), reg.domain.clone())
     };
-    
+
     // NO pre-bind here! The socket will be created fresh AFTER 200 OK,
     // inside run_fax_over_rtp() — exactly like the softphone does.
-    
+
     // SDP media address: let place_call() handle STUN discovery itself (sdp_media_override = None).
     // This is EXACTLY what the softphone does — place_call() calls stun_discover_public_ip()
     // on an ephemeral socket and uses that IP + local_rtp_port for the SDP.
     let sdp_media_override: Option<(String, u16)> = None;
-    tracing::info!("Using softphone-identical SDP strategy: place_call() will STUN + use local port {}", rtp_port);
-    
+    tracing::info!(
+        "Using softphone-identical SDP strategy: place_call() will STUN + use local port {}",
+        rtp_port
+    );
+
     // Emit discovery info for the activity UI
-    emit_fax_event(&app, &job_id, "nat_discovery", serde_json::json!({
-        "natInfo": format!("Using softphone SDP strategy (port {})", rtp_port),
-        "messageDirection": "info",
-    }));
-    
+    emit_fax_event(
+        &app,
+        &job_id,
+        "nat_discovery",
+        serde_json::json!({
+            "natInfo": format!("Using softphone SDP strategy (port {})", rtp_port),
+            "messageDirection": "info",
+        }),
+    );
+
     // Step 1: Place the initial G.711 call (SDP uses the STUN-discovered media address)
-    emit_fax_event(&app, &job_id, "sip_invite", serde_json::json!({
-        "sipMessage": format!("INVITE sip:{}@{}", target, registrar_domain),
-        "messageDirection": "outbound",
-    }));
-    
+    emit_fax_event(
+        &app,
+        &job_id,
+        "sip_invite",
+        serde_json::json!({
+            "sipMessage": format!("INVITE sip:{}@{}", target, registrar_domain),
+            "messageDirection": "outbound",
+        }),
+    );
+
     // use_t38: Only hint T.38 support in the initial INVITE when the user selected T.38 mode.
     // For G.711u passthrough, we start and stay on G.711 (unless the SBC forces T.38 via
     // re-INVITE, which the keepalive thread handles separately).
     let hint_t38 = mode == FaxMode::T38Udptl;
-    
+
     let (call_result, dialog_socket, _tcp_stream) = place_call(
         registrar_id.clone(),
         target.clone(),
@@ -918,12 +1043,16 @@ fn run_fax_send_blocking(
         hint_t38,
         sdp_media_override.clone(),
     )?;
-    
+
     // Emit SIP response event
     {
         let sdp_info = match (&call_result.remote_rtp_address, call_result.remote_rtp_port) {
-            (Some(addr), Some(port)) => format!("SDP: {}:{} {}", addr, port, 
-                call_result.negotiated_codec.as_deref().unwrap_or("unknown")),
+            (Some(addr), Some(port)) => format!(
+                "SDP: {}:{} {}",
+                addr,
+                port,
+                call_result.negotiated_codec.as_deref().unwrap_or("unknown")
+            ),
             _ => "No media in response".to_string(),
         };
         let nat_detail = match (&call_result.sbc_received_ip, call_result.sbc_rport) {
@@ -931,28 +1060,41 @@ fn run_fax_send_blocking(
             (Some(ip), None) => format!("SBC sees us at {} (no rport)", ip),
             _ => String::new(),
         };
-        emit_fax_event(&app, &job_id, "sip_response", serde_json::json!({
-            "sipMessage": format!("{} {}", call_result.status_code, call_result.status_text),
-            "sdpInfo": sdp_info,
-            "natInfo": if nat_detail.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(nat_detail) },
-            "remoteRtp": match (&call_result.remote_rtp_address, call_result.remote_rtp_port) {
-                (Some(addr), Some(port)) => serde_json::Value::String(format!("{}:{}", addr, port)),
-                _ => serde_json::Value::Null,
-            },
-            "messageDirection": "inbound",
-        }));
+        emit_fax_event(
+            &app,
+            &job_id,
+            "sip_response",
+            serde_json::json!({
+                "sipMessage": format!("{} {}", call_result.status_code, call_result.status_text),
+                "sdpInfo": sdp_info,
+                "natInfo": if nat_detail.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(nat_detail) },
+                "remoteRtp": match (&call_result.remote_rtp_address, call_result.remote_rtp_port) {
+                    (Some(addr), Some(port)) => serde_json::Value::String(format!("{}:{}", addr, port)),
+                    _ => serde_json::Value::Null,
+                },
+                "messageDirection": "inbound",
+            }),
+        );
     }
-    
+
     if !call_result.ok {
-        emit_fax_event(&app, &job_id, "sip_error", serde_json::json!({
-            "sipMessage": format!("Call failed: {} {}", call_result.status_code, call_result.status_text),
-            "messageDirection": "info",
-            "warning": format!("INVITE rejected: {} {}", call_result.status_code, call_result.status_text),
-        }));
+        emit_fax_event(
+            &app,
+            &job_id,
+            "sip_error",
+            serde_json::json!({
+                "sipMessage": format!("Call failed: {} {}", call_result.status_code, call_result.status_text),
+                "messageDirection": "info",
+                "warning": format!("INVITE rejected: {} {}", call_result.status_code, call_result.status_text),
+            }),
+        );
         return Ok(InternalFaxResult {
             ok: false,
             sip_call_id: Some(call_result.call_id),
-            error_message: Some(format!("Call failed: {} {}", call_result.status_code, call_result.status_text)),
+            error_message: Some(format!(
+                "Call failed: {} {}",
+                call_result.status_code, call_result.status_text
+            )),
             pages_sent: None,
             remote_station_id: None,
             capture_session_id: call_result.capture_session_id,
@@ -960,13 +1102,18 @@ fn run_fax_send_blocking(
             t38_fallback: None,
         });
     }
-    
+
     // Emit ACK
-    emit_fax_event(&app, &job_id, "sip_ack", serde_json::json!({
-        "sipMessage": "ACK",
-        "messageDirection": "outbound",
-    }));
-    
+    emit_fax_event(
+        &app,
+        &job_id,
+        "sip_ack",
+        serde_json::json!({
+            "sipMessage": "ACK",
+            "messageDirection": "outbound",
+        }),
+    );
+
     // Check for cancellation right after call setup
     if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
         let _ = end_call(
@@ -983,7 +1130,7 @@ fn run_fax_send_blocking(
         port_allocator::release(call_result.local_rtp_port);
         return Err("Fax cancelled".to_string());
     }
-    
+
     let call_id = call_result.call_id.clone();
     let from_tag = call_result.from_tag.clone();
     let to_tag = call_result.to_tag.clone().unwrap_or_default();
@@ -991,38 +1138,51 @@ fn run_fax_send_blocking(
     let remote_contact = call_result.remote_contact_uri.clone();
     let response_to_header = call_result.response_to_header.clone();
     let dialog_cseq = call_result.dialog_cseq;
-    let local_ip = call_result.local_ip.clone().unwrap_or_else(|| "0.0.0.0".to_string());
+    let local_ip = call_result
+        .local_ip
+        .clone()
+        .unwrap_or_else(|| "0.0.0.0".to_string());
     let local_rtp_port = call_result.local_rtp_port;
 
     // Get remote RTP address for G.711 fallback
-    let remote_rtp_addr: Option<std::net::SocketAddr> = match (&call_result.remote_rtp_address, call_result.remote_rtp_port) {
-        (Some(addr), Some(port)) => format!("{}:{}", addr, port).parse::<std::net::SocketAddr>().ok(),
-        _ => None,
-    };
-    
+    let remote_rtp_addr: Option<std::net::SocketAddr> =
+        match (&call_result.remote_rtp_address, call_result.remote_rtp_port) {
+            (Some(addr), Some(port)) => format!("{}:{}", addr, port)
+                .parse::<std::net::SocketAddr>()
+                .ok(),
+            _ => None,
+        };
+
     // Determine codec from negotiated payload type
-    let codec = call_result.negotiated_pt
+    let codec = call_result
+        .negotiated_pt
         .and_then(fax_media::G711Codec::from_pt)
         .unwrap_or(fax_media::G711Codec::PCMU);
-    
+
     // Step 2: Attempt T.38 re-INVITE if T.38 mode is requested
     // Otherwise use G.711 passthrough mode
     //
     // IMPORTANT: The UDPTL port allocated here is the one advertised in the SDP to the remote.
     // The same port MUST be used for the actual UDPTL session in Step 3. Allocating a different
     // port for transmission would cause a mismatch — remote sends to port A, we listen on port B.
-    let local_udptl_port = allocate_udptl_port(&format!("fax-udptl:{}", job_id)).unwrap_or(local_rtp_port + 2);
-    
+    let local_udptl_port =
+        allocate_udptl_port(&format!("fax-udptl:{}", job_id)).unwrap_or(local_rtp_port + 2);
+
     // UDPTL: Don't pre-bind. Use call's local_ip (STUN-discovered public IP from place_call)
     // + local UDPTL port for the re-INVITE SDP. Socket will bind fresh when T.38 session starts.
     let udptl_sdp_ip = local_ip.clone();
     let udptl_sdp_port = local_udptl_port;
-    tracing::info!("UDPTL SDP will use {}:{} (same strategy as RTP)", udptl_sdp_ip, udptl_sdp_port);
-    
+    tracing::info!(
+        "UDPTL SDP will use {}:{} (same strategy as RTP)",
+        udptl_sdp_ip,
+        udptl_sdp_port
+    );
+
     // Shared state for mid-stream G.711→T.38 switchover (SBC sends re-INVITE during G.711 fax).
     // The keepalive thread populates this when it accepts a T.38 re-INVITE.
-    let t38_switch_state: std::sync::Arc<Mutex<Option<T38SwitchInfo>>> = std::sync::Arc::new(Mutex::new(None));
-    
+    let t38_switch_state: std::sync::Arc<Mutex<Option<T38SwitchInfo>>> =
+        std::sync::Arc::new(Mutex::new(None));
+
     // CRITICAL: Separate flag for the keepalive thread to signal the G.711 media loop to stop
     // on T.38 switchover or BYE, WITHOUT killing the keepalive thread itself.
     //
@@ -1039,7 +1199,7 @@ fn run_fax_send_blocking(
     // Fix: media_stop is a SEPARATE Arc. It signals the G.711 loop to exit but does NOT
     // affect the keepalive's combined_shutdown (which only watches global shutdown + keepalive_shutdown).
     let media_stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    
+
     // fax_loop_shutdown = user_cancel || media_stop (passed to run_fax_over_rtp)
     let fax_loop_shutdown = {
         let cancel = shutdown.clone();
@@ -1061,18 +1221,27 @@ fn run_fax_send_blocking(
         });
         combined
     };
-    
+
     let (final_transport, t38_fallback, remote_udptl_addr, use_t38) = if mode == FaxMode::T38Udptl {
         emit_fax_phase(&app, &job_id, "t38_switch");
-        emit_fax_event(&app, &job_id, "sip_reinvite", serde_json::json!({
-            "sipMessage": format!("re-INVITE (T.38) UDPTL {}:{}", udptl_sdp_ip, udptl_sdp_port),
-            "sdpInfo": format!("SDP: m=image {} udptl t38", udptl_sdp_port),
-            "messageDirection": "outbound",
-        }));
-        tracing::info!("T.38 re-INVITE: advertising UDPTL at {}:{} (SDP c= address)", udptl_sdp_ip, udptl_sdp_port);
+        emit_fax_event(
+            &app,
+            &job_id,
+            "sip_reinvite",
+            serde_json::json!({
+                "sipMessage": format!("re-INVITE (T.38) UDPTL {}:{}", udptl_sdp_ip, udptl_sdp_port),
+                "sdpInfo": format!("SDP: m=image {} udptl t38", udptl_sdp_port),
+                "messageDirection": "outbound",
+            }),
+        );
+        tracing::info!(
+            "T.38 re-INVITE: advertising UDPTL at {}:{} (SDP c= address)",
+            udptl_sdp_ip,
+            udptl_sdp_port
+        );
         // Wait for call to stabilize before re-INVITE
         std::thread::sleep(Duration::from_millis(300));
-        
+
         let reinvite_result = send_t38_reinvite(
             registrar_id.clone(),
             call_id.clone(),
@@ -1086,48 +1255,64 @@ fn run_fax_send_blocking(
             udptl_sdp_port,
             dialog_socket,
         );
-        
+
         match reinvite_result {
             Ok((t38_result, returned_socket)) => {
                 if t38_result.ok && t38_result.remote_udptl_port.is_some() {
                     // T.38 accepted - stop RTP audio, switch to UDPTL
                     let _ = media_engine::stop_media(&call_id);
-                    
+
                     // Build remote UDPTL address
-                    let remote_udptl: Option<std::net::SocketAddr> = t38_result.remote_udptl_address
+                    let remote_udptl: Option<std::net::SocketAddr> = t38_result
+                        .remote_udptl_address
                         .as_ref()
                         .and_then(|addr| {
-                            t38_result.remote_udptl_port.map(|port| {
-                                format!("{}:{}", addr, port).parse().ok()
-                            })
+                            t38_result
+                                .remote_udptl_port
+                                .map(|port| format!("{}:{}", addr, port).parse().ok())
                         })
                         .flatten();
-                    
+
                     tracing::info!("T.38 re-INVITE accepted, remote UDPTL: {:?}", remote_udptl);
-                    emit_fax_event(&app, &job_id, "sip_response", serde_json::json!({
-                        "sipMessage": format!("{} {} (T.38 accepted)", t38_result.status_code, t38_result.status_text),
-                        "sdpInfo": format!("UDPTL: {:?}", remote_udptl),
-                        "messageDirection": "inbound",
-                    }));
+                    emit_fax_event(
+                        &app,
+                        &job_id,
+                        "sip_response",
+                        serde_json::json!({
+                            "sipMessage": format!("{} {} (T.38 accepted)", t38_result.status_code, t38_result.status_text),
+                            "sdpInfo": format!("UDPTL: {:?}", remote_udptl),
+                            "messageDirection": "inbound",
+                        }),
+                    );
                     emit_fax_phase(&app, &job_id, "t38_wait_dis");
                     ("T.38".to_string(), false, remote_udptl, true)
                 } else {
                     // T.38 rejected - use G.711 passthrough
                     emit_fax_phase(&app, &job_id, "g711_fax");
                     let rejection_reason = match t38_result.status_code {
-                        488 => "488 Not Acceptable Here (gateway does not support T.38)".to_string(),
+                        488 => {
+                            "488 Not Acceptable Here (gateway does not support T.38)".to_string()
+                        }
                         606 => "606 Not Acceptable".to_string(),
                         415 => "415 Unsupported Media Type".to_string(),
                         c if c >= 400 => format!("{} {}", c, t38_result.status_text),
                         _ => "200 OK without m=image (gateway kept audio mode)".to_string(),
                     };
-                    tracing::info!("T.38 re-INVITE rejected: {} — falling back to G.711 passthrough", rejection_reason);
-                    emit_fax_event(&app, &job_id, "sip_response", serde_json::json!({
-                        "sipMessage": format!("{} {} (T.38 rejected)", t38_result.status_code, t38_result.status_text),
-                        "warning": format!("T.38 rejected: {}", rejection_reason),
-                        "detail": "Falling back to G.711 passthrough",
-                        "messageDirection": "inbound",
-                    }));
+                    tracing::info!(
+                        "T.38 re-INVITE rejected: {} — falling back to G.711 passthrough",
+                        rejection_reason
+                    );
+                    emit_fax_event(
+                        &app,
+                        &job_id,
+                        "sip_response",
+                        serde_json::json!({
+                            "sipMessage": format!("{} {} (T.38 rejected)", t38_result.status_code, t38_result.status_text),
+                            "warning": format!("T.38 rejected: {}", rejection_reason),
+                            "detail": "Falling back to G.711 passthrough",
+                            "messageDirection": "inbound",
+                        }),
+                    );
                     // Start dialog keepalive with the returned socket (combined flag)
                     if let Some(sock) = returned_socket {
                         let bye_call_id = call_id.clone();
@@ -1138,11 +1323,14 @@ fn run_fax_send_blocking(
                         let combined_shutdown = {
                             let global = shutdown.clone();
                             let local = keepalive_shutdown.clone();
-                            let combined = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                            let combined =
+                                std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                             let combined2 = combined.clone();
                             std::thread::spawn(move || {
                                 while !combined2.load(std::sync::atomic::Ordering::Relaxed) {
-                                    if global.load(std::sync::atomic::Ordering::Relaxed) || local.load(std::sync::atomic::Ordering::Relaxed) {
+                                    if global.load(std::sync::atomic::Ordering::Relaxed)
+                                        || local.load(std::sync::atomic::Ordering::Relaxed)
+                                    {
                                         combined2.store(true, std::sync::atomic::Ordering::SeqCst);
                                         break;
                                     }
@@ -1154,9 +1342,18 @@ fn run_fax_send_blocking(
                         let t38_switch_for_keepalive = t38_switch_state.clone();
                         let media_shutdown_for_keepalive = media_stop.clone(); // SEPARATE flag — does NOT kill keepalive
                         std::thread::spawn(move || {
-                            run_fax_dialog_keepalive(sock, &bye_call_id, &bye_from_tag, &bye_to_tag, combined_shutdown,
-                                keepalive_udptl_port, keepalive_local_ip, t38_switch_for_keepalive, media_shutdown_for_keepalive,
-                                true); // allow_t38_switch: user originally chose T.38, SBC may retry later
+                            run_fax_dialog_keepalive(
+                                sock,
+                                &bye_call_id,
+                                &bye_from_tag,
+                                &bye_to_tag,
+                                combined_shutdown,
+                                keepalive_udptl_port,
+                                keepalive_local_ip,
+                                t38_switch_for_keepalive,
+                                media_shutdown_for_keepalive,
+                                true,
+                            ); // allow_t38_switch: user originally chose T.38, SBC may retry later
                         });
                     }
                     ("G.711".to_string(), true, None, false)
@@ -1166,12 +1363,17 @@ fn run_fax_send_blocking(
                 // T.38 re-INVITE failed - use G.711 passthrough
                 emit_fax_phase(&app, &job_id, "g711_fax");
                 tracing::error!("T.38 re-INVITE failed: {}, using G.711 passthrough", e);
-                emit_fax_event(&app, &job_id, "sip_error", serde_json::json!({
-                    "sipMessage": "re-INVITE failed",
-                    "warning": format!("T.38 re-INVITE error: {}", e),
-                    "detail": "Falling back to G.711 passthrough",
-                    "messageDirection": "info",
-                }));
+                emit_fax_event(
+                    &app,
+                    &job_id,
+                    "sip_error",
+                    serde_json::json!({
+                        "sipMessage": "re-INVITE failed",
+                        "warning": format!("T.38 re-INVITE error: {}", e),
+                        "detail": "Falling back to G.711 passthrough",
+                        "messageDirection": "info",
+                    }),
+                );
                 // Dialog socket was consumed by send_t38_reinvite — can't start keepalive.
                 // The call is still alive via SIP signaling so media should still work.
                 ("G.711".to_string(), true, None, false)
@@ -1200,7 +1402,9 @@ fn run_fax_send_blocking(
                 let combined2 = combined.clone();
                 std::thread::spawn(move || {
                     while !combined2.load(std::sync::atomic::Ordering::Relaxed) {
-                        if global.load(std::sync::atomic::Ordering::Relaxed) || local.load(std::sync::atomic::Ordering::Relaxed) {
+                        if global.load(std::sync::atomic::Ordering::Relaxed)
+                            || local.load(std::sync::atomic::Ordering::Relaxed)
+                        {
                             combined2.store(true, std::sync::atomic::Ordering::SeqCst);
                             break;
                         }
@@ -1224,14 +1428,23 @@ fn run_fax_send_blocking(
                 // gracefully accept T.38 when the SBC insists.
                 //
                 // The result will be labeled "T.38 (SBC-initiated)" in the audit log.
-                run_fax_dialog_keepalive(sock, &bye_call_id, &bye_from_tag, &bye_to_tag, combined_shutdown,
-                    keepalive_udptl_port, keepalive_local_ip, t38_switch_for_keepalive, media_shutdown_for_keepalive,
-                    true); // allow_t38_switch: true — accept SBC T.38 re-INVITEs so fax can complete
+                run_fax_dialog_keepalive(
+                    sock,
+                    &bye_call_id,
+                    &bye_from_tag,
+                    &bye_to_tag,
+                    combined_shutdown,
+                    keepalive_udptl_port,
+                    keepalive_local_ip,
+                    t38_switch_for_keepalive,
+                    media_shutdown_for_keepalive,
+                    true,
+                ); // allow_t38_switch: true — accept SBC T.38 re-INVITEs so fax can complete
             });
         }
         ("G.711u".to_string(), false, None, false)
     };
-    
+
     // Check for cancellation before starting fax transmission
     if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
         let _ = end_call(
@@ -1249,7 +1462,7 @@ fn run_fax_send_blocking(
         port_allocator::release(local_udptl_port);
         return Err("Fax cancelled".to_string());
     }
-    
+
     // Step 3: Transmit fax using SpanDSP
     // Uses the same local_udptl_port that was advertised in the re-INVITE SDP.
     let fax_result = if use_t38 {
@@ -1257,24 +1470,38 @@ fn run_fax_send_blocking(
         match remote_udptl_addr {
             Some(remote_udptl) => {
                 emit_fax_phase(&app, &job_id, "t38_page");
-                tracing::info!("Starting T.38 UDPTL transmission: local port {}, remote {}", local_udptl_port, remote_udptl);
-                
+                tracing::info!(
+                    "Starting T.38 UDPTL transmission: local port {}, remote {}",
+                    local_udptl_port,
+                    remote_udptl
+                );
+
                 let t38_start = std::time::Instant::now();
                 let progress_app = app.clone();
                 let progress_job_id = job_id.clone();
-                let on_progress: super::t38_session::T38ProgressCallback = Box::new(move |tx, rx, elapsed| {
-                    let _ = progress_app.emit("fax:send_progress", serde_json::json!({
-                        "jobId": progress_job_id,
-                        "phase": "t38_page",
-                        "udptlPacketsSent": tx,
-                        "udptlPacketsReceived": rx,
-                        "elapsedSecs": elapsed,
-                    }));
-                });
+                let on_progress: super::t38_session::T38ProgressCallback =
+                    Box::new(move |tx, rx, elapsed| {
+                        let _ = progress_app.emit(
+                            "fax:send_progress",
+                            serde_json::json!({
+                                "jobId": progress_job_id,
+                                "phase": "t38_page",
+                                "udptlPacketsSent": tx,
+                                "udptlPacketsReceived": rx,
+                                "elapsedSecs": elapsed,
+                            }),
+                        );
+                    });
                 // Build T.38 config from user settings (baud rate, ECM, modem type, station ID)
                 let t38_config = super::t38_session::T38Config::from_options(&opts);
-                tracing::info!("T.38 config: max_rate={}, ecm={}, modems=0x{:02x}, station={}", t38_config.max_bit_rate, t38_config.ecm_enabled, t38_config.modem_flags, t38_config.station_id);
-                
+                tracing::info!(
+                    "T.38 config: max_rate={}, ecm={}, modems=0x{:02x}, station={}",
+                    t38_config.max_bit_rate,
+                    t38_config.ecm_enabled,
+                    t38_config.modem_flags,
+                    t38_config.station_id
+                );
+
                 match super::t38_session::run_t38_fax_with_config(
                     &tiff_path,
                     local_udptl_port,
@@ -1285,8 +1512,20 @@ fn run_fax_send_blocking(
                     None, // Bind fresh — same pattern as RTP
                 ) {
                     Ok(result) => {
-                        emit_fax_phase(&app, &job_id, if result.success { "t38_done" } else { "t38_dcn" });
-                        tracing::info!("T.38 transmission complete: success={}, pages={}", result.success, result.pages_sent);
+                        emit_fax_phase(
+                            &app,
+                            &job_id,
+                            if result.success {
+                                "t38_done"
+                            } else {
+                                "t38_dcn"
+                            },
+                        );
+                        tracing::info!(
+                            "T.38 transmission complete: success={}, pages={}",
+                            result.success,
+                            result.pages_sent
+                        );
                         Some(super::session::FaxResult {
                             success: result.success,
                             pages_sent: result.pages_sent,
@@ -1316,7 +1555,7 @@ fn run_fax_send_blocking(
         }
     } else {
         // G.711 passthrough mode - use fax_state for audio modulation
-        // 
+        //
         // ARCHITECTURE NOTE:
         // Fax uses its own direct RTP path (run_fax_over_rtp) instead of the media engine.
         // The media engine's jitter buffer, audio device setup, and multi-threaded playout
@@ -1331,20 +1570,26 @@ fn run_fax_send_blocking(
         //
         // Safety check: Try to stop media just in case (won't affect anything if not running)
         let _ = media_engine::stop_media(&call_id);
-        
+
         tracing::info!("Using G.711 passthrough mode (call_id: {})", call_id);
-        
+
         if let Some(remote_addr) = remote_rtp_addr {
             // Create SpanDSP fax session with user settings (baud rate, ECM, modem type)
-            tracing::info!("G.711 config: baud_rate={}, ecm={}, modem={:?}, station={:?}", opts.baud_rate, opts.ecm, opts.modem_type, opts.station_id);
-            
+            tracing::info!(
+                "G.711 config: baud_rate={}, ecm={}, modem={:?}, station={:?}",
+                opts.baud_rate,
+                opts.ecm,
+                opts.modem_type,
+                opts.station_id
+            );
+
             match FaxSession::new_send(&tiff_path, &opts) {
                 Ok(mut session) => {
                     emit_fax_phase(&app, &job_id, "g711_page");
                     tracing::info!("Starting G.711 fax transmission via SpanDSP");
-                    
+
                     let g711_start = std::time::Instant::now();
-                    
+
                     // Run fax over RTP directly (own socket, no media engine).
                     // The media engine pipeline (jitter buffer, audio devices, multi-threaded
                     // playout) adds latency and complexity that breaks fax T.30 negotiation.
@@ -1366,13 +1611,21 @@ fn run_fax_send_blocking(
 
                     if let Some(switch_info) = t38_switch_info {
                         // SBC requested T.38 mid-stream — switch to T.38 UDPTL
-                        tracing::info!("G.711→T.38 switchover: SBC requested T.38, remote UDPTL: {}", switch_info.remote_udptl_addr);
+                        tracing::info!(
+                            "G.711→T.38 switchover: SBC requested T.38, remote UDPTL: {}",
+                            switch_info.remote_udptl_addr
+                        );
                         emit_fax_phase(&app, &job_id, "t38_switch");
-                        emit_fax_event(&app, &job_id, "sip_response", serde_json::json!({
-                            "sipMessage": "T.38 re-INVITE accepted (SBC-initiated)",
-                            "sdpInfo": format!("UDPTL: remote={}, local={}", switch_info.remote_udptl_addr, local_udptl_port),
-                            "messageDirection": "inbound",
-                        }));
+                        emit_fax_event(
+                            &app,
+                            &job_id,
+                            "sip_response",
+                            serde_json::json!({
+                                "sipMessage": "T.38 re-INVITE accepted (SBC-initiated)",
+                                "sdpInfo": format!("UDPTL: remote={}, local={}", switch_info.remote_udptl_addr, local_udptl_port),
+                                "messageDirection": "inbound",
+                            }),
+                        );
 
                         // Reset shutdown flag for the T.38 session
                         shutdown.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -1383,15 +1636,19 @@ fn run_fax_send_blocking(
                         let t38_start = std::time::Instant::now();
                         let progress_app = app.clone();
                         let progress_job_id = job_id.clone();
-                        let on_progress: super::t38_session::T38ProgressCallback = Box::new(move |tx, rx, elapsed| {
-                            let _ = progress_app.emit("fax:send_progress", serde_json::json!({
-                                "jobId": progress_job_id,
-                                "phase": "t38_page",
-                                "udptlPacketsSent": tx,
-                                "udptlPacketsReceived": rx,
-                                "elapsedSecs": elapsed,
-                            }));
-                        });
+                        let on_progress: super::t38_session::T38ProgressCallback =
+                            Box::new(move |tx, rx, elapsed| {
+                                let _ = progress_app.emit(
+                                    "fax:send_progress",
+                                    serde_json::json!({
+                                        "jobId": progress_job_id,
+                                        "phase": "t38_page",
+                                        "udptlPacketsSent": tx,
+                                        "udptlPacketsReceived": rx,
+                                        "elapsedSecs": elapsed,
+                                    }),
+                                );
+                            });
                         match super::t38_session::run_t38_fax_with_config(
                             &tiff_path,
                             local_udptl_port,
@@ -1402,8 +1659,20 @@ fn run_fax_send_blocking(
                             None,
                         ) {
                             Ok(result) => {
-                                emit_fax_phase(&app, &job_id, if result.success { "t38_done" } else { "t38_dcn" });
-                                tracing::info!("T.38 (SBC-initiated switch) complete: success={}, pages={}", result.success, result.pages_sent);
+                                emit_fax_phase(
+                                    &app,
+                                    &job_id,
+                                    if result.success {
+                                        "t38_done"
+                                    } else {
+                                        "t38_dcn"
+                                    },
+                                );
+                                tracing::info!(
+                                    "T.38 (SBC-initiated switch) complete: success={}, pages={}",
+                                    result.success,
+                                    result.pages_sent
+                                );
                                 Some(super::session::FaxResult {
                                     success: result.success,
                                     pages_sent: result.pages_sent,
@@ -1412,7 +1681,9 @@ fn run_fax_send_blocking(
                                     t30_error_code: result.t30_error_code,
                                     t30_error_description: result.error,
                                     remote_station_id: result.remote_station_id,
-                                    negotiated_baud_rate: result.negotiated_baud_rate.or(Some(14400)),
+                                    negotiated_baud_rate: result
+                                        .negotiated_baud_rate
+                                        .or(Some(14400)),
                                     ecm_used: result.ecm_used.or(Some(false)),
                                     transport: Some("T.38 (SBC-initiated)".to_string()),
                                     resolution: None,
@@ -1429,8 +1700,20 @@ fn run_fax_send_blocking(
                         // Normal G.711 result (no T.38 switchover)
                         match g711_result {
                             Ok(result) => {
-                                emit_fax_phase(&app, &job_id, if result.success { "g711_dcn" } else { "g711_dcn" });
-                                tracing::info!("Transmission complete: success={}, pages={}", result.success, result.pages_sent);
+                                emit_fax_phase(
+                                    &app,
+                                    &job_id,
+                                    if result.success {
+                                        "g711_dcn"
+                                    } else {
+                                        "g711_dcn"
+                                    },
+                                );
+                                tracing::info!(
+                                    "Transmission complete: success={}, pages={}",
+                                    result.success,
+                                    result.pages_sent
+                                );
                                 Some(super::session::FaxResult {
                                     success: result.success,
                                     pages_sent: result.pages_sent,
@@ -1464,11 +1747,15 @@ fn run_fax_send_blocking(
             None
         }
     };
-    
+
     // Step 4: End the call
     // CSeq must be correct: if T.38 re-INVITE happened, it used dialog_cseq + 1,
     // so BYE needs dialog_cseq + 2. Otherwise BYE uses dialog_cseq + 1.
-    let bye_cseq = if use_t38 { dialog_cseq + 2 } else { dialog_cseq + 1 };
+    let bye_cseq = if use_t38 {
+        dialog_cseq + 2
+    } else {
+        dialog_cseq + 1
+    };
     let _ = end_call(
         registrar_id,
         call_id.clone(),
@@ -1479,7 +1766,7 @@ fn run_fax_send_blocking(
         response_to_header,
         bye_cseq,
     );
-    
+
     // Stop any remaining media
     let _ = media_engine::stop_media(&call_id);
     // Release BOTH allocated ports back to the central pool.
@@ -1487,19 +1774,29 @@ fn run_fax_send_blocking(
     // explicitly release the RTP port here. Releasing an already-released port is safe.
     port_allocator::release(local_rtp_port);
     port_allocator::release(local_udptl_port);
-    
+
     // Signal the per-attempt keepalive thread to exit so it doesn't leak across retries
     keepalive_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
     // Give the thread a moment to see the flag and exit
     std::thread::sleep(Duration::from_millis(100));
-    
+
     // Build result from fax transmission
     let (ok, pages_sent, error_msg, remote_station_id) = if let Some(ref result) = fax_result {
-        (result.success, Some(result.pages_sent), result.error.clone(), result.remote_station_id.clone())
+        (
+            result.success,
+            Some(result.pages_sent),
+            result.error.clone(),
+            result.remote_station_id.clone(),
+        )
     } else {
-        (false, None, Some("Fax transmission failed".to_string()), None)
+        (
+            false,
+            None,
+            Some("Fax transmission failed".to_string()),
+            None,
+        )
     };
-    
+
     Ok(InternalFaxResult {
         ok,
         sip_call_id: Some(call_id),
@@ -1565,7 +1862,8 @@ pub async fn fax_send_test_page(
     // Build TestPageSettings from the SendFaxOptions so the TIFF content
     // accurately reflects the actual protocol / ECM / baud rate being used.
     let page_settings = {
-        let mode_str = options.as_ref()
+        let mode_str = options
+            .as_ref()
             .and_then(|o| o.mode.as_deref())
             .unwrap_or("t38");
         let protocol = match mode_str {
@@ -1574,8 +1872,17 @@ pub async fn fax_send_test_page(
         };
         let ecm = options.as_ref().and_then(|o| o.ecm).unwrap_or(true);
         let baud_rate = options.as_ref().and_then(|o| o.baud_rate).unwrap_or(14400);
-        let to = if target.is_empty() { None } else { Some(normalize_to_e164(&target)) };
-        TestPageSettings { protocol, ecm, baud_rate, to }
+        let to = if target.is_empty() {
+            None
+        } else {
+            Some(normalize_to_e164(&target))
+        };
+        TestPageSettings {
+            protocol,
+            ecm,
+            baud_rate,
+            to,
+        }
     };
 
     let temp_dir = std::env::temp_dir();
@@ -1584,23 +1891,33 @@ pub async fn fax_send_test_page(
         "itu_test_page" => {
             let temp_path = temp_dir.join(format!("fax_test_{}.tiff", Uuid::new_v4()));
             let temp_str = temp_path.to_string_lossy().to_string();
-            tiff::create_test_page(&temp_str, Some("SIPALYZER VIRTUAL FAX TEST"), resolution, Some(&page_settings))?;
+            tiff::create_test_page(
+                &temp_str,
+                Some("SIPALYZER VIRTUAL FAX TEST"),
+                resolution,
+                Some(&page_settings),
+            )?;
             let _guard = TempFileGuard(temp_path);
             fax_send(app, registrar_id, target, temp_str, options, job_id).await
         }
         "full_diagnostic" => {
             let p1_path = temp_dir.join(format!("fax_diag_p1_{}.tiff", Uuid::new_v4()));
             let p1_str = p1_path.to_string_lossy().to_string();
-            tiff::create_test_page(&p1_str, Some("SIPALYZER DIAGNOSTIC"), resolution, Some(&page_settings))?;
+            tiff::create_test_page(
+                &p1_str,
+                Some("SIPALYZER DIAGNOSTIC"),
+                resolution,
+                Some(&page_settings),
+            )?;
 
             let p2_path = temp_dir.join(format!("fax_diag_p2_{}.tiff", Uuid::new_v4()));
             let p2_str = p2_path.to_string_lossy().to_string();
             tiff::create_diagnostic_page(&p2_str, resolution)?;
 
-            let p1_data = std::fs::read(&p1_path)
-                .map_err(|e| format!("Failed to read page 1: {}", e))?;
-            let p2_data = std::fs::read(&p2_path)
-                .map_err(|e| format!("Failed to read page 2: {}", e))?;
+            let p1_data =
+                std::fs::read(&p1_path).map_err(|e| format!("Failed to read page 1: {}", e))?;
+            let p2_data =
+                std::fs::read(&p2_path).map_err(|e| format!("Failed to read page 2: {}", e))?;
             let _ = std::fs::remove_file(&p1_path);
             let _ = std::fs::remove_file(&p2_path);
 
@@ -1675,15 +1992,27 @@ pub async fn fax_send_queued(
         _ => FaxResolutionOption::Fine,
     };
     let resolution = res_option.to_tiff_resolution();
-    let mode_str = options.as_ref().and_then(|o| o.mode.as_deref()).unwrap_or("t38");
+    let mode_str = options
+        .as_ref()
+        .and_then(|o| o.mode.as_deref())
+        .unwrap_or("t38");
     let protocol = match mode_str {
         "g711" | "g711u" | "g711a" => "G.711 u-law".to_string(),
         _ => "T.38".to_string(),
     };
     let ecm = options.as_ref().and_then(|o| o.ecm).unwrap_or(true);
     let baud_rate = options.as_ref().and_then(|o| o.baud_rate).unwrap_or(14400);
-    let to = if target.is_empty() { None } else { Some(normalize_to_e164(&target)) };
-    let page_settings = TestPageSettings { protocol, ecm, baud_rate, to };
+    let to = if target.is_empty() {
+        None
+    } else {
+        Some(normalize_to_e164(&target))
+    };
+    let page_settings = TestPageSettings {
+        protocol,
+        ecm,
+        baud_rate,
+        to,
+    };
 
     let temp_dir = std::env::temp_dir();
     let mut guards: Vec<TempFileGuard> = Vec::new();
@@ -1707,46 +2036,81 @@ pub async fn fax_send_queued(
                     "itu_test_page" => {
                         let p_path = temp_dir.join(format!("fax_q_tpl_q_{}.tiff", Uuid::new_v4()));
                         let p_str = p_path.to_string_lossy().to_string();
-                        tiff::create_test_page(&p_str, Some("SIPALYZER VIRTUAL FAX TEST"), resolution, Some(&page_settings))?;
-                        let bytes = std::fs::read(&p_path).map_err(|e| format!("Failed to read queued test page: {}", e))?;
+                        tiff::create_test_page(
+                            &p_str,
+                            Some("SIPALYZER VIRTUAL FAX TEST"),
+                            resolution,
+                            Some(&page_settings),
+                        )?;
+                        let bytes = std::fs::read(&p_path)
+                            .map_err(|e| format!("Failed to read queued test page: {}", e))?;
                         page_bytes.push(bytes);
                         guards.push(TempFileGuard(p_path));
                     }
                     "full_diagnostic" => {
-                        let p1_path = temp_dir.join(format!("fax_q_tpl_fd1_{}.tiff", Uuid::new_v4()));
+                        let p1_path =
+                            temp_dir.join(format!("fax_q_tpl_fd1_{}.tiff", Uuid::new_v4()));
                         let p1_str = p1_path.to_string_lossy().to_string();
-                        tiff::create_test_page(&p1_str, Some("SIPALYZER DIAGNOSTIC"), resolution, Some(&page_settings))?;
-                        let p1 = std::fs::read(&p1_path).map_err(|e| format!("Failed to read queued full diagnostic page 1: {}", e))?;
+                        tiff::create_test_page(
+                            &p1_str,
+                            Some("SIPALYZER DIAGNOSTIC"),
+                            resolution,
+                            Some(&page_settings),
+                        )?;
+                        let p1 = std::fs::read(&p1_path).map_err(|e| {
+                            format!("Failed to read queued full diagnostic page 1: {}", e)
+                        })?;
                         page_bytes.push(p1);
                         guards.push(TempFileGuard(p1_path));
 
-                        let p2_path = temp_dir.join(format!("fax_q_tpl_fd2_{}.tiff", Uuid::new_v4()));
+                        let p2_path =
+                            temp_dir.join(format!("fax_q_tpl_fd2_{}.tiff", Uuid::new_v4()));
                         let p2_str = p2_path.to_string_lossy().to_string();
                         tiff::create_diagnostic_page(&p2_str, resolution)?;
-                        let p2 = std::fs::read(&p2_path).map_err(|e| format!("Failed to read queued full diagnostic page 2: {}", e))?;
+                        let p2 = std::fs::read(&p2_path).map_err(|e| {
+                            format!("Failed to read queued full diagnostic page 2: {}", e)
+                        })?;
                         page_bytes.push(p2);
                         guards.push(TempFileGuard(p2_path));
                     }
                     "quick_unbranded" => {
                         let p_path = temp_dir.join(format!("fax_q_tpl_uq_{}.tiff", Uuid::new_v4()));
                         let p_str = p_path.to_string_lossy().to_string();
-                        tiff::create_test_page(&p_str, title.as_deref().or(Some("VIRTUAL FAX TEST PAGE")), resolution, Some(&page_settings))?;
-                        let bytes = std::fs::read(&p_path).map_err(|e| format!("Failed to read queued unbranded test page: {}", e))?;
+                        tiff::create_test_page(
+                            &p_str,
+                            title.as_deref().or(Some("VIRTUAL FAX TEST PAGE")),
+                            resolution,
+                            Some(&page_settings),
+                        )?;
+                        let bytes = std::fs::read(&p_path).map_err(|e| {
+                            format!("Failed to read queued unbranded test page: {}", e)
+                        })?;
                         page_bytes.push(bytes);
                         guards.push(TempFileGuard(p_path));
                     }
                     "full_unbranded" => {
-                        let p1_path = temp_dir.join(format!("fax_q_tpl_uf1_{}.tiff", Uuid::new_v4()));
+                        let p1_path =
+                            temp_dir.join(format!("fax_q_tpl_uf1_{}.tiff", Uuid::new_v4()));
                         let p1_str = p1_path.to_string_lossy().to_string();
-                        tiff::create_test_page(&p1_str, title.as_deref().or(Some("VIRTUAL FAX DIAGNOSTIC")), resolution, Some(&page_settings))?;
-                        let p1 = std::fs::read(&p1_path).map_err(|e| format!("Failed to read queued unbranded diagnostic page 1: {}", e))?;
+                        tiff::create_test_page(
+                            &p1_str,
+                            title.as_deref().or(Some("VIRTUAL FAX DIAGNOSTIC")),
+                            resolution,
+                            Some(&page_settings),
+                        )?;
+                        let p1 = std::fs::read(&p1_path).map_err(|e| {
+                            format!("Failed to read queued unbranded diagnostic page 1: {}", e)
+                        })?;
                         page_bytes.push(p1);
                         guards.push(TempFileGuard(p1_path));
 
-                        let p2_path = temp_dir.join(format!("fax_q_tpl_uf2_{}.tiff", Uuid::new_v4()));
+                        let p2_path =
+                            temp_dir.join(format!("fax_q_tpl_uf2_{}.tiff", Uuid::new_v4()));
                         let p2_str = p2_path.to_string_lossy().to_string();
                         tiff::create_diagnostic_page(&p2_str, resolution)?;
-                        let p2 = std::fs::read(&p2_path).map_err(|e| format!("Failed to read queued unbranded diagnostic page 2: {}", e))?;
+                        let p2 = std::fs::read(&p2_path).map_err(|e| {
+                            format!("Failed to read queued unbranded diagnostic page 2: {}", e)
+                        })?;
                         page_bytes.push(p2);
                         guards.push(TempFileGuard(p2_path));
                     }
@@ -1763,23 +2127,41 @@ pub async fn fax_send_queued(
                     return Err("Composed queue page is empty".to_string());
                 }
                 let plain_text = compose_source
-                    .replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-                    .replace("<p>", "").replace("</p>", "\n")
-                    .replace("<strong>", "").replace("</strong>", "")
-                    .replace("<em>", "").replace("</em>", "")
-                    .replace("<h1>", "").replace("</h1>", "\n")
-                    .replace("<h2>", "").replace("</h2>", "\n")
-                    .replace("<h3>", "").replace("</h3>", "\n");
-                let re_clean = plain_text.chars().fold((String::new(), false), |(mut s, in_tag), c| {
-                    if c == '<' { (s, true) }
-                    else if c == '>' { (s, false) }
-                    else if !in_tag { s.push(c); (s, false) }
-                    else { (s, true) }
-                }).0;
+                    .replace("<br>", "\n")
+                    .replace("<br/>", "\n")
+                    .replace("<br />", "\n")
+                    .replace("<p>", "")
+                    .replace("</p>", "\n")
+                    .replace("<strong>", "")
+                    .replace("</strong>", "")
+                    .replace("<em>", "")
+                    .replace("</em>", "")
+                    .replace("<h1>", "")
+                    .replace("</h1>", "\n")
+                    .replace("<h2>", "")
+                    .replace("</h2>", "\n")
+                    .replace("<h3>", "")
+                    .replace("</h3>", "\n");
+                let re_clean = plain_text
+                    .chars()
+                    .fold((String::new(), false), |(mut s, in_tag), c| {
+                        if c == '<' {
+                            (s, true)
+                        } else if c == '>' {
+                            (s, false)
+                        } else if !in_tag {
+                            s.push(c);
+                            (s, false)
+                        } else {
+                            (s, true)
+                        }
+                    })
+                    .0;
                 let p_path = temp_dir.join(format!("fax_q_comp_{}.tiff", Uuid::new_v4()));
                 let p_str = p_path.to_string_lossy().to_string();
                 tiff::create_text_page(&p_str, &re_clean, resolution)?;
-                let bytes = std::fs::read(&p_path).map_err(|e| format!("Failed to read queued compose page: {}", e))?;
+                let bytes = std::fs::read(&p_path)
+                    .map_err(|e| format!("Failed to read queued compose page: {}", e))?;
                 page_bytes.push(bytes);
                 guards.push(TempFileGuard(p_path));
             }
@@ -1802,14 +2184,16 @@ pub async fn fax_send_queued(
                     .and_then(|e| e.to_str())
                     .unwrap_or("png");
                 let raw_path = temp_dir.join(format!("fax_q_raw_{}.{}", Uuid::new_v4(), ext));
-                std::fs::write(&raw_path, &data).map_err(|e| format!("Failed to write queued upload temp file: {}", e))?;
+                std::fs::write(&raw_path, &data)
+                    .map_err(|e| format!("Failed to write queued upload temp file: {}", e))?;
                 guards.push(TempFileGuard(raw_path.clone()));
 
                 let fax_path = temp_dir.join(format!("fax_q_img_{}.tiff", Uuid::new_v4()));
                 let raw_str = raw_path.to_string_lossy().to_string();
                 let fax_str = fax_path.to_string_lossy().to_string();
                 tiff::convert_to_fax_tiff(&raw_str, &fax_str, resolution)?;
-                let bytes = std::fs::read(&fax_path).map_err(|e| format!("Failed to read converted queued upload TIFF: {}", e))?;
+                let bytes = std::fs::read(&fax_path)
+                    .map_err(|e| format!("Failed to read converted queued upload TIFF: {}", e))?;
                 page_bytes.push(bytes);
                 guards.push(TempFileGuard(fax_path));
             }
@@ -1825,7 +2209,8 @@ pub async fn fax_send_queued(
     let page_refs: Vec<&[u8]> = page_bytes.iter().map(|b| b.as_slice()).collect();
     let combined = tiff::combine_single_page_tiffs(&page_refs)?;
     let combined_path = temp_dir.join(format!("fax_queued_{}.tiff", Uuid::new_v4()));
-    std::fs::write(&combined_path, &combined).map_err(|e| format!("Failed to write combined queued TIFF: {}", e))?;
+    std::fs::write(&combined_path, &combined)
+        .map_err(|e| format!("Failed to write combined queued TIFF: {}", e))?;
     let combined_str = combined_path.to_string_lossy().to_string();
     guards.push(TempFileGuard(combined_path));
 
@@ -1846,7 +2231,7 @@ pub async fn fax_send_uploaded(
     let data = base64::engine::general_purpose::STANDARD
         .decode(&image_base64)
         .map_err(|e| format!("Invalid base64 data: {}", e))?;
-    
+
     let temp_dir = std::env::temp_dir();
     let ext = std::path::Path::new(&file_name)
         .extension()
@@ -1854,11 +2239,10 @@ pub async fn fax_send_uploaded(
         .unwrap_or("tiff");
     let temp_path = temp_dir.join(format!("fax_upload_{}.{}", Uuid::new_v4(), ext));
     let temp_path_str = temp_path.to_string_lossy().to_string();
-    
-    std::fs::write(&temp_path, &data)
-        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    std::fs::write(&temp_path, &data).map_err(|e| format!("Failed to write temp file: {}", e))?;
     let _guard = TempFileGuard(temp_path);
-    
+
     fax_send(app, registrar_id, target, temp_path_str, options, job_id).await
 }
 
@@ -1875,37 +2259,62 @@ pub async fn fax_send_composed(
     job_id: Option<String>,
 ) -> Result<SendFaxResult, String> {
     use super::tiff;
-    
+
     let temp_dir = std::env::temp_dir();
     let temp_path = temp_dir.join(format!("fax_composed_{}.tiff", Uuid::new_v4()));
     let temp_path_str = temp_path.to_string_lossy().to_string();
-    
+
     // Render HTML to a fax-compatible TIFF — use the text content for now
     // Strip HTML tags to get plain text, then generate a TIFF page
     let plain_text = html_content
-        .replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-        .replace("<p>", "").replace("</p>", "\n")
-        .replace("<strong>", "").replace("</strong>", "")
-        .replace("<em>", "").replace("</em>", "")
-        .replace("<h1>", "").replace("</h1>", "\n")
-        .replace("<h2>", "").replace("</h2>", "\n")
-        .replace("<h3>", "").replace("</h3>", "\n");
+        .replace("<br>", "\n")
+        .replace("<br/>", "\n")
+        .replace("<br />", "\n")
+        .replace("<p>", "")
+        .replace("</p>", "\n")
+        .replace("<strong>", "")
+        .replace("</strong>", "")
+        .replace("<em>", "")
+        .replace("</em>", "")
+        .replace("<h1>", "")
+        .replace("</h1>", "\n")
+        .replace("<h2>", "")
+        .replace("</h2>", "\n")
+        .replace("<h3>", "")
+        .replace("</h3>", "\n");
     // Remove remaining HTML tags
-    let re_clean = plain_text.chars().fold((String::new(), false), |(mut s, in_tag), c| {
-        if c == '<' { (s, true) }
-        else if c == '>' { (s, false) }
-        else if !in_tag { s.push(c); (s, false) }
-        else { (s, true) }
-    }).0;
-    
+    let re_clean = plain_text
+        .chars()
+        .fold((String::new(), false), |(mut s, in_tag), c| {
+            if c == '<' {
+                (s, true)
+            } else if c == '>' {
+                (s, false)
+            } else if !in_tag {
+                s.push(c);
+                (s, false)
+            } else {
+                (s, true)
+            }
+        })
+        .0;
+
     let res_option = match options.as_ref().and_then(|o| o.resolution.as_deref()) {
         Some("standard") => FaxResolutionOption::Standard,
         _ => FaxResolutionOption::Fine,
     };
     tiff::create_text_page(&temp_path_str, &re_clean, res_option.to_tiff_resolution())?;
     let _guard = TempFileGuard(temp_path);
-    
-    fax_send(app, registrar_id, target, temp_path_str.clone(), options, job_id).await
+
+    fax_send(
+        app,
+        registrar_id,
+        target,
+        temp_path_str.clone(),
+        options,
+        job_id,
+    )
+    .await
 }
 
 /// Cancel an active fax job.
@@ -1967,20 +2376,25 @@ pub fn fax_get_prebuilt_test_doc(doc_id: String) -> Result<FaxDocumentResponse, 
 
 fn get_prebuilt_test_doc_internal(doc_id: &str) -> Result<FaxDocumentResponse, String> {
     use super::tiff;
-    
+
     let temp_dir = std::env::temp_dir();
     let resolution = tiff::FaxResolution::Fine;
-    
+
     match doc_id {
         "itu_test_page" => {
             let temp_path = temp_dir.join("sipalyzer_test_quick.tiff");
             let temp_str = temp_path.to_string_lossy().to_string();
-            tiff::create_test_page(&temp_str, Some("SIPALYZER VIRTUAL FAX TEST"), resolution, None)?;
-            
+            tiff::create_test_page(
+                &temp_str,
+                Some("SIPALYZER VIRTUAL FAX TEST"),
+                resolution,
+                None,
+            )?;
+
             let tiff_data = std::fs::read(&temp_path)
                 .map_err(|e| format!("Failed to read test page: {}", e))?;
             let _ = std::fs::remove_file(&temp_path);
-            
+
             use base64::Engine;
             Ok(FaxDocumentResponse {
                 format: "tiff".to_string(),
@@ -1993,23 +2407,23 @@ fn get_prebuilt_test_doc_internal(doc_id: &str) -> Result<FaxDocumentResponse, S
             let p1_path = temp_dir.join("sipalyzer_diag_p1.tiff");
             let p1_str = p1_path.to_string_lossy().to_string();
             tiff::create_test_page(&p1_str, Some("SIPALYZER DIAGNOSTIC"), resolution, None)?;
-            
+
             // Page 2: Line quality
             let p2_path = temp_dir.join("sipalyzer_diag_p2.tiff");
             let p2_str = p2_path.to_string_lossy().to_string();
             tiff::create_diagnostic_page(&p2_str, resolution)?;
-            
+
             // Combine into multi-page TIFF
-            let p1_data = std::fs::read(&p1_path)
-                .map_err(|e| format!("Failed to read page 1: {}", e))?;
-            let p2_data = std::fs::read(&p2_path)
-                .map_err(|e| format!("Failed to read page 2: {}", e))?;
+            let p1_data =
+                std::fs::read(&p1_path).map_err(|e| format!("Failed to read page 1: {}", e))?;
+            let p2_data =
+                std::fs::read(&p2_path).map_err(|e| format!("Failed to read page 2: {}", e))?;
             let _ = std::fs::remove_file(&p1_path);
             let _ = std::fs::remove_file(&p2_path);
-            
+
             // Build multi-page TIFF by chaining IFDs
             let combined = tiff::combine_single_page_tiffs(&[&p1_data, &p2_data])?;
-            
+
             use base64::Engine;
             Ok(FaxDocumentResponse {
                 format: "tiff".to_string(),
@@ -2022,7 +2436,7 @@ fn get_prebuilt_test_doc_internal(doc_id: &str) -> Result<FaxDocumentResponse, S
 }
 
 /// Generate a minimal test TIFF file
-/// 
+///
 /// This creates a valid 1-bit TIFF that can be used for testing.
 fn generate_minimal_test_tiff() -> Vec<u8> {
     // Minimal TIFF header for a 1728x100 1-bit image (A4 width at 204 DPI)
@@ -2032,10 +2446,10 @@ fn generate_minimal_test_tiff() -> Vec<u8> {
     let bits_per_sample: u16 = 1;
     let compression: u16 = 1; // No compression
     let photometric: u16 = 0; // WhiteIsZero (fax standard)
-    
+
     let bytes_per_row = (width + 7) / 8;
     let image_data_size = bytes_per_row * height;
-    
+
     // Create image data with a simple test pattern
     let mut image_data = vec![0u8; image_data_size as usize];
     // Add some horizontal lines for visual verification
@@ -2048,54 +2462,54 @@ fn generate_minimal_test_tiff() -> Vec<u8> {
             }
         }
     }
-    
+
     let mut tiff = Vec::new();
-    
+
     // TIFF Header
-    tiff.extend_from_slice(b"II");  // Little-endian
-    tiff.extend_from_slice(&42u16.to_le_bytes());  // Magic number
-    tiff.extend_from_slice(&8u32.to_le_bytes());   // Offset to first IFD
-    
+    tiff.extend_from_slice(b"II"); // Little-endian
+    tiff.extend_from_slice(&42u16.to_le_bytes()); // Magic number
+    tiff.extend_from_slice(&8u32.to_le_bytes()); // Offset to first IFD
+
     // IFD at offset 8
     let num_entries: u16 = 12;
     tiff.extend_from_slice(&num_entries.to_le_bytes());
-    
+
     let ifd_start = 8u32;
     let ifd_size = 2 + num_entries as u32 * 12 + 4;
     let values_offset = ifd_start + ifd_size;
     let strip_offset = values_offset + 24;
-    
+
     // IFD Entries (12 bytes each)
-    write_ifd_entry(&mut tiff, 256, 3, 1, width);      // ImageWidth
-    write_ifd_entry(&mut tiff, 257, 3, 1, height);     // ImageLength
+    write_ifd_entry(&mut tiff, 256, 3, 1, width); // ImageWidth
+    write_ifd_entry(&mut tiff, 257, 3, 1, height); // ImageLength
     write_ifd_entry(&mut tiff, 258, 3, 1, bits_per_sample as u32); // BitsPerSample
-    write_ifd_entry(&mut tiff, 259, 3, 1, compression as u32);     // Compression
-    write_ifd_entry(&mut tiff, 262, 3, 1, photometric as u32);     // PhotometricInterpretation
-    write_ifd_entry(&mut tiff, 273, 4, 1, strip_offset);           // StripOffsets
-    write_ifd_entry(&mut tiff, 277, 3, 1, 1);          // SamplesPerPixel
-    write_ifd_entry(&mut tiff, 278, 3, 1, rows_per_strip);         // RowsPerStrip
-    write_ifd_entry(&mut tiff, 279, 4, 1, image_data_size);        // StripByteCounts
-    write_ifd_entry(&mut tiff, 282, 5, 1, values_offset);          // XResolution
-    write_ifd_entry(&mut tiff, 283, 5, 1, values_offset + 8);      // YResolution
-    write_ifd_entry(&mut tiff, 296, 3, 1, 2);          // ResolutionUnit (inches)
-    
+    write_ifd_entry(&mut tiff, 259, 3, 1, compression as u32); // Compression
+    write_ifd_entry(&mut tiff, 262, 3, 1, photometric as u32); // PhotometricInterpretation
+    write_ifd_entry(&mut tiff, 273, 4, 1, strip_offset); // StripOffsets
+    write_ifd_entry(&mut tiff, 277, 3, 1, 1); // SamplesPerPixel
+    write_ifd_entry(&mut tiff, 278, 3, 1, rows_per_strip); // RowsPerStrip
+    write_ifd_entry(&mut tiff, 279, 4, 1, image_data_size); // StripByteCounts
+    write_ifd_entry(&mut tiff, 282, 5, 1, values_offset); // XResolution
+    write_ifd_entry(&mut tiff, 283, 5, 1, values_offset + 8); // YResolution
+    write_ifd_entry(&mut tiff, 296, 3, 1, 2); // ResolutionUnit (inches)
+
     // Next IFD offset (0 = no more IFDs)
     tiff.extend_from_slice(&0u32.to_le_bytes());
-    
+
     // Rational values for resolution
     tiff.extend_from_slice(&204u32.to_le_bytes()); // XResolution numerator
-    tiff.extend_from_slice(&1u32.to_le_bytes());   // XResolution denominator
+    tiff.extend_from_slice(&1u32.to_le_bytes()); // XResolution denominator
     tiff.extend_from_slice(&196u32.to_le_bytes()); // YResolution numerator (fine resolution)
-    tiff.extend_from_slice(&1u32.to_le_bytes());   // YResolution denominator
-    
+    tiff.extend_from_slice(&1u32.to_le_bytes()); // YResolution denominator
+
     // Padding to strip_offset
     while tiff.len() < strip_offset as usize {
         tiff.push(0);
     }
-    
+
     // Image data
     tiff.extend_from_slice(&image_data);
-    
+
     tiff
 }
 
@@ -2110,15 +2524,15 @@ fn write_ifd_entry(tiff: &mut Vec<u8>, tag: u16, typ: u16, count: u32, value: u3
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_generate_minimal_tiff() {
         let tiff = generate_minimal_test_tiff();
         // Check TIFF header
-        assert_eq!(&tiff[0..2], b"II");  // Little-endian
-        assert_eq!(u16::from_le_bytes([tiff[2], tiff[3]]), 42);  // Magic
+        assert_eq!(&tiff[0..2], b"II"); // Little-endian
+        assert_eq!(u16::from_le_bytes([tiff[2], tiff[3]]), 42); // Magic
     }
-    
+
     #[test]
     fn test_list_prebuilt_docs() {
         let docs = fax_list_prebuilt_docs().unwrap();

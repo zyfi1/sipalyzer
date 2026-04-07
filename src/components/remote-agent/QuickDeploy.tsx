@@ -27,7 +27,6 @@ interface CompileProgress {
 }
 
 type DeployStage = "idle" | "saving" | "compiling" | "done" | "error";
-type AgentExperience = "minimal" | "full";
 
 const PLATFORMS: {
   id: TargetOS;
@@ -77,11 +76,6 @@ const LIFETIME_PRESETS = [
   { id: "never", label: "∞", seconds: null as number | null, labelClass: "text-xl leading-none -mt-0.5" },
 ];
 
-const EXPERIENCE_OPTIONS: { id: AgentExperience; label: string; hint: string }[] = [
-  { id: "minimal", label: "Minimal", hint: "CLI/headless runtime" },
-  { id: "full", label: "Full", hint: "GUI runtime (no tray/CLI UX)" },
-];
-
 function parseDateString(value: string): Date | undefined {
   const [y, m, d] = value.split("-").map(Number);
   if (!y || !m || !d) return undefined;
@@ -113,7 +107,6 @@ export function QuickDeploy() {
   const [customDate, setCustomDate] = useState<string>(getDefaultCustomDate);
   const [customHour, setCustomHour] = useState<string>("09");
   const [customMinute, setCustomMinute] = useState<string>("00");
-  const [experience, setExperience] = useState<AgentExperience>("full");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const [stage, setStage] = useState<DeployStage>("idle");
@@ -209,6 +202,8 @@ export function QuickDeploy() {
     setDeployDone(0);
     let hadError = false;
 
+    const experience = "full" as const;
+
     for (let i = 0; i < savePaths.length; i++) {
       const { os, path } = savePaths[i]!;
       const plat = PLATFORMS.find((p) => p.id === os)!;
@@ -235,7 +230,7 @@ export function QuickDeploy() {
             label: null,
             profile: experience,
             experience,
-            daemon_headless: experience === "minimal",
+            daemon_headless: false,
           },
           path,
         );
@@ -389,31 +384,6 @@ export function QuickDeploy() {
           <div className="flex flex-col gap-3">
             {/* Expiry picker */}
             <div className="rounded-lg border border-border/30 bg-muted/10 p-3">
-              <div className="flex items-center gap-2 mb-2.5">
-                <span className="section-label-sm">Experience</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 mb-3">
-                {EXPERIENCE_OPTIONS.map((option) => (
-                  <Button
-                    key={option.id}
-                    onClick={() => setExperience(option.id)}
-                    disabled={isDeploying}
-                    variant={experience === option.id ? "default" : "neutral"}
-                    className={cn(
-                      "h-9 rounded-lg text-xs font-semibold transition-smooth border justify-start px-2.5",
-                      experience === option.id
-                        ? "border-primary/45 bg-primary/90 text-primary-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]"
-                        : "text-muted-foreground/70 border-border/20 bg-background/20 hover:text-foreground hover:bg-muted/20"
-                    )}
-                    size="sm"
-                  >
-                    <div className="flex flex-col items-start leading-tight">
-                      <span>{option.label}</span>
-                      <span className="text-[10px] opacity-80">{option.hint}</span>
-                    </div>
-                  </Button>
-                ))}
-              </div>
               <div className="flex items-center gap-2 mb-2.5">
                 <Timer className="h-3.5 w-3.5 text-info/70" />
                 <span className="section-label-sm">Expires after</span>

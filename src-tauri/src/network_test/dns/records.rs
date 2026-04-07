@@ -220,24 +220,21 @@ pub async fn lookup_records(config: &DnsConfig) -> DnsRecordSet {
     let start = Instant::now();
     let record_type = config.record_type.unwrap_or(DnsRecordType::A);
 
-    let resolver = match resolver::create_resolver(
-        config.server.as_deref(),
-        config.port,
-        config.transport,
-    ) {
-        Ok(r) => r,
-        Err(e) => {
-            return DnsRecordSet {
-                domain: config.domain.clone(),
-                record_type: record_type.label().to_string(),
-                server: config.server.clone(),
-                records: vec![],
-                resolution_ms: start.elapsed().as_secs_f64() * 1000.0,
-                success: false,
-                error: Some(e),
-            };
-        }
-    };
+    let resolver =
+        match resolver::create_resolver(config.server.as_deref(), config.port, config.transport) {
+            Ok(r) => r,
+            Err(e) => {
+                return DnsRecordSet {
+                    domain: config.domain.clone(),
+                    record_type: record_type.label().to_string(),
+                    server: config.server.clone(),
+                    records: vec![],
+                    resolution_ms: start.elapsed().as_secs_f64() * 1000.0,
+                    success: false,
+                    error: Some(e),
+                };
+            }
+        };
 
     let domain = config.domain.trim_end_matches('.');
 
@@ -294,7 +291,12 @@ async fn lookup_a(
         .map(|ip| DnsRecord {
             name: domain.to_string(),
             record_type: "A".to_string(),
-            ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map(|r| r.ttl())
+                .unwrap_or(0),
             data: DnsRecordEntry::A(ip.to_string()),
         })
         .collect())
@@ -314,7 +316,12 @@ async fn lookup_aaaa(
         .map(|ip| DnsRecord {
             name: domain.to_string(),
             record_type: "AAAA".to_string(),
-            ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map(|r| r.ttl())
+                .unwrap_or(0),
             data: DnsRecordEntry::AAAA(ip.to_string()),
         })
         .collect())
@@ -334,7 +341,12 @@ async fn lookup_srv(
         .map(|srv| DnsRecord {
             name: domain.to_string(),
             record_type: "SRV".to_string(),
-            ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map(|r| r.ttl())
+                .unwrap_or(0),
             data: DnsRecordEntry::SRV(SrvRecord {
                 service: domain.to_string(),
                 priority: srv.priority(),
@@ -360,7 +372,12 @@ async fn lookup_mx(
         .map(|mx| DnsRecord {
             name: domain.to_string(),
             record_type: "MX".to_string(),
-            ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map(|r| r.ttl())
+                .unwrap_or(0),
             data: DnsRecordEntry::MX(MxRecord {
                 preference: mx.preference(),
                 exchange: mx.exchange().to_string().trim_end_matches('.').to_string(),
@@ -389,7 +406,12 @@ async fn lookup_txt(
             DnsRecord {
                 name: domain.to_string(),
                 record_type: "TXT".to_string(),
-                ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+                ttl: response
+                    .as_lookup()
+                    .record_iter()
+                    .next()
+                    .map(|r| r.ttl())
+                    .unwrap_or(0),
                 data: DnsRecordEntry::TXT(TxtRecord { text }),
             }
         })
@@ -410,7 +432,12 @@ async fn lookup_ns(
         .map(|ns| DnsRecord {
             name: domain.to_string(),
             record_type: "NS".to_string(),
-            ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map(|r| r.ttl())
+                .unwrap_or(0),
             data: DnsRecordEntry::NS(ns.to_string().trim_end_matches('.').to_string()),
         })
         .collect())
@@ -430,7 +457,12 @@ async fn lookup_soa(
         .map(|soa| DnsRecord {
             name: domain.to_string(),
             record_type: "SOA".to_string(),
-            ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+            ttl: response
+                .as_lookup()
+                .record_iter()
+                .next()
+                .map(|r| r.ttl())
+                .unwrap_or(0),
             data: DnsRecordEntry::SOA(SoaRecord {
                 mname: soa.mname().to_string().trim_end_matches('.').to_string(),
                 rname: soa.rname().to_string().trim_end_matches('.').to_string(),
@@ -460,7 +492,12 @@ async fn lookup_ptr(
             .map(|name| DnsRecord {
                 name: domain.to_string(),
                 record_type: "PTR".to_string(),
-                ttl: response.as_lookup().record_iter().next().map(|r| r.ttl()).unwrap_or(0),
+                ttl: response
+                    .as_lookup()
+                    .record_iter()
+                    .next()
+                    .map(|r| r.ttl())
+                    .unwrap_or(0),
                 data: DnsRecordEntry::PTR(name.to_string().trim_end_matches('.').to_string()),
             })
             .collect());
@@ -497,9 +534,7 @@ async fn lookup_generic(
             RData::CNAME(cname) => {
                 DnsRecordEntry::CNAME(cname.to_string().trim_end_matches('.').to_string())
             }
-            RData::NS(ns) => {
-                DnsRecordEntry::NS(ns.to_string().trim_end_matches('.').to_string())
-            }
+            RData::NS(ns) => DnsRecordEntry::NS(ns.to_string().trim_end_matches('.').to_string()),
             RData::PTR(ptr) => {
                 DnsRecordEntry::PTR(ptr.to_string().trim_end_matches('.').to_string())
             }
@@ -528,7 +563,11 @@ async fn lookup_generic(
                 flags: String::from_utf8_lossy(naptr.flags()).to_string(),
                 service: String::from_utf8_lossy(naptr.services()).to_string(),
                 regexp: String::from_utf8_lossy(naptr.regexp()).to_string(),
-                replacement: naptr.replacement().to_string().trim_end_matches('.').to_string(),
+                replacement: naptr
+                    .replacement()
+                    .to_string()
+                    .trim_end_matches('.')
+                    .to_string(),
             }),
             RData::SOA(soa) => DnsRecordEntry::SOA(SoaRecord {
                 mname: soa.mname().to_string().trim_end_matches('.').to_string(),

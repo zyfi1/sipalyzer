@@ -121,7 +121,11 @@ pub async fn resolve_sip_domain(config: SipResolutionConfig) -> SipResolutionCha
             }
         }
         // Sort by order, then preference
-        naptr_entries.sort_by(|a, b| a.0.order.cmp(&b.0.order).then(a.0.preference.cmp(&b.0.preference)));
+        naptr_entries.sort_by(|a, b| {
+            a.0.order
+                .cmp(&b.0.order)
+                .then(a.0.preference.cmp(&b.0.preference))
+        });
     }
 
     steps.push(SipResolutionStep {
@@ -334,11 +338,7 @@ pub async fn resolve_sip_domain(config: SipResolutionConfig) -> SipResolutionCha
     }
 
     // Sort targets by priority (ascending), then weight (descending)
-    targets.sort_by(|a, b| {
-        a.priority
-            .cmp(&b.priority)
-            .then(b.weight.cmp(&a.weight))
-    });
+    targets.sort_by(|a, b| a.priority.cmp(&b.priority).then(b.weight.cmp(&a.weight)));
 
     let total_ms = total_start.elapsed().as_secs_f64() * 1000.0;
 

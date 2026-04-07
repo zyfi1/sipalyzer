@@ -205,7 +205,12 @@ fn parse_yealink(ua: &str) -> DeviceFingerprint {
     } else {
         DeviceType::Phone
     };
-    DeviceFingerprint { vendor: "Yealink".to_string(), model, firmware, device_type }
+    DeviceFingerprint {
+        vendor: "Yealink".to_string(),
+        model,
+        firmware,
+        device_type,
+    }
 }
 
 fn parse_polycom(ua: &str) -> DeviceFingerprint {
@@ -223,7 +228,11 @@ fn parse_polycom(ua: &str) -> DeviceFingerprint {
     };
     DeviceFingerprint {
         vendor: "Polycom".to_string(),
-        model: if model.starts_with("_") { model[1..].to_string() } else { model },
+        model: if model.starts_with("_") {
+            model[1..].to_string()
+        } else {
+            model
+        },
         firmware,
         device_type: DeviceType::Phone,
     }
@@ -246,8 +255,17 @@ fn parse_cisco(ua: &str) -> DeviceFingerprint {
     } else {
         DeviceType::Unknown
     };
-    let model = if let Some(m) = extract_cisco_model(ua) { m } else { String::new() };
-    DeviceFingerprint { vendor: "Cisco".to_string(), model, firmware, device_type }
+    let model = if let Some(m) = extract_cisco_model(ua) {
+        m
+    } else {
+        String::new()
+    };
+    DeviceFingerprint {
+        vendor: "Cisco".to_string(),
+        model,
+        firmware,
+        device_type,
+    }
 }
 
 fn extract_cisco_model(ua: &str) -> Option<String> {
@@ -270,16 +288,22 @@ fn parse_grandstream(ua: &str) -> DeviceFingerprint {
     let parts: Vec<&str> = ua.split_whitespace().collect();
     let model = parts.get(1).unwrap_or(&"").to_string();
     let firmware = parts.get(2).unwrap_or(&"").to_string();
-    let device_type = if model.starts_with("GXP") || model.starts_with("GRP") || model.starts_with("GXV") {
-        DeviceType::Phone
-    } else if model.starts_with("HT") || model.starts_with("GXW") {
-        DeviceType::Gateway
-    } else if model.starts_with("UCM") {
-        DeviceType::Pbx
-    } else {
-        DeviceType::Phone
-    };
-    DeviceFingerprint { vendor: "Grandstream".to_string(), model, firmware, device_type }
+    let device_type =
+        if model.starts_with("GXP") || model.starts_with("GRP") || model.starts_with("GXV") {
+            DeviceType::Phone
+        } else if model.starts_with("HT") || model.starts_with("GXW") {
+            DeviceType::Gateway
+        } else if model.starts_with("UCM") {
+            DeviceType::Pbx
+        } else {
+            DeviceType::Phone
+        };
+    DeviceFingerprint {
+        vendor: "Grandstream".to_string(),
+        model,
+        firmware,
+        device_type,
+    }
 }
 
 fn parse_snom(ua: &str) -> DeviceFingerprint {
@@ -319,7 +343,12 @@ fn parse_obihai(ua: &str) -> DeviceFingerprint {
     } else {
         DeviceType::Gateway // OBi devices are typically ATAs/gateways
     };
-    DeviceFingerprint { vendor: "Obihai".to_string(), model, firmware, device_type }
+    DeviceFingerprint {
+        vendor: "Obihai".to_string(),
+        model,
+        firmware,
+        device_type,
+    }
 }
 
 fn parse_audiocodes(ua: &str) -> DeviceFingerprint {
@@ -339,7 +368,12 @@ fn parse_audiocodes(ua: &str) -> DeviceFingerprint {
     } else {
         DeviceType::Gateway
     };
-    DeviceFingerprint { vendor: "AudioCodes".to_string(), model, firmware, device_type }
+    DeviceFingerprint {
+        vendor: "AudioCodes".to_string(),
+        model,
+        firmware,
+        device_type,
+    }
 }
 
 fn parse_asterisk(ua: &str) -> DeviceFingerprint {

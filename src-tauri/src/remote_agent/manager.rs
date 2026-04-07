@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sipalyzer_core::protocol::{AgentCommand, AgentMessage, HeartbeatData};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 
 /// Global connection manager instance.
 pub static AGENT_MANAGER: Lazy<Arc<Mutex<AgentManager>>> =
@@ -77,10 +77,7 @@ impl AgentManager {
         remote_ip: String,
     ) {
         let now = chrono::Utc::now().to_rfc3339();
-        let prev_name = self
-            .agents
-            .get(&agent_id)
-            .and_then(|e| e.info.name.clone());
+        let prev_name = self.agents.get(&agent_id).and_then(|e| e.info.name.clone());
 
         let conn = AgentConnection {
             id: agent_id.clone(),
@@ -175,7 +172,10 @@ impl AgentManager {
                 if info.status == AgentStatus::Connected {
                     let stale = chrono::DateTime::parse_from_rfc3339(&info.last_heartbeat)
                         .ok()
-                        .map(|ts| now - ts.with_timezone(&chrono::Utc) > chrono::Duration::seconds(STALE_CONNECTED_SECS))
+                        .map(|ts| {
+                            now - ts.with_timezone(&chrono::Utc)
+                                > chrono::Duration::seconds(STALE_CONNECTED_SECS)
+                        })
                         .unwrap_or(true);
                     if stale {
                         info.status = AgentStatus::Disconnected;

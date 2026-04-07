@@ -1,6 +1,6 @@
-use std::net::IpAddr;
 use ipnetwork::IpNetwork;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

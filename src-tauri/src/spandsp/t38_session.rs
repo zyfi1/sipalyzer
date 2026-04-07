@@ -13,7 +13,10 @@
 //! - Uses Pin<Box<SessionState>> for FFI callback data to prevent moves
 //! - Per-session counters (no global statics shared across sessions)
 //! - Proper cleanup via Drop implementation
-#![cfg_attr(not(feature = "spandsp-native"), allow(unused_imports, unused_variables, dead_code))]
+#![cfg_attr(
+    not(feature = "spandsp-native"),
+    allow(unused_imports, unused_variables, dead_code)
+)]
 
 use std::ffi::CString;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
@@ -88,7 +91,10 @@ impl T38Config {
             max_bit_rate: options.effective_baud_rate(),
             ecm_enabled: options.ecm,
             modem_flags,
-            station_id: options.station_id.clone().unwrap_or_else(|| "SIPalyzer Fax".to_string()),
+            station_id: options
+                .station_id
+                .clone()
+                .unwrap_or_else(|| "SIPalyzer Fax".to_string()),
             supported_resolutions: options.resolution.to_spandsp_flags(),
             ..Default::default()
         }
@@ -206,7 +212,10 @@ impl T38Session {
         let state_ptr = &*state as *const SessionState as *mut c_void;
 
         unsafe {
-            tracing::info!("[T.38:{}] Initializing t38_terminal (calling party)...", &id[..8]);
+            tracing::info!(
+                "[T.38:{}] Initializing t38_terminal (calling party)...",
+                &id[..8]
+            );
 
             let terminal = bindings::t38_terminal_init(
                 ptr::null_mut(),
@@ -250,20 +259,42 @@ impl T38Session {
             let t38_core = bindings::t38_terminal_get_t38_core_state(terminal);
             if !t38_core.is_null() {
                 bindings::t38_set_t38_version(t38_core, config.version as c_int);
-                bindings::t38_set_data_rate_management_method(t38_core, if config.local_tcf { 2 } else { 1 });
+                bindings::t38_set_data_rate_management_method(
+                    t38_core,
+                    if config.local_tcf { 2 } else { 1 },
+                );
                 bindings::t38_set_data_transport_protocol(t38_core, 0); // UDPTL
                 bindings::t38_set_max_datagram_size(t38_core, config.max_datagram as c_int);
                 bindings::t38_set_tep_handling(t38_core, 0);
 
                 // Set redundancy per category
-                bindings::t38_set_redundancy_control(t38_core, 0, config.redundancy_indicator as c_int);
-                bindings::t38_set_redundancy_control(t38_core, 1, config.redundancy_low_speed as c_int);
-                bindings::t38_set_redundancy_control(t38_core, 2, config.redundancy_high_speed as c_int);
+                bindings::t38_set_redundancy_control(
+                    t38_core,
+                    0,
+                    config.redundancy_indicator as c_int,
+                );
+                bindings::t38_set_redundancy_control(
+                    t38_core,
+                    1,
+                    config.redundancy_low_speed as c_int,
+                );
+                bindings::t38_set_redundancy_control(
+                    t38_core,
+                    2,
+                    config.redundancy_high_speed as c_int,
+                );
                 bindings::t38_set_redundancy_control(t38_core, 3, config.redundancy_image as c_int);
             }
 
-            tracing::info!("[T.38:{}] Initialized: file={} ({}B), modems=0x{:02x}, ecm={}, version={}",
-                     &id[..8], tiff_path, file_size, config.modem_flags, config.ecm_enabled, config.version);
+            tracing::info!(
+                "[T.38:{}] Initialized: file={} ({}B), modems=0x{:02x}, ecm={}, version={}",
+                &id[..8],
+                tiff_path,
+                file_size,
+                config.modem_flags,
+                config.ecm_enabled,
+                config.version
+            );
 
             Ok(Self {
                 id,
@@ -333,9 +364,21 @@ impl T38Session {
             let t38_core = bindings::t38_terminal_get_t38_core_state(terminal);
             if !t38_core.is_null() {
                 bindings::t38_set_t38_version(t38_core, config.version as c_int);
-                bindings::t38_set_redundancy_control(t38_core, 0, config.redundancy_indicator as c_int);
-                bindings::t38_set_redundancy_control(t38_core, 1, config.redundancy_low_speed as c_int);
-                bindings::t38_set_redundancy_control(t38_core, 2, config.redundancy_high_speed as c_int);
+                bindings::t38_set_redundancy_control(
+                    t38_core,
+                    0,
+                    config.redundancy_indicator as c_int,
+                );
+                bindings::t38_set_redundancy_control(
+                    t38_core,
+                    1,
+                    config.redundancy_low_speed as c_int,
+                );
+                bindings::t38_set_redundancy_control(
+                    t38_core,
+                    2,
+                    config.redundancy_high_speed as c_int,
+                );
                 bindings::t38_set_redundancy_control(t38_core, 3, config.redundancy_image as c_int);
             }
 
@@ -390,8 +433,13 @@ impl T38Session {
             );
 
             if result != 0 {
-                tracing::error!("[T.38:{}] rx_ifp_packet error {} for seq={} len={}",
-                         &self.id[..8], result, seq, ifp_packet.len());
+                tracing::error!(
+                    "[T.38:{}] rx_ifp_packet error {} for seq={} len={}",
+                    &self.id[..8],
+                    result,
+                    seq,
+                    ifp_packet.len()
+                );
             }
         }
 
@@ -426,18 +474,24 @@ impl T38Session {
         }
 
         unsafe {
-            let result = bindings::t38_terminal_restart(
-                self.terminal,
-                if self.is_calling { 1 } else { 0 },
-            );
+            let result =
+                bindings::t38_terminal_restart(self.terminal, if self.is_calling { 1 } else { 0 });
             if result != 0 {
-                tracing::warn!("[T.38:{}] Warning: t38_terminal_restart returned {}", &self.id[..8], result);
+                tracing::warn!(
+                    "[T.38:{}] Warning: t38_terminal_restart returned {}",
+                    &self.id[..8],
+                    result
+                );
             }
         }
 
         self.active = true;
         self.start_time = Some(Instant::now());
-        tracing::info!("[T.38:{}] Session started (calling={})", &self.id[..8], self.is_calling);
+        tracing::info!(
+            "[T.38:{}] Session started (calling={})",
+            &self.id[..8],
+            self.is_calling
+        );
         Ok(())
     }
 
@@ -492,7 +546,11 @@ impl T38Session {
                 let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
                 bindings::t30_get_transfer_statistics(t30, &mut stats);
 
-                (remote_id, Some(stats.bit_rate as u32), Some(stats.error_correcting_mode != 0))
+                (
+                    remote_id,
+                    Some(stats.bit_rate as u32),
+                    Some(stats.error_correcting_mode != 0),
+                )
             } else {
                 (None, None, None)
             }
@@ -501,14 +559,25 @@ impl T38Session {
         let pkts_sent = self.packets_sent();
         let pkts_recv = self.packets_received();
 
-        tracing::error!("[T.38:{}] Stopped: success={}, pages={}, code={} ({}), tx={}, rx={}",
-                 &self.id[..8], success, pages, completion_code, t30_error.description(),
-                 pkts_sent, pkts_recv);
+        tracing::error!(
+            "[T.38:{}] Stopped: success={}, pages={}, code={} ({}), tx={}, rx={}",
+            &self.id[..8],
+            success,
+            pages,
+            completion_code,
+            t30_error.description(),
+            pkts_sent,
+            pkts_recv
+        );
 
         T38Result {
             success,
             pages_sent: pages,
-            error: if success { None } else { Some(t30_error.description().to_string()) },
+            error: if success {
+                None
+            } else {
+                Some(t30_error.description().to_string())
+            },
             t30_error_code: Some(completion_code),
             remote_station_id: remote_id,
             negotiated_baud_rate: baud_rate,
@@ -550,7 +619,12 @@ unsafe extern "C" fn tx_packet_handler(
     let cb_num = state.tx_callback_count.fetch_add(1, Ordering::Relaxed);
 
     if cb_num < 5 {
-        tracing::info!("[T.38:{}] tx_packet #{}: len={}", &state.session_id[..8], cb_num, len);
+        tracing::info!(
+            "[T.38:{}] tx_packet #{}: len={}",
+            &state.session_id[..8],
+            cb_num,
+            len
+        );
     }
 
     let packet = std::slice::from_raw_parts(buf, len as usize).to_vec();
@@ -577,8 +651,13 @@ unsafe extern "C" fn phase_b_handler(
     if !s.is_null() {
         let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
         bindings::t30_get_transfer_statistics(s, &mut stats);
-        tracing::error!("[T.38:{}] Phase B: result={}, rate={}, ecm={}",
-                 &state.session_id[..8], result, stats.bit_rate, stats.error_correcting_mode);
+        tracing::error!(
+            "[T.38:{}] Phase B: result={}, rate={}, ecm={}",
+            &state.session_id[..8],
+            result,
+            stats.bit_rate,
+            stats.error_correcting_mode
+        );
 
         let rx_ident = bindings::t30_get_rx_ident(s);
         if !rx_ident.is_null() {
@@ -606,7 +685,12 @@ unsafe extern "C" fn phase_d_handler(
     }
     let state = &*(user_data as *const SessionState);
     let pages = state.pages_transferred.fetch_add(1, Ordering::SeqCst) + 1;
-    tracing::info!("[T.38:{}] Phase D: page {} (result={})", &state.session_id[..8], pages, result);
+    tracing::info!(
+        "[T.38:{}] Phase D: page {} (result={})",
+        &state.session_id[..8],
+        pages,
+        result
+    );
     0 // Always return 0 to continue to next page
 }
 
@@ -621,17 +705,30 @@ unsafe extern "C" fn phase_e_handler(
         return;
     }
     let state = &*(user_data as *const SessionState);
-    state.completion_code.store(completion_code, Ordering::SeqCst);
+    state
+        .completion_code
+        .store(completion_code, Ordering::SeqCst);
     state.completed.store(true, Ordering::SeqCst);
 
     let t30_error = T30Error::from_code(completion_code);
-    tracing::error!("[T.38:{}] Phase E: code={} ({})", &state.session_id[..8], completion_code, t30_error.description());
+    tracing::error!(
+        "[T.38:{}] Phase E: code={} ({})",
+        &state.session_id[..8],
+        completion_code,
+        t30_error.description()
+    );
 
     if !s.is_null() {
         let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
         bindings::t30_get_transfer_statistics(s, &mut stats);
-        tracing::error!("[T.38:{}] Final stats: pages_tx={}, pages_rx={}, rate={}, ecm={}",
-                 &state.session_id[..8], stats.pages_tx, stats.pages_rx, stats.bit_rate, stats.error_correcting_mode);
+        tracing::error!(
+            "[T.38:{}] Final stats: pages_tx={}, pages_rx={}, rate={}, ecm={}",
+            &state.session_id[..8],
+            stats.pages_tx,
+            stats.pages_rx,
+            stats.bit_rate,
+            stats.error_correcting_mode
+        );
     }
 }
 
@@ -646,7 +743,15 @@ pub fn run_t38_fax(
     remote_addr: SocketAddr,
     shutdown: Arc<AtomicBool>,
 ) -> Result<T38Result, String> {
-    run_t38_fax_with_config(tiff_path, local_udptl_port, remote_addr, shutdown, None, None, None)
+    run_t38_fax_with_config(
+        tiff_path,
+        local_udptl_port,
+        remote_addr,
+        shutdown,
+        None,
+        None,
+        None,
+    )
 }
 
 /// Run a T.38 fax transmission over UDPTL with progress callback
@@ -658,7 +763,15 @@ pub fn run_t38_fax_with_progress(
     shutdown: Arc<AtomicBool>,
     on_progress: T38ProgressCallback,
 ) -> Result<T38Result, String> {
-    run_t38_fax_with_config(tiff_path, local_udptl_port, remote_addr, shutdown, None, Some(on_progress), None)
+    run_t38_fax_with_config(
+        tiff_path,
+        local_udptl_port,
+        remote_addr,
+        shutdown,
+        None,
+        Some(on_progress),
+        None,
+    )
 }
 
 /// Run a T.38 fax transmission over UDPTL with custom configuration
@@ -674,8 +787,18 @@ pub fn run_t38_fax_with_config(
 ) -> Result<T38Result, String> {
     let config = config.unwrap_or_default();
 
-    tracing::info!("Starting transmission to {} (local port {})", remote_addr, local_udptl_port);
-    tracing::info!("Config: version={}, max_rate={}, ecm={}, ec={:?}", config.version, config.max_bit_rate, config.ecm_enabled, config.ec_mode);
+    tracing::info!(
+        "Starting transmission to {} (local port {})",
+        remote_addr,
+        local_udptl_port
+    );
+    tracing::info!(
+        "Config: version={}, max_rate={}, ecm={}, ec={:?}",
+        config.version,
+        config.max_bit_rate,
+        config.ecm_enabled,
+        config.ec_mode
+    );
 
     let mut session = T38Session::new_send(tiff_path, Some(config.clone()))?;
     session.start()?;
@@ -693,9 +816,11 @@ pub fn run_t38_fax_with_config(
     // Previous bug: 20ms socket timeout + 5ms sleep = 25ms per tick, but timer_tick(160)
     // tells SpanDSP only 20ms passed → T.30 timers drifted 20% slow.
     let _ = socket.set_nonblocking(false);
-    socket.set_read_timeout(Some(Duration::from_millis(1)))
+    socket
+        .set_read_timeout(Some(Duration::from_millis(1)))
         .map_err(|e| format!("Failed to set socket timeout: {}", e))?;
-    socket.set_write_timeout(Some(Duration::from_millis(100)))
+    socket
+        .set_write_timeout(Some(Duration::from_millis(100)))
         .map_err(|e| format!("Failed to set send timeout: {}", e))?;
 
     let start_time = Instant::now();
@@ -745,12 +870,11 @@ pub fn run_t38_fax_with_config(
         // Also send STUN pings from this socket to broaden the NAT mapping
         // (same technique as fax_media's STUN probes).
         let stun_request: [u8; 20] = [
-            0x00, 0x01,             // Binding Request
-            0x00, 0x00,             // Length: 0
+            0x00, 0x01, // Binding Request
+            0x00, 0x00, // Length: 0
             0x21, 0x12, 0xA4, 0x42, // Magic cookie
             // Transaction ID (12 bytes)
-            0xFA, 0xCE, 0x00, 0x38, 0xFA, 0xCE, 0x00, 0x38,
-            0xFA, 0xCE, 0x00, 0x38,
+            0xFA, 0xCE, 0x00, 0x38, 0xFA, 0xCE, 0x00, 0x38, 0xFA, 0xCE, 0x00, 0x38,
         ];
         for stun_addr in &["stun.l.google.com:19302", "stun.cloudflare.com:3478"] {
             if let Ok(addrs) = stun_addr.to_socket_addrs() {
@@ -773,7 +897,12 @@ pub fn run_t38_fax_with_config(
         while punch_start.elapsed() < punch_timeout {
             match socket.recv_from(&mut probe_buf) {
                 Ok((len, from)) => {
-                    tracing::info!("Got RX from {} ({} bytes) after {:.1}s — bidirectional!", from, len, punch_start.elapsed().as_secs_f64());
+                    tracing::info!(
+                        "Got RX from {} ({} bytes) after {:.1}s — bidirectional!",
+                        from,
+                        len,
+                        punch_start.elapsed().as_secs_f64()
+                    );
                     got_rx = true;
                     last_rx_time = Instant::now();
                     break;
@@ -797,7 +926,7 @@ pub fn run_t38_fax_with_config(
     // - During active TX (Phase C image data): the RECEIVER stays SILENT while we
     //   transmit pages. For a 2-page ECM fax at 14400 bps, Phase C can take 60-90s.
     //   We must NOT abort during this normal silence.
-    let rx_idle_timeout = Duration::from_secs(30);   // No TX, no RX → remote is dead
+    let rx_idle_timeout = Duration::from_secs(30); // No TX, no RX → remote is dead
     let rx_active_timeout = Duration::from_secs(90); // Active TX, no RX → Phase C silence
     let mut last_progress_report = Instant::now();
     let progress_interval = Duration::from_secs(2);
@@ -815,9 +944,17 @@ pub fn run_t38_fax_with_config(
         // is expected to be silent. Use a longer timeout. If we're idle (pre-Phase B
         // or waiting for response after EOP), use a shorter timeout.
         let recently_transmitting = last_tx_time.elapsed() < Duration::from_secs(5);
-        let effective_rx_timeout = if recently_transmitting { rx_active_timeout } else { rx_idle_timeout };
+        let effective_rx_timeout = if recently_transmitting {
+            rx_active_timeout
+        } else {
+            rx_idle_timeout
+        };
         if last_rx_time.elapsed() > effective_rx_timeout {
-            tracing::info!("No packets received for {:.0}s (tx_active={}) — remote unresponsive, aborting", last_rx_time.elapsed().as_secs_f64(), recently_transmitting);
+            tracing::info!(
+                "No packets received for {:.0}s (tx_active={}) — remote unresponsive, aborting",
+                last_rx_time.elapsed().as_secs_f64(),
+                recently_transmitting
+            );
             break;
         }
 
@@ -875,7 +1012,13 @@ pub fn run_t38_fax_with_config(
                 Ok((len, from)) => {
                     let pkts_so_far = session.packets_received();
                     if pkts_so_far < 3 {
-                        tracing::info!("RX #{}: {} bytes from {} (expected {})", pkts_so_far, len, from, remote_addr);
+                        tracing::info!(
+                            "RX #{}: {} bytes from {} (expected {})",
+                            pkts_so_far,
+                            len,
+                            from,
+                            remote_addr
+                        );
                     }
                     last_rx_time = Instant::now();
                     session.record_packet_received();
@@ -884,7 +1027,11 @@ pub fn run_t38_fax_with_config(
                     // This handles redundancy recovery, FEC, and sequence tracking.
                     let decoded_ifps = udptl_decoder.decode(&rx_buffer[..len]);
                     if decoded_ifps.is_empty() && len > 0 && pkts_so_far < 5 {
-                        tracing::info!("UDPTL decode returned 0 IFPs, len={}, first_bytes={:02x?}", len, &rx_buffer[..len.min(16)]);
+                        tracing::info!(
+                            "UDPTL decode returned 0 IFPs, len={}, first_bytes={:02x?}",
+                            len,
+                            &rx_buffer[..len.min(16)]
+                        );
                     }
                     for (seq, ifp_packet) in decoded_ifps {
                         if let Err(e) = session.process_rx_packet(&ifp_packet, seq) {
@@ -928,7 +1075,13 @@ pub fn run_t38_fax_with_config(
     }
 
     let result = session.stop();
-    tracing::info!("Complete: success={}, pages={}, tx={}, rx={}", result.success, result.pages_sent, result.udptl_packets_sent, result.udptl_packets_received);
+    tracing::info!(
+        "Complete: success={}, pages={}, tx={}, rx={}",
+        result.success,
+        result.pages_sent,
+        result.udptl_packets_sent,
+        result.udptl_packets_received
+    );
 
     Ok(result)
 }
@@ -948,8 +1101,17 @@ pub fn run_t38_fax_receive(
 ) -> Result<T38Result, String> {
     let config = config.unwrap_or_default();
 
-    tracing::info!("Starting receive from {} (local port {})", remote_addr, local_udptl_port);
-    tracing::info!("Config: version={}, ecm={}, ec={:?}", config.version, config.ecm_enabled, config.ec_mode);
+    tracing::info!(
+        "Starting receive from {} (local port {})",
+        remote_addr,
+        local_udptl_port
+    );
+    tracing::info!(
+        "Config: version={}, ecm={}, ec={:?}",
+        config.version,
+        config.ecm_enabled,
+        config.ec_mode
+    );
 
     let mut session = T38Session::new_receive(output_tiff_path, Some(config.clone()))?;
     session.start()?;
@@ -957,9 +1119,11 @@ pub fn run_t38_fax_receive(
     let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_udptl_port))
         .map_err(|e| format!("Failed to bind UDPTL port {}: {}", local_udptl_port, e))?;
     let _ = socket.set_nonblocking(false);
-    socket.set_read_timeout(Some(Duration::from_millis(1)))
+    socket
+        .set_read_timeout(Some(Duration::from_millis(1)))
         .map_err(|e| format!("Failed to set socket timeout: {}", e))?;
-    socket.set_write_timeout(Some(Duration::from_millis(100)))
+    socket
+        .set_write_timeout(Some(Duration::from_millis(100)))
         .map_err(|e| format!("Failed to set send timeout: {}", e))?;
 
     let start_time = Instant::now();
@@ -1000,7 +1164,10 @@ pub fn run_t38_fax_receive(
         }
 
         if last_rx_time.elapsed() > rx_inactivity_timeout {
-            tracing::warn!("No packets received for {}s — remote gone, aborting", rx_inactivity_timeout.as_secs());
+            tracing::warn!(
+                "No packets received for {}s — remote gone, aborting",
+                rx_inactivity_timeout.as_secs()
+            );
             break;
         }
 
@@ -1035,7 +1202,11 @@ pub fn run_t38_fax_receive(
             if last_progress_report.elapsed() >= progress_interval {
                 last_progress_report = Instant::now();
                 if let Some(ref cb) = on_progress {
-                    cb(session.packets_sent(), session.packets_received(), start_time.elapsed().as_secs());
+                    cb(
+                        session.packets_sent(),
+                        session.packets_received(),
+                        start_time.elapsed().as_secs(),
+                    );
                 }
             }
         }
@@ -1081,7 +1252,13 @@ pub fn run_t38_fax_receive(
     }
 
     let result = session.stop();
-    tracing::info!("Complete: success={}, pages={}, tx={}, rx={}", result.success, result.pages_sent, result.udptl_packets_sent, result.udptl_packets_received);
+    tracing::info!(
+        "Complete: success={}, pages={}, tx={}, rx={}",
+        result.success,
+        result.pages_sent,
+        result.udptl_packets_sent,
+        result.udptl_packets_received
+    );
 
     Ok(result)
 }
@@ -1106,7 +1283,10 @@ impl T38Session {
         Err("SpanDSP not available. Install with: brew install spandsp".to_string())
     }
 
-    pub fn new_receive(_output_tiff_path: &str, _config: Option<T38Config>) -> Result<Self, String> {
+    pub fn new_receive(
+        _output_tiff_path: &str,
+        _config: Option<T38Config>,
+    ) -> Result<Self, String> {
         Err("SpanDSP not available".to_string())
     }
 

@@ -10,7 +10,7 @@ import {
   FEATURE_FLAG_MCP_UI,
   FEATURE_FLAG_TOOLS_MOCKUP_UI,
 } from "./featureFlags";
-import { isFeatureFlagEnabled } from "./featureFlagCache";
+import { getCachedFeatureFlag, isFeatureFlagEnabled } from "./featureFlagCache";
 
 import { useToolStore } from "@/stores/toolStore";
 import { usePacketCaptureStore } from "@/stores/packetCaptureStore";
@@ -24,6 +24,18 @@ export interface NavigationContext {
 }
 
 const HASH_PREFIX = "#";
+
+function resolveToolsSubviewForCachedFlags(subviewId: string | null): string | null {
+  if (subviewId === "mockup") {
+    const cached = getCachedFeatureFlag(FEATURE_FLAG_TOOLS_MOCKUP_UI);
+    if (cached && !cached.enabled) return "syslog";
+  }
+  if (subviewId === "mcp") {
+    const cached = getCachedFeatureFlag(FEATURE_FLAG_MCP_UI);
+    if (cached && !cached.enabled) return "syslog";
+  }
+  return subviewId;
+}
 
 function getHash(): string {
   const h = window.location.hash;
@@ -85,11 +97,8 @@ export function parseHash(): {
 
   // Home tool has no subviews — KB is accessed via the slide-out panel
   if (toolId === HOME_TOOL_ID && subviewId) subviewId = null;
-  if (toolId === "tools" && subviewId === "mockup" && !isFeatureFlagEnabled(FEATURE_FLAG_TOOLS_MOCKUP_UI, false)) {
-    subviewId = "syslog";
-  }
-  if (toolId === "tools" && subviewId === "mcp" && !isFeatureFlagEnabled(FEATURE_FLAG_MCP_UI, false)) {
-    subviewId = "syslog";
+  if (toolId === "tools") {
+    subviewId = resolveToolsSubviewForCachedFlags(subviewId);
   }
 
   // Firmware catalog moved from Tools → Device Provisioning

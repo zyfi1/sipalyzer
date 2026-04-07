@@ -45,20 +45,22 @@
 //! ```
 
 pub mod bindings;
-pub mod session;
-pub mod t38_session;
-pub mod udptl;
 pub mod fax;
 pub mod fax_media;
+pub mod session;
+pub mod t38_session;
 pub mod tiff;
+pub mod udptl;
 
 // Core session types
 #[allow(unused_imports)]
-pub use session::{FaxSession, FaxMode, FaxSendOptions, FaxResult, ModemType, G711Variant, T30Error};
+pub use session::{
+    FaxMode, FaxResult, FaxSendOptions, FaxSession, G711Variant, ModemType, T30Error,
+};
 
 // T.38 session types
 #[allow(unused_imports)]
-pub use t38_session::{T38Session, T38Config, T38Result};
+pub use t38_session::{T38Config, T38Result, T38Session};
 
 // UDPTL types (native SpanDSP implementation)
 #[allow(unused_imports)]

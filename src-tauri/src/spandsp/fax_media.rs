@@ -7,16 +7,16 @@
 //! Fax audio uses strict 20ms intervals (160 samples at 8kHz).
 //! Uses Instant-based timing to maintain accurate pacing.
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 
-use tauri::{AppHandle, Emitter};
 use super::session::FaxSession;
+use tauri::{AppHandle, Emitter};
 
 // Re-export the existing G711Codec from the softphone module
 pub use crate::softphone::codecs::G711Codec;
@@ -149,7 +149,11 @@ impl JitterBuffer {
             return;
         }
         self.pending.sort_by_key(|(seq, _)| *seq);
-        while let Some(idx) = self.pending.iter().position(|(seq, _)| *seq == self.expected_seq) {
+        while let Some(idx) = self
+            .pending
+            .iter()
+            .position(|(seq, _)| *seq == self.expected_seq)
+        {
             let (_, samples) = self.pending.remove(idx);
             self.expected_seq = self.expected_seq.wrapping_add(1);
             let space = self.max_depth.saturating_sub(self.buffer.len());
@@ -215,7 +219,10 @@ pub fn run_fax_via_media_engine(
     media_engine::register_fax_receive(call_id, tx_fax)?;
 
     session.start()?;
-    tracing::info!("Session started via media engine (call_id={})", &call_id[..call_id.len().min(12)]);
+    tracing::info!(
+        "Session started via media engine (call_id={})",
+        &call_id[..call_id.len().min(12)]
+    );
 
     let start_time = Instant::now();
     let mut tx_samples = vec![0i16; 160];
@@ -290,7 +297,11 @@ pub fn run_fax_via_media_engine(
             }
 
             // One-way media detection
-            if !one_way_warned && frames_sent > 100 && packets_received < 3 && start_time.elapsed() > Duration::from_secs(5) {
+            if !one_way_warned
+                && frames_sent > 100
+                && packets_received < 3
+                && start_time.elapsed() > Duration::from_secs(5)
+            {
                 one_way_warned = true;
                 tracing::warn!("WARNING: One-way RTP detected! tx={} rx={} after {:.0}s. NAT/firewall may be blocking return traffic",
                     frames_sent, packets_received, start_time.elapsed().as_secs_f32());
@@ -308,11 +319,14 @@ pub fn run_fax_via_media_engine(
 
             if last_stats_emit.elapsed() >= stats_emit_interval {
                 if let (Some(ref app_handle), Some(ref jid)) = (&app, &job_id) {
-                    let _ = app_handle.emit("fax:send_progress", serde_json::json!({
-                        "jobId": jid,
-                        "phase": "g711_page",
-                        "elapsedSecs": start_time.elapsed().as_secs(),
-                    }));
+                    let _ = app_handle.emit(
+                        "fax:send_progress",
+                        serde_json::json!({
+                            "jobId": jid,
+                            "phase": "g711_page",
+                            "elapsedSecs": start_time.elapsed().as_secs(),
+                        }),
+                    );
                 }
                 last_stats_emit = Instant::now();
             }
@@ -324,8 +338,13 @@ pub fn run_fax_via_media_engine(
                 Duration::from_secs(10)
             };
             if last_log_time.elapsed() > log_interval {
-                tracing::info!("Stats: tx_frames={}, rx={}, elapsed={:.1}s, completed={}",
-                    frames_sent, packets_received, start_time.elapsed().as_secs_f32(), session.is_completed());
+                tracing::info!(
+                    "Stats: tx_frames={}, rx={}, elapsed={:.1}s, completed={}",
+                    frames_sent,
+                    packets_received,
+                    start_time.elapsed().as_secs_f32(),
+                    session.is_completed()
+                );
                 last_log_time = Instant::now();
             }
         }
@@ -372,8 +391,12 @@ pub fn run_fax_over_rtp(
         sock
     } else {
         tracing::info!("Binding fresh RTP port {} (legacy path)...", local_rtp_port);
-        UdpSocket::bind(format!("0.0.0.0:{}", local_rtp_port))
-            .map_err(|e| format!("Failed to bind RTP port {}: {} (port in use?)", local_rtp_port, e))?
+        UdpSocket::bind(format!("0.0.0.0:{}", local_rtp_port)).map_err(|e| {
+            format!(
+                "Failed to bind RTP port {}: {} (port in use?)",
+                local_rtp_port, e
+            )
+        })?
     };
 
     // Socket config: blocking mode with short read timeout.
@@ -381,7 +404,8 @@ pub fn run_fax_over_rtp(
     // Fax has a SINGLE-threaded loop with 20ms frame pacing, so we need a short
     // timeout to avoid blocking the TX path. 1ms is enough to poll for data.
     let _ = socket.set_nonblocking(false);
-    socket.set_read_timeout(Some(Duration::from_millis(1)))
+    socket
+        .set_read_timeout(Some(Duration::from_millis(1)))
         .map_err(|e| format!("Failed to set socket timeout: {}", e))?;
 
     // -- RTP header fields -- match softphone ----------------------------
@@ -448,12 +472,26 @@ pub fn run_fax_over_rtp(
     // Step 2: Hole-punch -- burst of RTP silence to the SBC.
     // Uses the same SSRC/seq/ts that SpanDSP will continue with.
     for i in 0..5 {
-        let _ = send_rtp_packet(&socket, &remote_addr, ssrc, rtp_seq, rtp_timestamp, codec.pt(), &silence_160);
+        let _ = send_rtp_packet(
+            &socket,
+            &remote_addr,
+            ssrc,
+            rtp_seq,
+            rtp_timestamp,
+            codec.pt(),
+            &silence_160,
+        );
         rtp_seq = rtp_seq.wrapping_add(1);
         rtp_timestamp = rtp_timestamp.wrapping_add(160);
-        if i < 4 { std::thread::sleep(Duration::from_millis(20)); }
+        if i < 4 {
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
-    tracing::info!("Sent 5 hole-punch RTP packets to {} (ssrc=0x{:08X})", remote_addr, ssrc);
+    tracing::info!(
+        "Sent 5 hole-punch RTP packets to {} (ssrc=0x{:08X})",
+        remote_addr,
+        ssrc
+    );
 
     // Step 3: Wait for bidirectional RTP -- keep sending silence every 20ms
     // until we get at least one RTP packet back, confirming the NAT pinhole is open.
@@ -463,10 +501,21 @@ pub fn run_fax_over_rtp(
     let mut rtp_buffer = vec![0u8; 1500];
     let wait_timeout = Duration::from_secs(3);
 
-    tracing::warn!("Waiting for return RTP (sending silence, up to {}s)...", wait_timeout.as_secs());
+    tracing::warn!(
+        "Waiting for return RTP (sending silence, up to {}s)...",
+        wait_timeout.as_secs()
+    );
     while wait_start.elapsed() < wait_timeout && !shutdown.load(Ordering::Relaxed) {
         // Send silence to keep NAT alive and signal the SBC
-        let _ = send_rtp_packet(&socket, &remote_addr, ssrc, rtp_seq, rtp_timestamp, codec.pt(), &silence_160);
+        let _ = send_rtp_packet(
+            &socket,
+            &remote_addr,
+            ssrc,
+            rtp_seq,
+            rtp_timestamp,
+            codec.pt(),
+            &silence_160,
+        );
         rtp_seq = rtp_seq.wrapping_add(1);
         rtp_timestamp = rtp_timestamp.wrapping_add(160);
 
@@ -479,8 +528,13 @@ pub fn run_fax_over_rtp(
                     } else {
                         String::new()
                     };
-                    tracing::info!("Got RX from {} ({} bytes) after {:.1}s -- bidirectional!{}",
-                        from, len, wait_start.elapsed().as_secs_f32(), source_note);
+                    tracing::info!(
+                        "Got RX from {} ({} bytes) after {:.1}s -- bidirectional!{}",
+                        from,
+                        len,
+                        wait_start.elapsed().as_secs_f32(),
+                        source_note
+                    );
                     got_rx = true;
                     break;
                 }
@@ -492,19 +546,31 @@ pub fn run_fax_over_rtp(
     }
 
     if !got_rx {
-        tracing::warn!("No return RTP after {:.1}s -- proceeding anyway (NAT/firewall may be blocking)", wait_start.elapsed().as_secs_f32());
+        tracing::warn!(
+            "No return RTP after {:.1}s -- proceeding anyway (NAT/firewall may be blocking)",
+            wait_start.elapsed().as_secs_f32()
+        );
         if let (Some(ref app_handle), Some(ref jid)) = (&app, &job_id) {
-            let _ = app_handle.emit("fax:send_progress", serde_json::json!({
-                "jobId": jid,
-                "phase": "warning",
-                "warning": "No return RTP during setup -- NAT/firewall may be blocking",
-                "messageDirection": "info",
-            }));
+            let _ = app_handle.emit(
+                "fax:send_progress",
+                serde_json::json!({
+                    "jobId": jid,
+                    "phase": "warning",
+                    "warning": "No return RTP during setup -- NAT/firewall may be blocking",
+                    "messageDirection": "info",
+                }),
+            );
         }
     }
 
     session.start()?;
-    tracing::info!("Session started, sending to {} (codec: {:?}, ssrc=0x{:08X}, next_seq={})", remote_addr, codec, ssrc, rtp_seq);
+    tracing::info!(
+        "Session started, sending to {} (codec: {:?}, ssrc=0x{:08X}, next_seq={})",
+        remote_addr,
+        codec,
+        ssrc,
+        rtp_seq
+    );
 
     let start_time = Instant::now();
 
@@ -548,7 +614,15 @@ pub fn run_fax_over_rtp(
             let tx_count = session.get_audio(&mut tx_samples)?;
             if tx_count > 0 {
                 let encoded = encode_g711(&tx_samples[..tx_count], codec);
-                send_rtp_packet(&socket, &remote_addr, ssrc, rtp_seq, rtp_timestamp, codec.pt(), &encoded)?;
+                send_rtp_packet(
+                    &socket,
+                    &remote_addr,
+                    ssrc,
+                    rtp_seq,
+                    rtp_timestamp,
+                    codec.pt(),
+                    &encoded,
+                )?;
                 packets_sent += 1;
                 rtp_seq = rtp_seq.wrapping_add(1);
                 rtp_timestamp = rtp_timestamp.wrapping_add(tx_count as u32);
@@ -571,13 +645,16 @@ pub fn run_fax_over_rtp(
             // Emit periodic packet stats to frontend for the live packet view
             if last_stats_emit.elapsed() >= stats_emit_interval {
                 if let (Some(ref app_handle), Some(ref jid)) = (&app, &job_id) {
-                    let _ = app_handle.emit("fax:send_progress", serde_json::json!({
-                        "jobId": jid,
-                        "phase": "g711_page",
-                        "udptlPacketsSent": packets_sent,
-                        "udptlPacketsReceived": packets_received,
-                        "elapsedSecs": start_time.elapsed().as_secs(),
-                    }));
+                    let _ = app_handle.emit(
+                        "fax:send_progress",
+                        serde_json::json!({
+                            "jobId": jid,
+                            "phase": "g711_page",
+                            "udptlPacketsSent": packets_sent,
+                            "udptlPacketsReceived": packets_received,
+                            "elapsedSecs": start_time.elapsed().as_secs(),
+                        }),
+                    );
                 }
                 last_stats_emit = Instant::now();
             }
@@ -605,7 +682,13 @@ pub fn run_fax_over_rtp(
                         } else {
                             String::new()
                         };
-                        tracing::info!("RX #{} from {} ({} bytes){}", packets_received, from, len, source_note);
+                        tracing::info!(
+                            "RX #{} from {} ({} bytes){}",
+                            packets_received,
+                            from,
+                            len,
+                            source_note
+                        );
                     }
 
                     // Only decode actual RTP audio (G.711 = 12-byte header + payload).
@@ -628,7 +711,10 @@ pub fn run_fax_over_rtp(
 
                     let mut payload_offset = 12 + cc * 4;
                     if has_extension && payload_offset + 4 <= len {
-                        let ext_len = u16::from_be_bytes([rtp_buffer[payload_offset + 2], rtp_buffer[payload_offset + 3]]) as usize;
+                        let ext_len = u16::from_be_bytes([
+                            rtp_buffer[payload_offset + 2],
+                            rtp_buffer[payload_offset + 3],
+                        ]) as usize;
                         payload_offset += 4 + ext_len * 4;
                     }
 
@@ -656,9 +742,18 @@ pub fn run_fax_over_rtp(
 
         // Early one-way media detection: if we've sent >100 packets but received <3,
         // the return path is broken (NAT/firewall). Warn immediately so logs show the issue.
-        if !one_way_warned && packets_sent > 100 && packets_received < 3 && start_time.elapsed() > Duration::from_secs(5) {
+        if !one_way_warned
+            && packets_sent > 100
+            && packets_received < 3
+            && start_time.elapsed() > Duration::from_secs(5)
+        {
             one_way_warned = true;
-            tracing::warn!("One-way RTP detected: tx={} rx={} after {:.0}s", packets_sent, packets_received, start_time.elapsed().as_secs_f32());
+            tracing::warn!(
+                "One-way RTP detected: tx={} rx={} after {:.0}s",
+                packets_sent,
+                packets_received,
+                start_time.elapsed().as_secs_f32()
+            );
             if let (Some(ref app_handle), Some(ref jid)) = (&app, &job_id) {
                 let _ = app_handle.emit("fax:send_progress", serde_json::json!({
                     "jobId": jid,
@@ -678,12 +773,23 @@ pub fn run_fax_over_rtp(
             Duration::from_secs(10)
         };
         if last_log_time.elapsed() > log_interval {
-            tracing::info!(tx = packets_sent, rx = packets_received, elapsed_s = start_time.elapsed().as_secs_f32(), completed = session.is_completed(), "Fax media stats");
+            tracing::info!(
+                tx = packets_sent,
+                rx = packets_received,
+                elapsed_s = start_time.elapsed().as_secs_f32(),
+                completed = session.is_completed(),
+                "Fax media stats"
+            );
             last_log_time = Instant::now();
         }
     }
 
-    tracing::info!(tx = packets_sent, rx = packets_received, elapsed_s = start_time.elapsed().as_secs_f32(), "Fax media complete");
+    tracing::info!(
+        tx = packets_sent,
+        rx = packets_received,
+        elapsed_s = start_time.elapsed().as_secs_f32(),
+        "Fax media complete"
+    );
 
     let fax_result = session.stop();
 
@@ -711,15 +817,25 @@ pub fn run_fax_receive_over_rtp(
 ) -> Result<FaxMediaResult, String> {
     tracing::info!("Binding RTP port {} for receive...", local_rtp_port);
 
-    let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_rtp_port))
-        .map_err(|e| format!("Failed to bind RTP port {}: {} (port in use?)", local_rtp_port, e))?;
-    socket.set_read_timeout(Some(Duration::from_millis(5)))
+    let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_rtp_port)).map_err(|e| {
+        format!(
+            "Failed to bind RTP port {}: {} (port in use?)",
+            local_rtp_port, e
+        )
+    })?;
+    socket
+        .set_read_timeout(Some(Duration::from_millis(5)))
         .map_err(|e| format!("Failed to set socket timeout: {}", e))?;
-    socket.set_write_timeout(Some(Duration::from_millis(100)))
+    socket
+        .set_write_timeout(Some(Duration::from_millis(100)))
         .map_err(|e| format!("Failed to set send timeout: {}", e))?;
 
     session.start()?;
-    tracing::info!("Session started, expecting from {} (codec: {:?})", remote_addr, codec);
+    tracing::info!(
+        "Session started, expecting from {} (codec: {:?})",
+        remote_addr,
+        codec
+    );
 
     let start_time = Instant::now();
     let mut rtp_seq: u16 = random_u32() as u16;
@@ -746,7 +862,10 @@ pub fn run_fax_receive_over_rtp(
             return Err("Fax receive timeout (3 minutes)".to_string());
         }
         if last_rx_time.elapsed() > rx_inactivity_timeout {
-            return Err(format!("No RTP packets received for {}s", rx_inactivity_timeout.as_secs()));
+            return Err(format!(
+                "No RTP packets received for {}s",
+                rx_inactivity_timeout.as_secs()
+            ));
         }
 
         let now = Instant::now();
@@ -757,7 +876,15 @@ pub fn run_fax_receive_over_rtp(
             let tx_count = session.get_audio(&mut tx_samples)?;
             if tx_count > 0 {
                 let encoded = encode_g711(&tx_samples[..tx_count], codec);
-                send_rtp_packet(&socket, &remote_addr, ssrc, rtp_seq, rtp_timestamp, codec.pt(), &encoded)?;
+                send_rtp_packet(
+                    &socket,
+                    &remote_addr,
+                    ssrc,
+                    rtp_seq,
+                    rtp_timestamp,
+                    codec.pt(),
+                    &encoded,
+                )?;
                 packets_sent += 1;
                 rtp_seq = rtp_seq.wrapping_add(1);
                 rtp_timestamp = rtp_timestamp.wrapping_add(tx_count as u32);
@@ -785,7 +912,12 @@ pub fn run_fax_receive_over_rtp(
 
                         // Log source address of first 5 received packets for NAT diagnostics
                         if packets_received <= 5 {
-                            tracing::info!("RX #{} from {} ({} bytes)", packets_received, from, len);
+                            tracing::info!(
+                                "RX #{} from {} ({} bytes)",
+                                packets_received,
+                                from,
+                                len
+                            );
                         }
 
                         let rtp_seq_rx = u16::from_be_bytes([rtp_buffer[2], rtp_buffer[3]]);
@@ -793,7 +925,10 @@ pub fn run_fax_receive_over_rtp(
                         let has_extension = (rtp_buffer[0] & 0x10) != 0;
                         let mut payload_offset = 12 + cc * 4;
                         if has_extension && payload_offset + 4 <= len {
-                            let ext_len = u16::from_be_bytes([rtp_buffer[payload_offset + 2], rtp_buffer[payload_offset + 3]]) as usize;
+                            let ext_len = u16::from_be_bytes([
+                                rtp_buffer[payload_offset + 2],
+                                rtp_buffer[payload_offset + 3],
+                            ]) as usize;
                             payload_offset += 4 + ext_len * 4;
                         }
                         if payload_offset < len {
@@ -819,14 +954,23 @@ pub fn run_fax_receive_over_rtp(
         }
 
         if last_log_time.elapsed() > Duration::from_secs(10) {
-            tracing::info!("Stats: tx={}, rx={}, jitter_depth={}, elapsed={:.1}s",
-                packets_sent, packets_received, jitter.depth(), start_time.elapsed().as_secs_f32());
+            tracing::info!(
+                "Stats: tx={}, rx={}, jitter_depth={}, elapsed={:.1}s",
+                packets_sent,
+                packets_received,
+                jitter.depth(),
+                start_time.elapsed().as_secs_f32()
+            );
             last_log_time = Instant::now();
         }
     }
 
-    tracing::info!("Complete: tx={}, rx={}, elapsed={:.1}s",
-        packets_sent, packets_received, start_time.elapsed().as_secs_f32());
+    tracing::info!(
+        "Complete: tx={}, rx={}, elapsed={:.1}s",
+        packets_sent,
+        packets_received,
+        start_time.elapsed().as_secs_f32()
+    );
 
     let fax_result = session.stop();
 
@@ -867,13 +1011,14 @@ fn send_rtp_packet(
 
     // RTP header (12 bytes)
     packet.push(0x80); // Version 2
-    packet.push(pt);   // Payload type
+    packet.push(pt); // Payload type
     packet.extend_from_slice(&seq.to_be_bytes());
     packet.extend_from_slice(&timestamp.to_be_bytes());
     packet.extend_from_slice(&ssrc.to_be_bytes());
     packet.extend_from_slice(payload);
 
-    socket.send_to(&packet, remote_addr)
+    socket
+        .send_to(&packet, remote_addr)
         .map_err(|e| format!("Failed to send RTP: {}", e))?;
 
     Ok(())

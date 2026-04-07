@@ -68,13 +68,19 @@ impl CallMetrics {
             self.last_seq = Some(seq);
         }
         self.received_packets += 1;
-        let elapsed_sec = self.first_arrival.map(|t| arrival.saturating_duration_since(t).as_secs_f64()).unwrap_or(0.0);
+        let elapsed_sec = self
+            .first_arrival
+            .map(|t| arrival.saturating_duration_since(t).as_secs_f64())
+            .unwrap_or(0.0);
         if in_order && self.last_rtp_ts != 0 {
-            let d_sec = arrival.saturating_duration_since(self.last_arrival).as_secs_f64();
+            let d_sec = arrival
+                .saturating_duration_since(self.last_arrival)
+                .as_secs_f64();
             let d_rtp = (rtp_ts.wrapping_sub(self.last_rtp_ts) as f64) / (RTP_CLOCK as f64);
             let d = (d_sec - d_rtp).abs() * 1000.0; // ms
             self.jitter_rfc_ms += (d - self.jitter_rfc_ms) / 16.0;
-            self.jitter_history.push_back((elapsed_sec, self.jitter_rfc_ms));
+            self.jitter_history
+                .push_back((elapsed_sec, self.jitter_rfc_ms));
             if self.jitter_history.len() > JITTER_HISTORY_LEN {
                 self.jitter_history.pop_front();
             }

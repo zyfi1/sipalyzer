@@ -41,10 +41,7 @@ pub fn send_prack(
         .and_then(|s| s.trim().parse::<u32>().ok())
         .ok_or("Missing or invalid RSeq in provisional response")?;
 
-    let original_cseq = response
-        .get_header("CSeq")
-        .cloned()
-        .unwrap_or_default();
+    let original_cseq = response.get_header("CSeq").cloned().unwrap_or_default();
     // CSeq value looks like "1 INVITE" — extract the number and method
     let cseq_parts: Vec<&str> = original_cseq.trim().split_whitespace().collect();
     let original_cseq_num: u32 = cseq_parts.first().and_then(|s| s.parse().ok()).unwrap_or(1);
@@ -57,7 +54,10 @@ pub fn send_prack(
     let mut prack = SipMessage::new_request("PRACK", request_uri);
     prack.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch={}", via_transport, local_ip, local_port, branch),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch={}",
+            via_transport, local_ip, local_port, branch
+        ),
     );
     prack.add_header("Max-Forwards", "70");
     prack.add_header("From", from_header);

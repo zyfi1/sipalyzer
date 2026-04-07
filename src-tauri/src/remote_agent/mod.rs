@@ -1,4 +1,4 @@
-pub mod server;
+pub mod config_gen;
 pub mod connection;
 pub mod manager;
-pub mod config_gen;
+pub mod server;

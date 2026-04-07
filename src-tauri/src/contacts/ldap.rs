@@ -59,16 +59,16 @@ pub async fn fetch_contacts(config: &LdapConfig) -> Result<Vec<ImportedContact>>
 
     // Attributes to fetch
     let attrs = vec![
-        "cn",                    // Common Name
-        "displayName",           // Display Name
-        "givenName",             // First Name
-        "sn",                    // Surname
-        "telephoneNumber",       // Phone
-        "mobile",                // Mobile Phone
-        "mail",                  // Email
-        "o",                     // Organization
-        "company",               // Company (AD)
-        "description",           // Notes
+        "cn",              // Common Name
+        "displayName",     // Display Name
+        "givenName",       // First Name
+        "sn",              // Surname
+        "telephoneNumber", // Phone
+        "mobile",          // Mobile Phone
+        "mail",            // Email
+        "o",               // Organization
+        "company",         // Company (AD)
+        "description",     // Notes
     ];
 
     let (results, _res) = ldap
@@ -109,19 +109,17 @@ pub async fn test_connection(config: &LdapConfig) -> Result<String> {
 
     // Do a quick search to verify base DN
     let (results, _) = ldap
-        .search(
-            &config.base_dn,
-            Scope::Base,
-            "(objectClass=*)",
-            vec!["dn"],
-        )
+        .search(&config.base_dn, Scope::Base, "(objectClass=*)", vec!["dn"])
         .await?
         .success()
         .map_err(|e| anyhow!("Search failed: {:?}", e))?;
 
     ldap.unbind().await?;
 
-    Ok(format!("Connected successfully. Found {} base entries.", results.len()))
+    Ok(format!(
+        "Connected successfully. Found {} base entries.",
+        results.len()
+    ))
 }
 
 fn parse_ldap_entry(entry: &SearchEntry) -> Option<ImportedContact> {
@@ -147,8 +145,8 @@ fn parse_ldap_entry(entry: &SearchEntry) -> Option<ImportedContact> {
     let email = get_first_attr(&entry.attrs, "mail");
 
     // Get company/organization
-    let company = get_first_attr(&entry.attrs, "company")
-        .or_else(|| get_first_attr(&entry.attrs, "o"));
+    let company =
+        get_first_attr(&entry.attrs, "company").or_else(|| get_first_attr(&entry.attrs, "o"));
 
     // Get notes
     let notes = get_first_attr(&entry.attrs, "description");
@@ -162,7 +160,10 @@ fn parse_ldap_entry(entry: &SearchEntry) -> Option<ImportedContact> {
     })
 }
 
-fn get_first_attr(attrs: &std::collections::HashMap<String, Vec<String>>, key: &str) -> Option<String> {
+fn get_first_attr(
+    attrs: &std::collections::HashMap<String, Vec<String>>,
+    key: &str,
+) -> Option<String> {
     attrs
         .get(key)
         .and_then(|v| v.first())

@@ -127,7 +127,8 @@ pub async fn test_ssh_connection(
         .await
         .context("SSH connect failed")?;
 
-    let authenticated = authenticate(&mut session, username, auth_method, password, key_path).await?;
+    let authenticated =
+        authenticate(&mut session, username, auth_method, password, key_path).await?;
     // Disconnect cleanly
     let _ = session
         .disconnect(russh::Disconnect::ByApplication, "", "en")
@@ -164,7 +165,8 @@ pub async fn list_remote_interfaces(
     ];
 
     for cmd in probes {
-        let result = execute_remote_command(&mut session, cmd, std::time::Duration::from_secs(5)).await?;
+        let result =
+            execute_remote_command(&mut session, cmd, std::time::Duration::from_secs(5)).await?;
         if result.exit_status != Some(0) {
             continue;
         }
@@ -210,8 +212,7 @@ pub async fn start_remote_capture(
     let source_json = serde_json::to_string(&source)?;
 
     // Insert DB row
-    let conn = crate::core::database::Database::get_connection()
-        .context("DB connection failed")?;
+    let conn = crate::core::database::Database::get_connection().context("DB connection failed")?;
     let filter_config = FilterConfig::default();
     let filter_config_json = serde_json::to_string(&filter_config)?;
     let now = chrono::Utc::now().to_rfc3339();
@@ -238,7 +239,9 @@ pub async fn start_remote_capture(
 
     // Track the session
     {
-        let mut sessions = REMOTE_SESSIONS.lock().map_err(|_| anyhow::anyhow!("lock"))?;
+        let mut sessions = REMOTE_SESSIONS
+            .lock()
+            .map_err(|_| anyhow::anyhow!("lock"))?;
         sessions.insert(
             session_id.clone(),
             RemoteSessionEntry {
@@ -254,7 +257,9 @@ pub async fn start_remote_capture(
     let sid = session_id.clone();
     let file_path_str = file_path.to_string_lossy().to_string();
     tokio::spawn(async move {
-        if let Err(e) = run_remote_capture(sid.clone(), config, file_path_str, cancel_rx, app_handle).await {
+        if let Err(e) =
+            run_remote_capture(sid.clone(), config, file_path_str, cancel_rx, app_handle).await
+        {
             tracing::error!("Session {} error: {}", sid, e);
         }
         // Mark session stopped in DB
@@ -310,7 +315,8 @@ pub fn stop_all_remote_captures() {
     }
     tracing::info!(
         "[RemoteCapture] stop_all: cancelling {} remote session(s)",
-        sessions.len());
+        sessions.len()
+    );
     for (id, entry) in sessions.iter() {
         if let Err(e) = entry.cancel_tx.send(true) {
             tracing::error!("stop_all: error cancelling {}: {}", id, e);
@@ -348,8 +354,8 @@ async fn authenticate(
         }
         SshAuthMethod::KeyFile => {
             let path = key_path.ok_or_else(|| anyhow::anyhow!("Key path required"))?;
-            let key_pair = russh_keys::load_secret_key(path, password)
-                .context("Failed to load SSH key")?;
+            let key_pair =
+                russh_keys::load_secret_key(path, password).context("Failed to load SSH key")?;
             let ok = session
                 .authenticate_publickey(username, Arc::new(key_pair))
                 .await
@@ -367,10 +373,11 @@ async fn authenticate(
             ];
             for path in &key_files {
                 if path.exists() {
-                    if let Ok(kp) = russh_keys::load_secret_key(path.to_str().unwrap_or(""), None::<&str>) {
-                        if let Ok(true) = session
-                            .authenticate_publickey(username, Arc::new(kp))
-                            .await
+                    if let Ok(kp) =
+                        russh_keys::load_secret_key(path.to_str().unwrap_or(""), None::<&str>)
+                    {
+                        if let Ok(true) =
+                            session.authenticate_publickey(username, Arc::new(kp)).await
                         {
                             return Ok(true);
                         }
@@ -517,14 +524,16 @@ async fn run_remote_capture(
 
     tracing::info!(
         "[RemoteCapture] Connecting to {}@{}:{}",
-        config.username, config.host, config.port);
+        config.username,
+        config.host,
+        config.port
+    );
 
     let ssh_config = Arc::new(client::Config {
         ..Default::default()
     });
     let handler = SshClientHandler;
-    let mut session =
-        client::connect(ssh_config, (&*config.host, config.port), handler).await?;
+    let mut session = client::connect(ssh_config, (&*config.host, config.port), handler).await?;
 
     let authenticated = authenticate(
         &mut session,
@@ -600,8 +609,8 @@ async fn run_remote_capture(
             packet_buffer.clone(),
             pcap_writer.clone(),
         );
-        let mut sessions = crate::commands::packet_capture::sessions_lock()
-            .map_err(|e| anyhow::anyhow!(e))?;
+        let mut sessions =
+            crate::commands::packet_capture::sessions_lock().map_err(|e| anyhow::anyhow!(e))?;
         sessions.insert(
             session_id.clone(),
             crate::commands::packet_capture::SessionEntry::new_running(session_obj),
@@ -752,7 +761,9 @@ async fn run_remote_capture(
 
     tracing::info!(
         "[RemoteCapture] Session {} finished, {} packets captured",
-        session_id, packet_count);
+        session_id,
+        packet_count
+    );
 
     // Disconnect SSH
     let _ = session
@@ -889,11 +900,7 @@ fn parse_raw_packet(
     )
     .ok();
 
-    let protocol = crate::packet_capture::Protocol::detect_with_ports(
-        src_port,
-        dst_port,
-        payload,
-    );
+    let protocol = crate::packet_capture::Protocol::detect_with_ports(src_port, dst_port, payload);
 
     Some(PacketInfo {
         timestamp,
@@ -922,8 +929,8 @@ fn extract_ip_layer(data: &[u8], link_type: u32) -> Option<&[u8]> {
             }
             let ethertype = u16::from_be_bytes([data[12], data[13]]);
             match ethertype {
-                0x0800 => Some(&data[14..]),       // IPv4
-                0x86DD => Some(&data[14..]),       // IPv6
+                0x0800 => Some(&data[14..]), // IPv4
+                0x86DD => Some(&data[14..]), // IPv6
                 0x8100 => {
                     // VLAN tagged
                     if data.len() < 18 {
@@ -973,7 +980,8 @@ fn shell_escape(s: &str) -> String {
 async fn detect_remote_capture_backend(
     session: &mut client::Handle<SshClientHandler>,
 ) -> Result<()> {
-    let uname_probe = execute_remote_command(session, "uname -s", std::time::Duration::from_secs(3)).await?;
+    let uname_probe =
+        execute_remote_command(session, "uname -s", std::time::Duration::from_secs(3)).await?;
     let uname = uname_probe.stdout.trim().to_ascii_lowercase();
     if uname.contains("windows") || uname.contains("mingw") || uname.contains("cygwin") {
         anyhow::bail!(
@@ -982,8 +990,12 @@ async fn detect_remote_capture_backend(
         );
     }
 
-    let tcpdump_probe =
-        execute_remote_command(session, "tcpdump --version", std::time::Duration::from_secs(4)).await?;
+    let tcpdump_probe = execute_remote_command(
+        session,
+        "tcpdump --version",
+        std::time::Duration::from_secs(4),
+    )
+    .await?;
     let tcpdump_out = tcpdump_probe.stdout.trim().to_ascii_lowercase();
     if tcpdump_probe.exit_status != Some(0) {
         if tcpdump_probe.exit_status == Some(127)

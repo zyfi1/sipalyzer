@@ -265,11 +265,13 @@ pub fn generate_agent_package(
         return Err(format!("Go binary not found at: {}", go_bin.display()));
     }
 
-    let mut agent_src_dir = resolve_resource(resources_dir, &["agent-go"])
-        .ok_or_else(|| format!(
+    let mut agent_src_dir = resolve_resource(resources_dir, &["agent-go"]).ok_or_else(|| {
+        format!(
             "Agent Go source not found. Looked in:\n  - {}/resources/agent-go\n  - {}/agent-go",
-            resources_dir.display(), resources_dir.display(),
-        ))?;
+            resources_dir.display(),
+            resources_dir.display(),
+        )
+    })?;
 
     if has_spaced_numbered_go_files(&agent_src_dir) {
         if let Some(clean_dir) = find_clean_agent_source(resources_dir) {
@@ -285,7 +287,10 @@ pub fn generate_agent_package(
     }
 
     if !agent_src_dir.join("main.go").exists() {
-        return Err(format!("main.go not found in agent source dir: {}", agent_src_dir.display()));
+        return Err(format!(
+            "main.go not found in agent source dir: {}",
+            agent_src_dir.display()
+        ));
     }
 
     let experience = resolve_experience(&params);
@@ -322,7 +327,10 @@ pub fn generate_agent_package(
     ));
 
     if let Some(ref expires) = expires_at {
-        ldflags.push(format!("-X main.embeddedExpiresAt={}", expires.to_rfc3339()));
+        ldflags.push(format!(
+            "-X main.embeddedExpiresAt={}",
+            expires.to_rfc3339()
+        ));
     }
 
     if let Some(ref label) = params.label {
@@ -348,8 +356,7 @@ pub fn generate_agent_package(
     );
 
     // Temp dir for GOPATH and GOCACHE (avoid polluting the source tree)
-    let tmp_dir = tempfile::tempdir()
-        .map_err(|e| format!("Failed to create temp dir: {e}"))?;
+    let tmp_dir = tempfile::tempdir().map_err(|e| format!("Failed to create temp dir: {e}"))?;
     let tmp_gopath = tmp_dir.path().join("gopath");
     std::fs::create_dir_all(&tmp_gopath)
         .map_err(|e| format!("Failed to create temp GOPATH: {e}"))?;
@@ -359,59 +366,60 @@ pub fn generate_agent_package(
     // Both minimal and full run through the portable notray runtime.
     let base_tags = vec!["notray".to_string()];
 
-    let run_build = |extra_tags: &[&str], use_vendor: bool| -> Result<std::process::Output, String> {
-        let mut tags = base_tags.clone();
-        tags.extend(extra_tags.iter().map(|t| t.to_string()));
+    let run_build =
+        |extra_tags: &[&str], use_vendor: bool| -> Result<std::process::Output, String> {
+            let mut tags = base_tags.clone();
+            tags.extend(extra_tags.iter().map(|t| t.to_string()));
 
-        let mut build_args = vec![
-            "build".to_string(),
-            format!("-ldflags={}", ldflags_str),
-            if use_vendor {
-                "-mod=vendor".to_string()
+            let mut build_args = vec![
+                "build".to_string(),
+                format!("-ldflags={}", ldflags_str),
+                if use_vendor {
+                    "-mod=vendor".to_string()
+                } else {
+                    "-mod=mod".to_string()
+                },
+            ];
+
+            if !tags.is_empty() {
+                build_args.push(format!("-tags={}", tags.join(",")));
+            }
+
+            build_args.extend_from_slice(&[
+                "-o".to_string(),
+                output_path.to_string_lossy().to_string(),
+                ".".to_string(),
+            ]);
+
+            let mut cmd = Command::new(&go_bin);
+            cmd.args(&build_args)
+                .current_dir(&agent_src_dir)
+                .env("GOOS", target.goos)
+                .env("GOARCH", target.goarch)
+                .env("CGO_ENABLED", cgo_flag)
+                .env("GOFLAGS", "")
+                .env("GOROOT", &go_toolchain_dir)
+                .env("GOPATH", &tmp_gopath)
+                .env("GOCACHE", tmp_dir.path().join("gocache"))
+                .env("GOMODCACHE", tmp_dir.path().join("gomodcache"));
+            if let Some(goarm) = target.goarm {
+                cmd.env("GOARM", goarm);
             } else {
-                "-mod=mod".to_string()
-            },
-        ];
-
-        if !tags.is_empty() {
-            build_args.push(format!("-tags={}", tags.join(",")));
-        }
-
-        build_args.extend_from_slice(&[
-            "-o".to_string(),
-            output_path.to_string_lossy().to_string(),
-            ".".to_string(),
-        ]);
-
-        let mut cmd = Command::new(&go_bin);
-        cmd.args(&build_args)
-            .current_dir(&agent_src_dir)
-            .env("GOOS", target.goos)
-            .env("GOARCH", target.goarch)
-            .env("CGO_ENABLED", cgo_flag)
-            .env("GOFLAGS", "")
-            .env("GOROOT", &go_toolchain_dir)
-            .env("GOPATH", &tmp_gopath)
-            .env("GOCACHE", tmp_dir.path().join("gocache"))
-            .env("GOMODCACHE", tmp_dir.path().join("gomodcache"));
-        if let Some(goarm) = target.goarm {
-            cmd.env("GOARM", goarm);
-        } else {
-            cmd.env_remove("GOARM");
-        }
-        if let Some(gomips) = target.gomips {
-            cmd.env("GOMIPS", gomips);
-        } else {
-            cmd.env_remove("GOMIPS");
-        }
-        if let Some(gomips64) = target.gomips64 {
-            cmd.env("GOMIPS64", gomips64);
-        } else {
-            cmd.env_remove("GOMIPS64");
-        }
-        cmd.output()
-            .map_err(|e| format!("Failed to execute Go compiler: {e}"))
-    };
+                cmd.env_remove("GOARM");
+            }
+            if let Some(gomips) = target.gomips {
+                cmd.env("GOMIPS", gomips);
+            } else {
+                cmd.env_remove("GOMIPS");
+            }
+            if let Some(gomips64) = target.gomips64 {
+                cmd.env("GOMIPS64", gomips64);
+            } else {
+                cmd.env_remove("GOMIPS64");
+            }
+            cmd.output()
+                .map_err(|e| format!("Failed to execute Go compiler: {e}"))
+        };
 
     let mut compile_result = run_build(&[], true)?;
     let first_stderr = String::from_utf8_lossy(&compile_result.stderr).to_string();
@@ -483,17 +491,29 @@ pub fn generate_agent_package(
             }
             Err(e) => {
                 tracing::error!("Warning: Failed to create .app bundle: {e}. Using raw binary.");
-                send_progress("package", "App bundle skipped (using raw binary).", Some(0.9));
+                send_progress(
+                    "package",
+                    "App bundle skipped (using raw binary).",
+                    Some(0.9),
+                );
                 output_path.to_path_buf()
             }
         }
     } else if target.goos == "windows" {
         // Best-effort self-signing for portability. Do not fail generation when
         // signing tooling is unavailable on the host.
-        send_progress("package", "Attempting to self-sign Windows executable...", Some(0.85));
+        send_progress(
+            "package",
+            "Attempting to self-sign Windows executable...",
+            Some(0.85),
+        );
         if let Err(err) = self_sign_windows_exe(output_path) {
             tracing::warn!("Windows self-sign skipped: {err}");
-            send_progress("package", "Self-sign skipped (tooling unavailable).", Some(0.9));
+            send_progress(
+                "package",
+                "Self-sign skipped (tooling unavailable).",
+                Some(0.9),
+            );
         } else {
             send_progress("package", "Windows executable self-signed.", Some(0.9));
         }
@@ -552,8 +572,7 @@ fn create_macos_app_bundle(binary_path: &Path, resources_dir: &Path) -> Result<P
     let res_dir = contents_dir.join("Resources");
 
     // Create directory structure
-    std::fs::create_dir_all(&macos_dir)
-        .map_err(|e| format!("Failed to create MacOS dir: {e}"))?;
+    std::fs::create_dir_all(&macos_dir).map_err(|e| format!("Failed to create MacOS dir: {e}"))?;
     std::fs::create_dir_all(&res_dir)
         .map_err(|e| format!("Failed to create Resources dir: {e}"))?;
 
@@ -577,15 +596,19 @@ fn create_macos_app_bundle(binary_path: &Path, resources_dir: &Path) -> Result<P
     // Copy icon.icns into Resources/
     // We ship icon.icns inside agent-go/ so it's always available as a bundled resource.
     // Also try the standard Tauri icons directory as a fallback.
-    let agent_src_dir = binary_path
-        .parent()
-        .unwrap_or(Path::new("."));
+    let agent_src_dir = binary_path.parent().unwrap_or(Path::new("."));
     let icon_candidates = [
         // Primary: icon.icns bundled alongside the agent Go source
-        resources_dir.join("resources").join("agent-go").join("icon.icns"),
+        resources_dir
+            .join("resources")
+            .join("agent-go")
+            .join("icon.icns"),
         resources_dir.join("agent-go").join("icon.icns"),
         // Fallback: Tauri icons directory (dev layout)
-        resources_dir.join("resources").join("icons").join("icon.icns"),
+        resources_dir
+            .join("resources")
+            .join("icons")
+            .join("icon.icns"),
         resources_dir.join("icons").join("icon.icns"),
         // Fallback: parent of resources (src-tauri/icons/)
         resources_dir
@@ -654,13 +677,14 @@ fn create_macos_app_bundle(binary_path: &Path, resources_dir: &Path) -> Result<P
 /// - `osslsigncode` OR `signtool` (required, to apply Authenticode signature)
 fn self_sign_windows_exe(exe_path: &Path) -> Result<(), String> {
     if !exe_path.exists() {
-        return Err(format!("Cannot self-sign missing executable: {}", exe_path.display()));
+        return Err(format!(
+            "Cannot self-sign missing executable: {}",
+            exe_path.display()
+        ));
     }
 
     if !has_command("openssl") {
-        return Err(
-            "Self-signing Windows executable requires 'openssl' on PATH.".to_string(),
-        );
+        return Err("Self-signing Windows executable requires 'openssl' on PATH.".to_string());
     }
 
     let tmp = tempfile::tempdir()
@@ -879,7 +903,6 @@ fn has_command(cmd: &str) -> bool {
     output.map(|o| o.status.success()).unwrap_or(false)
 }
 
-
 /// Resolve a resource path, trying with and without the `resources/` prefix.
 /// Tauri puts resources in different locations during development vs production.
 fn resolve_resource(base: &Path, segments: &[&str]) -> Option<PathBuf> {
@@ -972,4 +995,50 @@ fn find_clean_agent_source(resources_dir: &Path) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn go_target_supports_windows_and_macos_variants() {
+        let windows = go_target("windows").expect("windows target should resolve");
+        assert_eq!(windows.goos, "windows");
+        assert_eq!(windows.goarch, "amd64");
+
+        let mac_x64 = go_target("macos-x64").expect("macos-x64 target should resolve");
+        assert_eq!(mac_x64.goos, "darwin");
+        assert_eq!(mac_x64.goarch, "amd64");
+
+        let mac_arm64 = go_target("macos-arm64").expect("macos-arm64 target should resolve");
+        assert_eq!(mac_arm64.goos, "darwin");
+        assert_eq!(mac_arm64.goarch, "arm64");
+    }
+
+    #[test]
+    fn validate_controller_address_accepts_common_remote_agent_endpoints() {
+        let valid = [
+            "192.168.1.10:9147",
+            "controller.local:9147",
+            "[2001:db8::1]:9147",
+            "relay.zyfi.io/session/demo",
+            "controller.local:9147|relay.zyfi.io/session/demo",
+        ];
+        for endpoint in valid {
+            validate_controller_address(endpoint)
+                .unwrap_or_else(|_| panic!("expected valid endpoint: {endpoint}"));
+        }
+    }
+
+    #[test]
+    fn validate_controller_address_rejects_malformed_endpoints() {
+        let invalid = ["", "controller.local", "controller.local:0", "[2001:db8::1]:0", ":9147"];
+        for endpoint in invalid {
+            assert!(
+                validate_controller_address(endpoint).is_err(),
+                "expected invalid endpoint: {endpoint}"
+            );
+        }
+    }
 }

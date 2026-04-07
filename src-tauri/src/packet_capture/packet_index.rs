@@ -72,8 +72,8 @@ pub struct PacketIndex {
 impl PacketIndex {
     /// Create a new in-memory packet index.
     pub fn new_in_memory() -> Result<Self> {
-        let conn = Connection::open_in_memory()
-            .context("Failed to create in-memory SQLite database")?;
+        let conn =
+            Connection::open_in_memory().context("Failed to create in-memory SQLite database")?;
         Self::init_schema(&conn)?;
         Ok(Self {
             conn: RwLock::new(conn),
@@ -83,15 +83,18 @@ impl PacketIndex {
 
     /// Create a packet index backed by a file.
     pub fn new_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let conn = Connection::open(path)
-            .context("Failed to open SQLite database")?;
+        let conn = Connection::open(path).context("Failed to open SQLite database")?;
         Self::init_schema(&conn)?;
-        
+
         // Get the max offset from existing data
         let max_offset: i64 = conn
-            .query_row("SELECT COALESCE(MAX(buffer_offset), -1) FROM packet_index", [], |row| row.get(0))
+            .query_row(
+                "SELECT COALESCE(MAX(buffer_offset), -1) FROM packet_index",
+                [],
+                |row| row.get(0),
+            )
             .unwrap_or(-1);
-        
+
         Ok(Self {
             conn: RwLock::new(conn),
             next_offset: std::sync::atomic::AtomicI64::new(max_offset + 1),
@@ -141,19 +144,20 @@ impl PacketIndex {
             "#,
         )
         .context("Failed to initialize packet index schema")?;
-        
+
         Ok(())
     }
 
     /// Index a packet and return its assigned buffer offset.
     pub fn index_packet(&self, packet: &PacketInfo, buffer_offset: Option<i64>) -> Result<i64> {
         let offset = buffer_offset.unwrap_or_else(|| {
-            self.next_offset.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            self.next_offset
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
         });
-        
+
         let timestamp = packet.timestamp.timestamp_millis();
         let protocol_str = format!("{:?}", packet.protocol);
-        
+
         let conn = self.conn.write();
         conn.execute(
             "INSERT INTO packet_index (timestamp, src_ip, dst_ip, src_port, dst_port, protocol, size, buffer_offset)
@@ -170,15 +174,15 @@ impl PacketIndex {
             ],
         )
         .context("Failed to index packet")?;
-        
+
         let packet_id = conn.last_insert_rowid();
-        
+
         // Index SIP content for full-text search
         if matches!(packet.protocol, Protocol::SIP) {
             if let Some(ref decoded) = packet.decoded {
                 if let crate::packet_capture::ApplicationLayer::Sip(ref sip) = decoded.application {
                     let content = String::from_utf8_lossy(&packet.data);
-                        conn.execute(
+                    conn.execute(
                             "INSERT INTO sip_content (packet_id, call_id, from_uri, to_uri, method, content)
                              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                             params![
@@ -194,7 +198,7 @@ impl PacketIndex {
                 }
             }
         }
-        
+
         Ok(offset)
     }
 
@@ -202,18 +206,19 @@ impl PacketIndex {
     pub fn index_packets_batch(&self, packets: &[(PacketInfo, Option<i64>)]) -> Result<Vec<i64>> {
         let conn = self.conn.write();
         let tx = conn.unchecked_transaction()?;
-        
+
         let mut offsets = Vec::with_capacity(packets.len());
-        
+
         for (packet, buffer_offset) in packets {
             let offset = buffer_offset.unwrap_or_else(|| {
-                self.next_offset.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                self.next_offset
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
             });
             offsets.push(offset);
-            
+
             let timestamp = packet.timestamp.timestamp_millis();
             let protocol_str = format!("{:?}", packet.protocol);
-            
+
             tx.execute(
                 "INSERT INTO packet_index (timestamp, src_ip, dst_ip, src_port, dst_port, protocol, size, buffer_offset)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -228,13 +233,15 @@ impl PacketIndex {
                     offset,
                 ],
             )?;
-            
+
             let packet_id = tx.last_insert_rowid();
-            
+
             // Index SIP content
             if matches!(packet.protocol, Protocol::SIP) {
                 if let Some(ref decoded) = packet.decoded {
-                    if let crate::packet_capture::ApplicationLayer::Sip(ref sip) = decoded.application {
+                    if let crate::packet_capture::ApplicationLayer::Sip(ref sip) =
+                        decoded.application
+                    {
                         let content = String::from_utf8_lossy(&packet.data);
                         tx.execute(
                             "INSERT INTO sip_content (packet_id, call_id, from_uri, to_uri, method, content)
@@ -252,7 +259,7 @@ impl PacketIndex {
                 }
             }
         }
-        
+
         tx.commit()?;
         Ok(offsets)
     }
@@ -260,11 +267,11 @@ impl PacketIndex {
     /// Query packets based on filters.
     pub fn query(&self, query: &PacketQuery) -> Result<Vec<IndexedPacket>> {
         let conn = self.conn.read();
-        
+
         // Build dynamic query
         let mut sql = String::from("SELECT id, timestamp, src_ip, dst_ip, src_port, dst_port, protocol, size, buffer_offset FROM packet_index WHERE 1=1");
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-        
+
         if let Some(ref src_ip) = query.src_ip {
             sql.push_str(" AND src_ip = ?");
             params.push(Box::new(src_ip.clone()));
@@ -293,7 +300,7 @@ impl PacketIndex {
             sql.push_str(" AND timestamp <= ?");
             params.push(Box::new(end));
         }
-        
+
         // Handle FTS query (join with sip_content)
         if let Some(ref fts) = query.fts_query {
             sql = format!(
@@ -313,18 +320,18 @@ impl PacketIndex {
             );
             params.insert(0, Box::new(fts.clone()));
         }
-        
+
         sql.push_str(" ORDER BY timestamp DESC");
-        
+
         if let Some(limit) = query.limit {
             sql.push_str(&format!(" LIMIT {}", limit));
         }
         if let Some(offset) = query.offset {
             sql.push_str(&format!(" OFFSET {}", offset));
         }
-        
+
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-        
+
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(param_refs.as_slice(), |row| {
             Ok(IndexedPacket {
@@ -339,26 +346,26 @@ impl PacketIndex {
                 buffer_offset: row.get(8)?,
             })
         })?;
-        
+
         let mut results = Vec::new();
         for row in rows {
             results.push(row?);
         }
-        
+
         Ok(results)
     }
 
     /// Full-text search for SIP content.
     pub fn search_sip(&self, query: &str, limit: usize) -> Result<Vec<SipIndexEntry>> {
         let conn = self.conn.read();
-        
+
         let mut stmt = conn.prepare(
             "SELECT packet_id, call_id, from_uri, to_uri, method 
              FROM sip_content 
              WHERE sip_content MATCH ?1
-             LIMIT ?2"
+             LIMIT ?2",
         )?;
-        
+
         let rows = stmt.query_map(params![query, limit as i64], |row| {
             Ok(SipIndexEntry {
                 packet_id: row.get::<_, String>(0)?.parse().unwrap_or(0),
@@ -368,29 +375,30 @@ impl PacketIndex {
                 method: row.get(4).ok(),
             })
         })?;
-        
+
         let mut results = Vec::new();
         for row in rows {
             results.push(row?);
         }
-        
+
         Ok(results)
     }
 
     /// Get total packet count.
     pub fn count(&self) -> Result<usize> {
         let conn = self.conn.read();
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM packet_index", [], |row| row.get(0))?;
+        let count: i64 =
+            conn.query_row("SELECT COUNT(*) FROM packet_index", [], |row| row.get(0))?;
         Ok(count as usize)
     }
 
     /// Get packet count matching a query.
     pub fn count_query(&self, query: &PacketQuery) -> Result<usize> {
         let conn = self.conn.read();
-        
+
         let mut sql = String::from("SELECT COUNT(*) FROM packet_index WHERE 1=1");
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-        
+
         if let Some(ref src_ip) = query.src_ip {
             sql.push_str(" AND src_ip = ?");
             params.push(Box::new(src_ip.clone()));
@@ -411,21 +419,20 @@ impl PacketIndex {
             sql.push_str(" AND timestamp <= ?");
             params.push(Box::new(end));
         }
-        
+
         let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let mut stmt = conn.prepare(&sql)?;
         let count: i64 = stmt.query_row(param_refs.as_slice(), |row| row.get(0))?;
-        
+
         Ok(count as usize)
     }
 
     /// Clear all indexed packets.
     pub fn clear(&self) -> Result<()> {
         let conn = self.conn.write();
-        conn.execute_batch(
-            "DELETE FROM sip_content; DELETE FROM packet_index; VACUUM;"
-        )?;
-        self.next_offset.store(0, std::sync::atomic::Ordering::SeqCst);
+        conn.execute_batch("DELETE FROM sip_content; DELETE FROM packet_index; VACUUM;")?;
+        self.next_offset
+            .store(0, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -438,9 +445,10 @@ impl PacketIndex {
     /// Get distinct protocols in the index.
     pub fn get_protocols(&self) -> Result<Vec<String>> {
         let conn = self.conn.read();
-        let mut stmt = conn.prepare("SELECT DISTINCT protocol FROM packet_index ORDER BY protocol")?;
+        let mut stmt =
+            conn.prepare("SELECT DISTINCT protocol FROM packet_index ORDER BY protocol")?;
         let rows = stmt.query_map([], |row| row.get(0))?;
-        
+
         let mut protocols = Vec::new();
         for row in rows {
             protocols.push(row?);
@@ -451,21 +459,23 @@ impl PacketIndex {
     /// Get distinct IPs in the index.
     pub fn get_unique_ips(&self) -> Result<(Vec<String>, Vec<String>)> {
         let conn = self.conn.read();
-        
-        let mut src_stmt = conn.prepare("SELECT DISTINCT src_ip FROM packet_index ORDER BY src_ip")?;
+
+        let mut src_stmt =
+            conn.prepare("SELECT DISTINCT src_ip FROM packet_index ORDER BY src_ip")?;
         let src_rows = src_stmt.query_map([], |row| row.get(0))?;
         let mut src_ips = Vec::new();
         for row in src_rows {
             src_ips.push(row?);
         }
-        
-        let mut dst_stmt = conn.prepare("SELECT DISTINCT dst_ip FROM packet_index ORDER BY dst_ip")?;
+
+        let mut dst_stmt =
+            conn.prepare("SELECT DISTINCT dst_ip FROM packet_index ORDER BY dst_ip")?;
         let dst_rows = dst_stmt.query_map([], |row| row.get(0))?;
         let mut dst_ips = Vec::new();
         for row in dst_rows {
             dst_ips.push(row?);
         }
-        
+
         Ok((src_ips, dst_ips))
     }
 }
@@ -507,7 +517,7 @@ mod tests {
     fn test_index_packet() {
         let index = PacketIndex::new_in_memory().unwrap();
         let packet = create_test_packet(Protocol::SIP, 5060, 5060);
-        
+
         let offset = index.index_packet(&packet, None).unwrap();
         assert_eq!(offset, 0);
         assert_eq!(index.count().unwrap(), 1);
@@ -516,16 +526,22 @@ mod tests {
     #[test]
     fn test_query_by_protocol() {
         let index = PacketIndex::new_in_memory().unwrap();
-        
-        index.index_packet(&create_test_packet(Protocol::SIP, 5060, 5060), None).unwrap();
-        index.index_packet(&create_test_packet(Protocol::RTP, 10000, 10001), None).unwrap();
-        index.index_packet(&create_test_packet(Protocol::SIP, 5060, 5060), None).unwrap();
-        
+
+        index
+            .index_packet(&create_test_packet(Protocol::SIP, 5060, 5060), None)
+            .unwrap();
+        index
+            .index_packet(&create_test_packet(Protocol::RTP, 10000, 10001), None)
+            .unwrap();
+        index
+            .index_packet(&create_test_packet(Protocol::SIP, 5060, 5060), None)
+            .unwrap();
+
         let query = PacketQuery {
             protocol: Some("SIP".to_string()),
             ..Default::default()
         };
-        
+
         let results = index.query(&query).unwrap();
         assert_eq!(results.len(), 2);
     }
@@ -533,11 +549,11 @@ mod tests {
     #[test]
     fn test_batch_indexing() {
         let index = PacketIndex::new_in_memory().unwrap();
-        
+
         let packets: Vec<(PacketInfo, Option<i64>)> = (0..1000)
             .map(|i| (create_test_packet(Protocol::RTP, 10000 + i, 10001), None))
             .collect();
-        
+
         let offsets = index.index_packets_batch(&packets).unwrap();
         assert_eq!(offsets.len(), 1000);
         assert_eq!(index.count().unwrap(), 1000);
@@ -546,17 +562,19 @@ mod tests {
     #[test]
     fn test_pagination() {
         let index = PacketIndex::new_in_memory().unwrap();
-        
+
         for i in 0..100 {
-            index.index_packet(&create_test_packet(Protocol::UDP, 5000 + i, 5001), None).unwrap();
+            index
+                .index_packet(&create_test_packet(Protocol::UDP, 5000 + i, 5001), None)
+                .unwrap();
         }
-        
+
         let query = PacketQuery {
             limit: Some(10),
             offset: Some(20),
             ..Default::default()
         };
-        
+
         let results = index.query(&query).unwrap();
         assert_eq!(results.len(), 10);
     }

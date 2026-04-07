@@ -157,9 +157,7 @@ async fn run_icmp_ping(ip: IpAddr, count: u32, timeout_ms: u64) -> Result<PingRe
     };
 
     let client = Client::new(&config).map_err(|e| format!("ICMP client error: {}", e))?;
-    let mut pinger = client
-        .pinger(ip, PingIdentifier(rand_id()))
-        .await;
+    let mut pinger = client.pinger(ip, PingIdentifier(rand_id())).await;
     pinger.timeout(Duration::from_millis(timeout_ms));
 
     let payload = vec![0u8; 56];
@@ -213,7 +211,11 @@ async fn run_icmp_ping(ip: IpAddr, count: u32, timeout_ms: u64) -> Result<PingRe
         stddev_ms: stddev,
         packet_loss_pct: loss,
         success: !rtts.is_empty(),
-        error: if cancelled { Some("Cancelled by user".to_string()) } else { None },
+        error: if cancelled {
+            Some("Cancelled by user".to_string())
+        } else {
+            None
+        },
     })
 }
 
@@ -245,22 +247,38 @@ async fn run_udp_ping(ip: IpAddr, config: &PingConfig) -> PingResult {
                     Ok(Ok(_)) => {
                         let rtt = start.elapsed().as_secs_f64() * 1000.0;
                         rtts.push(rtt);
-                        probes.push(ProbeResult { seq, rtt_ms: Some(rtt), success: true });
+                        probes.push(ProbeResult {
+                            seq,
+                            rtt_ms: Some(rtt),
+                            success: true,
+                        });
                     }
                     _ => {
                         // Use send time as upper bound estimate
                         let rtt = start.elapsed().as_secs_f64() * 1000.0;
                         if rtt < config.timeout_ms as f64 {
                             rtts.push(rtt);
-                            probes.push(ProbeResult { seq, rtt_ms: Some(rtt), success: true });
+                            probes.push(ProbeResult {
+                                seq,
+                                rtt_ms: Some(rtt),
+                                success: true,
+                            });
                         } else {
-                            probes.push(ProbeResult { seq, rtt_ms: None, success: false });
+                            probes.push(ProbeResult {
+                                seq,
+                                rtt_ms: None,
+                                success: false,
+                            });
                         }
                     }
                 }
             }
             Err(_) => {
-                probes.push(ProbeResult { seq, rtt_ms: None, success: false });
+                probes.push(ProbeResult {
+                    seq,
+                    rtt_ms: None,
+                    success: false,
+                });
             }
         }
 
@@ -286,7 +304,11 @@ async fn run_udp_ping(ip: IpAddr, config: &PingConfig) -> PingResult {
         stddev_ms: stddev,
         packet_loss_pct: loss,
         success: !rtts.is_empty(),
-        error: if cancelled { Some("Cancelled by user".to_string()) } else { None },
+        error: if cancelled {
+            Some("Cancelled by user".to_string())
+        } else {
+            None
+        },
     }
 }
 

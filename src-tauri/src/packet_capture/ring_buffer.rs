@@ -1,18 +1,18 @@
 //! High-performance lock-free ring buffer for packet storage.
-//! 
+//!
 //! Uses Arc<PacketInfo> to avoid cloning and parking_lot for faster locking.
 //! Designed to handle millions of packets at wire speed.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use parking_lot::RwLock;
 use crate::packet_capture::PacketInfo;
+use parking_lot::RwLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 /// Default capacity for live captures (2M packets for enterprise scale)
 pub const DEFAULT_BUFFER_CAPACITY: usize = 2_000_000;
 
 /// High-performance ring buffer for packet storage.
-/// 
+///
 /// Key features:
 /// - Lock-free reads via atomic indices
 /// - Minimal locking for writes (parking_lot RwLock)
@@ -56,7 +56,7 @@ impl PacketRingBuffer {
         for _ in 0..capacity {
             buffer.push(RwLock::new(None));
         }
-        
+
         Self {
             buffer,
             write_index: AtomicUsize::new(0),
@@ -70,22 +70,22 @@ impl PacketRingBuffer {
     /// Returns an Arc to the stored packet.
     pub fn push(&self, packet: PacketInfo) -> Arc<PacketInfo> {
         let arc = Arc::new(packet);
-        
+
         // Get current write position and advance atomically
         let pos = self.write_index.fetch_add(1, Ordering::SeqCst) % self.capacity;
-        
+
         // Store the packet
         {
             let mut slot = self.buffer[pos].write();
             *slot = Some(arc.clone());
         }
-        
+
         // Update size (cap at capacity)
         let current_size = self.size.load(Ordering::Relaxed);
         if current_size < self.capacity {
             self.size.fetch_add(1, Ordering::SeqCst);
         }
-        
+
         arc
     }
 
@@ -122,7 +122,7 @@ impl PacketRingBuffer {
                 idx = 0;
             }
         }
-        
+
         result
     }
 
@@ -146,7 +146,7 @@ impl PacketRingBuffer {
                 idx = 0;
             }
         }
-        
+
         result
     }
 
@@ -191,10 +191,10 @@ unsafe impl Send for PacketRingBuffer {}
 unsafe impl Sync for PacketRingBuffer {}
 
 /// Thread-safe wrapper for PacketRingBuffer.
-/// 
+///
 /// The new implementation is already thread-safe internally,
 /// so this is just a type alias for Arc<PacketRingBuffer>.
-/// 
+///
 /// For backwards compatibility, we also provide a Mutex-wrapped version.
 pub type SharedPacketBuffer = Arc<std::sync::Mutex<PacketRingBufferCompat>>;
 
@@ -262,8 +262,8 @@ pub type LockFreePacketBuffer = Arc<PacketRingBuffer>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::IpAddr;
     use chrono::Utc;
+    use std::net::IpAddr;
 
     fn create_test_packet(id: u16) -> PacketInfo {
         PacketInfo {
@@ -286,13 +286,13 @@ mod tests {
     #[test]
     fn test_push_and_get() {
         let buffer = PacketRingBuffer::new(10);
-        
+
         for i in 0..5 {
             buffer.push(create_test_packet(i));
         }
-        
+
         assert_eq!(buffer.len(), 5);
-        
+
         let packets = buffer.get_last(3);
         assert_eq!(packets.len(), 3);
         assert_eq!(packets[0].src_port, 2);
@@ -302,13 +302,13 @@ mod tests {
     #[test]
     fn test_wrap_around() {
         let buffer = PacketRingBuffer::new(5);
-        
+
         for i in 0..10 {
             buffer.push(create_test_packet(i));
         }
-        
+
         assert_eq!(buffer.len(), 5);
-        
+
         let packets = buffer.get_all();
         assert_eq!(packets.len(), 5);
         // Should have packets 5-9 (newest 5)
@@ -319,11 +319,11 @@ mod tests {
     #[test]
     fn test_get_range() {
         let buffer = PacketRingBuffer::new(10);
-        
+
         for i in 0..10 {
             buffer.push(create_test_packet(i));
         }
-        
+
         let packets = buffer.get_range(2, 3);
         assert_eq!(packets.len(), 3);
         assert_eq!(packets[0].src_port, 2);
@@ -333,10 +333,10 @@ mod tests {
     #[test]
     fn test_concurrent_access() {
         use std::thread;
-        
+
         let buffer = Arc::new(PacketRingBuffer::new(1000));
         let mut handles = vec![];
-        
+
         // Spawn writer threads
         for t in 0..4 {
             let buf = buffer.clone();
@@ -346,7 +346,7 @@ mod tests {
                 }
             }));
         }
-        
+
         // Spawn reader threads
         for _ in 0..4 {
             let buf = buffer.clone();
@@ -356,11 +356,11 @@ mod tests {
                 }
             }));
         }
-        
+
         for handle in handles {
             handle.join().unwrap();
         }
-        
+
         assert_eq!(buffer.len(), 400);
     }
 }

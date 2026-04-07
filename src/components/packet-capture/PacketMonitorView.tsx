@@ -21,6 +21,7 @@ import {
   Bookmark,
   ExternalLink,
   Save,
+  ArrowUpFromLine,
   PanelRightOpen,
   PanelRightClose,
   Scan,
@@ -667,28 +668,28 @@ export function PacketMonitorView({ tabId, executionContext, isActiveTab }: Pack
                     </Button>
                   </TooltipWrapper>
                   <AppDivider orientation="vertical" size="md" className="mx-0.5 shrink-0" />
-                  <TooltipWrapper entry={tooltips.captureExport}>
-                    <Button
-                      type="button"
-                      variant="neutral"
-                      size="icon-sm"
-                      aria-label="Save or export packets"
-                      disabled={!hasData}
-                      onClick={() => setShowExport(true)}
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipWrapper>
                   <TooltipWrapper content="Save this capture and open it in the Captures viewer">
                     <Button
                       type="button"
                       variant="neutral"
                       size="icon-sm"
                       aria-label="Save capture and open in Captures"
-                      onClick={handleOpenInCaptures}
                       disabled={!hasData}
+                      onClick={handleOpenInCaptures}
                     >
                       <Save className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper entry={tooltips.captureExport}>
+                    <Button
+                      type="button"
+                      variant="neutral"
+                      size="icon-sm"
+                      aria-label="Save or export packets"
+                      onClick={() => setShowExport(true)}
+                      disabled={!hasData}
+                    >
+                      <ArrowUpFromLine className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipWrapper>
                   <AppDivider orientation="vertical" size="md" className="mx-0.5" />

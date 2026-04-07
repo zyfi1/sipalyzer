@@ -81,9 +81,15 @@ impl AudioCodec for G711Codec {
     fn decode_frame(&self, encoded: &[u8]) -> Vec<i16> {
         G711Codec::decode_frame(self, encoded)
     }
-    fn sample_rate(&self) -> u32 { SAMPLE_RATE_8K }
-    fn frame_samples(&self) -> usize { SAMPLES_PER_FRAME }
-    fn pt(&self) -> u8 { G711Codec::pt(self) }
+    fn sample_rate(&self) -> u32 {
+        SAMPLE_RATE_8K
+    }
+    fn frame_samples(&self) -> usize {
+        SAMPLES_PER_FRAME
+    }
+    fn pt(&self) -> u8 {
+        G711Codec::pt(self)
+    }
     fn name(&self) -> &'static str {
         match self {
             G711Codec::PCMU => "PCMU",
@@ -105,12 +111,16 @@ impl G722Codec {
     pub fn new() -> Self {
         use ezk_g722::libg722::Bitrate;
         Self {
-            encoder: std::sync::Mutex::new(
-                ezk_g722::libg722::encoder::Encoder::new(Bitrate::Mode1_64000, false, false)
-            ),
-            decoder: std::sync::Mutex::new(
-                ezk_g722::libg722::decoder::Decoder::new(Bitrate::Mode1_64000, false, false)
-            ),
+            encoder: std::sync::Mutex::new(ezk_g722::libg722::encoder::Encoder::new(
+                Bitrate::Mode1_64000,
+                false,
+                false,
+            )),
+            decoder: std::sync::Mutex::new(ezk_g722::libg722::decoder::Decoder::new(
+                Bitrate::Mode1_64000,
+                false,
+                false,
+            )),
         }
     }
 }
@@ -126,10 +136,18 @@ impl AudioCodec for G722Codec {
         decoder.decode(encoded)
     }
 
-    fn sample_rate(&self) -> u32 { SAMPLE_RATE_16K }
-    fn frame_samples(&self) -> usize { SAMPLES_PER_FRAME_16K }
-    fn pt(&self) -> u8 { 9 }
-    fn name(&self) -> &'static str { "G722" }
+    fn sample_rate(&self) -> u32 {
+        SAMPLE_RATE_16K
+    }
+    fn frame_samples(&self) -> usize {
+        SAMPLES_PER_FRAME_16K
+    }
+    fn pt(&self) -> u8 {
+        9
+    }
+    fn name(&self) -> &'static str {
+        "G722"
+    }
 }
 
 /// Create a codec from an RTP payload type. Returns a boxed AudioCodec.

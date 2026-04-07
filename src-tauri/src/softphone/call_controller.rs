@@ -12,8 +12,8 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc as tokio_mpsc;
 
-use once_cell::sync::Lazy;
 use super::sip_log;
+use once_cell::sync::Lazy;
 
 /// Send data on a UDP socket, handling both connected and unconnected sockets.
 ///
@@ -31,11 +31,11 @@ fn udp_send(socket: &UdpSocket, data: &[u8], dest: SocketAddr) -> std::io::Resul
 use crate::core::config::RegistrarConfig;
 use crate::core::credentials::CredentialStore;
 use crate::core::database::Database;
-use crate::sip::stack::{generate_call_id, generate_tag, SipMessage};
-use crate::sip::auth;
-use crate::sip::transport::{read_one_sip_message, Transport};
 use crate::core::user_agent;
-use crate::sip::uri::{SipUri, normalize_dial_target, escape_user};
+use crate::sip::auth;
+use crate::sip::stack::{generate_call_id, generate_tag, SipMessage};
+use crate::sip::transport::{read_one_sip_message, Transport};
+use crate::sip::uri::{escape_user, normalize_dial_target, SipUri};
 
 use super::media_engine::{self, set_hold};
 use super::port_allocator;
@@ -49,7 +49,9 @@ const SESSION_TIMEOUT_SECS: u64 = 7200;
 
 /// Extract Via, From, To, Call-ID, CSeq from raw request bytes (for 200 OK to BYE when full parse fails).
 /// Supports both full-form and compact headers per RFC 3261 §7.3.3.
-pub fn extract_headers_for_200_ok(bytes: &[u8]) -> Option<(String, String, String, String, String)> {
+pub fn extract_headers_for_200_ok(
+    bytes: &[u8],
+) -> Option<(String, String, String, String, String)> {
     let mut via = None;
     let mut from = None;
     let mut to = None;
@@ -74,11 +76,23 @@ pub fn extract_headers_for_200_ok(bytes: &[u8]) -> Option<(String, String, Strin
             let name = line[..colon].trim().to_lowercase();
             let value = line[colon + 1..].trim().to_string();
             match name.as_str() {
-                "via" | "v" => { if via.is_none() { via = Some(value); } }
-                "from" | "f" => { from = Some(value); }
-                "to" | "t" => { to = Some(value); }
-                "call-id" | "i" => { call_id = Some(value); }
-                "cseq" => { cseq = Some(value); }
+                "via" | "v" => {
+                    if via.is_none() {
+                        via = Some(value);
+                    }
+                }
+                "from" | "f" => {
+                    from = Some(value);
+                }
+                "to" | "t" => {
+                    to = Some(value);
+                }
+                "call-id" | "i" => {
+                    call_id = Some(value);
+                }
+                "cseq" => {
+                    cseq = Some(value);
+                }
                 _ => {}
             }
         }
@@ -98,7 +112,10 @@ static DIALOG_SENDERS: Lazy<Mutex<HashMap<String, mpsc::Sender<u32>>>> =
 
 /// Per-call metadata for the pending INVITE transaction so CANCEL can reuse the
 /// correct Via branch and CSeq (RFC 3261 §9.1).
-struct InviteTxn { branch: String, cseq: u32 }
+struct InviteTxn {
+    branch: String,
+    cseq: u32,
+}
 static INVITE_TXNS: Lazy<Mutex<HashMap<String, InviteTxn>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -271,10 +288,7 @@ fn stun_discover_public_ip_uncached() -> Option<String> {
     for server in &stun_servers {
         let dest: SocketAddr = match server.parse().or_else(|_| {
             use std::net::ToSocketAddrs;
-            server.to_socket_addrs()
-                .map_err(|_| ())?
-                .next()
-                .ok_or(())
+            server.to_socket_addrs().map_err(|_| ())?.next().ok_or(())
         }) {
             Ok(a) => a,
             Err(_) => continue,
@@ -291,7 +305,7 @@ fn stun_discover_public_ip_uncached() -> Option<String> {
         request.extend_from_slice(&0x0001u16.to_be_bytes()); // Binding Request
         request.extend_from_slice(&0x0000u16.to_be_bytes()); // Length: 0
         request.extend_from_slice(&0x2112A442u32.to_be_bytes()); // Magic Cookie
-        // Transaction ID (12 bytes)
+                                                                 // Transaction ID (12 bytes)
         let seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -300,7 +314,9 @@ fn stun_discover_public_ip_uncached() -> Option<String> {
             request.push(((seed >> (i * 7)) & 0xFF) as u8);
         }
 
-        if socket.send_to(&request, dest).is_err() { continue; }
+        if socket.send_to(&request, dest).is_err() {
+            continue;
+        }
 
         let mut buf = [0u8; 256];
         let len = match socket.recv_from(&mut buf) {
@@ -308,9 +324,13 @@ fn stun_discover_public_ip_uncached() -> Option<String> {
             Err(_) => continue,
         };
 
-        if len < 20 { continue; }
+        if len < 20 {
+            continue;
+        }
         let msg_type = u16::from_be_bytes([buf[0], buf[1]]);
-        if msg_type != 0x0101 { continue; } // Not Binding Success Response
+        if msg_type != 0x0101 {
+            continue;
+        } // Not Binding Success Response
         let msg_len = u16::from_be_bytes([buf[2], buf[3]]) as usize;
         let magic = 0x2112A442u32;
 
@@ -318,30 +338,59 @@ fn stun_discover_public_ip_uncached() -> Option<String> {
         while offset + 4 <= 20 + msg_len && offset + 4 <= len {
             let attr_type = u16::from_be_bytes([buf[offset], buf[offset + 1]]);
             let attr_len = u16::from_be_bytes([buf[offset + 2], buf[offset + 3]]) as usize;
-            if offset + 4 + attr_len > len { break; }
+            if offset + 4 + attr_len > len {
+                break;
+            }
             let attr_data = &buf[offset + 4..offset + 4 + attr_len];
 
             match attr_type {
-                0x0020 if attr_len >= 8 => { // XOR-MAPPED-ADDRESS (IPv4)
+                0x0020 if attr_len >= 8 => {
+                    // XOR-MAPPED-ADDRESS (IPv4)
                     let family = u16::from_be_bytes([attr_data[0], attr_data[1]]);
-                    if family == 0x01 { // IPv4
+                    if family == 0x01 {
+                        // IPv4
                         let port_xor = u16::from_be_bytes([attr_data[2], attr_data[3]]);
                         let _port = port_xor ^ (magic >> 16) as u16;
-                        let ip_xor = u32::from_be_bytes([attr_data[4], attr_data[5], attr_data[6], attr_data[7]]);
+                        let ip_xor = u32::from_be_bytes([
+                            attr_data[4],
+                            attr_data[5],
+                            attr_data[6],
+                            attr_data[7],
+                        ]);
                         let ip = ip_xor ^ magic;
-                        let public_ip = format!("{}.{}.{}.{}",
-                            (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
+                        let public_ip = format!(
+                            "{}.{}.{}.{}",
+                            (ip >> 24) & 0xFF,
+                            (ip >> 16) & 0xFF,
+                            (ip >> 8) & 0xFF,
+                            ip & 0xFF
+                        );
                         tracing::info!("Public IP discovered: {} (via {})", public_ip, server);
                         return Some(public_ip);
                     }
                 }
-                0x0001 if attr_len >= 8 => { // MAPPED-ADDRESS (fallback)
+                0x0001 if attr_len >= 8 => {
+                    // MAPPED-ADDRESS (fallback)
                     let family = u16::from_be_bytes([attr_data[0], attr_data[1]]);
                     if family == 0x01 {
-                        let ip = u32::from_be_bytes([attr_data[4], attr_data[5], attr_data[6], attr_data[7]]);
-                        let public_ip = format!("{}.{}.{}.{}",
-                            (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
-                        tracing::info!("Public IP discovered (MAPPED): {} (via {})", public_ip, server);
+                        let ip = u32::from_be_bytes([
+                            attr_data[4],
+                            attr_data[5],
+                            attr_data[6],
+                            attr_data[7],
+                        ]);
+                        let public_ip = format!(
+                            "{}.{}.{}.{}",
+                            (ip >> 24) & 0xFF,
+                            (ip >> 16) & 0xFF,
+                            (ip >> 8) & 0xFF,
+                            ip & 0xFF
+                        );
+                        tracing::info!(
+                            "Public IP discovered (MAPPED): {} (via {})",
+                            public_ip,
+                            server
+                        );
                         return Some(public_ip);
                     }
                 }
@@ -387,7 +436,9 @@ fn stun_single_probe(socket: &UdpSocket, dest: SocketAddr) -> Option<(String, u1
         request.push(((seed >> (i * 7)) & 0xFF) as u8);
     }
 
-    if socket.send_to(&request, dest).is_err() { return None; }
+    if socket.send_to(&request, dest).is_err() {
+        return None;
+    }
 
     let mut buf = [0u8; 256];
     let len = match socket.recv_from(&mut buf) {
@@ -395,9 +446,13 @@ fn stun_single_probe(socket: &UdpSocket, dest: SocketAddr) -> Option<(String, u1
         Err(_) => return None,
     };
 
-    if len < 20 { return None; }
+    if len < 20 {
+        return None;
+    }
     let msg_type = u16::from_be_bytes([buf[0], buf[1]]);
-    if msg_type != 0x0101 { return None; } // Not Binding Success Response
+    if msg_type != 0x0101 {
+        return None;
+    } // Not Binding Success Response
     let msg_len = u16::from_be_bytes([buf[2], buf[3]]) as usize;
     let magic = 0x2112A442u32;
 
@@ -405,29 +460,53 @@ fn stun_single_probe(socket: &UdpSocket, dest: SocketAddr) -> Option<(String, u1
     while offset + 4 <= 20 + msg_len && offset + 4 <= len {
         let attr_type = u16::from_be_bytes([buf[offset], buf[offset + 1]]);
         let attr_len = u16::from_be_bytes([buf[offset + 2], buf[offset + 3]]) as usize;
-        if offset + 4 + attr_len > len { break; }
+        if offset + 4 + attr_len > len {
+            break;
+        }
         let attr_data = &buf[offset + 4..offset + 4 + attr_len];
 
         match attr_type {
-            0x0020 if attr_len >= 8 => { // XOR-MAPPED-ADDRESS (IPv4)
+            0x0020 if attr_len >= 8 => {
+                // XOR-MAPPED-ADDRESS (IPv4)
                 let family = u16::from_be_bytes([attr_data[0], attr_data[1]]);
                 if family == 0x01 {
                     let port_xor = u16::from_be_bytes([attr_data[2], attr_data[3]]);
                     let port = port_xor ^ (magic >> 16) as u16;
-                    let ip_xor = u32::from_be_bytes([attr_data[4], attr_data[5], attr_data[6], attr_data[7]]);
+                    let ip_xor = u32::from_be_bytes([
+                        attr_data[4],
+                        attr_data[5],
+                        attr_data[6],
+                        attr_data[7],
+                    ]);
                     let ip = ip_xor ^ magic;
-                    let public_ip = format!("{}.{}.{}.{}",
-                        (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
+                    let public_ip = format!(
+                        "{}.{}.{}.{}",
+                        (ip >> 24) & 0xFF,
+                        (ip >> 16) & 0xFF,
+                        (ip >> 8) & 0xFF,
+                        ip & 0xFF
+                    );
                     return Some((public_ip, port));
                 }
             }
-            0x0001 if attr_len >= 8 => { // MAPPED-ADDRESS (fallback)
+            0x0001 if attr_len >= 8 => {
+                // MAPPED-ADDRESS (fallback)
                 let family = u16::from_be_bytes([attr_data[0], attr_data[1]]);
                 if family == 0x01 {
                     let port = u16::from_be_bytes([attr_data[2], attr_data[3]]);
-                    let ip = u32::from_be_bytes([attr_data[4], attr_data[5], attr_data[6], attr_data[7]]);
-                    let public_ip = format!("{}.{}.{}.{}",
-                        (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
+                    let ip = u32::from_be_bytes([
+                        attr_data[4],
+                        attr_data[5],
+                        attr_data[6],
+                        attr_data[7],
+                    ]);
+                    let public_ip = format!(
+                        "{}.{}.{}.{}",
+                        (ip >> 24) & 0xFF,
+                        (ip >> 16) & 0xFF,
+                        (ip >> 8) & 0xFF,
+                        ip & 0xFF
+                    );
                     return Some((public_ip, port));
                 }
             }
@@ -459,10 +538,7 @@ pub fn stun_probe_socket(socket: &UdpSocket) -> Option<StunProbeResult> {
     for server in &stun_servers {
         let dest: SocketAddr = match server.parse().or_else(|_| {
             use std::net::ToSocketAddrs;
-            server.to_socket_addrs()
-                .map_err(|_| ())?
-                .next()
-                .ok_or(())
+            server.to_socket_addrs().map_err(|_| ())?.next().ok_or(())
         }) {
             Ok(a) => a,
             Err(_) => continue,
@@ -472,7 +548,9 @@ pub fn stun_probe_socket(socket: &UdpSocket) -> Option<StunProbeResult> {
             tracing::info!("Probe via {}: {}:{}", server, ip, port);
             results.push((ip, port, server));
             // We need at least 2 results to detect symmetric NAT
-            if results.len() >= 2 { break; }
+            if results.len() >= 2 {
+                break;
+            }
         }
     }
 
@@ -490,18 +568,30 @@ pub fn stun_probe_socket(socket: &UdpSocket) -> Option<StunProbeResult> {
         let port_a = results[0].1;
         let port_b = results[1].1;
         if port_a != port_b {
-            tracing::info!("Symmetric NAT detected: {} port {} vs {} port {}", results[0].2, port_a, results[1].2, port_b);
+            tracing::info!(
+                "Symmetric NAT detected: {} port {} vs {} port {}",
+                results[0].2,
+                port_a,
+                results[1].2,
+                port_b
+            );
             true
         } else {
             tracing::info!("Consistent NAT: port {} across servers", port_a);
             false
         }
     } else {
-        tracing::error!("Only one server responded — cannot determine NAT type, assuming non-symmetric");
+        tracing::error!(
+            "Only one server responded — cannot determine NAT type, assuming non-symmetric"
+        );
         false
     };
 
-    Some(StunProbeResult { ip, port, is_symmetric })
+    Some(StunProbeResult {
+        ip,
+        port,
+        is_symmetric,
+    })
 }
 
 /// STUN-probe the remote RTP address from our RTP socket to discover our exact external
@@ -513,15 +603,25 @@ pub fn stun_probe_socket(socket: &UdpSocket) -> Option<StunProbeResult> {
 ///
 /// The socket's read timeout is saved, overridden (500ms per attempt), and restored.
 #[allow(dead_code)]
-pub fn stun_probe_remote_rtp(socket: &UdpSocket, remote_rtp_addr: SocketAddr) -> Option<(String, u16)> {
+pub fn stun_probe_remote_rtp(
+    socket: &UdpSocket,
+    remote_rtp_addr: SocketAddr,
+) -> Option<(String, u16)> {
     let orig_timeout = socket.read_timeout().ok().flatten();
     let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
 
     // Attempt 1: STUN binding request to the exact RTP address
     // Many modern media proxies handle STUN on their media ports (RFC 7983 demuxing).
-    tracing::info!("Probing SBC media address {} for external port discovery...", remote_rtp_addr);
+    tracing::info!(
+        "Probing SBC media address {} for external port discovery...",
+        remote_rtp_addr
+    );
     if let Some((ip, port)) = stun_single_probe(socket, remote_rtp_addr) {
-        tracing::info!("SBC media port responded: our external address is {}:{}", ip, port);
+        tracing::info!(
+            "SBC media port responded: our external address is {}:{}",
+            ip,
+            port
+        );
         let _ = socket.set_read_timeout(orig_timeout);
         return Some((ip, port));
     }
@@ -532,12 +632,18 @@ pub fn stun_probe_remote_rtp(socket: &UdpSocket, remote_rtp_addr: SocketAddr) ->
     let stun_addr = SocketAddr::new(remote_rtp_addr.ip(), 3478);
     tracing::info!("Trying standard STUN port at {}...", stun_addr);
     if let Some((ip, port)) = stun_single_probe(socket, stun_addr) {
-        tracing::info!("STUN port 3478 responded: our external address is {}:{}", ip, port);
+        tracing::info!(
+            "STUN port 3478 responded: our external address is {}:{}",
+            ip,
+            port
+        );
         let _ = socket.set_read_timeout(orig_timeout);
         return Some((ip, port));
     }
 
-    tracing::error!("SBC does not respond to STUN on media or 3478 port — cannot discover external port");
+    tracing::error!(
+        "SBC does not respond to STUN on media or 3478 port — cannot discover external port"
+    );
     let _ = socket.set_read_timeout(orig_timeout);
     None
 }
@@ -583,7 +689,14 @@ pub fn place_call(
     on_before_invite: OnBeforeInvite,
     use_t38: bool,
     sdp_media_override: Option<(String, u16)>,
-) -> Result<(PlaceCallResult, Option<std::net::UdpSocket>, Option<std::net::TcpStream>), String> {
+) -> Result<
+    (
+        PlaceCallResult,
+        Option<std::net::UdpSocket>,
+        Option<std::net::TcpStream>,
+    ),
+    String,
+> {
     let _span = tracing::info_span!("softphone.place_call", target = %target).entered();
     let config = get_registrar_config(&registrar_id)?;
     let password = get_password(&config)?;
@@ -613,7 +726,11 @@ pub fn place_call(
     };
 
     let (sdp_ip, sdp_port) = if let Some((ref override_ip, override_port)) = sdp_media_override {
-        tracing::info!("Using pre-probed media address: {}:{}", override_ip, override_port);
+        tracing::info!(
+            "Using pre-probed media address: {}:{}",
+            override_ip,
+            override_port
+        );
         (override_ip.clone(), override_port)
     } else {
         let ip = stun_handle
@@ -622,14 +739,22 @@ pub fn place_call(
             .ok()
             .flatten()
             .unwrap_or_else(|| {
-                tracing::error!("STUN discovery failed, using LAN IP {} in SDP", local_ip_lan);
+                tracing::error!(
+                    "STUN discovery failed, using LAN IP {} in SDP",
+                    local_ip_lan
+                );
                 local_ip_lan.clone()
             });
         (ip, local_rtp_port)
     };
     // local_ip is used for Via/Contact headers — use SDP IP (public) for consistency.
     let local_ip = sdp_ip.clone();
-    tracing::info!("SDP media address: {}:{} (LAN: {})", sdp_ip, sdp_port, local_ip_lan);
+    tracing::info!(
+        "SDP media address: {}:{} (LAN: {})",
+        sdp_ip,
+        sdp_port,
+        local_ip_lan
+    );
 
     // Fax over VoIP: initial INVITE is always m=audio G.711 (PCMU first for US carriers).
     // We never offer T.38 in the first INVITE; we re-INVITE to T.38 after call is up (see fax_send_fax).
@@ -666,7 +791,13 @@ pub fn place_call(
     let cseq = 1u32;
 
     if let Ok(mut g) = INVITE_TXNS.lock() {
-        g.insert(call_id.clone(), InviteTxn { branch: branch.clone(), cseq });
+        g.insert(
+            call_id.clone(),
+            InviteTxn {
+                branch: branch.clone(),
+                cseq,
+            },
+        );
     }
 
     // Pass LAN IP (not STUN/public IP) so the capture picks the correct local interface
@@ -704,7 +835,10 @@ pub fn place_call(
     req.add_header("Call-ID", &call_id);
     req.add_header("CSeq", &format!("{} INVITE", cseq));
     let contact_user = escape_user(&config.username);
-    req.add_header("Contact", &format!("<sip:{}@{}:{}>", contact_user, local_ip, local_port));
+    req.add_header(
+        "Contact",
+        &format!("<sip:{}@{}:{}>", contact_user, local_ip, local_port),
+    );
     req.add_header("Content-Type", "application/sdp");
     req.add_header("User-Agent", &user_agent::get_effective_user_agent());
     req.add_header("Supported", "timer, 100rel");
@@ -757,13 +891,26 @@ pub fn place_call(
         // RFC 3262: send PRACK for reliable provisional responses
         if super::prack::needs_prack(&response) {
             let from_hdr = format!(
-                "<sip:{}@{}>;tag={}", escape_user(&config.username), aor_domain, from_tag
+                "<sip:{}@{}>;tag={}",
+                escape_user(&config.username),
+                aor_domain,
+                from_tag
             );
-            let to_hdr = response.get_header("To").cloned().unwrap_or_else(|| to_header_value.clone());
+            let to_hdr = response
+                .get_header("To")
+                .cloned()
+                .unwrap_or_else(|| to_header_value.clone());
             let _ = super::prack::send_prack(
-                &transport, &response, &request_uri,
-                &from_hdr, &to_hdr, &call_id,
-                &local_ip, local_port, prack_cseq, via_transport,
+                &transport,
+                &response,
+                &request_uri,
+                &from_hdr,
+                &to_hdr,
+                &call_id,
+                &local_ip,
+                local_port,
+                prack_cseq,
+                via_transport,
             );
             prack_cseq += 1;
         }
@@ -785,7 +932,11 @@ pub fn place_call(
         if let Some(ref tx) = progress_tx {
             let _ = tx.send((code, status_text.clone()));
         }
-        tracing::warn!("Received {} {} — retrying INVITE with credentials", code, status_text);
+        tracing::warn!(
+            "Received {} {} — retrying INVITE with credentials",
+            code,
+            status_text
+        );
         let auth_header = if code == 401 {
             response.get_header("WWW-Authenticate")
         } else {
@@ -807,7 +958,11 @@ pub fn place_call(
         let mut auth_req = SipMessage::new_request("INVITE", &request_uri);
         for (name, value) in &req.headers {
             let lname = name.to_lowercase();
-            if lname == "via" || lname == "cseq" || lname == "authorization" || lname == "proxy-authorization" {
+            if lname == "via"
+                || lname == "cseq"
+                || lname == "authorization"
+                || lname == "proxy-authorization"
+            {
                 continue;
             }
             auth_req.add_header(name, value);
@@ -823,7 +978,13 @@ pub fn place_call(
         );
         cseq_used = cseq + 1;
         if let Ok(mut g) = INVITE_TXNS.lock() {
-            g.insert(call_id.clone(), InviteTxn { branch: auth_branch.clone(), cseq: cseq_used });
+            g.insert(
+                call_id.clone(),
+                InviteTxn {
+                    branch: auth_branch.clone(),
+                    cseq: cseq_used,
+                },
+            );
         }
         auth_req.add_header("CSeq", &format!("{} INVITE", cseq_used));
         if code == 401 {
@@ -841,7 +1002,10 @@ pub fn place_call(
             .unwrap_or(0);
         let auth_body = &auth_bytes[auth_body_start..];
         if !auth_body.windows(7).any(|w| w == b"m=audio") || auth_body.len() < 80 {
-            return Err("INVITE retry body missing m=audio or too short (SDP must include media)".to_string());
+            return Err(
+                "INVITE retry body missing m=audio or too short (SDP must include media)"
+                    .to_string(),
+            );
         }
         req_text = String::from_utf8_lossy(&auth_bytes).to_string();
         transport.send(&auth_bytes).map_err(|e| e.to_string())?;
@@ -886,34 +1050,42 @@ pub fn place_call(
     // Extract received= and rport= from Via header in the response (RFC 3581).
     // The SBC fills these to tell us our actual observed IP:port — invaluable for NAT diagnostics.
     let (sbc_received_ip, sbc_rport) = {
-        let via = response.get_header("Via").unwrap_or(&String::new()).to_lowercase();
-        let received = via.split(';')
-            .find_map(|part| part.trim().strip_prefix("received=").map(|v| v.trim().to_string()));
-        let rport = via.split(';')
-            .find_map(|part| part.trim().strip_prefix("rport=").and_then(|v| v.trim().parse::<u16>().ok()));
+        let via = response
+            .get_header("Via")
+            .unwrap_or(&String::new())
+            .to_lowercase();
+        let received = via.split(';').find_map(|part| {
+            part.trim()
+                .strip_prefix("received=")
+                .map(|v| v.trim().to_string())
+        });
+        let rport = via.split(';').find_map(|part| {
+            part.trim()
+                .strip_prefix("rport=")
+                .and_then(|v| v.trim().parse::<u16>().ok())
+        });
         if received.is_some() || rport.is_some() {
             tracing::info!("SBC sees us at received={:?} rport={:?}", received, rport);
         }
         (received, rport)
     };
 
-    let remote_contact = response
-        .get_header("Contact")
-        .map(|c| extract_sip_uri(c));
+    let remote_contact = response.get_header("Contact").map(|c| extract_sip_uri(c));
 
-    let (remote_rtp_address, remote_rtp_port, negotiated_pt) = if code >= 200 && code < 300 && !pts.is_empty() {
-        let body = response.body.as_deref().unwrap_or("");
-        let conn = sdp::parse_connection(body);
-        let media = sdp::parse_media(body);
-        if let (Some(addr), Some((port, answer_pts))) = (conn, media) {
-            let pt = pts.iter().find(|p| answer_pts.contains(p)).copied();
-            (Some(addr), Some(port), pt)
+    let (remote_rtp_address, remote_rtp_port, negotiated_pt) =
+        if code >= 200 && code < 300 && !pts.is_empty() {
+            let body = response.body.as_deref().unwrap_or("");
+            let conn = sdp::parse_connection(body);
+            let media = sdp::parse_media(body);
+            if let (Some(addr), Some((port, answer_pts))) = (conn, media) {
+                let pt = pts.iter().find(|p| answer_pts.contains(p)).copied();
+                (Some(addr), Some(port), pt)
+            } else {
+                (None, None, None)
+            }
         } else {
             (None, None, None)
-        }
-    } else {
-        (None, None, None)
-    };
+        };
 
     let negotiated_codec = negotiated_pt.map(|p| match p {
         0 => "PCMU".to_string(),
@@ -938,7 +1110,12 @@ pub fn place_call(
         );
         ack.add_header(
             "From",
-            &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), aor_domain, from_tag),
+            &format!(
+                "<sip:{}@{}>;tag={}",
+                escape_user(&config.username),
+                aor_domain,
+                from_tag
+            ),
         );
         ack.add_header("To", response.get_header("To").unwrap_or(&String::new()));
         ack.add_header("Call-ID", &call_id);
@@ -967,7 +1144,9 @@ pub fn place_call(
     let call_ok = code >= 200 && code < 300;
 
     // INVITE transaction is complete — remove pending txn metadata used by CANCEL.
-    if let Ok(mut g) = INVITE_TXNS.lock() { g.remove(&call_id); }
+    if let Ok(mut g) = INVITE_TXNS.lock() {
+        g.remove(&call_id);
+    }
 
     Ok((
         PlaceCallResult {
@@ -1036,11 +1215,19 @@ pub fn run_bye_listener(
             // Retry a few times in case the OS hasn't released the port yet.
             let mut sock = None;
             for attempt in 0..10 {
-                match crate::sip::transport::bind_udp_reuse(std::net::SocketAddr::from(([0, 0, 0, 0], local_port))) {
+                match crate::sip::transport::bind_udp_reuse(std::net::SocketAddr::from((
+                    [0, 0, 0, 0],
+                    local_port,
+                ))) {
                     Ok(s) => {
                         sock = Some(s);
                         if attempt > 0 {
-                            tracing::info!("[ByeListener:{}] Bound fresh socket on port {} after {} retries", call_id, local_port, attempt);
+                            tracing::info!(
+                                "[ByeListener:{}] Bound fresh socket on port {} after {} retries",
+                                call_id,
+                                local_port,
+                                attempt
+                            );
                         }
                         break;
                     }
@@ -1064,8 +1251,16 @@ pub fn run_bye_listener(
         }
     };
     let _ = socket.set_read_timeout(Some(Duration::from_secs(2)));
-    let local_addr = socket.local_addr().map(|a| a.to_string()).unwrap_or_else(|_| "unknown".to_string());
-    tracing::info!("[ByeListener:{}] Started listening on {} (socket={})", call_id, local_addr, socket_source);
+    let local_addr = socket
+        .local_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+    tracing::info!(
+        "[ByeListener:{}] Started listening on {} (socket={})",
+        call_id,
+        local_addr,
+        socket_source
+    );
     let mut last_activity = Instant::now();
     let mut last_heartbeat = Instant::now();
     // RFC 4028: refresh at half the Session-Expires interval
@@ -1084,7 +1279,10 @@ pub fn run_bye_listener(
     let remote_addr = match resolve_remote_addr(remote_contact_uri.as_deref(), &target_uri) {
         Some(a) => a,
         None => {
-            tracing::warn!("[ByeListener:{}] resolve_remote_addr failed; stopping media and exiting", call_id);
+            tracing::warn!(
+                "[ByeListener:{}] resolve_remote_addr failed; stopping media and exiting",
+                call_id
+            );
             let _ = media_engine::stop_media(&call_id);
             unregister_dialog_sender(&call_id);
             return;
@@ -1149,7 +1347,12 @@ pub fn run_bye_listener(
                     .lines()
                     .next()
                     .unwrap_or("<empty>");
-                tracing::info!("[ByeListener:{}] Received from {}: {}", call_id, peer, first_line);
+                tracing::info!(
+                    "[ByeListener:{}] Received from {}: {}",
+                    call_id,
+                    peer,
+                    first_line
+                );
                 sip_log::log_bytes(&call_id, "recv", bytes);
 
                 // Normalize Call-ID so BYE from cell/proxy (any casing/whitespace) matches this dialog.
@@ -1167,8 +1370,11 @@ pub fn run_bye_listener(
                         let msg_call_id = msg
                             .get_header("Call-ID")
                             .map(|s| normalize_call_id(s.as_str()));
-                        let msg_from_tag = msg.get_header("From").and_then(|s| parse_tag_from_header(s));
-                        let msg_to_tag = msg.get_header("To").and_then(|s| parse_tag_from_header(s));
+                        let msg_from_tag = msg
+                            .get_header("From")
+                            .and_then(|s| parse_tag_from_header(s));
+                        let msg_to_tag =
+                            msg.get_header("To").and_then(|s| parse_tag_from_header(s));
                         let call_id_ok = msg_call_id.as_deref() == Some(our_call_id.as_str());
                         // Incoming re-INVITE: From = remote (their tag = our to_tag), To = us (our tag = our from_tag).
                         let from_tag_ok = msg_from_tag.as_deref() == Some(to_tag.as_str());
@@ -1191,7 +1397,11 @@ pub fn run_bye_listener(
                                 let _ = udp_send(&socket, &b, peer);
                                 sip_log::log_bytes(&call_id, "send", &b);
                             }
-                            let sdp = sdp::build_offer(&local_ip, local_rtp_port, sdp::FAX_INITIAL_CODECS);
+                            let sdp = sdp::build_offer(
+                                &local_ip,
+                                local_rtp_port,
+                                sdp::FAX_INITIAL_CODECS,
+                            );
                             let mut ok = SipMessage::new_response(200, "OK");
                             for (name, value) in &msg.headers {
                                 if name.eq_ignore_ascii_case("Via")
@@ -1215,30 +1425,55 @@ pub fn run_bye_listener(
                         // NOTIFY: transfer status updates (RFC 3515 §2.4.5).
                         // During REFER-based transfer, the remote sends NOTIFY with sipfrag body.
                         // We respond 200 OK to acknowledge and log the transfer progress.
-                        if msg.method.eq_ignore_ascii_case("NOTIFY") && (dialog_match || call_id_ok) {
+                        if msg.method.eq_ignore_ascii_case("NOTIFY") && (dialog_match || call_id_ok)
+                        {
                             let mut ok = SipMessage::new_response(200, "OK");
-                            if let Some(v) = msg.get_header("Via") { ok.add_header("Via", v); }
-                            if let Some(v) = msg.get_header("From") { ok.add_header("From", v); }
-                            if let Some(v) = msg.get_header("To") { ok.add_header("To", v); }
-                            if let Some(v) = msg.get_header("Call-ID") { ok.add_header("Call-ID", v); }
-                            if let Some(v) = msg.get_header("CSeq") { ok.add_header("CSeq", v); }
+                            if let Some(v) = msg.get_header("Via") {
+                                ok.add_header("Via", v);
+                            }
+                            if let Some(v) = msg.get_header("From") {
+                                ok.add_header("From", v);
+                            }
+                            if let Some(v) = msg.get_header("To") {
+                                ok.add_header("To", v);
+                            }
+                            if let Some(v) = msg.get_header("Call-ID") {
+                                ok.add_header("Call-ID", v);
+                            }
+                            if let Some(v) = msg.get_header("CSeq") {
+                                ok.add_header("CSeq", v);
+                            }
                             if let Ok(ok_bytes) = ok.to_bytes() {
                                 let _ = udp_send(&socket, &ok_bytes, peer);
                             }
                             // Log sipfrag body for diagnostics
                             if let Some(ref body) = msg.body {
-                                tracing::info!("[ByeListener:{}] NOTIFY sipfrag: {}", call_id, body.lines().next().unwrap_or(""));
+                                tracing::info!(
+                                    "[ByeListener:{}] NOTIFY sipfrag: {}",
+                                    call_id,
+                                    body.lines().next().unwrap_or("")
+                                );
                             }
                             continue;
                         }
 
                         if msg.method.eq_ignore_ascii_case("BYE") && (dialog_match || call_id_ok) {
                             let mut ok = SipMessage::new_response(200, "OK");
-                            if let Some(v) = msg.get_header("Via") { ok.add_header("Via", v); }
-                            if let Some(v) = msg.get_header("From") { ok.add_header("From", v); }
-                            if let Some(v) = msg.get_header("To") { ok.add_header("To", v); }
-                            if let Some(v) = msg.get_header("Call-ID") { ok.add_header("Call-ID", v); }
-                            if let Some(v) = msg.get_header("CSeq") { ok.add_header("CSeq", v); }
+                            if let Some(v) = msg.get_header("Via") {
+                                ok.add_header("Via", v);
+                            }
+                            if let Some(v) = msg.get_header("From") {
+                                ok.add_header("From", v);
+                            }
+                            if let Some(v) = msg.get_header("To") {
+                                ok.add_header("To", v);
+                            }
+                            if let Some(v) = msg.get_header("Call-ID") {
+                                ok.add_header("Call-ID", v);
+                            }
+                            if let Some(v) = msg.get_header("CSeq") {
+                                ok.add_header("CSeq", v);
+                            }
                             if let Ok(ok_bytes) = ok.to_bytes() {
                                 let _ = udp_send(&socket, &ok_bytes, peer);
                                 sip_log::log_bytes(&call_id, "send", &ok_bytes);
@@ -1258,11 +1493,14 @@ pub fn run_bye_listener(
                         .take(1024)
                         .map(|&b| if b >= b'a' && b <= b'z' { b - 32 } else { b })
                         .collect::<Vec<u8>>();
-                    let has_bye = bytes_upper.starts_with(b"BYE ") || bytes_upper.windows(4).any(|w| w == b"BYE ");
+                    let has_bye = bytes_upper.starts_with(b"BYE ")
+                        || bytes_upper.windows(4).any(|w| w == b"BYE ");
                     let body_lower = String::from_utf8_lossy(bytes).to_lowercase();
                     let has_our_call_id = body_lower.contains(our_call_id.as_str());
                     if has_bye && has_our_call_id {
-                        if let Some((via, from, to_hdr, cid, cseq)) = extract_headers_for_200_ok(bytes) {
+                        if let Some((via, from, to_hdr, cid, cseq)) =
+                            extract_headers_for_200_ok(bytes)
+                        {
                             let mut ok = SipMessage::new_response(200, "OK");
                             ok.add_header("Via", &via);
                             ok.add_header("From", &from);
@@ -1283,7 +1521,12 @@ pub fn run_bye_listener(
             }
             Err(_) => {
                 if last_heartbeat.elapsed() >= Duration::from_secs(30) {
-                    tracing::info!("[ByeListener:{}] heartbeat — alive, waiting for BYE on {} (socket={})", call_id, local_addr, socket_source);
+                    tracing::info!(
+                        "[ByeListener:{}] heartbeat — alive, waiting for BYE on {} (socket={})",
+                        call_id,
+                        local_addr,
+                        socket_source
+                    );
                     last_heartbeat = Instant::now();
                 }
                 if last_activity.elapsed() >= Duration::from_secs(SESSION_TIMEOUT_SECS) {
@@ -1296,26 +1539,50 @@ pub fn run_bye_listener(
                 // RFC 4028 session timer refresh: send re-INVITE at half the Session-Expires interval
                 if let Some(deadline) = next_refresh {
                     if Instant::now() >= deadline {
-                        tracing::info!("[ByeListener:{}] Sending session refresh re-INVITE (cseq={})", call_id, refresh_cseq);
+                        tracing::info!(
+                            "[ByeListener:{}] Sending session refresh re-INVITE (cseq={})",
+                            call_id,
+                            refresh_cseq
+                        );
                         let sdp_body = sdp::build_reinvite_sdp(&local_ip, local_rtp_port, false);
                         let mut reinvite = SipMessage::new_request("INVITE", &bye_uri);
-                        reinvite.add_header("Via", &format!(
-                            "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()
-                        ));
+                        reinvite.add_header(
+                            "Via",
+                            &format!(
+                                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                                via_transport,
+                                local_ip,
+                                local_port,
+                                generate_tag()
+                            ),
+                        );
                         reinvite.add_header("Max-Forwards", "70");
-                        reinvite.add_header("From", &format!(
-                            "<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag
-                        ));
+                        reinvite.add_header(
+                            "From",
+                            &format!(
+                                "<sip:{}@{}>;tag={}",
+                                escape_user(&config.username),
+                                config.domain,
+                                from_tag
+                            ),
+                        );
                         let to_uri = extract_sip_uri(&target_uri);
                         reinvite.add_header("To", &format!("<{}>;tag={}", to_uri, to_tag));
                         reinvite.add_header("Call-ID", &call_id);
                         reinvite.add_header("CSeq", &format!("{} INVITE", refresh_cseq));
-                        reinvite.add_header("Contact", &format!(
-                            "<sip:{}@{}:{}>", escape_user(&config.username), local_ip, local_port
-                        ));
+                        reinvite.add_header(
+                            "Contact",
+                            &format!(
+                                "<sip:{}@{}:{}>",
+                                escape_user(&config.username),
+                                local_ip,
+                                local_port
+                            ),
+                        );
                         reinvite.add_header("Supported", "timer");
                         if let Some(se) = session_expires_secs {
-                            reinvite.add_header("Session-Expires", &format!("{};refresher=uac", se));
+                            reinvite
+                                .add_header("Session-Expires", &format!("{};refresher=uac", se));
                         }
                         reinvite.add_header("Content-Type", "application/sdp");
                         reinvite.add_header("User-Agent", &user_agent::get_effective_user_agent());
@@ -1432,7 +1699,9 @@ pub fn run_tcp_bye_listener(
                     let msg_call_id = msg
                         .get_header("Call-ID")
                         .map(|s| normalize_call_id(s.as_str()));
-                    let msg_from_tag = msg.get_header("From").and_then(|s| parse_tag_from_header(s));
+                    let msg_from_tag = msg
+                        .get_header("From")
+                        .and_then(|s| parse_tag_from_header(s));
                     let msg_to_tag = msg.get_header("To").and_then(|s| parse_tag_from_header(s));
                     let call_id_ok = msg_call_id.as_deref() == Some(our_call_id.as_str());
                     // Incoming re-INVITE/BYE from remote: From = their tag (our to_tag), To = our tag (our from_tag).
@@ -1455,7 +1724,8 @@ pub fn run_tcp_bye_listener(
                         if let Ok(b) = trying.to_bytes() {
                             let _ = stream.write_all(&b);
                         }
-                        let sdp = sdp::build_offer(&local_ip, local_rtp_port, sdp::FAX_INITIAL_CODECS);
+                        let sdp =
+                            sdp::build_offer(&local_ip, local_rtp_port, sdp::FAX_INITIAL_CODECS);
                         let mut ok = SipMessage::new_response(200, "OK");
                         for (name, value) in &msg.headers {
                             if name.eq_ignore_ascii_case("Via")
@@ -1541,7 +1811,10 @@ pub fn end_call(
                     return Ok(());
                 }
                 Err(_) => {
-                    tracing::info!("Dialog thread channel closed for call_id={}, falling back to direct BYE", call_id);
+                    tracing::info!(
+                        "Dialog thread channel closed for call_id={}, falling back to direct BYE",
+                        call_id
+                    );
                     // Fall through to direct BYE below
                 }
             }
@@ -1569,12 +1842,17 @@ pub fn end_call(
     let mut transport = if let Some(ref contact) = remote_contact_uri {
         let contact_clean = extract_sip_uri(contact);
         let uri = SipUri::parse(&contact_clean).map_err(|e| {
-            tracing::error!("Failed to parse remote contact URI '{}': {}", contact_clean, e);
+            tracing::error!(
+                "Failed to parse remote contact URI '{}': {}",
+                contact_clean,
+                e
+            );
             e.to_string()
         })?;
         let host = uri.host_for_resolution().to_string();
         let port = uri.port.unwrap_or(5060);
-        Transport::new(config.transport.clone(), local_port, &host, port).map_err(|e| e.to_string())?
+        Transport::new(config.transport.clone(), local_port, &host, port)
+            .map_err(|e| e.to_string())?
     } else {
         create_transport(&config)?
     };
@@ -1584,11 +1862,22 @@ pub fn end_call(
     let mut bye = SipMessage::new_request("BYE", &bye_uri);
     bye.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+            via_transport,
+            local_ip,
+            local_port,
+            generate_tag()
+        ),
     );
     bye.add_header(
         "From",
-        &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+        &format!(
+            "<sip:{}@{}>;tag={}",
+            escape_user(&config.username),
+            config.domain,
+            from_tag
+        ),
     );
     if let Some(ref to_hdr) = response_to_header {
         bye.add_header("To", to_hdr);
@@ -1623,7 +1912,10 @@ pub async fn cancel_call(
     let (invite_branch, invite_cseq) = match txn {
         Some(t) => (t.branch, t.cseq),
         None => {
-            tracing::warn!("cancel_call: no pending INVITE txn for call_id={}; using defaults", call_id);
+            tracing::warn!(
+                "cancel_call: no pending INVITE txn for call_id={}; using defaults",
+                call_id
+            );
             (format!("z9hG4bK{}", generate_tag()), 1)
         }
     };
@@ -1641,11 +1933,19 @@ pub async fn cancel_call(
     let mut cancel = SipMessage::new_request("CANCEL", &cancel_uri);
     cancel.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch={}", via_transport, local_ip, local_port, invite_branch),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch={}",
+            via_transport, local_ip, local_port, invite_branch
+        ),
     );
     cancel.add_header(
         "From",
-        &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+        &format!(
+            "<sip:{}@{}>;tag={}",
+            escape_user(&config.username),
+            config.domain,
+            from_tag
+        ),
     );
     cancel.add_header("To", &format!("<{}>", cancel_uri));
     cancel.add_header("Call-ID", &call_id);
@@ -1698,7 +1998,8 @@ pub fn send_refer(
         let uri = SipUri::parse(&contact_trimmed).map_err(|e| e.to_string())?;
         let host = uri.host_for_resolution().to_string();
         let port = uri.port.unwrap_or(5060);
-        Transport::new(config.transport.clone(), local_port, &host, port).map_err(|e| e.to_string())?
+        Transport::new(config.transport.clone(), local_port, &host, port)
+            .map_err(|e| e.to_string())?
     } else {
         create_transport(&config)?
     };
@@ -1715,12 +2016,23 @@ pub fn send_refer(
     let mut req = SipMessage::new_request("REFER", &refer_uri);
     req.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+            via_transport,
+            local_ip,
+            local_port,
+            generate_tag()
+        ),
     );
     req.add_header("Max-Forwards", "70");
     req.add_header(
         "From",
-        &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+        &format!(
+            "<sip:{}@{}>;tag={}",
+            escape_user(&config.username),
+            config.domain,
+            from_tag
+        ),
     );
     if let Some(ref to_hdr) = response_to_header {
         req.add_header("To", to_hdr);
@@ -1730,10 +2042,21 @@ pub fn send_refer(
     }
     req.add_header("Call-ID", &call_id);
     req.add_header("CSeq", &format!("{} REFER", cseq));
-    req.add_header("Contact", &format!("<sip:{}@{}:{}>", escape_user(&config.username), local_ip, local_port));
+    req.add_header(
+        "Contact",
+        &format!(
+            "<sip:{}@{}:{}>",
+            escape_user(&config.username),
+            local_ip,
+            local_port
+        ),
+    );
     req.add_header("Refer-To", &format!("<{}>", refer_to_uri));
     // Referred-By (RFC 3892): tells the transfer target who initiated the transfer.
-    req.add_header("Referred-By", &format!("<sip:{}@{}>", escape_user(&config.username), config.domain));
+    req.add_header(
+        "Referred-By",
+        &format!("<sip:{}@{}>", escape_user(&config.username), config.domain),
+    );
     req.add_header("User-Agent", &user_agent::get_effective_user_agent());
 
     let req_bytes = req.to_bytes().map_err(|e| e.to_string())?;
@@ -1762,25 +2085,30 @@ pub fn send_refer(
         let default_realm = config.realm.as_deref().unwrap_or(&config.domain);
         let challenge = auth::parse_auth_challenge(auth_header, default_realm)?;
         let username = config.auth_username.as_ref().unwrap_or(&config.username);
-        let auth_value = auth::build_digest_authorization(
-            "REFER",
-            &refer_uri,
-            username,
-            &password,
-            &challenge,
-        );
+        let auth_value =
+            auth::build_digest_authorization("REFER", &refer_uri, username, &password, &challenge);
 
         let mut auth_req = SipMessage::new_request("REFER", &refer_uri);
         for (name, value) in &req.headers {
             let lname = name.to_lowercase();
-            if lname == "via" || lname == "cseq" || lname == "authorization" || lname == "proxy-authorization" {
+            if lname == "via"
+                || lname == "cseq"
+                || lname == "authorization"
+                || lname == "proxy-authorization"
+            {
                 continue;
             }
             auth_req.add_header(name, value);
         }
         auth_req.add_header(
             "Via",
-            &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
         );
         cseq_used = cseq + 1;
         auth_req.add_header("CSeq", &format!("{} REFER", cseq_used));
@@ -1805,7 +2133,12 @@ pub fn send_refer(
         // REFER accepted. The far end will establish the new call and send us NOTIFYs
         // with sipfrag status updates, then BYE us when the transfer completes.
         // The BYE listener handles the remote BYE.
-        tracing::info!("[REFER:{}] Transfer accepted: {} {}", call_id, code, response.status_text.as_deref().unwrap_or(""));
+        tracing::info!(
+            "[REFER:{}] Transfer accepted: {} {}",
+            call_id,
+            code,
+            response.status_text.as_deref().unwrap_or("")
+        );
         Ok(cseq_used)
     } else {
         let status = response.status_code.unwrap_or(0);
@@ -1909,18 +2242,37 @@ pub async fn hold_call(
     let mut req = SipMessage::new_request("INVITE", &reinvite_uri);
     req.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+            via_transport,
+            local_ip,
+            local_port,
+            generate_tag()
+        ),
     );
     req.add_header("Max-Forwards", "70");
     req.add_header(
         "From",
-        &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+        &format!(
+            "<sip:{}@{}>;tag={}",
+            escape_user(&config.username),
+            config.domain,
+            from_tag
+        ),
     );
     let to_uri = extract_sip_uri(&target_uri);
     req.add_header("To", &format!("<{}>;tag={}", to_uri, to_tag));
     req.add_header("Call-ID", &call_id);
     req.add_header("CSeq", &format!("{} INVITE", cseq));
-    req.add_header("Contact", &format!("<sip:{}@{}:{}>", escape_user(&config.username), local_ip, local_port));
+    req.add_header(
+        "Contact",
+        &format!(
+            "<sip:{}@{}:{}>",
+            escape_user(&config.username),
+            local_ip,
+            local_port
+        ),
+    );
     req.add_header("Content-Type", "application/sdp");
     req.add_header("User-Agent", &user_agent::get_effective_user_agent());
     req.body = Some(sdp_body);
@@ -1961,14 +2313,24 @@ pub async fn hold_call(
         let mut auth_req = SipMessage::new_request("INVITE", &reinvite_uri);
         for (name, value) in &req.headers {
             let lname = name.to_lowercase();
-            if lname == "via" || lname == "cseq" || lname == "authorization" || lname == "proxy-authorization" {
+            if lname == "via"
+                || lname == "cseq"
+                || lname == "authorization"
+                || lname == "proxy-authorization"
+            {
                 continue;
             }
             auth_req.add_header(name, value);
         }
         auth_req.add_header(
             "Via",
-            &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
         );
         cseq_used = cseq + 1;
         auth_req.add_header("CSeq", &format!("{} INVITE", cseq_used));
@@ -1997,11 +2359,22 @@ pub async fn hold_call(
         let mut ack = SipMessage::new_request("ACK", &ack_uri);
         ack.add_header(
             "Via",
-            &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
         );
         ack.add_header(
             "From",
-            &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+            &format!(
+                "<sip:{}@{}>;tag={}",
+                escape_user(&config.username),
+                config.domain,
+                from_tag
+            ),
         );
         ack.add_header("To", response.get_header("To").unwrap_or(&String::new()));
         ack.add_header("Call-ID", &call_id);
@@ -2082,36 +2455,62 @@ pub fn send_t38_reinvite(
     let timeout_secs = config.timeout_seconds.max(16);
     let timeout = Duration::from_secs(timeout_secs);
 
-    let (local_port, transport_or_socket): (u16, ReinviteTransport) = if let Some(socket) = existing_dialog_socket {
-        let local_port = socket.local_addr().map_err(|e| e.to_string())?.port();
-        socket
-            .set_read_timeout(Some(timeout))
-            .map_err(|e| format!("set_read_timeout: {}", e))?;
-        (local_port, ReinviteTransport::Socket { socket, remote_addr })
-    } else {
-        let mut transport = create_transport(&config)?;
-        transport.update_local_ip().map_err(|e| e.to_string())?;
-        let local_port = config.local_port.unwrap_or(5060);
-        (local_port, ReinviteTransport::Transport(transport))
-    };
+    let (local_port, transport_or_socket): (u16, ReinviteTransport) =
+        if let Some(socket) = existing_dialog_socket {
+            let local_port = socket.local_addr().map_err(|e| e.to_string())?.port();
+            socket
+                .set_read_timeout(Some(timeout))
+                .map_err(|e| format!("set_read_timeout: {}", e))?;
+            (
+                local_port,
+                ReinviteTransport::Socket {
+                    socket,
+                    remote_addr,
+                },
+            )
+        } else {
+            let mut transport = create_transport(&config)?;
+            transport.update_local_ip().map_err(|e| e.to_string())?;
+            let local_port = config.local_port.unwrap_or(5060);
+            (local_port, ReinviteTransport::Transport(transport))
+        };
 
     let sdp_body = sdp::build_t38_offer(&local_ip, udptl_port);
 
     let mut req = SipMessage::new_request("INVITE", &reinvite_uri);
     req.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+            via_transport,
+            local_ip,
+            local_port,
+            generate_tag()
+        ),
     );
     req.add_header("Max-Forwards", "70");
     req.add_header(
         "From",
-        &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+        &format!(
+            "<sip:{}@{}>;tag={}",
+            escape_user(&config.username),
+            config.domain,
+            from_tag
+        ),
     );
     let to_uri = extract_sip_uri(&target_uri);
     req.add_header("To", &format!("<{}>;tag={}", to_uri, to_tag));
     req.add_header("Call-ID", &call_id);
     req.add_header("CSeq", &format!("{} INVITE", reinvite_cseq));
-    req.add_header("Contact", &format!("<sip:{}@{}:{}>", escape_user(&config.username), local_ip, local_port));
+    req.add_header(
+        "Contact",
+        &format!(
+            "<sip:{}@{}:{}>",
+            escape_user(&config.username),
+            local_ip,
+            local_port
+        ),
+    );
     req.add_header("Content-Type", "application/sdp");
     req.add_header("User-Agent", &user_agent::get_effective_user_agent());
     req.body = Some(sdp_body);
@@ -2151,14 +2550,24 @@ pub fn send_t38_reinvite(
         let mut auth_req = SipMessage::new_request("INVITE", &reinvite_uri);
         for (name, value) in &req.headers {
             let lname = name.to_lowercase();
-            if lname == "via" || lname == "cseq" || lname == "authorization" || lname == "proxy-authorization" {
+            if lname == "via"
+                || lname == "cseq"
+                || lname == "authorization"
+                || lname == "proxy-authorization"
+            {
                 continue;
             }
             auth_req.add_header(name, value);
         }
         auth_req.add_header(
             "Via",
-            &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
         );
         cseq_used = reinvite_cseq + 1;
         auth_req.add_header("CSeq", &format!("{} INVITE", cseq_used));
@@ -2190,11 +2599,22 @@ pub fn send_t38_reinvite(
         let mut ack = SipMessage::new_request("ACK", &ack_uri);
         ack.add_header(
             "Via",
-            &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
         );
         ack.add_header(
             "From",
-            &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+            &format!(
+                "<sip:{}@{}>;tag={}",
+                escape_user(&config.username),
+                config.domain,
+                from_tag
+            ),
         );
         ack.add_header("To", response.get_header("To").unwrap_or(&String::new()));
         ack.add_header("Call-ID", &call_id);
@@ -2275,18 +2695,25 @@ pub fn send_audio_reinvite(
     let timeout_secs = config.timeout_seconds.max(16);
     let timeout = Duration::from_secs(timeout_secs);
 
-    let (local_port, transport_or_socket): (u16, ReinviteTransport) = if let Some(socket) = existing_dialog_socket {
-        let local_port = socket.local_addr().map_err(|e| e.to_string())?.port();
-        socket
-            .set_read_timeout(Some(timeout))
-            .map_err(|e| format!("set_read_timeout: {}", e))?;
-        (local_port, ReinviteTransport::Socket { socket, remote_addr })
-    } else {
-        let mut transport = create_transport(&config)?;
-        transport.update_local_ip().map_err(|e| e.to_string())?;
-        let local_port = config.local_port.unwrap_or(5060);
-        (local_port, ReinviteTransport::Transport(transport))
-    };
+    let (local_port, transport_or_socket): (u16, ReinviteTransport) =
+        if let Some(socket) = existing_dialog_socket {
+            let local_port = socket.local_addr().map_err(|e| e.to_string())?.port();
+            socket
+                .set_read_timeout(Some(timeout))
+                .map_err(|e| format!("set_read_timeout: {}", e))?;
+            (
+                local_port,
+                ReinviteTransport::Socket {
+                    socket,
+                    remote_addr,
+                },
+            )
+        } else {
+            let mut transport = create_transport(&config)?;
+            transport.update_local_ip().map_err(|e| e.to_string())?;
+            let local_port = config.local_port.unwrap_or(5060);
+            (local_port, ReinviteTransport::Transport(transport))
+        };
 
     // Build corrected audio SDP with the discovered port
     let sdp_body = sdp::build_offer(&sdp_ip, sdp_port, sdp::FAX_INITIAL_CODECS);
@@ -2295,18 +2722,37 @@ pub fn send_audio_reinvite(
     let mut req = SipMessage::new_request("INVITE", &reinvite_uri);
     req.add_header(
         "Via",
-        &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()),
+        &format!(
+            "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+            via_transport,
+            local_ip,
+            local_port,
+            generate_tag()
+        ),
     );
     req.add_header("Max-Forwards", "70");
     req.add_header(
         "From",
-        &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag),
+        &format!(
+            "<sip:{}@{}>;tag={}",
+            escape_user(&config.username),
+            config.domain,
+            from_tag
+        ),
     );
     let to_uri = extract_sip_uri(&target_uri);
     req.add_header("To", &format!("<{}>;tag={}", to_uri, to_tag));
     req.add_header("Call-ID", &call_id);
     req.add_header("CSeq", &format!("{} INVITE", reinvite_cseq));
-    req.add_header("Contact", &format!("<sip:{}@{}:{}>", escape_user(&config.username), local_ip, local_port));
+    req.add_header(
+        "Contact",
+        &format!(
+            "<sip:{}@{}:{}>",
+            escape_user(&config.username),
+            local_ip,
+            local_port
+        ),
+    );
     req.add_header("Content-Type", "application/sdp");
     req.add_header("User-Agent", &user_agent::get_effective_user_agent());
     req.body = Some(sdp_body);
@@ -2345,13 +2791,38 @@ pub fn send_audio_reinvite(
 
         cseq_used = reinvite_cseq + 1;
         let mut retry = SipMessage::new_request("INVITE", &reinvite_uri);
-        retry.add_header("Via", &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()));
+        retry.add_header(
+            "Via",
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
+        );
         retry.add_header("Max-Forwards", "70");
-        retry.add_header("From", &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag));
+        retry.add_header(
+            "From",
+            &format!(
+                "<sip:{}@{}>;tag={}",
+                escape_user(&config.username),
+                config.domain,
+                from_tag
+            ),
+        );
         retry.add_header("To", &format!("<{}>;tag={}", to_uri, to_tag));
         retry.add_header("Call-ID", &call_id);
         retry.add_header("CSeq", &format!("{} INVITE", cseq_used));
-        retry.add_header("Contact", &format!("<sip:{}@{}:{}>", escape_user(&config.username), local_ip, local_port));
+        retry.add_header(
+            "Contact",
+            &format!(
+                "<sip:{}@{}:{}>",
+                escape_user(&config.username),
+                local_ip,
+                local_port
+            ),
+        );
         if code == 401 {
             retry.add_header("Authorization", &auth_value);
         } else {
@@ -2376,9 +2847,26 @@ pub fn send_audio_reinvite(
     // Send ACK for 2xx
     if code >= 200 && code < 300 {
         let mut ack = SipMessage::new_request("ACK", &reinvite_uri);
-        ack.add_header("Via", &format!("SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}", via_transport, local_ip, local_port, generate_tag()));
+        ack.add_header(
+            "Via",
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch=z9hG4bK{}",
+                via_transport,
+                local_ip,
+                local_port,
+                generate_tag()
+            ),
+        );
         ack.add_header("Max-Forwards", "70");
-        ack.add_header("From", &format!("<sip:{}@{}>;tag={}", escape_user(&config.username), config.domain, from_tag));
+        ack.add_header(
+            "From",
+            &format!(
+                "<sip:{}@{}>;tag={}",
+                escape_user(&config.username),
+                config.domain,
+                from_tag
+            ),
+        );
         ack.add_header("To", &format!("<{}>;tag={}", to_uri, to_tag));
         ack.add_header("Call-ID", &call_id);
         ack.add_header("CSeq", &format!("{} ACK", cseq_used));
@@ -2401,14 +2889,20 @@ pub fn send_audio_reinvite(
 
 /// Either a new Transport (binds a port) or the existing dialog UDP socket (no new bind).
 enum ReinviteTransport {
-    Socket { socket: UdpSocket, remote_addr: SocketAddr },
+    Socket {
+        socket: UdpSocket,
+        remote_addr: SocketAddr,
+    },
     Transport(Transport),
 }
 
 impl ReinviteTransport {
     fn send(&self, data: &[u8]) -> Result<(), String> {
         match self {
-            ReinviteTransport::Socket { socket, remote_addr } => {
+            ReinviteTransport::Socket {
+                socket,
+                remote_addr,
+            } => {
                 udp_send(socket, data, *remote_addr).map_err(|e| e.to_string())?;
                 Ok(())
             }

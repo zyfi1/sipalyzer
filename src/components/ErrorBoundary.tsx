@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { CopyTextButton } from "./ui/copy-text-button";
 import { AlertTriangle, RefreshCw } from "@/lib/icons";
+import { humanizeErrorMessage } from "@/lib/errorUtils";
 
 interface Props {
   children: ReactNode;
@@ -55,6 +56,9 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      const humanized = this.state.error
+        ? humanizeErrorMessage(this.state.error)
+        : null;
       return (
         <div className="flex items-center justify-center min-h-screen p-4">
           <Card className="max-w-2xl w-full">
@@ -64,8 +68,9 @@ export class ErrorBoundary extends Component<Props, State> {
                 <CardTitle>Something went wrong</CardTitle>
               </div>
               <CardDescription>
-                An unexpected error occurred. This can include failed requests or async operations.
-                Please try again or refresh the page. If the problem persists, contact support.
+                {humanized?.userMessage ??
+                  "An unexpected error occurred. This can include failed requests or async operations."}
+                {humanized?.actionHint ? ` ${humanized.actionHint}` : " Please try again or refresh the page."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

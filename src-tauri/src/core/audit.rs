@@ -3,8 +3,8 @@ use getrandom::fill as fill_random;
 use hmac::{Hmac, Mac};
 use once_cell::sync::Lazy;
 use rusqlite::params;
-use sha2::Sha256;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 
 use super::database::Database;
 
@@ -39,8 +39,7 @@ static HMAC_KEY: Lazy<Vec<u8>> = Lazy::new(|| {
     }
 
     // Last-resort fallback: unique per run context (prevents static shared key).
-    format!("audit-key-fallback-{}", uuid::Uuid::new_v4())
-        .into_bytes()
+    format!("audit-key-fallback-{}", uuid::Uuid::new_v4()).into_bytes()
 });
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -223,7 +222,8 @@ impl AuditWriter {
         };
 
         let count_sql = format!("SELECT COUNT(*) FROM audit_log {}", where_sql);
-        let refs: Vec<&dyn rusqlite::types::ToSql> = bind_values.iter().map(|b| b.as_ref()).collect();
+        let refs: Vec<&dyn rusqlite::types::ToSql> =
+            bind_values.iter().map(|b| b.as_ref()).collect();
         let total: i64 = conn.query_row(&count_sql, refs.as_slice(), |row| row.get(0))?;
 
         let offset = page * page_size;
@@ -238,7 +238,8 @@ impl AuditWriter {
             where_sql, limit_idx, offset_idx
         );
 
-        let refs2: Vec<&dyn rusqlite::types::ToSql> = bind_values.iter().map(|b| b.as_ref()).collect();
+        let refs2: Vec<&dyn rusqlite::types::ToSql> =
+            bind_values.iter().map(|b| b.as_ref()).collect();
         let mut stmt = conn.prepare(&query_sql)?;
         let entries: Vec<AuditEntry> = stmt
             .query_map(refs2.as_slice(), |row| {
@@ -267,17 +268,21 @@ impl AuditWriter {
     /// Get audit log statistics.
     pub fn get_stats() -> Result<AuditStats> {
         let conn = Database::get_connection()?;
-        let total: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM audit_log",
-            [],
-            |row| row.get(0),
-        )?;
+        let total: i64 = conn.query_row("SELECT COUNT(*) FROM audit_log", [], |row| row.get(0))?;
 
         let earliest: Option<String> = conn
-            .query_row("SELECT timestamp FROM audit_log ORDER BY seq ASC LIMIT 1", [], |row| row.get(0))
+            .query_row(
+                "SELECT timestamp FROM audit_log ORDER BY seq ASC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
             .ok();
         let latest: Option<String> = conn
-            .query_row("SELECT timestamp FROM audit_log ORDER BY seq DESC LIMIT 1", [], |row| row.get(0))
+            .query_row(
+                "SELECT timestamp FROM audit_log ORDER BY seq DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
             .ok();
 
         let (chain_valid, _) = Self::verify_chain()?;
@@ -325,7 +330,8 @@ impl AuditWriter {
     pub fn get_categories() -> Result<Vec<String>> {
         let conn = Database::get_connection()?;
         let mut stmt = conn.prepare("SELECT DISTINCT category FROM audit_log ORDER BY category")?;
-        let cats: Vec<String> = stmt.query_map([], |row| row.get(0))?
+        let cats: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(cats)
     }
@@ -334,7 +340,8 @@ impl AuditWriter {
     pub fn get_actions() -> Result<Vec<String>> {
         let conn = Database::get_connection()?;
         let mut stmt = conn.prepare("SELECT DISTINCT action FROM audit_log ORDER BY action")?;
-        let acts: Vec<String> = stmt.query_map([], |row| row.get(0))?
+        let acts: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(acts)
     }

@@ -128,7 +128,10 @@ fn resolve_model_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> 
             return Ok(path.clone());
         }
     }
-    Err(format!("Vosk model not found in candidate paths: {:?}", candidates))
+    Err(format!(
+        "Vosk model not found in candidate paths: {:?}",
+        candidates
+    ))
 }
 
 /// Check model status using the same resolver used by transcription startup.
@@ -491,8 +494,8 @@ pub fn transcribe_wav(
     let sample_rate = parse_wav_sample_rate(wav_data)?;
     let pcm = decode_wav_pcm(wav_data)?;
 
-    let mut recognizer = Recognizer::new(&model, sample_rate as f32)
-        .ok_or("Failed to create recognizer")?;
+    let mut recognizer =
+        Recognizer::new(&model, sample_rate as f32).ok_or("Failed to create recognizer")?;
 
     let total_samples = pcm.len();
     let chunk_size = (sample_rate as usize) / 5; // 200ms chunks
@@ -511,12 +514,15 @@ pub fn transcribe_wav(
                     full_text.push(' ');
                 }
                 full_text.push_str(&text);
-                let _ = app_handle.emit("speech:recording_transcript", RecordingTranscriptEvent {
-                    request_id: request_id.to_string(),
-                    text: full_text.clone(),
-                    is_final: false,
-                    progress,
-                });
+                let _ = app_handle.emit(
+                    "speech:recording_transcript",
+                    RecordingTranscriptEvent {
+                        request_id: request_id.to_string(),
+                        text: full_text.clone(),
+                        is_final: false,
+                        progress,
+                    },
+                );
             }
         } else {
             // Emit partial progress periodically
@@ -529,12 +535,15 @@ pub fn transcribe_wav(
                 format!("{} {}", full_text, partial)
             };
             if !display.is_empty() && processed % (chunk_size * 5) < chunk_size {
-                let _ = app_handle.emit("speech:recording_transcript", RecordingTranscriptEvent {
-                    request_id: request_id.to_string(),
-                    text: display,
-                    is_final: false,
-                    progress,
-                });
+                let _ = app_handle.emit(
+                    "speech:recording_transcript",
+                    RecordingTranscriptEvent {
+                        request_id: request_id.to_string(),
+                        text: display,
+                        is_final: false,
+                        progress,
+                    },
+                );
             }
         }
     }
@@ -548,12 +557,15 @@ pub fn transcribe_wav(
         full_text.push_str(&final_text);
     }
 
-    let _ = app_handle.emit("speech:recording_transcript", RecordingTranscriptEvent {
-        request_id: request_id.to_string(),
-        text: full_text.clone(),
-        is_final: true,
-        progress: 1.0,
-    });
+    let _ = app_handle.emit(
+        "speech:recording_transcript",
+        RecordingTranscriptEvent {
+            request_id: request_id.to_string(),
+            text: full_text.clone(),
+            is_final: true,
+            progress: 1.0,
+        },
+    );
 
     Ok(full_text)
 }
@@ -580,18 +592,22 @@ fn emit_transcript(
 fn extract_result_text(recognizer: &mut Recognizer) -> String {
     match recognizer.result() {
         CompleteResult::Single(s) => s.text.trim().to_string(),
-        CompleteResult::Multiple(m) => {
-            m.alternatives.first().map(|a| a.text.trim().to_string()).unwrap_or_default()
-        }
+        CompleteResult::Multiple(m) => m
+            .alternatives
+            .first()
+            .map(|a| a.text.trim().to_string())
+            .unwrap_or_default(),
     }
 }
 
 fn extract_final_text(recognizer: &mut Recognizer) -> String {
     match recognizer.final_result() {
         CompleteResult::Single(s) => s.text.trim().to_string(),
-        CompleteResult::Multiple(m) => {
-            m.alternatives.first().map(|a| a.text.trim().to_string()).unwrap_or_default()
-        }
+        CompleteResult::Multiple(m) => m
+            .alternatives
+            .first()
+            .map(|a| a.text.trim().to_string())
+            .unwrap_or_default(),
     }
 }
 
@@ -622,7 +638,8 @@ fn decode_wav_pcm(data: &[u8]) -> Result<Vec<i16>, String> {
     let mut data_size = data.len() - 44;
     for i in 12..data.len().saturating_sub(8).min(200) {
         if &data[i..i + 4] == b"data" {
-            data_size = u32::from_le_bytes([data[i + 4], data[i + 5], data[i + 6], data[i + 7]]) as usize;
+            data_size =
+                u32::from_le_bytes([data[i + 4], data[i + 5], data[i + 6], data[i + 7]]) as usize;
             data_offset = i + 8;
             break;
         }

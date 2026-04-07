@@ -4,13 +4,13 @@
 //!
 //! Results stream to the frontend in real time via `network-devices-progress` events.
 
+use crate::core::user_agent;
 use crate::network_discovery::arp;
 use crate::network_discovery::banner;
 use crate::network_discovery::fingerprint::{fingerprint_device, DeviceFingerprint, DeviceType};
 use crate::network_discovery::ip_range;
 use crate::network_discovery::oui;
 use crate::network_discovery::rdns;
-use crate::core::user_agent;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -255,11 +255,7 @@ impl DiscoveredDevice {
     }
 
     /// Create a device from a SIP probe response (legacy-compatible).
-    pub fn from_sip(
-        ip: String,
-        sip_info: SipDeviceInfo,
-        rtt_ms: f64,
-    ) -> Self {
+    pub fn from_sip(ip: String, sip_info: SipDeviceInfo, rtt_ms: f64) -> Self {
         Self {
             ip,
             mac_address: None,
@@ -368,7 +364,13 @@ fn infer_device_type(vendor: &str, hostname: &str, open_ports: &[banner::OpenPor
     let host_l = hostname.to_lowercase();
     let service_l = open_ports
         .iter()
-        .map(|p| format!("{} {}", p.service_name.to_lowercase(), p.banner.to_lowercase()))
+        .map(|p| {
+            format!(
+                "{} {}",
+                p.service_name.to_lowercase(),
+                p.banner.to_lowercase()
+            )
+        })
         .collect::<Vec<_>>()
         .join(" ");
     let signal = format!("{} {} {}", vendor_l, host_l, service_l);
@@ -609,7 +611,8 @@ fn build_sip_options(
         generate_tag(),
         target_host,
         target_port,
-        call_id, effective_user_agent,
+        call_id,
+        effective_user_agent,
     )
 }
 
@@ -678,7 +681,8 @@ fn build_sip_invite(
         generate_tag(),
         target_host,
         target_port,
-        call_id, effective_user_agent,
+        call_id,
+        effective_user_agent,
     )
 }
 
@@ -703,12 +707,7 @@ fn parse_sip_response(data: &[u8]) -> Option<ParsedResponse> {
             if line_lower.starts_with(&format!("{}:", name_lower))
                 || line_lower.starts_with(&format!("{} :", name_lower))
             {
-                return line
-                    .splitn(2, ':')
-                    .nth(1)
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+                return line.splitn(2, ':').nth(1).unwrap_or("").trim().to_string();
             }
         }
         String::new()
@@ -757,15 +756,30 @@ async fn probe_sip_single(
     let branch = generate_branch();
 
     let request = match method {
-        ScanMethod::Options => {
-            build_sip_options(&ip.to_string(), port, &local_ip, local_port, &call_id, &branch)
-        }
-        ScanMethod::Register => {
-            build_sip_register(&ip.to_string(), port, &local_ip, local_port, &call_id, &branch)
-        }
-        ScanMethod::Invite => {
-            build_sip_invite(&ip.to_string(), port, &local_ip, local_port, &call_id, &branch)
-        }
+        ScanMethod::Options => build_sip_options(
+            &ip.to_string(),
+            port,
+            &local_ip,
+            local_port,
+            &call_id,
+            &branch,
+        ),
+        ScanMethod::Register => build_sip_register(
+            &ip.to_string(),
+            port,
+            &local_ip,
+            local_port,
+            &call_id,
+            &branch,
+        ),
+        ScanMethod::Invite => build_sip_invite(
+            &ip.to_string(),
+            port,
+            &local_ip,
+            local_port,
+            &call_id,
+            &branch,
+        ),
     };
 
     let start = Instant::now();
@@ -816,11 +830,7 @@ async fn run_quick_scan(
         }
 
         let vendor = oui::lookup_oui(&entry.mac);
-        let mut device = DiscoveredDevice::from_arp(
-            entry.ip.clone(),
-            entry.mac.clone(),
-            vendor,
-        );
+        let mut device = DiscoveredDevice::from_arp(entry.ip.clone(), entry.mac.clone(), vendor);
         enrich_device_fingerprint(&mut device, config.enrichment_flags.fingerprint);
 
         let count = probed_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -921,11 +931,7 @@ async fn run_sip_scan(
             break;
         }
         let vendor = oui::lookup_oui(&entry.mac);
-        let mut device = DiscoveredDevice::from_arp(
-            entry.ip.clone(),
-            entry.mac.clone(),
-            vendor,
-        );
+        let mut device = DiscoveredDevice::from_arp(entry.ip.clone(), entry.mac.clone(), vendor);
         enrich_device_fingerprint(&mut device, config.enrichment_flags.fingerprint);
 
         let count = probed_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1092,11 +1098,7 @@ async fn run_full_scan(
         }
 
         let vendor = oui::lookup_oui(&entry.mac);
-        let mut device = DiscoveredDevice::from_arp(
-            entry.ip.clone(),
-            entry.mac.clone(),
-            vendor,
-        );
+        let mut device = DiscoveredDevice::from_arp(entry.ip.clone(), entry.mac.clone(), vendor);
         enrich_device_fingerprint(&mut device, config.enrichment_flags.fingerprint);
 
         let count = probed_count.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1278,7 +1280,9 @@ async fn run_full_scan(
         }
 
         for &port in &sip_ports {
-            if let Some((sip_info, rtt)) = probe_sip_single(*ip, port, &config.method, timeout).await {
+            if let Some((sip_info, rtt)) =
+                probe_sip_single(*ip, port, &config.method, timeout).await
+            {
                 let ip_str = ip.to_string();
                 if let Some(device) = device_map.get_mut(&ip_str) {
                     // Merge SIP info into existing ARP-discovered device
@@ -1408,15 +1412,9 @@ pub async fn run_scan(window: tauri::Window, config: ScanConfig) -> ScanResult {
 
     // Dispatch to the appropriate scan mode
     let devices = match &scan_mode {
-        ScanMode::Quick => {
-            run_quick_scan(window, &config, ips).await
-        }
-        ScanMode::Sip => {
-            run_sip_scan(window, &config, &ips).await
-        }
-        ScanMode::Full => {
-            run_full_scan(window, &config, ips).await
-        }
+        ScanMode::Quick => run_quick_scan(window, &config, ips).await,
+        ScanMode::Sip => run_sip_scan(window, &config, &ips).await,
+        ScanMode::Full => run_full_scan(window, &config, ips).await,
     };
 
     let duration_ms = start.elapsed().as_millis() as u64;

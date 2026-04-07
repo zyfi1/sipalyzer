@@ -158,7 +158,11 @@ pub async fn geoip_lookup(ip: &str) -> GeoIpResult {
     match geoip_lookup_https(ip).await {
         Ok(result) => result,
         Err(e) => {
-            tracing::error!("HTTPS GeoIP request failed for {}: {}, falling back to DNS", ip, e);
+            tracing::error!(
+                "HTTPS GeoIP request failed for {}: {}, falling back to DNS",
+                ip,
+                e
+            );
             geoip_from_asn(ip).await
         }
     }
@@ -320,7 +324,10 @@ fn geoip_error(ip: &str, error: &str) -> GeoIpResult {
 fn reverse_ip_for_cymru(ip: &str) -> Option<String> {
     if let Ok(addr) = ip.parse::<std::net::Ipv4Addr>() {
         let octets = addr.octets();
-        Some(format!("{}.{}.{}.{}", octets[3], octets[2], octets[1], octets[0]))
+        Some(format!(
+            "{}.{}.{}.{}",
+            octets[3], octets[2], octets[1], octets[0]
+        ))
     } else if let Ok(addr) = ip.parse::<std::net::Ipv6Addr>() {
         // IPv6 reverse: expand to full form, reverse nibbles
         let segments = addr.segments();
@@ -338,18 +345,55 @@ fn reverse_ip_for_cymru(ip: &str) -> Option<String> {
 }
 
 /// Parse Cymru origin TXT record: "AS# | CIDR | CC | registry | date"
-fn parse_cymru_origin(text: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+fn parse_cymru_origin(
+    text: &str,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
     let parts: Vec<&str> = text.split('|').map(|s| s.trim()).collect();
     (
-        parts.first().and_then(|s| if s.is_empty() { None } else { Some(s.to_string()) }),
-        parts.get(1).and_then(|s| if s.is_empty() { None } else { Some(s.to_string()) }),
-        parts.get(2).and_then(|s| if s.is_empty() { None } else { Some(s.to_string()) }),
-        parts.get(3).and_then(|s| if s.is_empty() { None } else { Some(s.to_string()) }),
+        parts.first().and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        }),
+        parts.get(1).and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        }),
+        parts.get(2).and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        }),
+        parts.get(3).and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        }),
     )
 }
 
 /// Parse Cymru ASN TXT record for the org name (last pipe-separated field).
 fn parse_cymru_asn_org(text: &str) -> Option<String> {
     let parts: Vec<&str> = text.split('|').map(|s| s.trim()).collect();
-    parts.last().and_then(|s| if s.is_empty() { None } else { Some(s.to_string()) })
+    parts.last().and_then(|s| {
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.to_string())
+        }
+    })
 }

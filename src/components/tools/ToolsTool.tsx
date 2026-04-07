@@ -6,6 +6,7 @@ import { TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS } from "@/lib/toolSubviewTabs";
 import { cn } from "@/lib/utils";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { FEATURE_FLAG_MCP_UI, FEATURE_FLAG_TOOLS_MOCKUP_UI } from "@/lib/featureFlags";
+import { shouldDeferToolsSubviewHydration } from "@/components/tools/toolsSubviewHydration";
 
 import { SyslogView } from "@/components/tools/syslog/SyslogView";
 import { LogViewerView } from "@/components/tools/log-viewer/LogViewerView";
@@ -38,8 +39,8 @@ export function ToolsTool() {
   const setActiveSubview = useToolStore((s) => s.setActiveSubview);
   const setLastViewedSubview = useToolStore((s) => s.setLastViewedSubview);
   const [activeTab, setActiveTab] = useState<string>(SUBVIEW_SYSLOG);
-  const { enabled: mcpEnabled } = useFeatureFlag(FEATURE_FLAG_MCP_UI);
-  const { enabled: mockupEnabled } = useFeatureFlag(FEATURE_FLAG_TOOLS_MOCKUP_UI);
+  const { enabled: mcpEnabled, loading: mcpLoading } = useFeatureFlag(FEATURE_FLAG_MCP_UI);
+  const { enabled: mockupEnabled, loading: mockupLoading } = useFeatureFlag(FEATURE_FLAG_TOOLS_MOCKUP_UI);
 
   const execContextToolId = useMemo(
     () => EXEC_CONTEXT_MAP[activeTab],
@@ -76,9 +77,31 @@ export function ToolsTool() {
     if (validTabs.includes(activeSubviewId)) {
       setActiveTab(activeSubviewId);
       setLastViewedSubview(TOOL_ID, activeSubviewId);
+      setActiveSubview(null);
+      return;
+    }
+    if (
+      shouldDeferToolsSubviewHydration(activeSubviewId, {
+        mcpEnabled,
+        mcpLoading,
+        mockupEnabled,
+        mockupLoading,
+      })
+    ) {
+      return;
     }
     setActiveSubview(null);
-  }, [activeToolId, activeSubviewId, setActiveSubview, setLastViewedSubview, validTabs]);
+  }, [
+    activeToolId,
+    activeSubviewId,
+    mcpEnabled,
+    mcpLoading,
+    mockupEnabled,
+    mockupLoading,
+    setActiveSubview,
+    setLastViewedSubview,
+    validTabs,
+  ]);
 
   useEffect(() => {
     setLastViewedSubview(TOOL_ID, activeTab);

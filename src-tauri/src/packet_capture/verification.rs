@@ -29,7 +29,10 @@ pub fn is_authoritative_provenance(provenance: PacketProvenance) -> bool {
 ///
 /// This only checks rule wiring and deterministic invariants; protocol-specific
 /// fidelity checks can be added incrementally.
-pub fn run_fidelity_scaffold_checks(payload_len: usize, frame_len: usize) -> Vec<FidelityRuleResult> {
+pub fn run_fidelity_scaffold_checks(
+    payload_len: usize,
+    frame_len: usize,
+) -> Vec<FidelityRuleResult> {
     vec![
         FidelityRuleResult {
             rule_id: "frame_len_gte_payload",

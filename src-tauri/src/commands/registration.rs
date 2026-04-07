@@ -1,12 +1,14 @@
-use crate::commands::packet_capture::{get_interface_for_ip, list_interfaces, start_capture_session, stop_capture};
+use crate::commands::packet_capture::{
+    get_interface_for_ip, list_interfaces, start_capture_session, stop_capture,
+};
 use crate::core::config;
 use crate::core::credentials::CredentialStore;
 use crate::core::database::Database;
 use crate::packet_capture::FilterConfig;
 use crate::sip::register::RegistrationTester;
 use crate::sip::tests::{TestSuite, TestType};
-use crate::sip::transport::Transport;
 use crate::sip::transport;
+use crate::sip::transport::Transport;
 use crate::sip::uri::SipUri;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -66,12 +68,9 @@ pub struct RegistrationStatus {
 
 #[command]
 #[tracing::instrument(skip_all)]
-pub fn create_registrar(
-    registrar: Registrar,
-    password: String,
-) -> Result<String, String> {
+pub fn create_registrar(registrar: Registrar, password: String) -> Result<String, String> {
     let registrar_id = Uuid::new_v4().to_string();
-    
+
     // Encrypt password before storing
     let encrypted_password = CredentialStore::encrypt_password(&password)
         .map_err(|e| format!("Failed to encrypt password: {}", e))?;
@@ -85,9 +84,13 @@ pub fn create_registrar(
     };
 
     // New registrars go to the end: max(sort_order) + 1
-    let existing_registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
-    let max_sort = existing_registrars.iter().map(|r| r.sort_order).max().unwrap_or(-1);
+    let existing_registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let max_sort = existing_registrars
+        .iter()
+        .map(|r| r.sort_order)
+        .max()
+        .unwrap_or(-1);
 
     let registrar_config = config::RegistrarConfig {
         id: registrar_id.clone(),
@@ -120,8 +123,11 @@ pub fn create_registrar(
         .map_err(|e| format!("Failed to save registrar: {}", e))?;
 
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "registration", "create_registrar", "user",
-        Some(&registrar_id), Some(&registrar_config.name),
+        "registration",
+        "create_registrar",
+        "user",
+        Some(&registrar_id),
+        Some(&registrar_config.name),
     );
 
     Ok(registrar_id)
@@ -135,9 +141,9 @@ pub fn update_registrar(
     password: Option<String>,
 ) -> Result<(), String> {
     // Load existing registrar to preserve ID and update fields
-    let existing_registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
-    
+    let existing_registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
+
     let existing = existing_registrars
         .iter()
         .find(|r| r.id == id)
@@ -179,7 +185,9 @@ pub fn update_registrar(
         tags: registrar.tags,
         group: registrar.group,
         use_case: registrar.use_case,
-        voicemail_number: registrar.voicemail_number.or(existing.voicemail_number.clone()),
+        voicemail_number: registrar
+            .voicemail_number
+            .or(existing.voicemail_number.clone()),
         mwi_enabled: registrar.mwi_enabled,
         auto_register: registrar.auto_register,
         sort_order: existing.sort_order,
@@ -189,8 +197,11 @@ pub fn update_registrar(
         .map_err(|e| format!("Failed to update registrar: {}", e))?;
 
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "registration", "update_registrar", "user",
-        Some(&id), Some(&updated_config.name),
+        "registration",
+        "update_registrar",
+        "user",
+        Some(&id),
+        Some(&updated_config.name),
     );
 
     Ok(())
@@ -199,8 +210,8 @@ pub fn update_registrar(
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_registrar_password(id: String) -> Result<String, String> {
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let registrar_config = registrars
         .iter()
@@ -217,11 +228,14 @@ pub fn get_registrar_password(id: String) -> Result<String, String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn delete_registrar(id: String) -> Result<(), String> {
-    Database::delete_registrar(&id)
-        .map_err(|e| format!("Failed to delete registrar: {}", e))?;
+    Database::delete_registrar(&id).map_err(|e| format!("Failed to delete registrar: {}", e))?;
     crate::softphone::clear_registration_binding(&id);
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "registration", "delete_registrar", "user", Some(&id), None,
+        "registration",
+        "delete_registrar",
+        "user",
+        Some(&id),
+        None,
     );
     Ok(())
 }
@@ -229,8 +243,8 @@ pub fn delete_registrar(id: String) -> Result<(), String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn list_registrars() -> Result<Vec<Registrar>, String> {
-    let registrars_config = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars_config =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let registrars: Vec<Registrar> = registrars_config
         .iter()
@@ -273,7 +287,8 @@ pub fn list_registrars() -> Result<Vec<Registrar>, String> {
 /// Get the local IP that would be used for this registrar (so we can pick the right capture interface).
 fn get_local_ip_for_registrar(config: &config::RegistrarConfig) -> Result<String, String> {
     let local_port = config.local_port.unwrap_or(5060);
-    let registrar_uri = SipUri::parse(&config.domain).map_err(|e| format!("Invalid domain: {}", e))?;
+    let registrar_uri =
+        SipUri::parse(&config.domain).map_err(|e| format!("Invalid domain: {}", e))?;
     let registrar_port = registrar_uri.port.unwrap_or(config.remote_port);
     let registrar_host = registrar_uri.host_for_resolution();
     let transport_type = match config.transport {
@@ -284,15 +299,17 @@ fn get_local_ip_for_registrar(config: &config::RegistrarConfig) -> Result<String
     };
     let mut transport = Transport::new(transport_type, local_port, registrar_host, registrar_port)
         .map_err(|e| format!("Failed to create transport: {}", e))?;
-    transport.update_local_ip().map_err(|e| format!("Failed to get local IP: {}", e))?;
+    transport
+        .update_local_ip()
+        .map_err(|e| format!("Failed to get local IP: {}", e))?;
     Ok(transport.get_local_ip_address())
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn test_registration(id: String) -> Result<serde_json::Value, String> {
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let registrar_config = registrars
         .iter()
@@ -327,19 +344,13 @@ pub fn test_registration(id: String) -> Result<serde_json::Value, String> {
             "response_message": result.response_message,
         }
     });
-    
+
     // Save as basic_registration test result
-    Database::save_test_result(
-        &id,
-        "basic_registration",
-        &test_result,
-        None,
-    ).unwrap_or_else(|e| {
+    Database::save_test_result(&id, "basic_registration", &test_result, None).unwrap_or_else(|e| {
         tracing::error!("Failed to save registration test result: {}", e);
     });
 
-    serde_json::to_value(&result)
-        .map_err(|e| format!("Failed to serialize result: {}", e))
+    serde_json::to_value(&result).map_err(|e| format!("Failed to serialize result: {}", e))
 }
 
 /// Run registration test with a per-test packet capture on the interface used for SIP.
@@ -347,8 +358,8 @@ pub fn test_registration(id: String) -> Result<serde_json::Value, String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn test_registration_with_capture(id: String) -> Result<serde_json::Value, String> {
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let registrar_config = registrars
         .iter()
@@ -421,7 +432,10 @@ pub fn test_registration_with_capture(id: String) -> Result<serde_json::Value, S
 
     let mut out = serde_json::to_value(&result).map_err(|e| e.to_string())?;
     if let Some(obj) = out.as_object_mut() {
-        obj.insert("capture_session_id".to_string(), serde_json::json!(session_id));
+        obj.insert(
+            "capture_session_id".to_string(),
+            serde_json::json!(session_id),
+        );
     }
     Ok(out)
 }
@@ -465,8 +479,7 @@ pub fn check_local_port(port: u16) -> Result<bool, String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_default_local_port() -> Result<u16, String> {
-    transport::find_available_port(5060)
-        .ok_or_else(|| "No available port found".to_string())
+    transport::find_available_port(5060).ok_or_else(|| "No available port found".to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -481,9 +494,13 @@ pub(crate) struct RunTestSuiteArgs {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn run_test_suite(args: RunTestSuiteArgs) -> Result<serde_json::Value, String> {
-    let RunTestSuiteArgs { id, test_types, test_configs } = args;
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let RunTestSuiteArgs {
+        id,
+        test_types,
+        test_configs,
+    } = args;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let registrar_config = registrars
         .iter()
@@ -500,24 +517,22 @@ pub fn run_test_suite(args: RunTestSuiteArgs) -> Result<serde_json::Value, Strin
     // Convert string test types to enum
     let test_types_enum: Vec<TestType> = test_types
         .iter()
-        .filter_map(|t| {
-            match t.as_str() {
-                "basic_registration" => Some(TestType::BasicRegistration),
-                "reregistration" => Some(TestType::Reregistration),
-                "deregistration" => Some(TestType::Deregistration),
-                "network_connectivity" => Some(TestType::NetworkConnectivity),
-                "transport_validation" => Some(TestType::TransportValidation),
-                "expires_header" => Some(TestType::ExpiresHeader),
-                "contact_header" => Some(TestType::ContactHeader),
-                "error_handling" => Some(TestType::ErrorHandling),
-                "nat_traversal" => Some(TestType::NatTraversal),
-                "firewall_test" => Some(TestType::FirewallTest),
-                "dns_srv_test" => Some(TestType::DnsSrvTest),
-                "registration_stability" => Some(TestType::RegistrationStability),
-                "network_conditions" => Some(TestType::NetworkConditions),
-                "multi_transport" => Some(TestType::MultiTransport),
-                _ => None,
-            }
+        .filter_map(|t| match t.as_str() {
+            "basic_registration" => Some(TestType::BasicRegistration),
+            "reregistration" => Some(TestType::Reregistration),
+            "deregistration" => Some(TestType::Deregistration),
+            "network_connectivity" => Some(TestType::NetworkConnectivity),
+            "transport_validation" => Some(TestType::TransportValidation),
+            "expires_header" => Some(TestType::ExpiresHeader),
+            "contact_header" => Some(TestType::ContactHeader),
+            "error_handling" => Some(TestType::ErrorHandling),
+            "nat_traversal" => Some(TestType::NatTraversal),
+            "firewall_test" => Some(TestType::FirewallTest),
+            "dns_srv_test" => Some(TestType::DnsSrvTest),
+            "registration_stability" => Some(TestType::RegistrationStability),
+            "network_conditions" => Some(TestType::NetworkConditions),
+            "multi_transport" => Some(TestType::MultiTransport),
+            _ => None,
         })
         .collect();
 
@@ -543,7 +558,9 @@ pub fn run_test_suite(args: RunTestSuiteArgs) -> Result<serde_json::Value, Strin
                     "multi_transport" => TestType::MultiTransport,
                     _ => continue,
                 };
-                if let Ok(config) = serde_json::from_value::<crate::sip::tests::TestConfig>(config_json.clone()) {
+                if let Ok(config) =
+                    serde_json::from_value::<crate::sip::tests::TestConfig>(config_json.clone())
+                {
                     configs_map.insert(test_type_enum, config);
                 }
             }
@@ -556,32 +573,32 @@ pub fn run_test_suite(args: RunTestSuiteArgs) -> Result<serde_json::Value, Strin
     // Save test results to database for health reports
     let suite_result_json = serde_json::to_value(&suite_result)
         .map_err(|e| format!("Failed to serialize result: {}", e))?;
-    
+
     // Save the entire test suite result
-    match Database::save_test_result(
-        &id,
-        "test_suite",
-        &suite_result_json,
-        None,
-    ) {
+    match Database::save_test_result(&id, "test_suite", &suite_result_json, None) {
         Ok(_) => {
             tracing::info!("Successfully saved test suite result for registrar {}", id);
         }
         Err(e) => {
-            tracing::error!("ERROR: Failed to save test suite result for registrar {}: {}", id, e);
+            tracing::error!(
+                "ERROR: Failed to save test suite result for registrar {}: {}",
+                id,
+                e
+            );
         }
     }
-    
+
     // Also save individual test results for easier parsing
     if let Some(suite_obj) = suite_result_json.as_object() {
         if let Some(tests) = suite_obj.get("tests").and_then(|t| t.as_array()) {
             for test in tests {
                 if let Some(test_obj) = test.as_object() {
                     // Get test type from the test object
-                    let test_type_str = test_obj.get("test_type")
+                    let test_type_str = test_obj
+                        .get("test_type")
                         .and_then(|t| t.as_str())
                         .unwrap_or("unknown");
-                    
+
                     // Save individual test result
                     let diagnostics = test_obj.get("diagnostics").and_then(|d| {
                         if d.is_null() {
@@ -590,15 +607,11 @@ pub fn run_test_suite(args: RunTestSuiteArgs) -> Result<serde_json::Value, Strin
                             Some(d)
                         }
                     });
-                    
-                    Database::save_test_result(
-                        &id,
-                        test_type_str,
-                        test,
-                        diagnostics,
-                    ).unwrap_or_else(|e| {
-                        tracing::error!("Failed to save individual test result: {}", e);
-                    });
+
+                    Database::save_test_result(&id, test_type_str, test, diagnostics)
+                        .unwrap_or_else(|e| {
+                            tracing::error!("Failed to save individual test result: {}", e);
+                        });
                 }
             }
         }
@@ -618,30 +631,28 @@ pub(crate) struct BulkTestRegistrarsArgs {
 #[tracing::instrument(skip_all)]
 pub fn bulk_test_registrars(args: BulkTestRegistrarsArgs) -> Result<serde_json::Value, String> {
     let BulkTestRegistrarsArgs { ids, test_types } = args;
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     // Convert string test types to enum
     let test_types_enum: Vec<TestType> = test_types
         .iter()
-        .filter_map(|t| {
-            match t.as_str() {
-                "basic_registration" => Some(TestType::BasicRegistration),
-                "reregistration" => Some(TestType::Reregistration),
-                "deregistration" => Some(TestType::Deregistration),
-                "network_connectivity" => Some(TestType::NetworkConnectivity),
-                "transport_validation" => Some(TestType::TransportValidation),
-                "expires_header" => Some(TestType::ExpiresHeader),
-                "contact_header" => Some(TestType::ContactHeader),
-                "error_handling" => Some(TestType::ErrorHandling),
-                "nat_traversal" => Some(TestType::NatTraversal),
-                "firewall_test" => Some(TestType::FirewallTest),
-                "dns_srv_test" => Some(TestType::DnsSrvTest),
-                "registration_stability" => Some(TestType::RegistrationStability),
-                "network_conditions" => Some(TestType::NetworkConditions),
-                "multi_transport" => Some(TestType::MultiTransport),
-                _ => None,
-            }
+        .filter_map(|t| match t.as_str() {
+            "basic_registration" => Some(TestType::BasicRegistration),
+            "reregistration" => Some(TestType::Reregistration),
+            "deregistration" => Some(TestType::Deregistration),
+            "network_connectivity" => Some(TestType::NetworkConnectivity),
+            "transport_validation" => Some(TestType::TransportValidation),
+            "expires_header" => Some(TestType::ExpiresHeader),
+            "contact_header" => Some(TestType::ContactHeader),
+            "error_handling" => Some(TestType::ErrorHandling),
+            "nat_traversal" => Some(TestType::NatTraversal),
+            "firewall_test" => Some(TestType::FirewallTest),
+            "dns_srv_test" => Some(TestType::DnsSrvTest),
+            "registration_stability" => Some(TestType::RegistrationStability),
+            "network_conditions" => Some(TestType::NetworkConditions),
+            "multi_transport" => Some(TestType::MultiTransport),
+            _ => None,
         })
         .collect();
 
@@ -663,31 +674,34 @@ pub fn bulk_test_registrars(args: BulkTestRegistrarsArgs) -> Result<serde_json::
                     // Save test results to database
                     let suite_result_json = serde_json::to_value(&suite_result)
                         .map_err(|e| format!("Failed to serialize: {}", e))?;
-                    
+
                     // Save the entire test suite result
-                    match Database::save_test_result(
-                        &id,
-                        "test_suite",
-                        &suite_result_json,
-                        None,
-                    ) {
+                    match Database::save_test_result(&id, "test_suite", &suite_result_json, None) {
                         Ok(_) => {
-                            tracing::info!("Successfully saved test suite result for registrar {}", id);
+                            tracing::info!(
+                                "Successfully saved test suite result for registrar {}",
+                                id
+                            );
                         }
                         Err(e) => {
-                            tracing::error!("ERROR: Failed to save test suite result for registrar {}: {}", id, e);
+                            tracing::error!(
+                                "ERROR: Failed to save test suite result for registrar {}: {}",
+                                id,
+                                e
+                            );
                         }
                     }
-                    
+
                     // Also save individual test results
                     if let Some(suite_obj) = suite_result_json.as_object() {
                         if let Some(tests) = suite_obj.get("tests").and_then(|t| t.as_array()) {
                             for test in tests {
                                 if let Some(test_obj) = test.as_object() {
-                                    let test_type_str = test_obj.get("test_type")
+                                    let test_type_str = test_obj
+                                        .get("test_type")
                                         .and_then(|t| t.as_str())
                                         .unwrap_or("unknown");
-                                    
+
                                     let diagnostics = test_obj.get("diagnostics").and_then(|d| {
                                         if d.is_null() {
                                             None
@@ -695,20 +709,24 @@ pub fn bulk_test_registrars(args: BulkTestRegistrarsArgs) -> Result<serde_json::
                                             Some(d)
                                         }
                                     });
-                                    
+
                                     Database::save_test_result(
                                         &id,
                                         test_type_str,
                                         test,
                                         diagnostics,
-                                    ).unwrap_or_else(|e| {
-                                        tracing::error!("Failed to save bulk individual test result: {}", e);
+                                    )
+                                    .unwrap_or_else(|e| {
+                                        tracing::error!(
+                                            "Failed to save bulk individual test result: {}",
+                                            e
+                                        );
                                     });
                                 }
                             }
                         }
                     }
-                    
+
                     results.push(serde_json::json!({
                         "registrar_id": id,
                         "success": suite_result.overall_success,
@@ -726,15 +744,14 @@ pub fn bulk_test_registrars(args: BulkTestRegistrarsArgs) -> Result<serde_json::
         }
     }
 
-    serde_json::to_value(&results)
-        .map_err(|e| format!("Failed to serialize results: {}", e))
+    serde_json::to_value(&results).map_err(|e| format!("Failed to serialize results: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn bulk_register(ids: Vec<String>) -> Result<serde_json::Value, String> {
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let mut results = Vec::new();
 
@@ -767,16 +784,12 @@ pub fn bulk_register(ids: Vec<String>) -> Result<serde_json::Value, String> {
                             "response_message": result.response_message,
                         }
                     });
-                    
+
                     // Save as basic_registration test result
-                    Database::save_test_result(
-                        &id,
-                        "basic_registration",
-                        &test_result,
-                        None,
-                    ).unwrap_or_else(|e| {
-                        tracing::error!("Failed to save registration test result: {}", e);
-                    });
+                    Database::save_test_result(&id, "basic_registration", &test_result, None)
+                        .unwrap_or_else(|e| {
+                            tracing::error!("Failed to save registration test result: {}", e);
+                        });
 
                     results.push(serde_json::json!({
                         "registrar_id": id,
@@ -798,15 +811,14 @@ pub fn bulk_register(ids: Vec<String>) -> Result<serde_json::Value, String> {
                             "error": e.to_string(),
                         }
                     });
-                    
-                    Database::save_test_result(
-                        &id,
-                        "basic_registration",
-                        &test_result,
-                        None,
-                    ).unwrap_or_else(|err| {
-                        tracing::error!("Failed to save failed registration test result: {}", err);
-                    });
+
+                    Database::save_test_result(&id, "basic_registration", &test_result, None)
+                        .unwrap_or_else(|err| {
+                            tracing::error!(
+                                "Failed to save failed registration test result: {}",
+                                err
+                            );
+                        });
 
                     results.push(serde_json::json!({
                         "registrar_id": id,
@@ -818,15 +830,14 @@ pub fn bulk_register(ids: Vec<String>) -> Result<serde_json::Value, String> {
         }
     }
 
-    serde_json::to_value(&results)
-        .map_err(|e| format!("Failed to serialize results: {}", e))
+    serde_json::to_value(&results).map_err(|e| format!("Failed to serialize results: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn unregister_registrar(id: String) -> Result<serde_json::Value, String> {
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     if let Some(registrar_config) = registrars.iter().find(|r| r.id == id) {
         // Decrypt password
@@ -856,15 +867,11 @@ pub fn unregister_registrar(id: String) -> Result<serde_json::Value, String> {
                         "response_message": result.response_message,
                     }
                 });
-                
-                Database::save_test_result(
-                    &id,
-                    "deregistration",
-                    &test_result,
-                    None,
-                ).unwrap_or_else(|e| {
-                    tracing::error!("Failed to save unregistration test result: {}", e);
-                });
+
+                Database::save_test_result(&id, "deregistration", &test_result, None)
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Failed to save unregistration test result: {}", e);
+                    });
 
                 // Also save as basic_registration with success=false to mark as unregistered
                 let unregistered_result = serde_json::json!({
@@ -879,15 +886,11 @@ pub fn unregister_registrar(id: String) -> Result<serde_json::Value, String> {
                         "unregistered": true,
                     }
                 });
-                
-                Database::save_test_result(
-                    &id,
-                    "basic_registration",
-                    &unregistered_result,
-                    None,
-                ).unwrap_or_else(|e| {
-                    tracing::error!("Failed to save unregistered status: {}", e);
-                });
+
+                Database::save_test_result(&id, "basic_registration", &unregistered_result, None)
+                    .unwrap_or_else(|e| {
+                        tracing::error!("Failed to save unregistered status: {}", e);
+                    });
 
                 Ok(serde_json::json!({
                     "registrar_id": id,
@@ -908,15 +911,14 @@ pub fn unregister_registrar(id: String) -> Result<serde_json::Value, String> {
                         "error": e.to_string(),
                     }
                 });
-                
-                Database::save_test_result(
-                    &id,
-                    "deregistration",
-                    &test_result,
-                    None,
-                ).unwrap_or_else(|err| {
-                    tracing::error!("Failed to save failed unregistration test result: {}", err);
-                });
+
+                Database::save_test_result(&id, "deregistration", &test_result, None)
+                    .unwrap_or_else(|err| {
+                        tracing::error!(
+                            "Failed to save failed unregistration test result: {}",
+                            err
+                        );
+                    });
 
                 Err(format!("Unregistration failed: {}", e))
             }
@@ -929,8 +931,8 @@ pub fn unregister_registrar(id: String) -> Result<serde_json::Value, String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn bulk_unregister(ids: Vec<String>) -> Result<serde_json::Value, String> {
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
 
     let mut results = Vec::new();
 
@@ -964,15 +966,11 @@ pub fn bulk_unregister(ids: Vec<String>) -> Result<serde_json::Value, String> {
                             "response_message": result.response_message,
                         }
                     });
-                    
-                    Database::save_test_result(
-                        &id,
-                        "deregistration",
-                        &test_result,
-                        None,
-                    ).unwrap_or_else(|e| {
-                        tracing::error!("Failed to save unregistration test result: {}", e);
-                    });
+
+                    Database::save_test_result(&id, "deregistration", &test_result, None)
+                        .unwrap_or_else(|e| {
+                            tracing::error!("Failed to save unregistration test result: {}", e);
+                        });
 
                     // Also save as basic_registration with success=false to mark as unregistered
                     // Format matches TestResult structure
@@ -988,13 +986,14 @@ pub fn bulk_unregister(ids: Vec<String>) -> Result<serde_json::Value, String> {
                             "unregistered": true,
                         }
                     });
-                    
+
                     Database::save_test_result(
                         &id,
                         "basic_registration",
                         &unregistered_result,
                         None,
-                    ).unwrap_or_else(|e| {
+                    )
+                    .unwrap_or_else(|e| {
                         tracing::error!("Failed to save unregistered status: {}", e);
                     });
 
@@ -1017,15 +1016,14 @@ pub fn bulk_unregister(ids: Vec<String>) -> Result<serde_json::Value, String> {
                             "error": e.to_string(),
                         }
                     });
-                    
-                    Database::save_test_result(
-                        &id,
-                        "deregistration",
-                        &test_result,
-                        None,
-                    ).unwrap_or_else(|err| {
-                        tracing::error!("Failed to save failed unregistration test result: {}", err);
-                    });
+
+                    Database::save_test_result(&id, "deregistration", &test_result, None)
+                        .unwrap_or_else(|err| {
+                            tracing::error!(
+                                "Failed to save failed unregistration test result: {}",
+                                err
+                            );
+                        });
 
                     results.push(serde_json::json!({
                         "registrar_id": id,
@@ -1037,29 +1035,28 @@ pub fn bulk_unregister(ids: Vec<String>) -> Result<serde_json::Value, String> {
         }
     }
 
-    serde_json::to_value(&results)
-        .map_err(|e| format!("Failed to serialize results: {}", e))
+    serde_json::to_value(&results).map_err(|e| format!("Failed to serialize results: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_registration_health() -> Result<serde_json::Value, String> {
     use crate::core::database::Database;
-    
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
-    
+
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
+
     let mut registrar_healths = Vec::new();
     let mut total_response_time = 0u64;
     let mut total_tests = 0usize;
     let mut successful_tests = 0usize;
     let mut last_successful_registration: Option<String> = None;
-    
+
     for registrar in &registrars {
         // Load recent test results for this registrar
-        let test_results = Database::load_test_results(Some(&registrar.id), Some(100))
-            .unwrap_or_default();
-        
+        let test_results =
+            Database::load_test_results(Some(&registrar.id), Some(100)).unwrap_or_default();
+
         let mut registrar_response_times = Vec::new();
         let mut registrar_successful = 0usize;
         let mut registrar_total = 0usize;
@@ -1067,58 +1064,80 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
         let mut registrar_last_test: Option<String> = None;
         let mut registrar_last_success: Option<String> = None;
         let mut latest_registration_test: Option<(String, bool, u64)> = None; // (timestamp, success, status_code)
-        
+
         // Parse test results
         for result_json in &test_results {
             if let Some(result_obj) = result_json.as_object() {
                 // Extract timestamp if available
-                let timestamp = result_obj.get("_timestamp")
+                let timestamp = result_obj
+                    .get("_timestamp")
                     .and_then(|t| t.as_str())
                     .map(|s| s.to_string());
-                
+
                 if timestamp.is_some() {
-                    if registrar_last_test.is_none() || timestamp.as_ref().unwrap() > registrar_last_test.as_ref().unwrap() {
+                    if registrar_last_test.is_none()
+                        || timestamp.as_ref().unwrap() > registrar_last_test.as_ref().unwrap()
+                    {
                         registrar_last_test = timestamp.clone();
                     }
                 }
-                
+
                 // Try to extract test suite result or single test result
                 if let Some(tests) = result_obj.get("tests").and_then(|t| t.as_array()) {
                     // Test suite result
                     for test in tests {
                         if let Some(test_obj) = test.as_object() {
-                            if let Some(success) = test_obj.get("success").and_then(|s| s.as_bool()) {
+                            if let Some(success) = test_obj.get("success").and_then(|s| s.as_bool())
+                            {
                                 registrar_total += 1;
                                 if success {
                                     registrar_successful += 1;
                                     if timestamp.is_some() {
-                                        if registrar_last_success.is_none() || timestamp.as_ref().unwrap() > registrar_last_success.as_ref().unwrap() {
+                                        if registrar_last_success.is_none()
+                                            || timestamp.as_ref().unwrap()
+                                                > registrar_last_success.as_ref().unwrap()
+                                        {
                                             registrar_last_success = timestamp.clone();
                                         }
                                     }
                                 }
-                                
-                                if let Some(result) = test_obj.get("result").and_then(|r| r.as_object()) {
-                                    if let Some(response_time) = result.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+
+                                if let Some(result) =
+                                    test_obj.get("result").and_then(|r| r.as_object())
+                                {
+                                    if let Some(response_time) =
+                                        result.get("response_time_ms").and_then(|rt| rt.as_u64())
+                                    {
                                         registrar_response_times.push(response_time);
                                         total_response_time += response_time;
                                     }
                                     // Track registration tests to determine current registered status
-                                    let test_type_str = test_obj.get("test_type")
+                                    let test_type_str = test_obj
+                                        .get("test_type")
                                         .and_then(|t| t.as_str())
                                         .unwrap_or("");
-                                    
+
                                     // Handle both enum format (basic_registration) and string format
-                                    let is_basic_registration = test_type_str == "basic_registration" 
+                                    let is_basic_registration = test_type_str
+                                        == "basic_registration"
                                         || test_type_str == "BasicRegistration";
-                                    
+
                                     if is_basic_registration {
-                                        if let Some(status_code) = result.get("status_code").and_then(|sc| sc.as_u64()) {
+                                        if let Some(status_code) =
+                                            result.get("status_code").and_then(|sc| sc.as_u64())
+                                        {
                                             if let Some(ts) = timestamp.clone() {
                                                 // Only 200 OK means registered for SIP REGISTER
                                                 let is_registered = success && status_code == 200;
-                                                if latest_registration_test.is_none() || ts > latest_registration_test.as_ref().unwrap().0 {
-                                                    latest_registration_test = Some((ts, is_registered, status_code));
+                                                if latest_registration_test.is_none()
+                                                    || ts
+                                                        > latest_registration_test
+                                                            .as_ref()
+                                                            .unwrap()
+                                                            .0
+                                                {
+                                                    latest_registration_test =
+                                                        Some((ts, is_registered, status_code));
                                                 }
                                             }
                                         }
@@ -1133,50 +1152,64 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                     if success {
                         registrar_successful += 1;
                         if timestamp.is_some() {
-                            if registrar_last_success.is_none() || timestamp.as_ref().unwrap() > registrar_last_success.as_ref().unwrap() {
+                            if registrar_last_success.is_none()
+                                || timestamp.as_ref().unwrap()
+                                    > registrar_last_success.as_ref().unwrap()
+                            {
                                 registrar_last_success = timestamp.clone();
                             }
                         }
                     }
-                    
+
                     // Check if it's a TestResult structure
                     if let Some(result) = result_obj.get("result").and_then(|r| r.as_object()) {
-                        if let Some(response_time) = result.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+                        if let Some(response_time) =
+                            result.get("response_time_ms").and_then(|rt| rt.as_u64())
+                        {
                             registrar_response_times.push(response_time);
                             total_response_time += response_time;
                         }
                         // Track registration tests to determine current registered status
-                        let test_type_str = result_obj.get("_test_type")
+                        let test_type_str = result_obj
+                            .get("_test_type")
                             .and_then(|t| t.as_str())
                             .unwrap_or("");
-                        
+
                         // Handle both enum format and string format
-                        let is_basic_registration = test_type_str == "basic_registration" 
+                        let is_basic_registration = test_type_str == "basic_registration"
                             || test_type_str == "BasicRegistration";
-                        
+
                         if is_basic_registration {
                             // Try to get status_code from nested result or direct
-                            let status_code = result.get("status_code")
+                            let status_code = result
+                                .get("status_code")
                                 .and_then(|sc| sc.as_u64())
-                                .or_else(|| result_obj.get("status_code").and_then(|sc| sc.as_u64()));
-                            
+                                .or_else(|| {
+                                    result_obj.get("status_code").and_then(|sc| sc.as_u64())
+                                });
+
                             if let Some(sc) = status_code {
                                 if let Some(ts) = timestamp.clone() {
                                     // Only 200 OK means registered for SIP REGISTER
                                     let is_registered = success && sc == 200;
-                                    if latest_registration_test.is_none() || ts > latest_registration_test.as_ref().unwrap().0 {
+                                    if latest_registration_test.is_none()
+                                        || ts > latest_registration_test.as_ref().unwrap().0
+                                    {
                                         latest_registration_test = Some((ts, is_registered, sc));
                                     }
                                 }
                             } else if success {
                                 // If no status code but success=true, check for error to determine if actually registered
-                                let has_error = result.get("error")
+                                let has_error = result
+                                    .get("error")
                                     .and_then(|e| e.as_str())
                                     .map(|e| !e.is_empty())
                                     .unwrap_or(false);
                                 let is_registered = !has_error;
                                 if let Some(ts) = timestamp.clone() {
-                                    if latest_registration_test.is_none() || ts > latest_registration_test.as_ref().unwrap().0 {
+                                    if latest_registration_test.is_none()
+                                        || ts > latest_registration_test.as_ref().unwrap().0
+                                    {
                                         latest_registration_test = Some((ts, is_registered, 200));
                                     }
                                 }
@@ -1184,32 +1217,38 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                         }
                     } else {
                         // Direct result fields
-                        if let Some(response_time) = result_obj.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+                        if let Some(response_time) = result_obj
+                            .get("response_time_ms")
+                            .and_then(|rt| rt.as_u64())
+                        {
                             registrar_response_times.push(response_time);
                             total_response_time += response_time;
                         }
                         // Track registration tests to determine current registered status
                         // Check for any registration-related test (basic_registration, registration_stability, etc.)
-                        let test_type_str = result_obj.get("_test_type")
+                        let test_type_str = result_obj
+                            .get("_test_type")
                             .and_then(|t| t.as_str())
                             .unwrap_or("");
-                        
+
                         // Check if this is a basic registration test (most important for status)
-                        let is_basic_registration = test_type_str == "basic_registration" 
+                        let is_basic_registration = test_type_str == "basic_registration"
                             || test_type_str == "BasicRegistration";
-                        
+
                         if is_basic_registration {
                             // Try multiple ways to get status code
-                            let status_code = result_obj.get("status_code")
+                            let status_code = result_obj
+                                .get("status_code")
                                 .and_then(|sc| sc.as_u64())
                                 .or_else(|| {
                                     // Also check in nested result object
-                                    result_obj.get("result")
+                                    result_obj
+                                        .get("result")
                                         .and_then(|r| r.as_object())
                                         .and_then(|ro| ro.get("status_code"))
                                         .and_then(|sc| sc.as_u64())
                                 });
-                            
+
                             if let Some(ts) = timestamp.clone() {
                                 // Determine if registered: For SIP REGISTER, only 200 OK means successful registration
                                 // RFC 3261: 200 OK is the only success response for REGISTER
@@ -1219,7 +1258,8 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                                 } else {
                                     // If no status code but success=true, check if there's an error indicating failure
                                     // If there's an error message, it's likely not registered
-                                    let has_error = result_obj.get("result")
+                                    let has_error = result_obj
+                                        .get("result")
                                         .and_then(|r| r.as_object())
                                         .and_then(|ro| ro.get("error"))
                                         .and_then(|e| e.as_str())
@@ -1227,9 +1267,12 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                                         .unwrap_or(false);
                                     success && !has_error
                                 };
-                                
-                                if latest_registration_test.is_none() || ts > latest_registration_test.as_ref().unwrap().0 {
-                                    latest_registration_test = Some((ts, is_registered, status_code.unwrap_or(0)));
+
+                                if latest_registration_test.is_none()
+                                    || ts > latest_registration_test.as_ref().unwrap().0
+                                {
+                                    latest_registration_test =
+                                        Some((ts, is_registered, status_code.unwrap_or(0)));
                                 }
                             }
                         }
@@ -1237,39 +1280,40 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                 }
             }
         }
-        
+
         total_tests += registrar_total;
         successful_tests += registrar_successful;
-        
+
         // Determine registered status from most recent basic_registration test
         if let Some((_, is_registered, _)) = latest_registration_test {
             registrar_registered = is_registered;
         }
-        
+
         // Calculate health score for this registrar
         // Only calculate if there are actual test results
         let avg_response_time = if !registrar_response_times.is_empty() {
-            registrar_response_times.iter().sum::<u64>() as f64 / registrar_response_times.len() as f64
+            registrar_response_times.iter().sum::<u64>() as f64
+                / registrar_response_times.len() as f64
         } else {
             0.0
         };
-        
+
         let pass_rate = if registrar_total > 0 {
             (registrar_successful as f64 / registrar_total as f64) * 100.0
         } else {
             0.0
         };
-        
+
         let health_score = if registrar_total > 0 {
             // Weighted scoring:
             // - Registration stability: 40% (registered = 100, not registered = 0)
             // - Test pass rate: 35% (actual percentage of tests passing)
             // - Response time: 25% (based on response time performance)
             let stability_score = if registrar_registered { 100.0 } else { 0.0 };
-            
+
             // Response time scoring: penalize missing data less harshly, reward fast responses
             let response_time_score = if avg_response_time == 0.0 {
-                75.0  // Missing data gets neutral score instead of dragging down
+                75.0 // Missing data gets neutral score instead of dragging down
             } else if avg_response_time < 100.0 {
                 100.0
             } else if avg_response_time < 300.0 {
@@ -1279,12 +1323,12 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
             } else {
                 40.0
             };
-            
+
             (stability_score * 0.40) + (pass_rate * 0.35) + (response_time_score * 0.25)
         } else {
             0.0 // No tests = no health score
         };
-        
+
         let network_quality = if registrar_total > 0 {
             if avg_response_time < 100.0 {
                 "excellent"
@@ -1298,14 +1342,14 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
         } else {
             "unknown"
         };
-        
+
         // Only include health score if there are actual test results
         let health_score_value = if registrar_total > 0 {
             Some(health_score.round() as u64)
         } else {
             None
         };
-        
+
         registrar_healths.push(serde_json::json!({
             "registrar_id": registrar.id,
             "registered": registrar_registered,
@@ -1316,28 +1360,30 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
             "test_pass_rate": if registrar_total > 0 { Some(pass_rate / 100.0) } else { None },
             "network_quality": network_quality,
         }));
-        
+
         if registrar_last_success.is_some() {
-            if last_successful_registration.is_none() || 
-               registrar_last_success.as_ref().unwrap() > last_successful_registration.as_ref().unwrap() {
+            if last_successful_registration.is_none()
+                || registrar_last_success.as_ref().unwrap()
+                    > last_successful_registration.as_ref().unwrap()
+            {
                 last_successful_registration = registrar_last_success;
             }
         }
     }
-    
+
     // Calculate aggregate metrics
     let avg_response_time = if total_tests > 0 {
         Some(total_response_time / total_tests as u64)
     } else {
         None
     };
-    
+
     let test_success_rate = if total_tests > 0 {
         Some(successful_tests as f64 / total_tests as f64)
     } else {
         None
     };
-    
+
     let overall_network_quality = if let Some(avg_rt) = avg_response_time {
         if avg_rt < 100 {
             "excellent"
@@ -1351,53 +1397,62 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
     } else {
         "unknown"
     };
-    
+
     // Build test history and collect data for status analysis
     let mut test_history = Vec::new();
     let mut recent_results = Vec::new();
-    
+
     // Track test type status across all registrars
     let mut test_type_status_map: HashMap<String, Vec<(String, bool, String)>> = HashMap::new(); // test_type -> [(registrar_id, success, timestamp)]
-    
+
     for registrar in &registrars {
-        let test_results = Database::load_test_results(Some(&registrar.id), Some(100))
-            .unwrap_or_default();
-        
+        let test_results =
+            Database::load_test_results(Some(&registrar.id), Some(100)).unwrap_or_default();
+
         for result_json in &test_results {
             if let Some(result_obj) = result_json.as_object() {
-                let timestamp = result_obj.get("_timestamp")
+                let timestamp = result_obj
+                    .get("_timestamp")
                     .and_then(|t| t.as_str())
                     .map(|s| s.to_string());
-                let test_type = result_obj.get("_test_type")
+                let test_type = result_obj
+                    .get("_test_type")
                     .and_then(|t| t.as_str())
                     .map(|s| s.to_string());
-                
+
                 // Extract success and response time
                 let mut success = false;
                 let mut response_time = 0u64;
-                
+
                 if let Some(tests) = result_obj.get("tests").and_then(|t| t.as_array()) {
                     // Test suite - process individual tests
                     for test in tests {
                         if let Some(test_obj) = test.as_object() {
-                            let test_success = test_obj.get("success").and_then(|s| s.as_bool()).unwrap_or(false);
-                            let _test_type_str = test_obj.get("test_type")
+                            let test_success = test_obj
+                                .get("success")
+                                .and_then(|s| s.as_bool())
+                                .unwrap_or(false);
+                            let _test_type_str = test_obj
+                                .get("test_type")
                                 .and_then(|t| t.as_str())
                                 .unwrap_or("");
-                            
-                            if let Some(result) = test_obj.get("result").and_then(|r| r.as_object()) {
-                                if let Some(rt) = result.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+
+                            if let Some(result) = test_obj.get("result").and_then(|r| r.as_object())
+                            {
+                                if let Some(rt) =
+                                    result.get("response_time_ms").and_then(|rt| rt.as_u64())
+                                {
                                     response_time = rt;
                                 }
                             }
-                            
+
                             if let (Some(ts), Some(tt)) = (timestamp.clone(), test_type.clone()) {
                                 if !tt.is_empty() {
                                     test_type_status_map
                                         .entry(tt.clone())
                                         .or_insert_with(Vec::new)
                                         .push((registrar.id.clone(), test_success, ts.clone()));
-                                    
+
                                     recent_results.push(serde_json::json!({
                                         "timestamp": ts,
                                         "registrar_id": registrar.id,
@@ -1410,9 +1465,11 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                             }
                         }
                     }
-                    
+
                     // Use overall success for test history
-                    if let Some(overall_success) = result_obj.get("overall_success").and_then(|s| s.as_bool()) {
+                    if let Some(overall_success) =
+                        result_obj.get("overall_success").and_then(|s| s.as_bool())
+                    {
                         success = overall_success;
                     }
                     // Get average response time from tests
@@ -1420,8 +1477,11 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                     let mut count = 0usize;
                     for test in tests {
                         if let Some(test_obj) = test.as_object() {
-                            if let Some(result) = test_obj.get("result").and_then(|r| r.as_object()) {
-                                if let Some(rt) = result.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+                            if let Some(result) = test_obj.get("result").and_then(|r| r.as_object())
+                            {
+                                if let Some(rt) =
+                                    result.get("response_time_ms").and_then(|rt| rt.as_u64())
+                                {
                                     total_rt += rt;
                                     count += 1;
                                 }
@@ -1434,13 +1494,17 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                 } else if let Some(s) = result_obj.get("success").and_then(|s| s.as_bool()) {
                     success = s;
                     if let Some(result) = result_obj.get("result").and_then(|r| r.as_object()) {
-                        if let Some(rt) = result.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+                        if let Some(rt) = result.get("response_time_ms").and_then(|rt| rt.as_u64())
+                        {
                             response_time = rt;
                         }
-                    } else if let Some(rt) = result_obj.get("response_time_ms").and_then(|rt| rt.as_u64()) {
+                    } else if let Some(rt) = result_obj
+                        .get("response_time_ms")
+                        .and_then(|rt| rt.as_u64())
+                    {
                         response_time = rt;
                     }
-                    
+
                     // Track single test result
                     if let (Some(ts), Some(tt)) = (timestamp.clone(), test_type.clone()) {
                         if !tt.is_empty() {
@@ -1448,7 +1512,7 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                                 .entry(tt.clone())
                                 .or_insert_with(Vec::new)
                                 .push((registrar.id.clone(), success, ts.clone()));
-                            
+
                             recent_results.push(serde_json::json!({
                                 "timestamp": ts,
                                 "registrar_id": registrar.id,
@@ -1460,7 +1524,7 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
                         }
                     }
                 }
-                
+
                 if let (Some(ts), Some(tt)) = (timestamp, test_type) {
                     test_history.push(serde_json::json!({
                         "timestamp": ts,
@@ -1473,37 +1537,38 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
             }
         }
     }
-    
+
     // Sort by timestamp descending
     test_history.sort_by(|a, b| {
         let ts_a = a.get("timestamp").and_then(|t| t.as_str()).unwrap_or("");
         let ts_b = b.get("timestamp").and_then(|t| t.as_str()).unwrap_or("");
         ts_b.cmp(ts_a)
     });
-    
+
     // Limit to most recent 100
     test_history.truncate(100);
-    
+
     // Sort recent results by timestamp descending
     recent_results.sort_by(|a, b| {
         let ts_a = a.get("timestamp").and_then(|t| t.as_str()).unwrap_or("");
         let ts_b = b.get("timestamp").and_then(|t| t.as_str()).unwrap_or("");
         ts_b.cmp(ts_a)
     });
-    
+
     // Limit recent results to 50
     recent_results.truncate(50);
-    
+
     // Build test type status array
     let mut test_type_status = Vec::new();
     for (test_type, registrar_statuses) in test_type_status_map {
         // Determine overall status
         let has_fail = registrar_statuses.iter().any(|(_, success, _)| !success);
         let has_pass = registrar_statuses.iter().any(|(_, success, _)| *success);
-        let latest = registrar_statuses.iter()
+        let latest = registrar_statuses
+            .iter()
             .max_by(|a, b| a.2.cmp(&b.2))
             .map(|(_, _, ts)| ts.clone());
-        
+
         let overall_status = if registrar_statuses.is_empty() {
             "not_tested"
         } else if has_fail && !has_pass {
@@ -1513,7 +1578,7 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
         } else {
             "warning" // Mixed results
         };
-        
+
         test_type_status.push(serde_json::json!({
             "test_type": test_type,
             "status": overall_status,
@@ -1527,23 +1592,29 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
             }).collect::<Vec<_>>()
         }));
     }
-    
+
     // Build time series data (group by hour for last 7 days)
     let mut time_series_data = Vec::new();
     let now = chrono::Utc::now();
     let seven_days_ago = now - chrono::Duration::hours(168);
-    
+
     // Group test history by hour
     let mut hourly_data: HashMap<String, (usize, usize, u64, usize)> = HashMap::new(); // hour -> (success_count, total_count, total_rt, count)
-    
+
     for entry in &test_history {
         if let Some(ts_str) = entry.get("timestamp").and_then(|t| t.as_str()) {
             if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(ts_str) {
                 if ts.timestamp() >= seven_days_ago.timestamp() {
                     let hour_key = format!("{}", ts.format("%Y-%m-%dT%H:00:00Z"));
-                    let success = entry.get("success").and_then(|s| s.as_bool()).unwrap_or(false);
-                    let rt = entry.get("response_time_ms").and_then(|rt| rt.as_u64()).unwrap_or(0);
-                    
+                    let success = entry
+                        .get("success")
+                        .and_then(|s| s.as_bool())
+                        .unwrap_or(false);
+                    let rt = entry
+                        .get("response_time_ms")
+                        .and_then(|rt| rt.as_u64())
+                        .unwrap_or(0);
+
                     let entry = hourly_data.entry(hour_key).or_insert((0, 0, 0, 0));
                     entry.1 += 1; // total
                     if success {
@@ -1555,7 +1626,7 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
             }
         }
     }
-    
+
     for (period, (success_count, total_count, total_rt, count)) in hourly_data {
         let success_rate = if total_count > 0 {
             success_count as f64 / total_count as f64
@@ -1567,21 +1638,21 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
         } else {
             0
         };
-        
+
         time_series_data.push(serde_json::json!({
             "period": period,
             "success_rate": success_rate,
             "avg_response_time": avg_response_time
         }));
     }
-    
+
     // Sort time series by period
     time_series_data.sort_by(|a, b| {
         let period_a = a.get("period").and_then(|p| p.as_str()).unwrap_or("");
         let period_b = b.get("period").and_then(|p| p.as_str()).unwrap_or("");
         period_a.cmp(period_b)
     });
-    
+
     let result = serde_json::json!({
         "registrars": registrar_healths,
         "metrics": {
@@ -1595,7 +1666,7 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
         "recent_results": recent_results,
         "time_series_data": time_series_data,
     });
-    
+
     Ok(result)
 }
 
@@ -1603,48 +1674,57 @@ pub fn get_registration_health() -> Result<serde_json::Value, String> {
 #[tracing::instrument(skip_all)]
 pub fn clear_test_results(registrar_id: Option<String>) -> Result<usize, String> {
     use crate::core::database::Database;
-    
+
     Database::clear_test_results(registrar_id.as_deref())
         .map_err(|e| format!("Failed to clear test results: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
-pub fn get_test_suite_results(registrar_id: String, limit: Option<usize>) -> Result<Vec<serde_json::Value>, String> {
+pub fn get_test_suite_results(
+    registrar_id: String,
+    limit: Option<usize>,
+) -> Result<Vec<serde_json::Value>, String> {
     use crate::core::database::Database;
     use rusqlite::params;
-    
+
     let limit = limit.unwrap_or(50);
-    
+
     // Query directly for test_suite results to avoid loading all test results
     let conn = Database::get_connection()
         .map_err(|e| format!("Failed to get database connection: {}", e))?;
-    
-    let mut stmt = conn.prepare(
-        "SELECT result, timestamp, test_type FROM test_results 
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT result, timestamp, test_type FROM test_results 
          WHERE registrar_id = ?1 AND test_type = 'test_suite' 
-         ORDER BY timestamp DESC LIMIT ?2"
-    ).map_err(|e| format!("Failed to prepare query: {}", e))?;
-    
+         ORDER BY timestamp DESC LIMIT ?2",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
     let mut suite_results = Vec::new();
-    let rows = stmt.query_map(params![registrar_id, limit], |row| {
-        let result_json: String = row.get(0)?;
-        let timestamp: String = row.get(1)?;
-        let test_type: String = row.get(2)?;
-        let mut result_value: serde_json::Value = serde_json::from_str(&result_json)
-            .map_err(|_| rusqlite::Error::InvalidColumnType(
-                0,
-                "Invalid JSON in test result".to_string(),
-                rusqlite::types::Type::Text,
-            ))?;
-        // Add timestamp and test_type to the result
-        if let Some(obj) = result_value.as_object_mut() {
-            obj.insert("_timestamp".to_string(), serde_json::json!(timestamp));
-            obj.insert("_test_type".to_string(), serde_json::json!(test_type));
-        }
-        Ok(result_value)
-    }).map_err(|e| format!("Failed to execute query: {}", e))?;
-    
+    let rows = stmt
+        .query_map(params![registrar_id, limit], |row| {
+            let result_json: String = row.get(0)?;
+            let timestamp: String = row.get(1)?;
+            let test_type: String = row.get(2)?;
+            let mut result_value: serde_json::Value =
+                serde_json::from_str(&result_json).map_err(|_| {
+                    rusqlite::Error::InvalidColumnType(
+                        0,
+                        "Invalid JSON in test result".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?;
+            // Add timestamp and test_type to the result
+            if let Some(obj) = result_value.as_object_mut() {
+                obj.insert("_timestamp".to_string(), serde_json::json!(timestamp));
+                obj.insert("_test_type".to_string(), serde_json::json!(test_type));
+            }
+            Ok(result_value)
+        })
+        .map_err(|e| format!("Failed to execute query: {}", e))?;
+
     for row in rows {
         match row {
             Ok(result_value) => {
@@ -1655,7 +1735,7 @@ pub fn get_test_suite_results(registrar_id: String, limit: Option<usize>) -> Res
             }
         }
     }
-    
+
     Ok(suite_results)
 }
 
@@ -1668,10 +1748,13 @@ pub async fn export_test_results(
 ) -> Result<String, String> {
     use crate::core::database::Database;
     use std::fs;
-    
+
     let extension = if format == "html" { "html" } else { "pdf" };
-    let default_filename = format!("registration_report_{}.{}",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"), extension);
+    let default_filename = format!(
+        "registration_report_{}.{}",
+        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+        extension
+    );
 
     let dialog_result = rfd::AsyncFileDialog::new()
         .set_title("Save Registration Report")
@@ -1684,52 +1767,62 @@ pub async fn export_test_results(
         Some(handle) => handle.path().to_path_buf(),
         None => return Err("File save dialog was cancelled".to_string()),
     };
-    
+
     // Get health data
-    let health_data = get_registration_health()
-        .map_err(|e| format!("Failed to get health data: {}", e))?;
-    
-    let registrars = Database::load_registrars()
-        .map_err(|e| format!("Failed to load registrars: {}", e))?;
-    
+    let health_data =
+        get_registration_health().map_err(|e| format!("Failed to get health data: {}", e))?;
+
+    let registrars =
+        Database::load_registrars().map_err(|e| format!("Failed to load registrars: {}", e))?;
+
     // Filter registrars if IDs provided
     let filtered_registrars: Vec<_> = if let Some(ids) = registrar_ids {
         registrars.iter().filter(|r| ids.contains(&r.id)).collect()
     } else {
         registrars.iter().collect()
     };
-    
+
     match format.as_str() {
         "html" => {
             // Generate HTML report
             let html = generate_html_report(&health_data, &filtered_registrars);
-            
+
             fs::write(&final_path, html)
                 .map_err(|e| format!("Failed to write HTML file: {}", e))?;
-            
+
             Ok(format!("Report exported to: {}", final_path.display()))
         }
         "pdf" => {
             // Generate PDF report
             let pdf_bytes = generate_pdf_report(&health_data, &filtered_registrars)
                 .map_err(|e| format!("Failed to generate PDF: {}", e))?;
-            
+
             fs::write(&final_path, pdf_bytes)
                 .map_err(|e| format!("Failed to write PDF file: {}", e))?;
-            
+
             Ok(format!("Report exported to: {}", final_path.display()))
         }
-        _ => Err(format!("Unsupported format: {}", format))
+        _ => Err(format!("Unsupported format: {}", format)),
     }
 }
 
-fn generate_html_report(health_data: &serde_json::Value, registrars: &[&crate::core::config::RegistrarConfig]) -> String {
+fn generate_html_report(
+    health_data: &serde_json::Value,
+    registrars: &[&crate::core::config::RegistrarConfig],
+) -> String {
     let empty_vec: Vec<serde_json::Value> = Vec::new();
-    let registrars_json = health_data.get("registrars").and_then(|r| r.as_array()).unwrap_or(&empty_vec);
+    let registrars_json = health_data
+        .get("registrars")
+        .and_then(|r| r.as_array())
+        .unwrap_or(&empty_vec);
     let empty_map = serde_json::Map::new();
-    let metrics = health_data.get("metrics").and_then(|m| m.as_object()).unwrap_or(&empty_map);
-    
-    let mut html = String::from(r#"<!DOCTYPE html>
+    let metrics = health_data
+        .get("metrics")
+        .and_then(|m| m.as_object())
+        .unwrap_or(&empty_map);
+
+    let mut html = String::from(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1762,49 +1855,84 @@ fn generate_html_report(health_data: &serde_json::Value, registrars: &[&crate::c
 <body>
     <div class="container">
         <h1>Registration Health Report</h1>
-        <p>Generated: "#);
-    
+        <p>Generated: "#,
+    );
+
     html.push_str(&chrono::Utc::now().to_rfc3339());
-    html.push_str(r#"</p>
+    html.push_str(
+        r#"</p>
         
         <h2>Overall Metrics</h2>
-        <div class="metrics">"#);
-    
-    if let Some(avg_rt) = metrics.get("average_response_time").and_then(|v| v.as_u64()) {
-        html.push_str(&format!(r#"<div class="metric-card">
+        <div class="metrics">"#,
+    );
+
+    if let Some(avg_rt) = metrics
+        .get("average_response_time")
+        .and_then(|v| v.as_u64())
+    {
+        html.push_str(&format!(
+            r#"<div class="metric-card">
                 <div class="metric-label">Average Response Time</div>
                 <div class="metric-value">{}ms</div>
-            </div>"#, avg_rt));
+            </div>"#,
+            avg_rt
+        ));
     }
-    
+
     if let Some(success_rate) = metrics.get("test_success_rate").and_then(|v| v.as_f64()) {
-        html.push_str(&format!(r#"<div class="metric-card">
+        html.push_str(&format!(
+            r#"<div class="metric-card">
                 <div class="metric-label">Test Success Rate</div>
                 <div class="metric-value">{:.1}%</div>
-            </div>"#, success_rate * 100.0));
+            </div>"#,
+            success_rate * 100.0
+        ));
     }
-    
+
     if let Some(network_quality) = metrics.get("network_quality").and_then(|v| v.as_str()) {
-        html.push_str(&format!(r#"<div class="metric-card">
+        html.push_str(&format!(
+            r#"<div class="metric-card">
                 <div class="metric-label">Network Quality</div>
                 <div class="metric-value">{}</div>
-            </div>"#, network_quality));
+            </div>"#,
+            network_quality
+        ));
     }
-    
-    html.push_str(r#"</div>
+
+    html.push_str(
+        r#"</div>
         
-        <h2>Registrar Health</h2>"#);
-    
+        <h2>Registrar Health</h2>"#,
+    );
+
     for registrar_health in registrars_json {
-        if let Some(reg_id) = registrar_health.get("registrar_id").and_then(|v| v.as_str()) {
+        if let Some(reg_id) = registrar_health
+            .get("registrar_id")
+            .and_then(|v| v.as_str())
+        {
             if let Some(registrar) = registrars.iter().find(|r| r.id == reg_id) {
-                let health_score = registrar_health.get("health_score").and_then(|v| v.as_u64()).unwrap_or(0);
-                let registered = registrar_health.get("registered").and_then(|v| v.as_bool()).unwrap_or(false);
-                let response_time = registrar_health.get("response_time_ms").and_then(|v| v.as_u64());
-                
-                let health_class = if health_score >= 80 { "health-good" } else if health_score >= 60 { "health-fair" } else { "health-poor" };
-                
-                html.push_str(&format!(r#"
+                let health_score = registrar_health
+                    .get("health_score")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let registered = registrar_health
+                    .get("registered")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let response_time = registrar_health
+                    .get("response_time_ms")
+                    .and_then(|v| v.as_u64());
+
+                let health_class = if health_score >= 80 {
+                    "health-good"
+                } else if health_score >= 60 {
+                    "health-fair"
+                } else {
+                    "health-poor"
+                };
+
+                html.push_str(&format!(
+                    r#"
             <div class="registrar-card">
                 <div class="registrar-header">
                     <div>
@@ -1815,93 +1943,169 @@ fn generate_html_report(health_data: &serde_json::Value, registrars: &[&crate::c
                         <div class="health-score {}">{}</div>
                         <span class="status-badge {}">{}</span>
                     </div>
-                </div>"#, 
+                </div>"#,
                     registrar.name,
                     registrar.domain,
                     health_class,
                     health_score,
-                    if registered { "status-registered" } else { "status-not-registered" },
-                    if registered { "Registered" } else { "Not Registered" }
+                    if registered {
+                        "status-registered"
+                    } else {
+                        "status-not-registered"
+                    },
+                    if registered {
+                        "Registered"
+                    } else {
+                        "Not Registered"
+                    }
                 ));
-                
+
                 if let Some(rt) = response_time {
-                    html.push_str(&format!(r#"<p style="margin-top: 10px; color: #999;">Response Time: {}ms</p>"#, rt));
+                    html.push_str(&format!(
+                        r#"<p style="margin-top: 10px; color: #999;">Response Time: {}ms</p>"#,
+                        rt
+                    ));
                 }
-                
+
                 html.push_str("</div>");
             }
         }
     }
-    
-    html.push_str(r#"
+
+    html.push_str(
+        r#"
         <div class="footer">
             <p>VoIP Toolset - Registration Health Report</p>
         </div>
     </div>
 </body>
-</html>"#);
-    
+</html>"#,
+    );
+
     html
 }
 
-fn generate_pdf_report(health_data: &serde_json::Value, registrars: &[&crate::core::config::RegistrarConfig]) -> Result<Vec<u8>, String> {
+fn generate_pdf_report(
+    health_data: &serde_json::Value,
+    registrars: &[&crate::core::config::RegistrarConfig],
+) -> Result<Vec<u8>, String> {
     use printpdf::*;
     use std::io::{BufWriter, Cursor, Write};
-    
+
     let empty_vec: Vec<serde_json::Value> = Vec::new();
-    let registrars_json = health_data.get("registrars").and_then(|r| r.as_array()).unwrap_or(&empty_vec);
+    let registrars_json = health_data
+        .get("registrars")
+        .and_then(|r| r.as_array())
+        .unwrap_or(&empty_vec);
     let empty_map = serde_json::Map::new();
-    let metrics = health_data.get("metrics").and_then(|m| m.as_object()).unwrap_or(&empty_map);
-    
+    let metrics = health_data
+        .get("metrics")
+        .and_then(|m| m.as_object())
+        .unwrap_or(&empty_map);
+
     // Create a new PDF document
-    let (doc, page1, layer1) = PdfDocument::new("Registration Health Report", Mm(210.0), Mm(297.0), "Layer 1");
+    let (doc, page1, layer1) = PdfDocument::new(
+        "Registration Health Report",
+        Mm(210.0),
+        Mm(297.0),
+        "Layer 1",
+    );
     let current_page_ref = doc.get_page(page1);
     let current_layer = current_page_ref.get_layer(layer1);
-    let font = doc.add_builtin_font(BuiltinFont::Helvetica)
+    let font = doc
+        .add_builtin_font(BuiltinFont::Helvetica)
         .map_err(|e| format!("Failed to add font: {}", e))?;
-    let font_bold = doc.add_builtin_font(BuiltinFont::HelveticaBold)
+    let font_bold = doc
+        .add_builtin_font(BuiltinFont::HelveticaBold)
         .map_err(|e| format!("Failed to add bold font: {}", e))?;
-    
+
     let mut y_position = 280.0;
     let left_margin = 20.0;
     let line_height = 12.0;
     let mut current_page = page1;
     let mut current_layer_index = layer1;
-    
+
     // Title
-    current_layer.use_text("Registration Health Report", 24.0, Mm(left_margin), Mm(y_position), &font_bold);
+    current_layer.use_text(
+        "Registration Health Report",
+        24.0,
+        Mm(left_margin),
+        Mm(y_position),
+        &font_bold,
+    );
     y_position -= 20.0;
-    
+
     // Generated date
-    let generated_date = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
-    current_layer.use_text(&format!("Generated: {}", generated_date), 10.0, Mm(left_margin), Mm(y_position), &font);
+    let generated_date = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S UTC")
+        .to_string();
+    current_layer.use_text(
+        &format!("Generated: {}", generated_date),
+        10.0,
+        Mm(left_margin),
+        Mm(y_position),
+        &font,
+    );
     y_position -= 20.0;
-    
+
     // Overall Metrics section
-    current_layer.use_text("Overall Metrics", 16.0, Mm(left_margin), Mm(y_position), &font_bold);
+    current_layer.use_text(
+        "Overall Metrics",
+        16.0,
+        Mm(left_margin),
+        Mm(y_position),
+        &font_bold,
+    );
     y_position -= 15.0;
-    
-    if let Some(avg_rt) = metrics.get("average_response_time").and_then(|v| v.as_u64()) {
-        current_layer.use_text(&format!("Average Response Time: {}ms", avg_rt), 10.0, Mm(left_margin), Mm(y_position), &font);
+
+    if let Some(avg_rt) = metrics
+        .get("average_response_time")
+        .and_then(|v| v.as_u64())
+    {
+        current_layer.use_text(
+            &format!("Average Response Time: {}ms", avg_rt),
+            10.0,
+            Mm(left_margin),
+            Mm(y_position),
+            &font,
+        );
         y_position -= line_height;
     }
-    
+
     if let Some(success_rate) = metrics.get("test_success_rate").and_then(|v| v.as_f64()) {
-        current_layer.use_text(&format!("Test Success Rate: {:.1}%", success_rate * 100.0), 10.0, Mm(left_margin), Mm(y_position), &font);
+        current_layer.use_text(
+            &format!("Test Success Rate: {:.1}%", success_rate * 100.0),
+            10.0,
+            Mm(left_margin),
+            Mm(y_position),
+            &font,
+        );
         y_position -= line_height;
     }
-    
+
     if let Some(network_quality) = metrics.get("network_quality").and_then(|v| v.as_str()) {
-        current_layer.use_text(&format!("Network Quality: {}", network_quality), 10.0, Mm(left_margin), Mm(y_position), &font);
+        current_layer.use_text(
+            &format!("Network Quality: {}", network_quality),
+            10.0,
+            Mm(left_margin),
+            Mm(y_position),
+            &font,
+        );
         y_position -= line_height;
     }
-    
+
     y_position -= 10.0;
-    
+
     // Registrar Health section
-    current_layer.use_text("Registrar Health", 16.0, Mm(left_margin), Mm(y_position), &font_bold);
+    current_layer.use_text(
+        "Registrar Health",
+        16.0,
+        Mm(left_margin),
+        Mm(y_position),
+        &font_bold,
+    );
     y_position -= 15.0;
-    
+
     for registrar_health in registrars_json {
         // Check if we need a new page
         if y_position < 30.0 {
@@ -1910,61 +2114,112 @@ fn generate_pdf_report(health_data: &serde_json::Value, registrars: &[&crate::co
             current_layer_index = new_layer;
             y_position = 280.0;
         }
-        
+
         let page_ref = doc.get_page(current_page);
         let layer = page_ref.get_layer(current_layer_index);
-        
-        if let Some(reg_id) = registrar_health.get("registrar_id").and_then(|v| v.as_str()) {
+
+        if let Some(reg_id) = registrar_health
+            .get("registrar_id")
+            .and_then(|v| v.as_str())
+        {
             if let Some(registrar) = registrars.iter().find(|r| r.id == reg_id) {
-                let health_score = registrar_health.get("health_score").and_then(|v| v.as_u64()).unwrap_or(0);
-                let registered = registrar_health.get("registered").and_then(|v| v.as_bool()).unwrap_or(false);
-                let response_time = registrar_health.get("response_time_ms").and_then(|v| v.as_u64());
-                
+                let health_score = registrar_health
+                    .get("health_score")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let registered = registrar_health
+                    .get("registered")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let response_time = registrar_health
+                    .get("response_time_ms")
+                    .and_then(|v| v.as_u64());
+
                 // Registrar name
-                layer.use_text(&registrar.name, 12.0, Mm(left_margin), Mm(y_position), &font_bold);
-                y_position -= line_height;
-                
-                // Domain
-                layer.use_text(&registrar.domain, 10.0, Mm(left_margin + 5.0), Mm(y_position), &font);
-                y_position -= line_height;
-                
-                // Health score and status
-                layer.use_text(&format!("Health Score: {}", health_score), 10.0, Mm(left_margin + 5.0), Mm(y_position), &font);
-                y_position -= line_height;
-                
                 layer.use_text(
-                    &format!("Status: {}", if registered { "Registered" } else { "Not Registered" }),
+                    &registrar.name,
+                    12.0,
+                    Mm(left_margin),
+                    Mm(y_position),
+                    &font_bold,
+                );
+                y_position -= line_height;
+
+                // Domain
+                layer.use_text(
+                    &registrar.domain,
                     10.0,
                     Mm(left_margin + 5.0),
                     Mm(y_position),
-                    &font
+                    &font,
                 );
                 y_position -= line_height;
-                
+
+                // Health score and status
+                layer.use_text(
+                    &format!("Health Score: {}", health_score),
+                    10.0,
+                    Mm(left_margin + 5.0),
+                    Mm(y_position),
+                    &font,
+                );
+                y_position -= line_height;
+
+                layer.use_text(
+                    &format!(
+                        "Status: {}",
+                        if registered {
+                            "Registered"
+                        } else {
+                            "Not Registered"
+                        }
+                    ),
+                    10.0,
+                    Mm(left_margin + 5.0),
+                    Mm(y_position),
+                    &font,
+                );
+                y_position -= line_height;
+
                 if let Some(rt) = response_time {
-                    layer.use_text(&format!("Response Time: {}ms", rt), 10.0, Mm(left_margin + 5.0), Mm(y_position), &font);
+                    layer.use_text(
+                        &format!("Response Time: {}ms", rt),
+                        10.0,
+                        Mm(left_margin + 5.0),
+                        Mm(y_position),
+                        &font,
+                    );
                     y_position -= line_height;
                 }
-                
+
                 y_position -= 10.0;
             }
         }
     }
-    
+
     // Footer on last page
     let page_ref = doc.get_page(current_page);
     let layer = page_ref.get_layer(current_layer_index);
-    layer.use_text("VoIP Toolset - Registration Health Report", 8.0, Mm(left_margin), Mm(20.0), &font);
-    
+    layer.use_text(
+        "VoIP Toolset - Registration Health Report",
+        8.0,
+        Mm(left_margin),
+        Mm(20.0),
+        &font,
+    );
+
     // Convert to bytes using Cursor and BufWriter
     let mut buffer = Vec::new();
     {
         let cursor = Cursor::new(&mut buffer);
         let mut writer = BufWriter::new(cursor);
-        doc.save(&mut writer).map_err(|e| format!("Failed to save PDF: {}", e))?;
-        writer.flush().map_err(|e| format!("Failed to flush PDF buffer: {}", e))?;
+        doc.save(&mut writer)
+            .map_err(|e| format!("Failed to save PDF: {}", e))?;
+        writer
+            .flush()
+            .map_err(|e| format!("Failed to flush PDF buffer: {}", e))?;
     }
-    
+
     Ok(buffer)
 }
 
@@ -1981,11 +2236,17 @@ pub struct RegistrarFolder {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn list_registrar_folders() -> Result<Vec<RegistrarFolder>, String> {
-    let rows = Database::load_registrar_folders()
-        .map_err(|e| format!("Failed to load folders: {}", e))?;
-    Ok(rows.into_iter().map(|(id, name, sort_order, created_at)| RegistrarFolder {
-        id, name, sort_order, created_at,
-    }).collect())
+    let rows =
+        Database::load_registrar_folders().map_err(|e| format!("Failed to load folders: {}", e))?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, name, sort_order, created_at)| RegistrarFolder {
+            id,
+            name,
+            sort_order,
+            created_at,
+        })
+        .collect())
 }
 
 #[command]
@@ -1994,8 +2255,8 @@ pub fn create_registrar_folder(name: String) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     // Default sort_order: after all existing folders
-    let existing = Database::load_registrar_folders()
-        .map_err(|e| format!("Failed to load folders: {}", e))?;
+    let existing =
+        Database::load_registrar_folders().map_err(|e| format!("Failed to load folders: {}", e))?;
     let max_order = existing.iter().map(|(_, _, o, _)| *o).max().unwrap_or(-1);
     Database::save_registrar_folder(&id, &name, max_order + 1, &now)
         .map_err(|e| format!("Failed to create folder: {}", e))?;
@@ -2012,8 +2273,7 @@ pub fn rename_registrar_folder(id: String, name: String) -> Result<(), String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn delete_registrar_folder(id: String) -> Result<(), String> {
-    Database::delete_registrar_folder(&id)
-        .map_err(|e| format!("Failed to delete folder: {}", e))
+    Database::delete_registrar_folder(&id).map_err(|e| format!("Failed to delete folder: {}", e))
 }
 
 #[command]
@@ -2026,6 +2286,5 @@ pub fn reorder_registrar_folders(ids: Vec<String>) -> Result<(), String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn reorder_registrars(ids: Vec<String>) -> Result<(), String> {
-    Database::reorder_registrars(&ids)
-        .map_err(|e| format!("Failed to reorder registrars: {}", e))
+    Database::reorder_registrars(&ids).map_err(|e| format!("Failed to reorder registrars: {}", e))
 }

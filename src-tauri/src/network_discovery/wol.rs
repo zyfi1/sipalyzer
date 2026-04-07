@@ -13,8 +13,8 @@ pub fn send_wol(mac: &str) -> Result<(), String> {
     let mac_bytes = parse_mac(mac)?;
     let packet = build_magic_packet(&mac_bytes);
 
-    let socket = UdpSocket::bind("0.0.0.0:0")
-        .map_err(|e| format!("Failed to bind UDP socket: {}", e))?;
+    let socket =
+        UdpSocket::bind("0.0.0.0:0").map_err(|e| format!("Failed to bind UDP socket: {}", e))?;
 
     socket
         .set_broadcast(true)

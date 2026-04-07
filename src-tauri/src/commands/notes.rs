@@ -101,11 +101,14 @@ pub fn create_note(
         updated_at: now,
     };
 
-    Database::save_note(&note)
-        .map_err(|e| format!("Failed to save note: {}", e))?;
+    Database::save_note(&note).map_err(|e| format!("Failed to save note: {}", e))?;
 
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "notes", "create_note", "user", Some(&note_id), Some(&note.title),
+        "notes",
+        "create_note",
+        "user",
+        Some(&note_id),
+        Some(&note.title),
     );
 
     Ok(note_id)
@@ -126,9 +129,9 @@ pub fn update_note(
     linked_agent_id: Option<String>,
 ) -> Result<(), String> {
     // Create version before updating
-    let existing_note = Database::load_note(&id)
-        .map_err(|e| format!("Failed to load note: {}", e))?;
-    
+    let existing_note =
+        Database::load_note(&id).map_err(|e| format!("Failed to load note: {}", e))?;
+
     // Save version
     let version_id = Uuid::new_v4().to_string();
     let version = crate::core::database::NoteVersion {
@@ -139,8 +142,7 @@ pub fn update_note(
         version_number: existing_note.version.unwrap_or(1),
         created_at: chrono::Utc::now().to_rfc3339(),
     };
-    Database::save_note_version(&version)
-        .map_err(|e| format!("Failed to save version: {}", e))?;
+    Database::save_note_version(&version).map_err(|e| format!("Failed to save version: {}", e))?;
 
     // Load existing note to preserve created_at
     let mut note = existing_note;
@@ -156,11 +158,14 @@ pub fn update_note(
     note.linked_agent_id = linked_agent_id;
     note.updated_at = chrono::Utc::now().to_rfc3339();
 
-    Database::save_note(&note)
-        .map_err(|e| format!("Failed to update note: {}", e))?;
+    Database::save_note(&note).map_err(|e| format!("Failed to update note: {}", e))?;
 
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "notes", "update_note", "user", Some(&id), Some(&note.title),
+        "notes",
+        "update_note",
+        "user",
+        Some(&id),
+        Some(&note.title),
     );
 
     Ok(())
@@ -169,10 +174,13 @@ pub fn update_note(
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn delete_note(id: String) -> Result<(), String> {
-    Database::soft_delete_note(&id)
-        .map_err(|e| format!("Failed to delete note: {}", e))?;
+    Database::soft_delete_note(&id).map_err(|e| format!("Failed to delete note: {}", e))?;
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "notes", "delete_note", "user", Some(&id), None,
+        "notes",
+        "delete_note",
+        "user",
+        Some(&id),
+        None,
     );
     Ok(())
 }
@@ -180,8 +188,7 @@ pub fn delete_note(id: String) -> Result<(), String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_note(id: String) -> Result<Note, String> {
-    Database::load_note(&id)
-        .map_err(|e| format!("Failed to load note: {}", e))
+    Database::load_note(&id).map_err(|e| format!("Failed to load note: {}", e))
 }
 
 #[command]
@@ -192,15 +199,18 @@ pub fn get_notes(
     linked_agent_id: Option<String>,
 ) -> Result<Vec<Note>, String> {
     let tag_slice = tags.as_deref();
-    Database::load_notes(linked_registrar_id.as_deref(), tag_slice, linked_agent_id.as_deref())
-        .map_err(|e| format!("Failed to load notes: {}", e))
+    Database::load_notes(
+        linked_registrar_id.as_deref(),
+        tag_slice,
+        linked_agent_id.as_deref(),
+    )
+    .map_err(|e| format!("Failed to load notes: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_all_notes() -> Result<Vec<Note>, String> {
-    Database::load_notes(None, None, None)
-        .map_err(|e| format!("Failed to load notes: {}", e))
+    Database::load_notes(None, None, None).map_err(|e| format!("Failed to load notes: {}", e))
 }
 
 #[command]
@@ -210,34 +220,28 @@ pub fn search_notes(query: String) -> Result<Vec<Note>, String> {
         return Database::load_notes(None, None, None)
             .map_err(|e| format!("Failed to load notes: {}", e));
     }
-    Database::search_notes(&query)
-        .map_err(|e| format!("Failed to search notes: {}", e))
+    Database::search_notes(&query).map_err(|e| format!("Failed to search notes: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_all_tags() -> Result<Vec<String>, String> {
-    Database::get_all_tags()
-        .map_err(|e| format!("Failed to get tags: {}", e))
+    Database::get_all_tags().map_err(|e| format!("Failed to get tags: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_all_categories() -> Result<Vec<String>, String> {
-    Database::get_all_categories()
-        .map_err(|e| format!("Failed to get categories: {}", e))
+    Database::get_all_categories().map_err(|e| format!("Failed to get categories: {}", e))
 }
 
 // Folder commands
 #[command]
 #[tracing::instrument(skip_all)]
-pub fn create_note_folder(
-    name: String,
-    parent_id: Option<String>,
-) -> Result<String, String> {
+pub fn create_note_folder(name: String, parent_id: Option<String>) -> Result<String, String> {
     let folder_id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    
+
     // Build path
     let path = if let Some(parent) = &parent_id {
         let parent_folder = Database::load_note_folder(parent)
@@ -256,8 +260,7 @@ pub fn create_note_folder(
         updated_at: now,
     };
 
-    Database::save_note_folder(&folder)
-        .map_err(|e| format!("Failed to save folder: {}", e))?;
+    Database::save_note_folder(&folder).map_err(|e| format!("Failed to save folder: {}", e))?;
 
     Ok(folder_id)
 }
@@ -269,8 +272,8 @@ pub fn update_note_folder(
     name: Option<String>,
     parent_id: Option<String>,
 ) -> Result<(), String> {
-    let mut folder = Database::load_note_folder(&id)
-        .map_err(|e| format!("Failed to load folder: {}", e))?;
+    let mut folder =
+        Database::load_note_folder(&id).map_err(|e| format!("Failed to load folder: {}", e))?;
 
     if let Some(new_name) = name {
         folder.name = new_name;
@@ -290,8 +293,7 @@ pub fn update_note_folder(
 
     folder.updated_at = chrono::Utc::now().to_rfc3339();
 
-    Database::save_note_folder(&folder)
-        .map_err(|e| format!("Failed to update folder: {}", e))?;
+    Database::save_note_folder(&folder).map_err(|e| format!("Failed to update folder: {}", e))?;
 
     Ok(())
 }
@@ -299,25 +301,27 @@ pub fn update_note_folder(
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn delete_note_folder(id: String) -> Result<(), String> {
-    Database::delete_note_folder(&id)
-        .map_err(|e| format!("Failed to delete folder: {}", e))?;
+    Database::delete_note_folder(&id).map_err(|e| format!("Failed to delete folder: {}", e))?;
     Ok(())
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_note_folders() -> Result<Vec<NoteFolder>, String> {
-    let db_folders = Database::load_note_folders()
-        .map_err(|e| format!("Failed to load folders: {}", e))?;
-    
-    Ok(db_folders.into_iter().map(|f| NoteFolder {
-        id: f.id,
-        name: f.name,
-        parent_id: f.parent_id,
-        path: f.path,
-        created_at: f.created_at,
-        updated_at: f.updated_at,
-    }).collect())
+    let db_folders =
+        Database::load_note_folders().map_err(|e| format!("Failed to load folders: {}", e))?;
+
+    Ok(db_folders
+        .into_iter()
+        .map(|f| NoteFolder {
+            id: f.id,
+            name: f.name,
+            parent_id: f.parent_id,
+            path: f.path,
+            created_at: f.created_at,
+            updated_at: f.updated_at,
+        })
+        .collect())
 }
 
 // Version commands
@@ -339,8 +343,7 @@ pub fn create_note_version(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    Database::save_note_version(&version)
-        .map_err(|e| format!("Failed to save version: {}", e))?;
+    Database::save_note_version(&version).map_err(|e| format!("Failed to save version: {}", e))?;
 
     Ok(version_id)
 }
@@ -350,15 +353,18 @@ pub fn create_note_version(
 pub fn get_note_versions(note_id: String) -> Result<Vec<NoteVersion>, String> {
     let db_versions = Database::load_note_versions(&note_id)
         .map_err(|e| format!("Failed to load versions: {}", e))?;
-    
-    Ok(db_versions.into_iter().map(|v| NoteVersion {
-        id: v.id,
-        note_id: v.note_id,
-        title: v.title,
-        content: v.content,
-        version_number: v.version_number,
-        created_at: v.created_at,
-    }).collect())
+
+    Ok(db_versions
+        .into_iter()
+        .map(|v| NoteVersion {
+            id: v.id,
+            note_id: v.note_id,
+            title: v.title,
+            content: v.content,
+            version_number: v.version_number,
+            created_at: v.created_at,
+        })
+        .collect())
 }
 
 #[command]
@@ -366,7 +372,7 @@ pub fn get_note_versions(note_id: String) -> Result<Vec<NoteVersion>, String> {
 pub fn get_note_version(version_id: String) -> Result<NoteVersion, String> {
     let version = Database::get_note_version(&version_id)
         .map_err(|e| format!("Failed to load version: {}", e))?;
-    
+
     Ok(NoteVersion {
         id: version.id,
         note_id: version.note_id,
@@ -382,9 +388,9 @@ pub fn get_note_version(version_id: String) -> Result<NoteVersion, String> {
 pub fn restore_note_version(version_id: String) -> Result<(), String> {
     let version = Database::get_note_version(&version_id)
         .map_err(|e| format!("Failed to load version: {}", e))?;
-    
-    let note = Database::load_note(&version.note_id)
-        .map_err(|e| format!("Failed to load note: {}", e))?;
+
+    let note =
+        Database::load_note(&version.note_id).map_err(|e| format!("Failed to load note: {}", e))?;
 
     // Snapshot current state before restoring so the user can undo
     let snapshot = crate::core::database::NoteVersion {
@@ -403,8 +409,7 @@ pub fn restore_note_version(version_id: String) -> Result<(), String> {
     restored.content = version.content;
     restored.updated_at = chrono::Utc::now().to_rfc3339();
 
-    Database::save_note(&restored)
-        .map_err(|e| format!("Failed to restore note: {}", e))?;
+    Database::save_note(&restored).map_err(|e| format!("Failed to restore note: {}", e))?;
 
     Ok(())
 }
@@ -442,26 +447,28 @@ pub fn create_note_template(
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_note_templates() -> Result<Vec<NoteTemplate>, String> {
-    let db_templates = Database::load_note_templates()
-        .map_err(|e| format!("Failed to load templates: {}", e))?;
-    
-    Ok(db_templates.into_iter().map(|t| NoteTemplate {
-        id: t.id,
-        name: t.name,
-        title_template: t.title_template,
-        content_template: t.content_template,
-        category: t.category,
-        tags: t.tags,
-        created_at: t.created_at,
-        updated_at: t.updated_at,
-    }).collect())
+    let db_templates =
+        Database::load_note_templates().map_err(|e| format!("Failed to load templates: {}", e))?;
+
+    Ok(db_templates
+        .into_iter()
+        .map(|t| NoteTemplate {
+            id: t.id,
+            name: t.name,
+            title_template: t.title_template,
+            content_template: t.content_template,
+            category: t.category,
+            tags: t.tags,
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+        })
+        .collect())
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn delete_note_template(id: String) -> Result<(), String> {
-    Database::delete_note_template(&id)
-        .map_err(|e| format!("Failed to delete template: {}", e))?;
+    Database::delete_note_template(&id).map_err(|e| format!("Failed to delete template: {}", e))?;
     Ok(())
 }
 
@@ -479,13 +486,12 @@ pub fn search_notes_advanced(
 ) -> Result<Vec<Note>, String> {
     // Start with all notes or search results
     let mut notes = if !query.is_empty() {
-        Database::search_notes(&query)
-            .map_err(|e| format!("Failed to search notes: {}", e))?
+        Database::search_notes(&query).map_err(|e| format!("Failed to search notes: {}", e))?
     } else {
         Database::load_notes(linked_registrar_id.as_deref(), None, None)
             .map_err(|e| format!("Failed to load notes: {}", e))?
     };
-    
+
     // Apply filters
     if let Some(folder) = &folder_id {
         notes.retain(|n| n.folder_id.as_ref() == Some(folder));
@@ -507,7 +513,7 @@ pub fn search_notes_advanced(
     if let Some(to) = &date_to {
         notes.retain(|n| n.updated_at <= *to);
     }
-    
+
     Ok(notes)
 }
 
@@ -517,7 +523,11 @@ pub fn permanently_delete_note(id: String) -> Result<(), String> {
     Database::permanently_delete_note(&id)
         .map_err(|e| format!("Failed to permanently delete note: {}", e))?;
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "notes", "permanently_delete_note", "user", Some(&id), None,
+        "notes",
+        "permanently_delete_note",
+        "user",
+        Some(&id),
+        None,
     );
     Ok(())
 }
@@ -525,10 +535,13 @@ pub fn permanently_delete_note(id: String) -> Result<(), String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn restore_note(id: String) -> Result<(), String> {
-    Database::restore_note(&id)
-        .map_err(|e| format!("Failed to restore note: {}", e))?;
+    Database::restore_note(&id).map_err(|e| format!("Failed to restore note: {}", e))?;
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "notes", "restore_note", "user", Some(&id), None,
+        "notes",
+        "restore_note",
+        "user",
+        Some(&id),
+        None,
     );
     Ok(())
 }
@@ -536,17 +549,19 @@ pub fn restore_note(id: String) -> Result<(), String> {
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn get_deleted_notes() -> Result<Vec<Note>, String> {
-    Database::load_deleted_notes()
-        .map_err(|e| format!("Failed to load deleted notes: {}", e))
+    Database::load_deleted_notes().map_err(|e| format!("Failed to load deleted notes: {}", e))
 }
 
 #[command]
 #[tracing::instrument(skip_all)]
 pub fn empty_trash() -> Result<i32, String> {
-    let count = Database::empty_trash()
-        .map_err(|e| format!("Failed to empty trash: {}", e))?;
+    let count = Database::empty_trash().map_err(|e| format!("Failed to empty trash: {}", e))?;
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "notes", "empty_trash", "user", None, Some(&format!("{} notes", count)),
+        "notes",
+        "empty_trash",
+        "user",
+        None,
+        Some(&format!("{} notes", count)),
     );
     Ok(count)
 }
@@ -554,11 +569,8 @@ pub fn empty_trash() -> Result<i32, String> {
 // AI suggestions (placeholder - would integrate with AI service)
 #[command]
 #[tracing::instrument(skip_all)]
-pub fn get_note_ai_suggestions(
-    note_id: String,
-) -> Result<serde_json::Value, String> {
-    let note = Database::load_note(&note_id)
-        .map_err(|e| format!("Failed to load note: {}", e))?;
+pub fn get_note_ai_suggestions(note_id: String) -> Result<serde_json::Value, String> {
+    let note = Database::load_note(&note_id).map_err(|e| format!("Failed to load note: {}", e))?;
 
     // Basic AI suggestions based on content analysis
     let mut suggestions: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
@@ -567,14 +579,17 @@ pub fn get_note_ai_suggestions(
     let content_lower = note.content.to_lowercase();
     let title_lower = note.title.to_lowercase();
     let all_text = format!("{} {}", title_lower, content_lower);
-    
+
     let suggested_tags: Vec<String> = vec!["important", "todo", "meeting", "bug", "feature"]
         .iter()
         .filter(|tag| all_text.contains(*tag))
         .map(|s| s.to_string())
         .collect();
 
-    suggestions.insert("suggested_tags".to_string(), serde_json::json!(suggested_tags));
+    suggestions.insert(
+        "suggested_tags".to_string(),
+        serde_json::json!(suggested_tags),
+    );
 
     // Suggest category based on content
     let suggested_category = if all_text.contains("registrar") || all_text.contains("sip") {
@@ -587,7 +602,10 @@ pub fn get_note_ai_suggestions(
         None
     };
 
-    suggestions.insert("suggested_category".to_string(), serde_json::json!(suggested_category));
+    suggestions.insert(
+        "suggested_category".to_string(),
+        serde_json::json!(suggested_category),
+    );
 
     let summary = if note.content.chars().count() > 200 {
         let truncated: String = note.content.chars().take(200).collect();

@@ -1,11 +1,11 @@
 //! Dig-style raw DNS query diagnostics — full header flags, all sections, EDNS0, RCODE.
 
-use hickory_proto::op::{Message, MessageType, OpCode, ResponseCode};
-use hickory_proto::rr::{Name, RecordType, RData};
-use hickory_proto::serialize::binary::BinEncodable;
-use hickory_proto::udp::UdpClientStream;
-use hickory_proto::tcp::TcpClientStream;
 use hickory_client::client::{AsyncClient, ClientHandle};
+use hickory_proto::op::{Message, MessageType, OpCode, ResponseCode};
+use hickory_proto::rr::{Name, RData, RecordType};
+use hickory_proto::serialize::binary::BinEncodable;
+use hickory_proto::tcp::TcpClientStream;
+use hickory_proto::udp::UdpClientStream;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::Instant;
@@ -173,12 +173,11 @@ fn record_data_to_string(rdata: &RData) -> String {
         RData::NS(ns) => ns.to_string(),
         RData::PTR(ptr) => ptr.to_string(),
         RData::MX(mx) => format!("{} {}", mx.preference(), mx.exchange()),
-        RData::TXT(txt) => {
-            txt.iter()
-                .map(|chunk| format!("\"{}\"", String::from_utf8_lossy(chunk)))
-                .collect::<Vec<_>>()
-                .join(" ")
-        }
+        RData::TXT(txt) => txt
+            .iter()
+            .map(|chunk| format!("\"{}\"", String::from_utf8_lossy(chunk)))
+            .collect::<Vec<_>>()
+            .join(" "),
         RData::SRV(srv) => format!(
             "{} {} {} {}",
             srv.priority(),
@@ -300,10 +299,7 @@ fn format_dig_output(
         out.push('\n');
     }
 
-    out.push_str(&format!(
-        ";; Query time: {:.0} msec\n",
-        query_time_ms
-    ));
+    out.push_str(&format!(";; Query time: {:.0} msec\n", query_time_ms));
     out.push_str(&format!(";; SERVER: {}#53\n", server));
     out.push_str(&format!(";; MSG SIZE  rcvd: {}\n", response_size));
 
@@ -312,13 +308,27 @@ fn format_dig_output(
 
 fn format_flags(flags: &DnsFlags) -> String {
     let mut parts = Vec::new();
-    if flags.qr { parts.push("qr"); }
-    if flags.aa { parts.push("aa"); }
-    if flags.tc { parts.push("tc"); }
-    if flags.rd { parts.push("rd"); }
-    if flags.ra { parts.push("ra"); }
-    if flags.ad { parts.push("ad"); }
-    if flags.cd { parts.push("cd"); }
+    if flags.qr {
+        parts.push("qr");
+    }
+    if flags.aa {
+        parts.push("aa");
+    }
+    if flags.tc {
+        parts.push("tc");
+    }
+    if flags.rd {
+        parts.push("rd");
+    }
+    if flags.ra {
+        parts.push("ra");
+    }
+    if flags.ad {
+        parts.push("ad");
+    }
+    if flags.cd {
+        parts.push("cd");
+    }
     parts.join(" ")
 }
 
@@ -327,15 +337,16 @@ fn format_flags(flags: &DnsFlags) -> String {
 /// Perform a raw DNS query with full diagnostic output, similar to `dig`.
 pub async fn run_dig(config: DigConfig) -> RawDnsResponse {
     let start = Instant::now();
-    let server_ip = config
-        .server
-        .as_deref()
-        .unwrap_or("8.8.8.8");
+    let server_ip = config.server.as_deref().unwrap_or("8.8.8.8");
     let port = config.port.unwrap_or(53);
     let server_addr: SocketAddr = match format!("{}:{}", server_ip, port).parse() {
         Ok(a) => a,
         Err(e) => {
-            return make_error_response(&config, server_ip, &format!("Invalid server address: {}", e));
+            return make_error_response(
+                &config,
+                server_ip,
+                &format!("Invalid server address: {}", e),
+            );
         }
     };
 
@@ -373,18 +384,40 @@ pub async fn run_dig(config: DigConfig) -> RawDnsResponse {
                 let tcp_time = start.elapsed().as_secs_f64() * 1000.0;
 
                 match tcp_result {
-                    Ok((tcp_response, tcp_size)) => {
-                        parse_response(&config, server_ip, "TCP", &tcp_response, tcp_size, tcp_time, true)
-                    }
+                    Ok((tcp_response, tcp_size)) => parse_response(
+                        &config,
+                        server_ip,
+                        "TCP",
+                        &tcp_response,
+                        tcp_size,
+                        tcp_time,
+                        true,
+                    ),
                     Err(e) => {
                         // TCP retry failed, return the truncated UDP result
-                        let mut result = parse_response(&config, server_ip, "UDP", &response, response_size, query_time, false);
+                        let mut result = parse_response(
+                            &config,
+                            server_ip,
+                            "UDP",
+                            &response,
+                            response_size,
+                            query_time,
+                            false,
+                        );
                         result.error = Some(format!("TCP retry failed: {}", e));
                         result
                     }
                 }
             } else {
-                parse_response(&config, server_ip, transport, &response, response_size, query_time, false)
+                parse_response(
+                    &config,
+                    server_ip,
+                    transport,
+                    &response,
+                    response_size,
+                    query_time,
+                    false,
+                )
             }
         }
         Err(e) => make_error_response(&config, server_ip, &e),
@@ -491,7 +524,10 @@ fn parse_response(
             ttl: r.ttl(),
             class: "IN".to_string(),
             record_type: format!("{:?}", r.record_type()),
-            data: r.data().map(|d| record_data_to_string(d)).unwrap_or_default(),
+            data: r
+                .data()
+                .map(|d| record_data_to_string(d))
+                .unwrap_or_default(),
         })
         .collect();
 
@@ -503,7 +539,10 @@ fn parse_response(
             ttl: r.ttl(),
             class: "IN".to_string(),
             record_type: format!("{:?}", r.record_type()),
-            data: r.data().map(|d| record_data_to_string(d)).unwrap_or_default(),
+            data: r
+                .data()
+                .map(|d| record_data_to_string(d))
+                .unwrap_or_default(),
         })
         .collect();
 
@@ -516,7 +555,10 @@ fn parse_response(
             ttl: r.ttl(),
             class: "IN".to_string(),
             record_type: format!("{:?}", r.record_type()),
-            data: r.data().map(|d| record_data_to_string(d)).unwrap_or_default(),
+            data: r
+                .data()
+                .map(|d| record_data_to_string(d))
+                .unwrap_or_default(),
         })
         .collect();
 
@@ -596,6 +638,9 @@ fn make_error_response(config: &DigConfig, server_ip: &str, error: &str) -> RawD
         tcp_retry: false,
         success: false,
         error: Some(error.to_string()),
-        dig_output: format!(";; connection timed out; no servers could be reached\n;; Error: {}\n", error),
+        dig_output: format!(
+            ";; connection timed out; no servers could be reached\n;; Error: {}\n",
+            error
+        ),
     }
 }

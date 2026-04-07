@@ -72,7 +72,9 @@ fn is_zsh(shell: &str) -> bool {
 /// `plugins_dir` — optional path to the bundled zsh-plugins resource directory.
 ///
 /// Returns the path to the temp ZDOTDIR directory.
-fn create_zsh_zdotdir(plugins_dir: Option<std::path::PathBuf>) -> Result<std::path::PathBuf, String> {
+fn create_zsh_zdotdir(
+    plugins_dir: Option<std::path::PathBuf>,
+) -> Result<std::path::PathBuf, String> {
     let dir = std::env::temp_dir().join(format!("sipalyzer-zsh-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create ZDOTDIR: {}", e))?;
 
@@ -241,7 +243,9 @@ pub async fn terminal_spawn(
 
         let plugins_dir = candidates.into_iter().find(|p| {
             // Verify the autosuggestions file actually exists, not just the directory
-            p.join("zsh-autosuggestions").join("zsh-autosuggestions.zsh").exists()
+            p.join("zsh-autosuggestions")
+                .join("zsh-autosuggestions.zsh")
+                .exists()
         });
 
         tracing::info!("resource_dir = {:?}", resource_dir);

@@ -6,7 +6,9 @@ use tauri::command;
 /// Check if the speech model is downloaded and return its status.
 #[command]
 #[tracing::instrument(skip_all)]
-pub async fn speech_model_status(app_handle: tauri::AppHandle) -> Result<transcription::ModelStatus, String> {
+pub async fn speech_model_status(
+    app_handle: tauri::AppHandle,
+) -> Result<transcription::ModelStatus, String> {
     Ok(transcription::model_status(&app_handle))
 }
 
@@ -16,11 +18,9 @@ pub async fn speech_model_status(app_handle: tauri::AppHandle) -> Result<transcr
 #[tracing::instrument(skip_all)]
 pub async fn speech_ensure_model(app_handle: tauri::AppHandle) -> Result<String, String> {
     // Run in blocking thread since the download can take a while
-    tokio::task::spawn_blocking(move || {
-        transcription::ensure_model(&app_handle)
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    tokio::task::spawn_blocking(move || transcription::ensure_model(&app_handle))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }
 
 /// Start live transcription for an active call.
@@ -63,9 +63,7 @@ pub async fn speech_transcribe_recording(
         .map_err(|e| format!("Failed to read recording: {}", e))?;
 
     let app = app_handle.clone();
-    tokio::task::spawn_blocking(move || {
-        transcription::transcribe_wav(&wav_data, &app, &request_id)
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    tokio::task::spawn_blocking(move || transcription::transcribe_wav(&wav_data, &app, &request_id))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }

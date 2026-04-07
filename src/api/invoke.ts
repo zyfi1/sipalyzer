@@ -3,7 +3,7 @@
  */
 
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import { extractErrorMessage } from "@/lib/errorUtils";
+import { extractErrorMessage, formatHumanizedError } from "@/lib/errorUtils";
 import { tauriInvokeResponseSchemas } from "@/contracts/tauriInvokeSchemas";
 import { formatIpcIssues, validateIpcPayload } from "@/lib/ipcValidation";
 import type { ZodType } from "zod";
@@ -111,6 +111,6 @@ export async function invokeTauri<T>(
   } catch (e) {
     const message = extractErrorMessage(e);
     void writeAuditInvokeEvent(cmd, false, startedAtMs, message);
-    throw new Error(message);
+    throw new Error(formatHumanizedError(message));
   }
 }

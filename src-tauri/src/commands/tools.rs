@@ -1,9 +1,9 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use once_cell::sync::Lazy;
 use tauri::{Emitter, Manager};
 use tokio::sync::watch;
 
@@ -24,7 +24,8 @@ fn get_lan_ip() -> Option<String> {
 }
 
 fn has_parent_traversal(path: &Path) -> bool {
-    path.components().any(|component| matches!(component, Component::ParentDir))
+    path.components()
+        .any(|component| matches!(component, Component::ParentDir))
 }
 
 fn approved_local_scopes(app: &tauri::AppHandle) -> Vec<PathBuf> {
@@ -358,10 +359,13 @@ pub async fn tools_syslog_start(
         }
 
         if !batch.is_empty() {
-            let _ = app.emit("tools:syslog-batch", SyslogBatchPayload {
-                session_id: sid.clone(),
-                entries: batch,
-            });
+            let _ = app.emit(
+                "tools:syslog-batch",
+                SyslogBatchPayload {
+                    session_id: sid.clone(),
+                    entries: batch,
+                },
+            );
         }
     });
 
@@ -376,18 +380,24 @@ pub async fn tools_syslog_stop(session_id: String) -> Result<(), String> {
 }
 
 const FACILITY_NAMES: &[&str] = &[
-    "kern", "user", "mail", "daemon", "auth", "syslog", "lpr", "news",
-    "uucp", "cron", "authpriv", "ftp", "ntp", "audit", "alert", "clock",
-    "local0", "local1", "local2", "local3", "local4", "local5", "local6", "local7",
+    "kern", "user", "mail", "daemon", "auth", "syslog", "lpr", "news", "uucp", "cron", "authpriv",
+    "ftp", "ntp", "audit", "alert", "clock", "local0", "local1", "local2", "local3", "local4",
+    "local5", "local6", "local7",
 ];
 
 const SEVERITY_NAMES: &[&str] = &[
-    "emergency", "alert", "critical", "error", "warning", "notice", "info", "debug",
+    "emergency",
+    "alert",
+    "critical",
+    "error",
+    "warning",
+    "notice",
+    "info",
+    "debug",
 ];
 
 fn parse_syslog(raw: &str, source: &str) -> SyslogEntry {
-    let now = chrono::Utc::now()
-        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
     if !raw.starts_with('<') {
         return SyslogEntry {
@@ -403,8 +413,12 @@ fn parse_syslog(raw: &str, source: &str) -> SyslogEntry {
 
     let Some(gt) = raw.find('>') else {
         return SyslogEntry {
-            timestamp: now, hostname: source.into(), facility: "user".into(),
-            severity: "info".into(), app_name: String::new(), process_id: String::new(),
+            timestamp: now,
+            hostname: source.into(),
+            facility: "user".into(),
+            severity: "info".into(),
+            app_name: String::new(),
+            process_id: String::new(),
             message: raw.into(),
         };
     };
@@ -413,8 +427,12 @@ fn parse_syslog(raw: &str, source: &str) -> SyslogEntry {
         Ok(v) => v,
         Err(_) => {
             return SyslogEntry {
-                timestamp: now, hostname: source.into(), facility: "user".into(),
-                severity: "info".into(), app_name: String::new(), process_id: String::new(),
+                timestamp: now,
+                hostname: source.into(),
+                facility: "user".into(),
+                severity: "info".into(),
+                app_name: String::new(),
+                process_id: String::new(),
                 message: raw.into(),
             };
         }
@@ -435,12 +453,28 @@ fn parse_syslog(raw: &str, source: &str) -> SyslogEntry {
         let parts: Vec<&str> = rest[2..].splitn(6, ' ').collect();
         if parts.len() >= 5 {
             return SyslogEntry {
-                timestamp: if parts[0] == "-" { now } else { parts[0].into() },
-                hostname: if parts[1] == "-" { source.into() } else { parts[1].into() },
+                timestamp: if parts[0] == "-" {
+                    now
+                } else {
+                    parts[0].into()
+                },
+                hostname: if parts[1] == "-" {
+                    source.into()
+                } else {
+                    parts[1].into()
+                },
                 facility,
                 severity,
-                app_name: if parts[2] == "-" { String::new() } else { parts[2].into() },
-                process_id: if parts[3] == "-" { String::new() } else { parts[3].into() },
+                app_name: if parts[2] == "-" {
+                    String::new()
+                } else {
+                    parts[2].into()
+                },
+                process_id: if parts[3] == "-" {
+                    String::new()
+                } else {
+                    parts[3].into()
+                },
                 message: parts.get(5).or(parts.get(4)).unwrap_or(&"").to_string(),
             };
         }
@@ -640,9 +674,7 @@ pub async fn tools_serve_start(
         .await
         .map_err(|e| format!("Failed to bind port {}: {}", http_port, e))?;
 
-    let local_addr = listener
-        .local_addr()
-        .map_err(|e| e.to_string())?;
+    let local_addr = listener.local_addr().map_err(|e| e.to_string())?;
     let ip = if bind_all {
         get_lan_ip().unwrap_or_else(|| "127.0.0.1".into())
     } else {
@@ -813,10 +845,7 @@ pub async fn tools_virtual_add_files(
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn tools_virtual_remove_file(
-    session_id: String,
-    name: String,
-) -> Result<(), String> {
+pub async fn tools_virtual_remove_file(session_id: String, name: String) -> Result<(), String> {
     let store = VIRTUAL_STORES
         .lock()
         .unwrap()
@@ -866,8 +895,7 @@ async fn handle_virtual_http_connection(
     }
 
     let path_only = request_path_only(&raw_path);
-    let decoded = urlencoding::decode(path_only)
-        .unwrap_or_else(|_| path_only.into());
+    let decoded = urlencoding::decode(path_only).unwrap_or_else(|_| path_only.into());
     let clean = decoded.trim_start_matches('/').trim_end_matches('/');
 
     let map = store.read().await;
@@ -881,34 +909,53 @@ async fn handle_virtual_http_connection(
         let size = html.len() as u64;
         stream.write_all(resp.as_bytes()).await?;
         stream.write_all(html.as_bytes()).await?;
-        emit_request(app, session_id, client_ip, &method, &raw_path, 200, size, start);
+        emit_request(
+            app, session_id, client_ip, &method, &raw_path, 200, size, start,
+        );
     } else {
         let matched_key = if map.contains_key(clean) {
             Some(clean.to_string())
         } else {
-            map.keys()
-                .find(|k| k.eq_ignore_ascii_case(clean))
-                .cloned()
+            map.keys().find(|k| k.eq_ignore_ascii_case(clean)).cloned()
         };
 
         if let Some(key) = matched_key {
             let (data, content_type) = map.get(&key).ok_or("missing virtual file")?;
-        let header = format!(
+            let header = format!(
             "HTTP/1.1 200 OK\r\n{}Content-Type: {}\r\nContent-Length: {}\r\nContent-Disposition: inline; filename=\"{}\"\r\nConnection: close\r\n\r\n",
             CORS_HEADERS, content_type, data.len(), key
         );
-        stream.write_all(header.as_bytes()).await?;
-        stream.write_all(data).await?;
-        emit_request(app, session_id, client_ip, &method, &raw_path, 200, data.len() as u64, start);
+            stream.write_all(header.as_bytes()).await?;
+            stream.write_all(data).await?;
+            emit_request(
+                app,
+                session_id,
+                client_ip,
+                &method,
+                &raw_path,
+                200,
+                data.len() as u64,
+                start,
+            );
         } else {
-        let body = b"404 Not Found";
-        let resp = format!(
-            "HTTP/1.1 404 Not Found\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
-            CORS_HEADERS, body.len()
-        );
-        stream.write_all(resp.as_bytes()).await?;
-        stream.write_all(body).await?;
-        emit_request(app, session_id, client_ip, &method, &raw_path, 404, body.len() as u64, start);
+            let body = b"404 Not Found";
+            let resp = format!(
+                "HTTP/1.1 404 Not Found\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
+                CORS_HEADERS,
+                body.len()
+            );
+            stream.write_all(resp.as_bytes()).await?;
+            stream.write_all(body).await?;
+            emit_request(
+                app,
+                session_id,
+                client_ip,
+                &method,
+                &raw_path,
+                404,
+                body.len() as u64,
+                start,
+            );
         }
     }
 
@@ -1045,8 +1092,12 @@ tbody tr:last-child td{{border-bottom:none}}
              <td class=\"tp\">{tp}</td></tr>",
             esc_name = name.replace('"', "&quot;"),
             raw_size = data.len(),
-            icon = icon, href = href, name = name,
-            badge = badge, sz = size_str, tp = short_type,
+            icon = icon,
+            href = href,
+            name = name,
+            badge = badge,
+            sz = size_str,
+            tp = short_type,
         ));
     }
 
@@ -1173,8 +1224,7 @@ async fn handle_http_connection(
     }
 
     let path_only = request_path_only(&raw_path);
-    let decoded = urlencoding::decode(path_only)
-        .unwrap_or_else(|_| path_only.into());
+    let decoded = urlencoding::decode(path_only).unwrap_or_else(|_| path_only.into());
     let clean = decoded.trim_start_matches('/');
     let target = serve_root.join(clean);
     let mut canonical_target = target.canonicalize().unwrap_or_else(|_| target.clone());
@@ -1187,7 +1237,8 @@ async fn handle_http_connection(
                 for entry in rd.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
                     if name.eq_ignore_ascii_case(wanted) {
-                        canonical_target = entry.path().canonicalize().unwrap_or_else(|_| entry.path());
+                        canonical_target =
+                            entry.path().canonicalize().unwrap_or_else(|_| entry.path());
                         break;
                     }
                 }
@@ -1199,11 +1250,21 @@ async fn handle_http_connection(
         let body = b"403 Forbidden";
         let resp = format!(
             "HTTP/1.1 403 Forbidden\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
-            CORS_HEADERS, body.len()
+            CORS_HEADERS,
+            body.len()
         );
         stream.write_all(resp.as_bytes()).await?;
         stream.write_all(body).await?;
-        emit_request(app, session_id, client_ip, &method, &raw_path, 403, body.len() as u64, start);
+        emit_request(
+            app,
+            session_id,
+            client_ip,
+            &method,
+            &raw_path,
+            403,
+            body.len() as u64,
+            start,
+        );
         return Ok(());
     }
 
@@ -1216,7 +1277,9 @@ async fn handle_http_connection(
         let size = html.len() as u64;
         stream.write_all(resp.as_bytes()).await?;
         stream.write_all(html.as_bytes()).await?;
-        emit_request(app, session_id, client_ip, &method, &raw_path, 200, size, start);
+        emit_request(
+            app, session_id, client_ip, &method, &raw_path, 200, size, start,
+        );
     } else if canonical_target.is_file() {
         let meta = tokio::fs::metadata(&canonical_target).await?;
         let len = meta.len();
@@ -1235,19 +1298,33 @@ async fn handle_http_connection(
         let mut chunk = vec![0u8; 65536];
         loop {
             let n = tokio::io::AsyncReadExt::read(&mut file, &mut chunk).await?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             stream.write_all(&chunk[..n]).await?;
         }
-        emit_request(app, session_id, client_ip, &method, &raw_path, 200, len, start);
+        emit_request(
+            app, session_id, client_ip, &method, &raw_path, 200, len, start,
+        );
     } else {
         let body = b"404 Not Found";
         let resp = format!(
             "HTTP/1.1 404 Not Found\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
-            CORS_HEADERS, body.len()
+            CORS_HEADERS,
+            body.len()
         );
         stream.write_all(resp.as_bytes()).await?;
         stream.write_all(body).await?;
-        emit_request(app, session_id, client_ip, &method, &raw_path, 404, body.len() as u64, start);
+        emit_request(
+            app,
+            session_id,
+            client_ip,
+            &method,
+            &raw_path,
+            404,
+            body.len() as u64,
+            start,
+        );
     }
 
     Ok(())
@@ -1273,8 +1350,7 @@ fn emit_request(
             status,
             size,
             duration_ms: start.elapsed().as_millis() as u64,
-            timestamp: chrono::Utc::now()
-                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
         },
     );
 }
@@ -1299,9 +1375,16 @@ fn generate_directory_listing(dir: &Path, url_path: &str, hide_hidden: bool) -> 
         )
     });
 
-    let dir_count = entries.iter().filter(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false)).count();
+    let dir_count = entries
+        .iter()
+        .filter(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+        .count();
     let file_count = entries.len() - dir_count;
-    let total_size: u64 = entries.iter().filter_map(|e| e.metadata().ok()).map(|m| m.len()).sum();
+    let total_size: u64 = entries
+        .iter()
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
+        .sum();
 
     let mut html = format!(
         r##"<!DOCTYPE html>
@@ -1411,7 +1494,10 @@ tbody tr[style*="display: none"]{{height:0;overflow:hidden}}
     for seg in &segments {
         crumb_path.push_str(seg);
         crumb_path.push('/');
-        html.push_str(&format!("<span class=\"sep\">&rsaquo;</span><a href=\"{}\">{}</a>", crumb_path, seg));
+        html.push_str(&format!(
+            "<span class=\"sep\">&rsaquo;</span><a href=\"{}\">{}</a>",
+            crumb_path, seg
+        ));
     }
     html.push_str("</div></div>");
 
@@ -1422,8 +1508,10 @@ tbody tr[style*="display: none"]{{height:0;overflow:hidden}}
          <span><span class=\"dot dot-file\"></span>{} file{}</span>\
          <span><span class=\"dot dot-size\"></span>{}</span>\
          </div>",
-        dir_count, if dir_count == 1 { "y" } else { "ies" },
-        file_count, if file_count == 1 { "" } else { "s" },
+        dir_count,
+        if dir_count == 1 { "y" } else { "ies" },
+        file_count,
+        if file_count == 1 { "" } else { "s" },
         format_file_size(total_size),
     ));
 
@@ -1476,12 +1564,25 @@ tbody tr[style*="display: none"]{{height:0;overflow:hidden}}
             file_icon_for_ext(&name)
         };
         let icon = ph_icon(icon_path, icon_color);
-        let display = if is_dir { format!("{}/", name) } else { name.clone() };
+        let display = if is_dir {
+            format!("{}/", name)
+        } else {
+            name.clone()
+        };
         let href = urlencoding::encode(&name);
-        let href = if is_dir { format!("{}/", href) } else { href.to_string() };
-        let size_str = if is_dir { String::new() } else { format_file_size(size) };
+        let href = if is_dir {
+            format!("{}/", href)
+        } else {
+            href.to_string()
+        };
+        let size_str = if is_dir {
+            String::new()
+        } else {
+            format_file_size(size)
+        };
 
-        let mod_str = meta.as_ref()
+        let mod_str = meta
+            .as_ref()
             .and_then(|m| m.modified().ok())
             .map(|t| {
                 let dt: chrono::DateTime<chrono::Utc> = t.into();
@@ -1489,7 +1590,8 @@ tbody tr[style*="display: none"]{{height:0;overflow:hidden}}
             })
             .unwrap_or_default();
 
-        let mod_sort = meta.as_ref()
+        let mod_sort = meta
+            .as_ref()
             .and_then(|m| m.modified().ok())
             .map(|t| {
                 let dt: chrono::DateTime<chrono::Utc> = t.into();
@@ -1497,7 +1599,13 @@ tbody tr[style*="display: none"]{{height:0;overflow:hidden}}
             })
             .unwrap_or_default();
 
-        let link_class = if is_dir { "dir-a" } else if is_hidden { "hidden-f" } else { "" };
+        let link_class = if is_dir {
+            "dir-a"
+        } else if is_hidden {
+            "hidden-f"
+        } else {
+            ""
+        };
         let badge = file_badge(&name, is_dir);
 
         html.push_str(&format!(
@@ -1642,8 +1750,16 @@ fn ph_icon(path_d: &str, color: &str) -> String {
 }
 
 fn file_icon_for_ext(name: &str) -> (&'static str, &'static str) {
-    match name.rsplit('.').next().unwrap_or("").to_lowercase().as_str() {
-        "cfg" | "conf" | "ini" | "yaml" | "yml" | "xml" | "json" | "toml" => (PH_GEAR, "var(--amber)"),
+    match name
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
+        "cfg" | "conf" | "ini" | "yaml" | "yml" | "xml" | "json" | "toml" => {
+            (PH_GEAR, "var(--amber)")
+        }
         "bin" | "fw" | "img" | "rom" | "iso" => (PH_HARD_DRIVE, "var(--purple)"),
         "log" | "txt" => (PH_FILE_TEXT, "var(--text2)"),
         "sh" | "bash" | "py" | "rb" | "pl" => (PH_TERMINAL, "var(--green)"),
@@ -1659,7 +1775,9 @@ fn file_icon_for_ext(name: &str) -> (&'static str, &'static str) {
 }
 
 fn file_badge(name: &str, is_dir: bool) -> String {
-    if is_dir { return " <span class=\"ext-tag dir\">dir</span>".into(); }
+    if is_dir {
+        return " <span class=\"ext-tag dir\">dir</span>".into();
+    }
     let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
     match ext.as_str() {
         "cfg" | "conf" | "ini" | "yaml" | "yml" | "xml" | "json" | "toml"
@@ -1679,11 +1797,7 @@ fn file_badge(name: &str, is_dir: bool) -> String {
 }
 
 fn guess_content_type(path: &Path) -> &'static str {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-    {
+    match path.extension().and_then(|e| e.to_str()).unwrap_or("") {
         "html" | "htm" => "text/html; charset=utf-8",
         "css" => "text/css",
         "js" | "mjs" => "application/javascript",
@@ -2029,13 +2143,41 @@ struct MirrorConfig {
 }
 
 static MIRROR_CHECKS: &[MirrorConfig] = &[
-    MirrorConfig { vendor: "yealink", series: "T5", url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T5xW/" },
-    MirrorConfig { vendor: "yealink", series: "T4U", url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T4xU/" },
-    MirrorConfig { vendor: "yealink", series: "T4S", url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T4xS/" },
-    MirrorConfig { vendor: "yealink", series: "T3", url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T3x/" },
-    MirrorConfig { vendor: "yealink", series: "T46G", url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T46G/" },
-    MirrorConfig { vendor: "yealink", series: "T42G", url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T42G/" },
-    MirrorConfig { vendor: "poly", series: "VVX", url: "https://downloads.bicomsystems.com/polycom/" },
+    MirrorConfig {
+        vendor: "yealink",
+        series: "T5",
+        url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T5xW/",
+    },
+    MirrorConfig {
+        vendor: "yealink",
+        series: "T4U",
+        url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T4xU/",
+    },
+    MirrorConfig {
+        vendor: "yealink",
+        series: "T4S",
+        url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T4xS/",
+    },
+    MirrorConfig {
+        vendor: "yealink",
+        series: "T3",
+        url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T3x/",
+    },
+    MirrorConfig {
+        vendor: "yealink",
+        series: "T46G",
+        url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T46G/",
+    },
+    MirrorConfig {
+        vendor: "yealink",
+        series: "T42G",
+        url: "https://download.1afa.com/telefonie/toestellen/yealink/firmware/T42G/",
+    },
+    MirrorConfig {
+        vendor: "poly",
+        series: "VVX",
+        url: "https://downloads.bicomsystems.com/polycom/",
+    },
 ];
 
 fn compare_fw_versions(a: &str, b: &str) -> std::cmp::Ordering {
@@ -2131,9 +2273,7 @@ pub async fn tools_firmware_check_updates() -> Result<FirmwareCheckResult, Strin
 
     for check in MIRROR_CHECKS {
         let html = match client.get(check.url).send().await {
-            Ok(resp) if resp.status().is_success() => {
-                resp.text().await.unwrap_or_default()
-            }
+            Ok(resp) if resp.status().is_success() => resp.text().await.unwrap_or_default(),
             _ => continue,
         };
 
@@ -2178,8 +2318,14 @@ pub async fn tools_firmware_check_updates() -> Result<FirmwareCheckResult, Strin
                 continue;
             }
 
-            let models = template.map(|t| t.models.as_str()).unwrap_or("").to_string();
-            let filename = template.map(|t| t.filename.as_str()).unwrap_or("").to_string();
+            let models = template
+                .map(|t| t.models.as_str())
+                .unwrap_or("")
+                .to_string();
+            let filename = template
+                .map(|t| t.filename.as_str())
+                .unwrap_or("")
+                .to_string();
             let archive_format = if check.vendor == "poly" {
                 "tar.bz2".to_string()
             } else {
@@ -2244,8 +2390,8 @@ static FIRMWARE_CACHE_OVERRIDE: LazyLock<RwLock<Option<PathBuf>>> =
     LazyLock::new(|| RwLock::new(None));
 
 fn firmware_prefs_path() -> Result<PathBuf, String> {
-    let config = crate::core::config::get_config_dir()
-        .map_err(|e| format!("Config dir error: {}", e))?;
+    let config =
+        crate::core::config::get_config_dir().map_err(|e| format!("Config dir error: {}", e))?;
     Ok(config.join("firmware_prefs.json"))
 }
 
@@ -2269,29 +2415,25 @@ fn firmware_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn tools_firmware_get_cache_dir(
-    app: tauri::AppHandle,
-) -> Result<String, String> {
+pub async fn tools_firmware_get_cache_dir(app: tauri::AppHandle) -> Result<String, String> {
     let dir = firmware_cache_dir(&app)?;
     Ok(dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn tools_firmware_set_cache_dir(
-    path: Option<String>,
-) -> Result<String, String> {
+pub async fn tools_firmware_set_cache_dir(path: Option<String>) -> Result<String, String> {
     let resolved = match &path {
         Some(p) if !p.is_empty() => {
             let pb = PathBuf::from(p);
-            std::fs::create_dir_all(&pb)
-                .map_err(|e| format!("Cannot create directory: {}", e))?;
+            std::fs::create_dir_all(&pb).map_err(|e| format!("Cannot create directory: {}", e))?;
             Some(pb)
         }
         _ => None,
     };
 
-    let display = resolved.as_ref()
+    let display = resolved
+        .as_ref()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| "default".into());
 
@@ -2302,8 +2444,11 @@ pub async fn tools_firmware_set_cache_dir(
 
     let prefs_path = firmware_prefs_path()?;
     let json = serde_json::json!({ "cache_dir": path });
-    std::fs::write(&prefs_path, serde_json::to_string_pretty(&json).unwrap_or_default())
-        .map_err(|e| format!("Failed to save preferences: {}", e))?;
+    std::fs::write(
+        &prefs_path,
+        serde_json::to_string_pretty(&json).unwrap_or_default(),
+    )
+    .map_err(|e| format!("Failed to save preferences: {}", e))?;
 
     Ok(display)
 }
@@ -2315,8 +2460,7 @@ pub async fn tools_firmware_load_prefs() -> Result<(), String> {
     if !prefs_path.exists() {
         return Ok(());
     }
-    let data = std::fs::read_to_string(&prefs_path)
-        .map_err(|e| format!("Read prefs: {}", e))?;
+    let data = std::fs::read_to_string(&prefs_path).map_err(|e| format!("Read prefs: {}", e))?;
     if let Ok(obj) = serde_json::from_str::<serde_json::Value>(&data) {
         if let Some(dir) = obj.get("cache_dir").and_then(|v| v.as_str()) {
             if !dir.is_empty() {
@@ -2530,8 +2674,12 @@ pub async fn tools_firmware_download(
             // Poly archives must provide both firmware binaries and cfg files.
             // If an older/bad extraction left an incomplete cache entry, force re-download.
             if entry.archive_format == "tar.bz2" {
-                let has_ld = files.iter().any(|f| f.to_ascii_lowercase().ends_with(".ld"));
-                let has_cfg = files.iter().any(|f| f.to_ascii_lowercase().ends_with(".cfg"));
+                let has_ld = files
+                    .iter()
+                    .any(|f| f.to_ascii_lowercase().ends_with(".ld"));
+                let has_cfg = files
+                    .iter()
+                    .any(|f| f.to_ascii_lowercase().ends_with(".cfg"));
                 if has_ld && has_cfg {
                     return Ok(entry_dir.to_string_lossy().to_string());
                 }
@@ -2579,7 +2727,10 @@ pub async fn tools_firmware_download(
         }
     }
 
-    Err(format!("All download URLs failed. Last error: {}", last_error))
+    Err(format!(
+        "All download URLs failed. Last error: {}",
+        last_error
+    ))
 }
 
 async fn download_firmware(
@@ -2593,7 +2744,7 @@ async fn download_firmware(
     entry_size_bytes: u64,
     cache_dir: &Path,
 ) -> Result<String, String> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     use std::io::Write;
 
     let resp = client
@@ -2612,8 +2763,8 @@ async fn download_firmware(
     let mut last_pct: i32 = -1;
 
     let tmp_path = cache_dir.join(format!(".{}.tmp", entry_id));
-    let mut file = std::fs::File::create(&tmp_path)
-        .map_err(|e| format!("Create temp file: {}", e))?;
+    let mut file =
+        std::fs::File::create(&tmp_path).map_err(|e| format!("Create temp file: {}", e))?;
 
     let mut stream = resp.bytes_stream();
     use futures_util::StreamExt;
@@ -2761,7 +2912,9 @@ fn extract_from_tar_bz2(
 ) -> Result<(String, usize), String> {
     use std::io::BufReader;
 
-    let archive_size = std::fs::metadata(archive_path).map(|m| m.len()).unwrap_or(1);
+    let archive_size = std::fs::metadata(archive_path)
+        .map(|m| m.len())
+        .unwrap_or(1);
     let file = std::fs::File::open(archive_path).map_err(|e| format!("Open archive: {}", e))?;
     let bytes_read = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let counter = CountingReader {
@@ -2771,7 +2924,9 @@ fn extract_from_tar_bz2(
     let decompressor = bzip2::read::BzDecoder::new(counter);
     let mut archive = tar::Archive::new(decompressor);
 
-    let entries = archive.entries().map_err(|e| format!("Read tar entries: {}", e))?;
+    let entries = archive
+        .entries()
+        .map_err(|e| format!("Read tar entries: {}", e))?;
     let mut count: u32 = 0;
 
     for entry_result in entries {
@@ -2797,10 +2952,9 @@ fn extract_from_tar_bz2(
         }
 
         let out_path = output_dir.join(&name);
-        let mut out_file = std::fs::File::create(&out_path)
-            .map_err(|e| format!("Create output: {}", e))?;
-        std::io::copy(&mut tar_entry, &mut out_file)
-            .map_err(|e| format!("Extract copy: {}", e))?;
+        let mut out_file =
+            std::fs::File::create(&out_path).map_err(|e| format!("Create output: {}", e))?;
+        std::io::copy(&mut tar_entry, &mut out_file).map_err(|e| format!("Extract copy: {}", e))?;
         count += 1;
 
         if let Some(app) = app {
@@ -2849,10 +3003,7 @@ pub async fn tools_firmware_serve(
             if item.metadata().map(|m| m.is_file()).unwrap_or(false) {
                 let fname = item.file_name().to_string_lossy().to_string();
                 let data = std::fs::read(item.path()).map_err(|e| e.to_string())?;
-                let b64 = base64::Engine::encode(
-                    &base64::engine::general_purpose::STANDARD,
-                    &data,
-                );
+                let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
                 inputs.push(VirtualFileInput {
                     name: fname,
                     data_base64: b64,
@@ -2861,7 +3012,10 @@ pub async fn tools_firmware_serve(
         }
         let count = inputs.len();
         tools_virtual_add_files(sid, inputs).await?;
-        return Ok(format!("Added {} file(s) from {} to virtual server", count, entry_id));
+        return Ok(format!(
+            "Added {} file(s) from {} to virtual server",
+            count, entry_id
+        ));
     }
 
     if let Some(dir) = serve_dir {
@@ -2876,7 +3030,12 @@ pub async fn tools_firmware_serve(
                 count += 1;
             }
         }
-        return Ok(format!("Copied {} file(s) from {} to {}", count, entry_id, dest_dir.display()));
+        return Ok(format!(
+            "Copied {} file(s) from {} to {}",
+            count,
+            entry_id,
+            dest_dir.display()
+        ));
     }
 
     Err("Provide either session_id (virtual server) or serve_dir".into())

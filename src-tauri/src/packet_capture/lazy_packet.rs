@@ -95,8 +95,13 @@ impl LazyPacketInfo {
     /// the result for subsequent calls.
     pub fn decoded(&self) -> &DecodedPacket {
         self.decoded.get_or_init(|| {
-            decode_packet(&self.raw_data, Some(self.link_layer_type), None, self.rtp_port_range)
-                .unwrap_or_else(|_| DecodedPacket::default())
+            decode_packet(
+                &self.raw_data,
+                Some(self.link_layer_type),
+                None,
+                self.rtp_port_range,
+            )
+            .unwrap_or_else(|_| DecodedPacket::default())
         })
     }
 
@@ -176,16 +181,46 @@ impl LazyPacketInfo {
 
     fn basic_summary(&self) -> String {
         match self.protocol {
-            Protocol::SIP => format!("SIP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::RTP => format!("RTP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::SRTP => format!("SRTP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::RTCP => format!("RTCP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::FAX => format!("FAX {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::TCP => format!("TCP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::UDP => format!("UDP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::HTTP => format!("HTTP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::HTTPS => format!("HTTPS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
-            Protocol::DNS => format!("DNS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port),
+            Protocol::SIP => format!(
+                "SIP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::RTP => format!(
+                "RTP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::SRTP => format!(
+                "SRTP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::RTCP => format!(
+                "RTCP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::FAX => format!(
+                "FAX {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::TCP => format!(
+                "TCP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::UDP => format!(
+                "UDP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::HTTP => format!(
+                "HTTP {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::HTTPS => format!(
+                "HTTPS {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
+            Protocol::DNS => format!(
+                "DNS {}:{} -> {}:{}",
+                self.src_ip, self.src_port, self.dst_ip, self.dst_port
+            ),
             Protocol::ICMP => format!("ICMP {} -> {}", self.src_ip, self.dst_ip),
             Protocol::ARP => format!("ARP {} -> {}", self.src_ip, self.dst_ip),
             Protocol::Other => format!("IP {} -> {}", self.src_ip, self.dst_ip),
@@ -198,21 +233,44 @@ impl LazyPacketInfo {
         match &decoded.application {
             ApplicationLayer::Sip(sip) => {
                 if let Some(ref method) = sip.method {
-                    format!("SIP {} {}:{} -> {}:{}", method, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SIP {} {}:{} -> {}:{}",
+                        method, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 } else if let Some(code) = sip.response_code {
                     let reason = sip.response_text.as_deref().unwrap_or("");
-                    format!("SIP {} {} {}:{} -> {}:{}", code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SIP {} {} {}:{} -> {}:{}",
+                        code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 } else {
-                    format!("SIP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SIP {}:{} -> {}:{}",
+                        self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 }
             }
             ApplicationLayer::Rtp(rtp) => {
-                format!("RTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}", 
-                    rtp.payload_type, rtp.ssrc, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "RTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}",
+                    rtp.payload_type,
+                    rtp.ssrc,
+                    self.src_ip,
+                    self.src_port,
+                    self.dst_ip,
+                    self.dst_port
+                )
             }
             ApplicationLayer::Srtp(rtp) => {
-                format!("SRTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}", 
-                    rtp.payload_type, rtp.ssrc, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "SRTP PT:{} SSRC:0x{:08x} {}:{} -> {}:{}",
+                    rtp.payload_type,
+                    rtp.ssrc,
+                    self.src_ip,
+                    self.src_port,
+                    self.dst_ip,
+                    self.dst_port
+                )
             }
             ApplicationLayer::Rtcp(rtcp) => {
                 if let Some(first) = rtcp.packets.first() {
@@ -224,41 +282,74 @@ impl LazyPacketInfo {
                         204 => "APP",
                         _ => "RTCP",
                     };
-                    format!("RTCP {} SSRC:0x{:08x} {}:{} -> {}:{}", 
-                        type_name, first.ssrc, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "RTCP {} SSRC:0x{:08x} {}:{} -> {}:{}",
+                        type_name,
+                        first.ssrc,
+                        self.src_ip,
+                        self.src_port,
+                        self.dst_ip,
+                        self.dst_port
+                    )
                 } else {
-                    format!("RTCP {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "RTCP {}:{} -> {}:{}",
+                        self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 }
             }
             ApplicationLayer::Dns(dns) => {
                 if dns.queries.is_empty() {
-                    format!("DNS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "DNS {}:{} -> {}:{}",
+                        self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 } else {
-                    let query_names: Vec<String> = dns.queries.iter().map(|q| q.name.clone()).collect();
-                    format!("DNS {} {}:{} -> {}:{}", 
-                        query_names.join(","), self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    let query_names: Vec<String> =
+                        dns.queries.iter().map(|q| q.name.clone()).collect();
+                    format!(
+                        "DNS {} {}:{} -> {}:{}",
+                        query_names.join(","),
+                        self.src_ip,
+                        self.src_port,
+                        self.dst_ip,
+                        self.dst_port
+                    )
                 }
             }
             ApplicationLayer::T38(t38) => {
                 let ifp = t38.ifp_type.as_deref().unwrap_or("UDPTL");
-                format!("T.38 {} seq {} {}:{} -> {}:{}", ifp, t38.seq, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "T.38 {} seq {} {}:{} -> {}:{}",
+                    ifp, t38.seq, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
             ApplicationLayer::SipOverWs { sip, .. } => {
                 if let Some(ref method) = sip.method {
-                    format!("SIP/WS {} {}:{} -> {}:{}", method, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SIP/WS {} {}:{} -> {}:{}",
+                        method, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 } else if let Some(code) = sip.response_code {
                     let reason = sip.response_text.as_deref().unwrap_or("");
-                    format!("SIP/WS {} {} {}:{} -> {}:{}", code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SIP/WS {} {} {}:{} -> {}:{}",
+                        code, reason, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 } else {
-                    format!("SIP/WS {}:{} -> {}:{}", self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                    format!(
+                        "SIP/WS {}:{} -> {}:{}",
+                        self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                    )
                 }
             }
             ApplicationLayer::WebSocket(ws) => {
-                format!("WebSocket {} {}:{} -> {}:{}", ws.opcode_name, self.src_ip, self.src_port, self.dst_ip, self.dst_port)
+                format!(
+                    "WebSocket {} {}:{} -> {}:{}",
+                    ws.opcode_name, self.src_ip, self.src_port, self.dst_ip, self.dst_port
+                )
             }
-            ApplicationLayer::Unknown(_) => {
-                self.basic_summary()
-            }
+            ApplicationLayer::Unknown(_) => self.basic_summary(),
         }
     }
 }
@@ -338,10 +429,10 @@ mod tests {
         );
 
         assert!(!packet.is_decoded());
-        
+
         // Accessing decoded triggers lazy decode
         let _ = packet.decoded();
-        
+
         assert!(packet.is_decoded());
     }
 
@@ -366,7 +457,7 @@ mod tests {
 
         // Force decode
         let _ = packet.decoded();
-        
+
         // Clone and verify still decoded
         let _cloned = packet.clone();
         // Note: Clone of OnceCell doesn't copy the initialized value

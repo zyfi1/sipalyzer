@@ -1,6 +1,8 @@
 //! Core DNS resolver factory — builds async resolvers with optional custom server/transport.
 
-use hickory_resolver::config::{NameServerConfig, NameServerConfigGroup, ResolveHosts, ResolverConfig, ResolverOpts};
+use hickory_resolver::config::{
+    NameServerConfig, NameServerConfigGroup, ResolveHosts, ResolverConfig, ResolverOpts,
+};
 use hickory_resolver::name_server::TokioConnectionProvider;
 use hickory_resolver::proto::xfer::Protocol;
 use hickory_resolver::{Resolver, TokioResolver};
@@ -58,9 +60,11 @@ pub fn create_resolver(
             opts.use_hosts_file = ResolveHosts::Never;
             opts.edns0 = true;
 
-            Ok(Resolver::builder_with_config(config, TokioConnectionProvider::default())
-                .with_options(opts)
-                .build())
+            Ok(
+                Resolver::builder_with_config(config, TokioConnectionProvider::default())
+                    .with_options(opts)
+                    .build(),
+            )
         }
         None => {
             let mut opts = ResolverOpts::default();
@@ -103,9 +107,11 @@ pub fn create_fast_resolver(
             opts.attempts = 1;
             opts.use_hosts_file = ResolveHosts::Never;
 
-            Ok(Resolver::builder_with_config(config, TokioConnectionProvider::default())
-                .with_options(opts)
-                .build())
+            Ok(
+                Resolver::builder_with_config(config, TokioConnectionProvider::default())
+                    .with_options(opts)
+                    .build(),
+            )
         }
         None => {
             let mut opts = ResolverOpts::default();

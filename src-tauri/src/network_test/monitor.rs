@@ -54,22 +54,24 @@ pub async fn start_monitor(window: tauri::Window, config: MonitorConfig) -> Resu
         return Err("Monitor is already running".into());
     }
 
-    let ip = crate::network_test::ping::resolve_host(&config.host)
-        .map_err(|e| {
-            MONITOR_RUNNING.store(false, Ordering::Relaxed);
-            e
-        })?;
+    let ip = crate::network_test::ping::resolve_host(&config.host).map_err(|e| {
+        MONITOR_RUNNING.store(false, Ordering::Relaxed);
+        e
+    })?;
 
     let interval = Duration::from_millis(config.interval_ms as u64);
     let total_iterations = (config.duration_secs as u64 * 1000) / config.interval_ms as u64;
     let start = std::time::Instant::now();
 
     // Emit initial status
-    let _ = window.emit("network-monitor-status", MonitorStatus {
-        running: true,
-        elapsed_secs: 0.0,
-        total_samples: 0,
-    });
+    let _ = window.emit(
+        "network-monitor-status",
+        MonitorStatus {
+            running: true,
+            elapsed_secs: 0.0,
+            total_samples: 0,
+        },
+    );
 
     let mut sample_count: u32 = 0;
     let mut prev_rtt: Option<f64> = None;
@@ -141,11 +143,14 @@ pub async fn start_monitor(window: tauri::Window, config: MonitorConfig) -> Resu
     MONITOR_RUNNING.store(false, Ordering::Relaxed);
 
     // Emit final status
-    let _ = window.emit("network-monitor-status", MonitorStatus {
-        running: false,
-        elapsed_secs: start.elapsed().as_secs_f64(),
-        total_samples: sample_count,
-    });
+    let _ = window.emit(
+        "network-monitor-status",
+        MonitorStatus {
+            running: false,
+            elapsed_secs: start.elapsed().as_secs_f64(),
+            total_samples: sample_count,
+        },
+    );
 
     Ok(())
 }

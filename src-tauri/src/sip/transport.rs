@@ -1,13 +1,13 @@
+use crate::core::config::TransportType;
+use crate::sip::uri::SipUri;
 use anyhow::{Context, Result};
-use std::net::{SocketAddr, UdpSocket, TcpStream, ToSocketAddrs, IpAddr};
-use std::io::{Read, Write};
-use std::sync::Mutex;
-use std::time::Duration;
 use hickory_resolver::config::{ResolveHosts, ResolverConfig, ResolverOpts};
 use hickory_resolver::name_server::TokioConnectionProvider;
 use hickory_resolver::Resolver;
-use crate::core::config::TransportType;
-use crate::sip::uri::SipUri;
+use std::io::{Read, Write};
+use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
+use std::sync::Mutex;
+use std::time::Duration;
 
 const SUPPORTED_SIP_TRANSPORTS: &str = "UDP, TCP";
 
@@ -39,7 +39,8 @@ pub fn bind_udp_reuse(addr: SocketAddr) -> Result<UdpSocket> {
         socket2::Domain::IPV4,
         socket2::Type::DGRAM,
         Some(socket2::Protocol::UDP),
-    ).context("socket2 create")?;
+    )
+    .context("socket2 create")?;
     socket2.set_reuse_address(true).context("SO_REUSEADDR")?;
     #[cfg(target_os = "macos")]
     socket2.set_reuse_port(true).context("SO_REUSEPORT")?;
@@ -78,19 +79,22 @@ impl Transport {
                 supported_transports = SUPPORTED_SIP_TRANSPORTS,
                 "Unsupported SIP transport selected; refusing to initialize transport"
             );
-            return Err(unsupported_transport_error(&transport_type, "transport initialization"));
+            return Err(unsupported_transport_error(
+                &transport_type,
+                "transport initialization",
+            ));
         }
 
         let local_addr = SocketAddr::from(([0, 0, 0, 0], local_port));
-        
+
         // Parse the remote host - could be a SIP URI or just hostname/IP
         let sip_uri = SipUri::parse(remote_host)
             .context("Failed to parse remote host as SIP URI or hostname")?;
-        
+
         // Use port from URI if present, otherwise use provided remote_port
         let target_port = sip_uri.port.unwrap_or(remote_port);
         let target_host = sip_uri.host_for_resolution();
-        
+
         // Resolve hostname to IP address
         let remote_addr = {
             let _dns_span = tracing::info_span!("sip.dns_resolve").entered();
@@ -112,8 +116,8 @@ impl Transport {
         // by the kernel for packets from the connected address, ensuring SIP responses
         // to our INVITE are delivered here instead of to the inbound listener's socket.
         let udp_socket = if transport_type == TransportType::Udp {
-            let sock = bind_udp_reuse(local_addr)
-                .context("Failed to bind UDP socket for dialog")?;
+            let sock =
+                bind_udp_reuse(local_addr).context("Failed to bind UDP socket for dialog")?;
             sock.connect(remote_addr)
                 .context("Failed to connect UDP socket to remote (for SO_REUSEPORT priority)")?;
             let _ = sock.set_read_timeout(Some(Duration::from_secs(5)));
@@ -168,14 +172,14 @@ impl Transport {
                 Ok(Some(ip)) => return ip,
                 _ => {}
             }
-            
+
             // Fallback: try to extract from local_addr
             if let IpAddr::V4(ipv4) = self.local_addr.ip() {
                 if !ipv4.is_unspecified() && !ipv4.is_loopback() {
                     return ipv4.to_string();
                 }
             }
-            
+
             // Last resort: try to get IP by connecting to a well-known address
             // This helps when the remote isn't reachable yet
             if let Ok(addr) = "8.8.8.8:53".parse::<SocketAddr>() {
@@ -183,13 +187,13 @@ impl Transport {
                     return ip;
                 }
             }
-            
+
             // If all else fails, we'll use 0.0.0.0 and let the server handle it
             // or the user can configure it manually
             "0.0.0.0".to_string()
         })
     }
-    
+
     /// Resolve a hostname to a SocketAddr, trying DNS SRV first (RFC 3263).
     fn resolve_host(host: &str, port: u16) -> Result<SocketAddr> {
         // IP address: skip DNS entirely
@@ -294,13 +298,14 @@ impl Transport {
 
     fn send_udp(&self, data: &[u8]) -> Result<usize> {
         let _span = tracing::info_span!("sip.send_message", transport = "UDP").entered();
-        let socket = self.udp_socket.as_ref()
+        let socket = self
+            .udp_socket
+            .as_ref()
             .context("UDP socket not bound (already taken for BYE listener?)")?;
         // Socket is connect()-ed to remote_addr in new(), so use send() not send_to().
-        socket.send(data)
-            .context("Failed to send UDP packet")
+        socket.send(data).context("Failed to send UDP packet")
     }
-    
+
     /// Take the UDP socket so it can be handed to the BYE listener (same socket receives BYE per RFC 3261).
     /// Call only once after dialog establishment; further send/receive on this Transport will fail for UDP.
     pub fn take_udp_socket(&mut self) -> Option<UdpSocket> {
@@ -332,14 +337,17 @@ impl Transport {
 
     fn receive_udp(&self, timeout: Duration) -> Result<Vec<u8>> {
         let _span = tracing::info_span!("sip.receive_message", transport = "UDP").entered();
-        let socket = self.udp_socket.as_ref()
+        let socket = self
+            .udp_socket
+            .as_ref()
             .context("UDP socket not bound (already taken for BYE listener?)")?;
         socket.set_read_timeout(Some(timeout))?;
         let mut buf = vec![0u8; 4096];
         // Socket is connect()-ed, so recv() only returns packets from the remote addr.
         // This prevents the inbound listener (sharing the port via SO_REUSEPORT) from
         // stealing SIP responses meant for this dialog.
-        let size = socket.recv(&mut buf)
+        let size = socket
+            .recv(&mut buf)
             .context("Failed to receive UDP packet (timeout or remote unreachable)")?;
         buf.truncate(size);
         Ok(buf)
@@ -354,8 +362,7 @@ impl Transport {
             .map_err(|e| anyhow::anyhow!("tcp lock: {}", e))?;
         if guard.is_none() {
             let _connect_span = tracing::info_span!("sip.tcp_connect").entered();
-            let stream = TcpStream::connect(self.remote_addr)
-                .context("Failed to connect TCP")?;
+            let stream = TcpStream::connect(self.remote_addr).context("Failed to connect TCP")?;
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .context("Failed to set TCP read timeout")?;
@@ -458,7 +465,11 @@ pub fn read_one_sip_message<R: Read>(r: &mut R) -> Result<Vec<u8>> {
                 // Continuation line — append to previous
                 if let Some(prev) = unfolded_lines.last_mut() {
                     prev.push(b' ');
-                    prev.extend_from_slice(trimmed.strip_prefix(&[b' ']).unwrap_or(trimmed.strip_prefix(&[b'\t']).unwrap_or(trimmed)));
+                    prev.extend_from_slice(
+                        trimmed
+                            .strip_prefix(&[b' '])
+                            .unwrap_or(trimmed.strip_prefix(&[b'\t']).unwrap_or(trimmed)),
+                    );
                 }
             } else {
                 unfolded_lines.push(trimmed.to_vec());
@@ -468,8 +479,13 @@ pub fn read_one_sip_message<R: Read>(r: &mut R) -> Result<Vec<u8>> {
         unfolded_lines
             .iter()
             .find(|line| {
-                let lower_start: Vec<u8> = line.iter().take(20).map(|b| b.to_ascii_lowercase()).collect();
-                lower_start.starts_with(b"content-length:") || (line.len() >= 2 && lower_start.starts_with(b"l:"))
+                let lower_start: Vec<u8> = line
+                    .iter()
+                    .take(20)
+                    .map(|b| b.to_ascii_lowercase())
+                    .collect();
+                lower_start.starts_with(b"content-length:")
+                    || (line.len() >= 2 && lower_start.starts_with(b"l:"))
             })
             .and_then(|line| {
                 let colon = line.iter().position(|&b| b == b':')?;

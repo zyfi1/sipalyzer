@@ -187,9 +187,7 @@ impl LiveStats {
 
         // Update IP pair counts
         let pair = (packet.src_ip, packet.dst_ip);
-        if self.ip_pair_counts.len() < MAX_TOP_ENTRIES
-            || self.ip_pair_counts.contains_key(&pair)
-        {
+        if self.ip_pair_counts.len() < MAX_TOP_ENTRIES || self.ip_pair_counts.contains_key(&pair) {
             self.ip_pair_counts
                 .entry(pair)
                 .or_insert_with(|| AtomicU64::new(0))
@@ -473,9 +471,21 @@ mod tests {
     fn test_record_packet() {
         let stats = LiveStats::new();
 
-        stats.record(&create_test_packet(Protocol::SIP, "192.168.1.1", "192.168.1.2"));
-        stats.record(&create_test_packet(Protocol::RTP, "192.168.1.1", "192.168.1.2"));
-        stats.record(&create_test_packet(Protocol::SIP, "192.168.1.1", "192.168.1.3"));
+        stats.record(&create_test_packet(
+            Protocol::SIP,
+            "192.168.1.1",
+            "192.168.1.2",
+        ));
+        stats.record(&create_test_packet(
+            Protocol::RTP,
+            "192.168.1.1",
+            "192.168.1.2",
+        ));
+        stats.record(&create_test_packet(
+            Protocol::SIP,
+            "192.168.1.1",
+            "192.168.1.3",
+        ));
 
         assert_eq!(stats.total_packets.load(Ordering::Relaxed), 3);
         assert_eq!(stats.total_bytes.load(Ordering::Relaxed), 300);
@@ -520,7 +530,11 @@ mod tests {
 
         for i in 0..100 {
             stats.record(&create_test_packet(
-                if i % 2 == 0 { Protocol::SIP } else { Protocol::RTP },
+                if i % 2 == 0 {
+                    Protocol::SIP
+                } else {
+                    Protocol::RTP
+                },
                 "192.168.1.1",
                 "192.168.1.2",
             ));
@@ -537,7 +551,11 @@ mod tests {
     fn test_reset() {
         let stats = LiveStats::new();
 
-        stats.record(&create_test_packet(Protocol::SIP, "192.168.1.1", "192.168.1.2"));
+        stats.record(&create_test_packet(
+            Protocol::SIP,
+            "192.168.1.1",
+            "192.168.1.2",
+        ));
         assert_eq!(stats.total_packets.load(Ordering::Relaxed), 1);
 
         stats.reset();

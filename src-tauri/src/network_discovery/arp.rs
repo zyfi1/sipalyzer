@@ -81,7 +81,13 @@ async fn ping_batch(ips: &[IpAddr]) {
 /// Platform-specific ping arguments for a single, fast ping.
 fn ping_args(ip: &str) -> Vec<String> {
     if cfg!(target_os = "windows") {
-        vec!["-n".into(), "1".into(), "-w".into(), "500".into(), ip.into()]
+        vec![
+            "-n".into(),
+            "1".into(),
+            "-w".into(),
+            "500".into(),
+            ip.into(),
+        ]
     } else {
         vec!["-c".into(), "1".into(), "-W".into(), "1".into(), ip.into()]
     }
@@ -124,7 +130,12 @@ fn strict_mode_enabled() -> bool {
 fn env_flag_enabled(name: &str) -> bool {
     std::env::var(name)
         .ok()
-        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -149,7 +160,9 @@ fn parse_arp_line(line: &str) -> Option<(String, String)> {
     if parts.len() >= 2 {
         let ip_candidate = parts[0];
         let mac_candidate = parts[1];
-        if ip_candidate.contains('.') && (mac_candidate.contains('-') || mac_candidate.contains(':')) {
+        if ip_candidate.contains('.')
+            && (mac_candidate.contains('-') || mac_candidate.contains(':'))
+        {
             return Some((ip_candidate.to_string(), mac_candidate.to_string()));
         }
     }

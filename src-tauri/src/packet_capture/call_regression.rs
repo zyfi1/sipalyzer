@@ -153,7 +153,9 @@ pub fn diff_call_behaviors(
             score: m.score,
         });
 
-        for (header_name, before_values, after_values, is_regression) in compare_headers(&before, &after) {
+        for (header_name, before_values, after_values, is_regression) in
+            compare_headers(&before, &after)
+        {
             if is_regression {
                 regression_count += 1;
             }
@@ -220,7 +222,10 @@ pub fn diff_call_behaviors(
     let comparability_note = if is_comparable {
         None
     } else if matched_calls.is_empty() {
-        Some("No overlapping calls found between captures; treat as different populations.".to_string())
+        Some(
+            "No overlapping calls found between captures; treat as different populations."
+                .to_string(),
+        )
     } else {
         Some("Low overlap between captures; regression counts may not represent like-for-like behavior.".to_string())
     };
@@ -261,7 +266,10 @@ struct CandidateMatch {
     score: i32,
 }
 
-fn match_calls(before_calls: &[CallBehaviorSummary], after_calls: &[CallBehaviorSummary]) -> Vec<CandidateMatch> {
+fn match_calls(
+    before_calls: &[CallBehaviorSummary],
+    after_calls: &[CallBehaviorSummary],
+) -> Vec<CandidateMatch> {
     let mut candidates = Vec::new();
 
     for (before_idx, before_call) in before_calls.iter().enumerate() {
@@ -312,10 +320,7 @@ fn first_sequence_token(call: &CallBehaviorSummary) -> String {
 fn set_intersection_count(a: &[String], b: &[String]) -> usize {
     let a_set = normalize_set(a);
     let b_set = normalize_set(b);
-    a_set
-        .iter()
-        .filter(|item| b_set.contains(*item))
-        .count()
+    a_set.iter().filter(|item| b_set.contains(*item)).count()
 }
 
 fn is_plausible_match(before_call: &CallBehaviorSummary, after_call: &CallBehaviorSummary) -> bool {
@@ -326,13 +331,15 @@ fn is_plausible_match(before_call: &CallBehaviorSummary, after_call: &CallBehavi
         return false;
     }
 
-    let participant_overlap = set_intersection_count(&before_call.participants, &after_call.participants);
+    let participant_overlap =
+        set_intersection_count(&before_call.participants, &after_call.participants);
     let from_overlap = set_intersection_count(&before_call.headers.from, &after_call.headers.from);
     let to_overlap = set_intersection_count(&before_call.headers.to, &after_call.headers.to);
     let identity_overlap = participant_overlap + from_overlap + to_overlap;
 
-    let call_id_equal =
-        !before_call.call_id.is_empty() && !after_call.call_id.is_empty() && before_call.call_id == after_call.call_id;
+    let call_id_equal = !before_call.call_id.is_empty()
+        && !after_call.call_id.is_empty()
+        && before_call.call_id == after_call.call_id;
 
     // We only accept Call-ID matches when at least one identity vector also overlaps.
     // This prevents false pairing when two captures contain unrelated dialogs with recycled IDs.
@@ -357,13 +364,26 @@ fn match_score(before_call: &CallBehaviorSummary, after_call: &CallBehaviorSumma
         score += 45;
     }
 
-    let before_prefix = before_call.sip_sequence.iter().take(4).cloned().collect::<Vec<_>>();
-    let after_prefix = after_call.sip_sequence.iter().take(4).cloned().collect::<Vec<_>>();
+    let before_prefix = before_call
+        .sip_sequence
+        .iter()
+        .take(4)
+        .cloned()
+        .collect::<Vec<_>>();
+    let after_prefix = after_call
+        .sip_sequence
+        .iter()
+        .take(4)
+        .cloned()
+        .collect::<Vec<_>>();
     if !before_prefix.is_empty() && before_prefix == after_prefix {
         score += 25;
     }
 
-    if same_response_class(before_call.final_response_code, after_call.final_response_code) {
+    if same_response_class(
+        before_call.final_response_code,
+        after_call.final_response_code,
+    ) {
         score += 10;
     }
 
@@ -398,11 +418,23 @@ fn compare_headers(
         ("to", &before.headers.to, &after.headers.to),
         ("contact", &before.headers.contact, &after.headers.contact),
         ("via", &before.headers.via, &after.headers.via),
-        ("supported", &before.headers.supported, &after.headers.supported),
+        (
+            "supported",
+            &before.headers.supported,
+            &after.headers.supported,
+        ),
         ("allow", &before.headers.allow, &after.headers.allow),
         ("require", &before.headers.require, &after.headers.require),
-        ("proxyRequire", &before.headers.proxy_require, &after.headers.proxy_require),
-        ("sessionExpires", &before.headers.session_expires, &after.headers.session_expires),
+        (
+            "proxyRequire",
+            &before.headers.proxy_require,
+            &after.headers.proxy_require,
+        ),
+        (
+            "sessionExpires",
+            &before.headers.session_expires,
+            &after.headers.session_expires,
+        ),
         ("minSe", &before.headers.min_se, &after.headers.min_se),
     ];
 
@@ -410,7 +442,10 @@ fn compare_headers(
         let before_norm = normalize_set(before_values);
         let after_norm = normalize_set(after_values);
         if before_norm != after_norm {
-            let is_regression = matches!(name, "require" | "proxyRequire" | "sessionExpires" | "minSe");
+            let is_regression = matches!(
+                name,
+                "require" | "proxyRequire" | "sessionExpires" | "minSe"
+            );
             changes.push((name.to_string(), before_norm, after_norm, is_regression));
         }
     }
@@ -421,7 +456,9 @@ fn compare_timers(
     before: &CallBehaviorSummary,
     after: &CallBehaviorSummary,
 ) -> Option<(bool, Option<u64>, Option<u64>, Option<u64>, Option<u64>)> {
-    if before.setup_delay_ms == after.setup_delay_ms && before.total_duration_ms == after.total_duration_ms {
+    if before.setup_delay_ms == after.setup_delay_ms
+        && before.total_duration_ms == after.total_duration_ms
+    {
         return None;
     }
 
@@ -479,8 +516,8 @@ fn compare_codecs(
         .cloned()
         .collect::<Vec<_>>();
 
-    let is_regression = !removed_codecs.is_empty()
-        || (!answer_before.is_empty() && answer_after.is_empty());
+    let is_regression =
+        !removed_codecs.is_empty() || (!answer_before.is_empty() && answer_after.is_empty());
 
     Some(CodecNegotiationChange {
         match_id: match_id.to_string(),

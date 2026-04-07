@@ -42,8 +42,7 @@ fn parse_qop(header: &str) -> Option<String> {
 
 #[allow(dead_code)]
 pub fn parse_auth_challenge(header: &str, default_realm: &str) -> Result<AuthChallenge, String> {
-    let realm = extract_auth_param(header, "realm")
-        .unwrap_or_else(|| default_realm.to_string());
+    let realm = extract_auth_param(header, "realm").unwrap_or_else(|| default_realm.to_string());
     let nonce = extract_auth_param(header, "nonce")
         .ok_or_else(|| "Missing nonce in auth challenge".to_string())?;
     let qop = parse_qop(header);
@@ -61,7 +60,8 @@ pub fn build_digest_authorization(
     let _span = tracing::info_span!("sip.digest_compute",
         realm = %challenge.realm,
         algorithm = "MD5",
-    ).entered();
+    )
+    .entered();
 
     let ha1 = format!("{}:{}:{}", username, challenge.realm, password);
     let ha1_md5 = format!("{:x}", md5::compute(ha1.as_bytes()));
@@ -72,7 +72,10 @@ pub fn build_digest_authorization(
     if let Some(qop) = &challenge.qop {
         let nc = "00000001";
         let cnonce = generate_tag();
-        let response = format!("{}:{}:{}:{}:{}:{}", ha1_md5, challenge.nonce, nc, cnonce, qop, ha2_md5);
+        let response = format!(
+            "{}:{}:{}:{}:{}:{}",
+            ha1_md5, challenge.nonce, nc, cnonce, qop, ha2_md5
+        );
         let response_md5 = format!("{:x}", md5::compute(response.as_bytes()));
         // RFC 2617: uri is Request-URI; qop value (e.g. auth) matches challenge
         format!(

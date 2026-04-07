@@ -1,8 +1,8 @@
-use anyhow::{Context, Result, anyhow, bail};
-use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
+use anyhow::{anyhow, bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use chacha20poly1305::{
-    Key, KeyInit, XChaCha20Poly1305, XNonce,
     aead::{Aead, Payload},
+    Key, KeyInit, XChaCha20Poly1305, XNonce,
 };
 use getrandom::fill as fill_random;
 
@@ -44,7 +44,9 @@ impl CredentialStore {
         }
 
         let encoded = &encrypted[CREDENTIAL_PREFIX.len()..];
-        let payload = B64.decode(encoded).context("Credential payload is invalid base64")?;
+        let payload = B64
+            .decode(encoded)
+            .context("Credential payload is invalid base64")?;
         if payload.len() < 25 {
             bail!("Credential payload is truncated");
         }

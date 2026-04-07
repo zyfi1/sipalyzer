@@ -37,11 +37,9 @@ pub async fn run_stun_test(config: StunConfig) -> StunResult {
     let stun_server = config.stun_server.clone();
     let stun_port = config.stun_port;
 
-    let result = tokio::task::spawn_blocking(move || {
-        stun_binding_request(&stun_server, stun_port)
-    })
-    .await
-    .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
+    let result = tokio::task::spawn_blocking(move || stun_binding_request(&stun_server, stun_port))
+        .await
+        .unwrap_or_else(|e| Err(format!("Task error: {}", e)));
 
     match result {
         Ok(r) => r,
@@ -61,19 +59,16 @@ pub async fn run_stun_test(config: StunConfig) -> StunResult {
 
 fn stun_binding_request(server: &str, port: u16) -> Result<StunResult, String> {
     let server_addr = format!("{}:{}", server, port);
-    let dest: SocketAddr = server_addr
-        .parse()
-        .or_else(|_| {
-            use std::net::ToSocketAddrs;
-            server_addr
-                .to_socket_addrs()
-                .map_err(|e| format!("DNS error: {}", e))?
-                .next()
-                .ok_or_else(|| "No address found".to_string())
-        })?;
+    let dest: SocketAddr = server_addr.parse().or_else(|_| {
+        use std::net::ToSocketAddrs;
+        server_addr
+            .to_socket_addrs()
+            .map_err(|e| format!("DNS error: {}", e))?
+            .next()
+            .ok_or_else(|| "No address found".to_string())
+    })?;
 
-    let socket = UdpSocket::bind("0.0.0.0:0")
-        .map_err(|e| format!("Bind error: {}", e))?;
+    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| format!("Bind error: {}", e))?;
     socket
         .set_read_timeout(Some(Duration::from_secs(3)))
         .map_err(|e| format!("Timeout error: {}", e))?;

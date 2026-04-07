@@ -1,27 +1,27 @@
-pub mod resolver;
-pub mod records;
-pub mod sip_resolution;
-pub mod reverse;
 pub mod diagnostics;
 pub mod geoip;
 pub mod pcap_correlation;
+pub mod records;
+pub mod resolver;
+pub mod reverse;
+pub mod sip_resolution;
 
 // Re-export commonly used types for backward compatibility
 #[allow(unused_imports)]
-pub use records::{
-    DnsConfig, DnsRecordSet, DnsRecordEntry, DnsRecordType,
-    SrvRecord, NaptrRecord, MxRecord, TxtRecord, SoaRecord, CaaRecord,
-};
+pub use diagnostics::{DnsFlags, DnsSection, RawDnsRecord, RawDnsResponse};
 #[allow(unused_imports)]
-pub use sip_resolution::{SipResolutionChain, SipResolutionStep, SipTarget};
-#[allow(unused_imports)]
-pub use reverse::{ReverseDnsResult, FcrDnsResult};
-#[allow(unused_imports)]
-pub use diagnostics::{RawDnsResponse, DnsFlags, DnsSection, RawDnsRecord};
-#[allow(unused_imports)]
-pub use geoip::{GeoIpResult, AsnResult};
+pub use geoip::{AsnResult, GeoIpResult};
 #[allow(unused_imports)]
 pub use pcap_correlation::DnsCorrelation;
+#[allow(unused_imports)]
+pub use records::{
+    CaaRecord, DnsConfig, DnsRecordEntry, DnsRecordSet, DnsRecordType, MxRecord, NaptrRecord,
+    SoaRecord, SrvRecord, TxtRecord,
+};
+#[allow(unused_imports)]
+pub use reverse::{FcrDnsResult, ReverseDnsResult};
+#[allow(unused_imports)]
+pub use sip_resolution::{SipResolutionChain, SipResolutionStep, SipTarget};
 
 /// Legacy run_dns_lookup for backward compatibility with existing commands.
 /// Delegates to the new records module.
@@ -43,7 +43,8 @@ pub async fn run_dns_lookup(config: LegacyDnsConfig) -> LegacyDnsResult {
     let a_aaaa = records::lookup_records(&DnsConfig {
         record_type: Some(DnsRecordType::A),
         ..new_config.clone()
-    }).await;
+    })
+    .await;
 
     let aaaa_config = DnsConfig {
         record_type: Some(DnsRecordType::AAAA),

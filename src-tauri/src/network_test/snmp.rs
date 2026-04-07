@@ -274,14 +274,8 @@ fn run_snmp_poll_v3(config: SnmpConfig, start: std::time::Instant) -> SnmpPollRe
         };
     }
 
-    let auth_password = config
-        .v3_auth_password
-        .unwrap_or_default()
-        .into_bytes();
-    let privacy_password = config
-        .v3_priv_password
-        .unwrap_or_default()
-        .into_bytes();
+    let auth_password = config.v3_auth_password.unwrap_or_default().into_bytes();
+    let privacy_password = config.v3_priv_password.unwrap_or_default().into_bytes();
     let security_level = config
         .v3_security_level
         .unwrap_or(SnmpV3SecurityLevel::AuthNoPriv);
@@ -296,8 +290,8 @@ fn run_snmp_poll_v3(config: SnmpConfig, start: std::time::Instant) -> SnmpPollRe
             .unwrap_or(SnmpV3PrivacyProtocol::Aes128),
     );
 
-    let mut security = v3::Security::new(username.as_bytes(), &auth_password)
-        .with_auth_protocol(auth_protocol);
+    let mut security =
+        v3::Security::new(username.as_bytes(), &auth_password).with_auth_protocol(auth_protocol);
     security = match security_level {
         SnmpV3SecurityLevel::NoAuthNoPriv => security.with_auth(v3::Auth::NoAuthNoPriv),
         SnmpV3SecurityLevel::AuthNoPriv => security.with_auth(v3::Auth::AuthNoPriv),
@@ -307,21 +301,17 @@ fn run_snmp_poll_v3(config: SnmpConfig, start: std::time::Instant) -> SnmpPollRe
         }),
     };
 
-    let mut session = match SyncSession::new_v3(
-        host.as_str(),
-        Some(Duration::from_secs(3)),
-        0,
-        security,
-    ) {
-        Ok(s) => s,
-        Err(_) => {
-            return SnmpPollResult {
-                system_info: SnmpSystemInfo::default(),
-                interfaces: vec![],
-                elapsed_ms: start.elapsed().as_millis() as u64,
-            };
-        }
-    };
+    let mut session =
+        match SyncSession::new_v3(host.as_str(), Some(Duration::from_secs(3)), 0, security) {
+            Ok(s) => s,
+            Err(_) => {
+                return SnmpPollResult {
+                    system_info: SnmpSystemInfo::default(),
+                    interfaces: vec![],
+                    elapsed_ms: start.elapsed().as_millis() as u64,
+                };
+            }
+        };
 
     // Resolve and synchronize authoritative engine state.
     loop {
@@ -367,24 +357,18 @@ fn run_snmp_poll_v3(config: SnmpConfig, start: std::time::Instant) -> SnmpPollRe
         };
         misses = 0;
 
-        let if_type_raw =
-            snmp_get_v3_u64(&mut session, &format!("{base}.3.{index}")).unwrap_or(0);
+        let if_type_raw = snmp_get_v3_u64(&mut session, &format!("{base}.3.{index}")).unwrap_or(0);
         let speed = snmp_get_v3_u64(&mut session, &format!("{base}.5.{index}")).unwrap_or(0);
         let oper_status = map_oper_status(
             snmp_get_v3_u64(&mut session, &format!("{base}.8.{index}")).unwrap_or(0),
         );
-        let in_octets =
-            snmp_get_v3_u64(&mut session, &format!("{base}.10.{index}")).unwrap_or(0);
-        let in_discards =
-            snmp_get_v3_u64(&mut session, &format!("{base}.13.{index}")).unwrap_or(0);
-        let in_errors =
-            snmp_get_v3_u64(&mut session, &format!("{base}.14.{index}")).unwrap_or(0);
-        let out_octets =
-            snmp_get_v3_u64(&mut session, &format!("{base}.16.{index}")).unwrap_or(0);
+        let in_octets = snmp_get_v3_u64(&mut session, &format!("{base}.10.{index}")).unwrap_or(0);
+        let in_discards = snmp_get_v3_u64(&mut session, &format!("{base}.13.{index}")).unwrap_or(0);
+        let in_errors = snmp_get_v3_u64(&mut session, &format!("{base}.14.{index}")).unwrap_or(0);
+        let out_octets = snmp_get_v3_u64(&mut session, &format!("{base}.16.{index}")).unwrap_or(0);
         let out_discards =
             snmp_get_v3_u64(&mut session, &format!("{base}.19.{index}")).unwrap_or(0);
-        let out_errors =
-            snmp_get_v3_u64(&mut session, &format!("{base}.20.{index}")).unwrap_or(0);
+        let out_errors = snmp_get_v3_u64(&mut session, &format!("{base}.20.{index}")).unwrap_or(0);
 
         interfaces.push(SnmpInterface {
             index,
@@ -430,7 +414,10 @@ fn map_v3_privacy_protocol(proto: SnmpV3PrivacyProtocol) -> v3::Cipher {
 }
 
 fn parse_oid(oid: &str) -> Option<Oid<'static>> {
-    let parts: Vec<u64> = oid.split('.').filter_map(|s| s.parse::<u64>().ok()).collect();
+    let parts: Vec<u64> = oid
+        .split('.')
+        .filter_map(|s| s.parse::<u64>().ok())
+        .collect();
     Oid::from(&parts).ok()
 }
 
@@ -494,7 +481,8 @@ fn snmp_get(socket: &UdpSocket, community: &[u8], version: u8, oid: &str) -> Opt
     let req_id: u32 = (std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_nanos() & 0x7FFF_FFFF) as u32;
+        .as_nanos()
+        & 0x7FFF_FFFF) as u32;
 
     let req_id_ber = ber_integer(req_id);
     let zero = ber_integer(0);
@@ -569,15 +557,15 @@ fn parse_snmp_value(data: &[u8]) -> Option<String> {
     // Then read the value.
     let mut idx = 0;
     idx = skip_ber_header(data, idx)?; // outer SEQUENCE
-    idx = skip_ber_tlv(data, idx)?;    // version
-    idx = skip_ber_tlv(data, idx)?;    // community
+    idx = skip_ber_tlv(data, idx)?; // version
+    idx = skip_ber_tlv(data, idx)?; // community
     idx = skip_ber_header(data, idx)?; // PDU
-    idx = skip_ber_tlv(data, idx)?;    // reqID
-    idx = skip_ber_tlv(data, idx)?;    // error-status
-    idx = skip_ber_tlv(data, idx)?;    // error-index
+    idx = skip_ber_tlv(data, idx)?; // reqID
+    idx = skip_ber_tlv(data, idx)?; // error-status
+    idx = skip_ber_tlv(data, idx)?; // error-index
     idx = skip_ber_header(data, idx)?; // varbindlist
     idx = skip_ber_header(data, idx)?; // varbind
-    idx = skip_ber_tlv(data, idx)?;    // OID
+    idx = skip_ber_tlv(data, idx)?; // OID
 
     // Now at the value
     if idx >= data.len() {
@@ -615,19 +603,25 @@ fn parse_snmp_value(data: &[u8]) -> Option<String> {
 }
 
 fn skip_ber_header(data: &[u8], idx: usize) -> Option<usize> {
-    if idx >= data.len() { return None; }
+    if idx >= data.len() {
+        return None;
+    }
     let (_, new_idx) = ber_decode_length(data, idx + 1)?;
     Some(new_idx)
 }
 
 fn skip_ber_tlv(data: &[u8], idx: usize) -> Option<usize> {
-    if idx >= data.len() { return None; }
+    if idx >= data.len() {
+        return None;
+    }
     let (len, new_idx) = ber_decode_length(data, idx + 1)?;
     Some(new_idx + len)
 }
 
 fn ber_decode_length(data: &[u8], idx: usize) -> Option<(usize, usize)> {
-    if idx >= data.len() { return None; }
+    if idx >= data.len() {
+        return None;
+    }
     let b = data[idx];
     if b < 0x80 {
         Some((b as usize, idx + 1))
@@ -635,7 +629,9 @@ fn ber_decode_length(data: &[u8], idx: usize) -> Option<(usize, usize)> {
         let num_bytes = (b & 0x7F) as usize;
         let mut length = 0usize;
         for i in 0..num_bytes {
-            if idx + 1 + i >= data.len() { return None; }
+            if idx + 1 + i >= data.len() {
+                return None;
+            }
             length = (length << 8) | data[idx + 1 + i] as usize;
         }
         Some((length, idx + 1 + num_bytes))

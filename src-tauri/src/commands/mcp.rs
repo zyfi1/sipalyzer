@@ -3,19 +3,27 @@ use crate::mcp::{
     McpPromptDescriptor, McpResourceDescriptor, McpServerProfile, McpServerStatus,
     McpToolCallResult, McpToolDescriptor, MCP_MANAGER,
 };
+use once_cell::sync::Lazy;
+use std::path::Path;
+use std::process::Stdio;
+use std::time::Duration;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::Command;
 use tokio::sync::watch;
-use once_cell::sync::Lazy;
-use std::time::Duration;
-use std::path::Path;
 
 static HOSTED_SERVER_STOP: Lazy<std::sync::Mutex<Option<watch::Sender<bool>>>> =
     Lazy::new(|| std::sync::Mutex::new(None));
+const STDIO_MCP_CALL_TIMEOUT_SECS: u64 = 30;
 
-fn default_catalog(profile: &McpServerProfile) -> (Vec<McpToolDescriptor>, Vec<McpResourceDescriptor>, Vec<McpPromptDescriptor>) {
+fn default_catalog(
+    profile: &McpServerProfile,
+) -> (
+    Vec<McpToolDescriptor>,
+    Vec<McpResourceDescriptor>,
+    Vec<McpPromptDescriptor>,
+) {
     let tools = vec![
         McpToolDescriptor {
             server_id: profile.id.clone(),
@@ -46,7 +54,11 @@ fn default_catalog(profile: &McpServerProfile) -> (Vec<McpToolDescriptor>, Vec<M
     (tools, resources, prompts)
 }
 
-async fn call_network_tool(endpoint: &str, tool_name: &str, arguments_json: &str) -> Result<String, String> {
+async fn call_network_tool(
+    endpoint: &str,
+    tool_name: &str,
+    arguments_json: &str,
+) -> Result<String, String> {
     let parsed_args = serde_json::from_str::<serde_json::Value>(arguments_json)
         .map_err(|e| format!("Invalid tool arguments JSON: {e}"))?;
     if endpoint.starts_with("tcp://") {
@@ -143,7 +155,11 @@ async fn check_network_endpoint(endpoint: &str) -> Result<(), String> {
     }
 }
 
-async fn call_stdio_tool(profile: &McpServerProfile, tool_name: &str, arguments_json: &str) -> Result<String, String> {
+async fn call_stdio_tool(
+    profile: &McpServerProfile,
+    tool_name: &str,
+    arguments_json: &str,
+) -> Result<String, String> {
     let command = profile
         .command
         .as_deref()
@@ -152,15 +168,29 @@ async fn call_stdio_tool(profile: &McpServerProfile, tool_name: &str, arguments_
     if !profile.args.is_empty() {
         cmd.args(&profile.args);
     }
+    cmd.kill_on_drop(true);
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
     cmd.env("SIPALYZER_MCP_TOOL_NAME", tool_name);
     cmd.env("SIPALYZER_MCP_TOOL_ARGS_JSON", arguments_json);
     for (key, value) in &profile.env {
         cmd.env(key, value);
     }
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("Failed to spawn stdio MCP command: {e}"))?;
+    let output = match tokio::time::timeout(
+        Duration::from_secs(STDIO_MCP_CALL_TIMEOUT_SECS),
+        cmd.output(),
+    )
+    .await
+    {
+        Ok(result) => result.map_err(|e| format!("Failed to spawn stdio MCP command: {e}"))?,
+        Err(_) => {
+            return Err(format!(
+                "stdio MCP command timed out after {}s and was cancelled",
+                STDIO_MCP_CALL_TIMEOUT_SECS
+            ));
+        }
+    };
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("stdio MCP command failed: {}", stderr.trim()));
@@ -247,7 +277,10 @@ pub async fn mcp_delete_profile(server_id: String) -> Result<(), String> {
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn mcp_connect_server(server_id: String, app: tauri::AppHandle) -> Result<McpServerStatus, String> {
+pub async fn mcp_connect_server(
+    server_id: String,
+    app: tauri::AppHandle,
+) -> Result<McpServerStatus, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
         "agent",
         "mcp_connect_server",
@@ -283,7 +316,11 @@ pub async fn mcp_connect_server(server_id: String, app: tauri::AppHandle) -> Res
         server_id: server_id.clone(),
         connected: true,
         last_error: None,
-        capabilities: vec!["tools".to_string(), "resources".to_string(), "prompts".to_string()],
+        capabilities: vec![
+            "tools".to_string(),
+            "resources".to_string(),
+            "prompts".to_string(),
+        ],
         tool_count: tools.len(),
         resource_count: resources.len(),
         prompt_count: prompts.len(),
@@ -300,7 +337,9 @@ pub async fn mcp_connect_server(server_id: String, app: tauri::AppHandle) -> Res
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn mcp_test_server_connection(server_id: String) -> Result<McpConnectionTestResult, String> {
+pub async fn mcp_test_server_connection(
+    server_id: String,
+) -> Result<McpConnectionTestResult, String> {
     let profile = {
         let mgr = MCP_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
         mgr.profiles
@@ -482,7 +521,9 @@ pub async fn mcp_orchestrate_call(
     }
 
     for handle in handles {
-        let result = handle.await.map_err(|e| format!("MCP orchestration worker failed: {e}"))?;
+        let result = handle
+            .await
+            .map_err(|e| format!("MCP orchestration worker failed: {e}"))?;
         results.push(result);
     }
 
@@ -511,14 +552,19 @@ pub async fn mcp_start_hosted_server(
     auth_token: Option<String>,
 ) -> Result<McpHostedServerState, String> {
     if !stdio_enabled && !network_enabled {
-        return Err("Hosted MCP server requires at least one transport (stdio or network).".to_string());
+        return Err(
+            "Hosted MCP server requires at least one transport (stdio or network).".to_string(),
+        );
     }
     let _ = crate::core::audit::AuditWriter::write_entry(
         "agent",
         "mcp_start_hosted_server",
         "user",
         None,
-        Some(&format!("stdio={}, network={}", stdio_enabled, network_enabled)),
+        Some(&format!(
+            "stdio={}, network={}",
+            stdio_enabled, network_enabled
+        )),
     );
     if let Some(sender) = HOSTED_SERVER_STOP
         .lock()
@@ -647,4 +693,3 @@ pub async fn mcp_get_hosted_server_state() -> Option<McpHostedServerState> {
     let mgr = MCP_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
     mgr.hosted_state.clone()
 }
-

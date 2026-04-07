@@ -1,12 +1,12 @@
-use anyhow::{Context, Result};
-use std::time::{Duration, Instant};
-use serde::Serialize;
 use crate::core::config::RegistrarConfig;
 use crate::core::user_agent;
-use crate::sip::stack::{SipMessage, generate_call_id, generate_tag};
 use crate::sip::auth;
+use crate::sip::stack::{generate_call_id, generate_tag, SipMessage};
 use crate::sip::transport::Transport;
 use crate::sip::uri::SipUri;
+use anyhow::{Context, Result};
+use serde::Serialize;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RegistrationResult {
@@ -38,10 +38,11 @@ impl RegistrationTester {
             domain = %config.domain,
             transport = %transport_str,
             timeout = config.timeout_seconds,
-        ).entered();
+        )
+        .entered();
 
         let start_time = Instant::now();
-        
+
         // Determine local port
         let local_port = config.local_port.unwrap_or(5060);
 
@@ -50,13 +51,13 @@ impl RegistrationTester {
         // - A SIP URI (sip:host, sip:host:port, sip:user@host:port)
         // - Just a hostname (example.com)
         // - An IP address (192.168.1.1)
-        let registrar_uri = SipUri::parse(&config.domain)
-            .context("Failed to parse registrar domain")?;
-        
+        let registrar_uri =
+            SipUri::parse(&config.domain).context("Failed to parse registrar domain")?;
+
         // Use port from URI if present, otherwise use remote_port from config
         let registrar_port = registrar_uri.port.unwrap_or(config.remote_port);
         let registrar_host = registrar_uri.host_for_resolution();
-        
+
         // Create transport using the resolved host and port
         let mut transport = {
             let _dns_span = tracing::info_span!("sip.dns_resolve").entered();
@@ -70,7 +71,7 @@ impl RegistrationTester {
 
         // Update local IP from actual connection if not already detected
         transport.update_local_ip()?;
-        
+
         // Get the actual local IP address from the transport
         let local_ip = transport.get_local_ip_address();
 
@@ -89,10 +90,7 @@ impl RegistrationTester {
             format!("sip:{}:{}", registrar_host, registrar_port)
         };
 
-        let mut request = SipMessage::new_request(
-            "REGISTER",
-            &request_uri,
-        );
+        let mut request = SipMessage::new_request("REGISTER", &request_uri);
 
         // Determine transport protocol for Via header
         let via_transport = match config.transport {
@@ -101,46 +99,57 @@ impl RegistrationTester {
             crate::core::config::TransportType::Tls => "TLS",
             crate::core::config::TransportType::Wss => "WSS",
         };
-        
+
         // Use register_interval_seconds from config if available, otherwise use provided expires
         // EXCEPT: If expires is 0 (unregister), always use 0 regardless of config
         let expires_value = if expires == 0 {
             0 // Force 0 for unregistration
         } else {
-            config.register_interval_seconds
+            config
+                .register_interval_seconds
                 .map(|s| s as u32)
                 .unwrap_or(expires)
         };
-        
+
         // Build RFC-compliant headers
         // Via header: SIP/2.0/TRANSPORT host:port;rport;branch=branch-value
         // Use listening_port if set (user-specified reachable port, e.g. port-forwarded),
         // otherwise use local_port. Include rport (RFC 3581) for NAT traversal so
         // the server reports back the actual observed source port.
         let via_port = config.listening_port.unwrap_or(local_port);
-        request.add_header("Via", &format!("SIP/2.0/{} {}:{};rport;branch={}", 
-            via_transport, local_ip, via_port, branch));
+        request.add_header(
+            "Via",
+            &format!(
+                "SIP/2.0/{} {}:{};rport;branch={}",
+                via_transport, local_ip, via_port, branch
+            ),
+        );
         request.add_header("Max-Forwards", "70");
-        
+
         // To header: sip:user@domain (the AOR - Address of Record)
         // The AOR domain is typically the domain from the config, not the registrar host
         // The registrar host is where we send the REGISTER, the AOR domain is the user's domain
         // Parse config.domain to extract the domain part if it's a SIP URI
-        let aor_uri = SipUri::parse(&config.domain)
-            .context("Failed to parse AOR domain")?;
+        let aor_uri = SipUri::parse(&config.domain).context("Failed to parse AOR domain")?;
         let aor_domain = aor_uri.host.clone();
-        
+
         request.add_header("To", &format!("<sip:{}@{}>", config.username, aor_domain));
-        
+
         // From header: same as To but with tag
-        request.add_header("From", &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag));
+        request.add_header(
+            "From",
+            &format!("<sip:{}@{}>;tag={}", config.username, aor_domain, from_tag),
+        );
         request.add_header("Call-ID", &call_id);
         request.add_header("CSeq", "1 REGISTER");
-        
+
         // Contact header: sip:user@contact-address:port (use listening_port for inbound calls if set)
         let contact_port = config.listening_port.unwrap_or(local_port);
         let contact_header = if expires_value == 0 {
-            format!("<sip:{}@{}:{}>;expires=0", config.username, local_ip, contact_port)
+            format!(
+                "<sip:{}@{}:{}>;expires=0",
+                config.username, local_ip, contact_port
+            )
         } else {
             format!("<sip:{}@{}:{}>", config.username, local_ip, contact_port)
         };
@@ -159,13 +168,15 @@ impl RegistrationTester {
         // Send request
         {
             let _send_span = tracing::info_span!("sip.register_send").entered();
-            transport.send(&request_bytes)
+            transport
+                .send(&request_bytes)
                 .context("Failed to send REGISTER request")?;
         }
 
         // Receive response
         let timeout = Duration::from_secs(config.timeout_seconds);
-        let response_bytes = transport.receive(timeout)
+        let response_bytes = transport
+            .receive(timeout)
             .context("Failed to receive REGISTER response")?;
 
         let (response, status_code, status_text) = {
@@ -183,21 +194,20 @@ impl RegistrationTester {
         // Handle 401/407 challenge
         if status_code == 401 || status_code == 407 {
             return Self::handle_auth_challenge(
-                &transport,
-                &request,
-                &response,
-                config,
-                &call_id,
-                &from_tag,
-                timeout,
+                &transport, &request, &response, config, &call_id, &from_tag, timeout,
             );
         }
 
-        let expires = response.get_header("Expires")
+        let expires = response
+            .get_header("Expires")
             .and_then(|v| v.parse::<u32>().ok());
 
         let error_message = if status_code >= 400 {
-            Some(format!("Registration failed: {} {}", status_code, status_text.clone()))
+            Some(format!(
+                "Registration failed: {} {}",
+                status_code,
+                status_text.clone()
+            ))
         } else {
             None
         };
@@ -232,8 +242,7 @@ impl RegistrationTester {
             challenge.get_header("Proxy-Authenticate")
         };
 
-        let auth_header = auth_header
-            .context("Missing authentication challenge header")?;
+        let auth_header = auth_header.context("Missing authentication challenge header")?;
 
         let default_realm = config.realm.as_deref().unwrap_or(&config.domain);
         let auth_challenge = auth::parse_auth_challenge(auth_header, default_realm)
@@ -254,23 +263,24 @@ impl RegistrationTester {
 
         // Build authenticated request with same Request-URI
         let mut auth_request = SipMessage::new_request("REGISTER", &request_uri);
-        
+
         // Get CSeq from original request
-        let cseq = original_request.get_header("CSeq")
+        let cseq = original_request
+            .get_header("CSeq")
             .and_then(|v| v.split_whitespace().next())
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(1);
-        
+
         // Copy headers from original request (except CSeq which we'll update)
         for (name, value) in &original_request.headers {
             if name.to_lowercase() != "cseq" {
                 auth_request.add_header(name, value);
             }
         }
-        
+
         // Update CSeq
         auth_request.add_header("CSeq", &format!("{} REGISTER", cseq + 1));
-        
+
         // Use the same request URI in the Authorization header
         let auth_value = auth::build_digest_authorization(
             "REGISTER",
@@ -279,7 +289,7 @@ impl RegistrationTester {
             password,
             &auth_challenge,
         );
-        
+
         if challenge.status_code == Some(401) {
             auth_request.add_header("Authorization", &auth_value);
         } else {
@@ -293,11 +303,13 @@ impl RegistrationTester {
             let _auth_reg_span = tracing::info_span!("sip.authenticated_register").entered();
 
             // Send authenticated request
-            transport.send(&request_bytes)
+            transport
+                .send(&request_bytes)
                 .context("Failed to send authenticated REGISTER request")?;
 
             // Receive final response
-            let response_bytes = transport.receive(timeout)
+            let response_bytes = transport
+                .receive(timeout)
                 .context("Failed to receive authenticated REGISTER response")?;
 
             let resp = SipMessage::from_bytes(&response_bytes)
@@ -309,11 +321,16 @@ impl RegistrationTester {
         let status_code = response.status_code.unwrap_or(0);
         let status_text = response.status_text.clone().unwrap_or_default();
 
-        let expires = response.get_header("Expires")
+        let expires = response
+            .get_header("Expires")
             .and_then(|v| v.parse::<u32>().ok());
 
         let error_message = if status_code >= 400 {
-            Some(format!("Registration failed: {} {}", status_code, status_text.clone()))
+            Some(format!(
+                "Registration failed: {} {}",
+                status_code,
+                status_text.clone()
+            ))
         } else {
             None
         };
@@ -329,6 +346,4 @@ impl RegistrationTester {
             response_message: response_text.to_string(),
         })
     }
-
-    
 }

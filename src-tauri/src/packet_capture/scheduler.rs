@@ -1,8 +1,10 @@
+use crate::commands::packet_capture::{
+    get_scheduled_captures_due, start_capture, ScheduledCaptureInfo,
+};
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
-use chrono::{DateTime, Utc};
-use crate::commands::packet_capture::{get_scheduled_captures_due, start_capture, ScheduledCaptureInfo};
 
 #[derive(Clone)]
 pub struct ScheduledCaptureScheduler {
@@ -30,7 +32,7 @@ impl ScheduledCaptureScheduler {
             let mut consecutive_failures: u32 = 0;
             loop {
                 interval.tick().await;
-                
+
                 // Check if still running
                 let is_running = *running_clone.lock().await;
                 if !is_running {
@@ -69,7 +71,7 @@ impl ScheduledCaptureScheduler {
 
         for capture in due_captures {
             tracing::info!("Starting scheduled capture: {}", capture.name);
-            
+
             // Start the capture
             match start_capture(
                 capture.name.clone(),
@@ -79,7 +81,7 @@ impl ScheduledCaptureScheduler {
             ) {
                 Ok(session_id) => {
                     tracing::info!("Started capture session: {}", session_id);
-                    
+
                     // Update last_run and calculate next_run
                     Self::update_capture_after_run(&capture).await?;
                 }
@@ -94,11 +96,11 @@ impl ScheduledCaptureScheduler {
 
     async fn update_capture_after_run(capture: &ScheduledCaptureInfo) -> Result<()> {
         use crate::core::database;
-        let conn = database::Database::get_connection()
-            .context("Failed to get database connection")?;
-        
+        let conn =
+            database::Database::get_connection().context("Failed to get database connection")?;
+
         let now = Utc::now().to_rfc3339();
-        
+
         // Update last_run
         conn.execute(
             "UPDATE scheduled_captures SET last_run = ?1 WHERE id = ?2",

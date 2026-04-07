@@ -53,11 +53,12 @@ impl Default for BandwidthConfig {
 /// (buffer sizes, CPU throttling, firewall overhead).
 #[tracing::instrument(skip_all)]
 pub async fn run_bandwidth_test(config: BandwidthConfig) -> BandwidthResult {
-    let host_label = if config.host.is_empty() || config.host == "localhost" || config.host == "127.0.0.1" {
-        "localhost (self-test)".to_string()
-    } else {
-        config.host.clone()
-    };
+    let host_label =
+        if config.host.is_empty() || config.host == "localhost" || config.host == "127.0.0.1" {
+            "localhost (self-test)".to_string()
+        } else {
+            config.host.clone()
+        };
 
     // ── 1. Spawn a local UDP echo server ────────────────────────
     let echo_socket = match UdpSocket::bind("127.0.0.1:0").await {
@@ -87,7 +88,8 @@ pub async fn run_bandwidth_test(config: BandwidthConfig) -> BandwidthResult {
             if stop_echo.load(Ordering::Relaxed) {
                 break;
             }
-            match tokio::time::timeout(Duration::from_millis(50), echo_socket.recv_from(&mut buf)).await
+            match tokio::time::timeout(Duration::from_millis(50), echo_socket.recv_from(&mut buf))
+                .await
             {
                 Ok(Ok((n, addr))) => {
                     let _ = echo_socket.send_to(&buf[..n], addr).await;

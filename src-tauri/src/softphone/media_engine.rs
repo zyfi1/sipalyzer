@@ -17,8 +17,8 @@ use once_cell::sync::Lazy;
 use super::audio_processing::{RecvProcessor, SendProcessor};
 use super::codecs::{AudioCodec, G711Codec, G722Codec, SAMPLES_PER_FRAME, SAMPLE_RATE};
 use super::jitter_buffer::JitterBuffer;
-use super::moh::MohPreset;
 use super::metrics::CallMetrics;
+use super::moh::MohPreset;
 use super::rtp::RtpPacket;
 
 const DEFAULT_SSRC: u32 = 1;
@@ -30,12 +30,15 @@ fn emit_dtmf_event(call_id: &str, digit: char, direction: &str) {
 
     if let Some(app) = super::sip_log::app_handle() {
         use tauri::Emitter;
-        let _ = app.emit("softphone:dtmf_event", serde_json::json!({
-            "call_id": call_id,
-            "digit": digit.to_string(),
-            "direction": dir,
-            "timestamp": ts,
-        }));
+        let _ = app.emit(
+            "softphone:dtmf_event",
+            serde_json::json!({
+                "call_id": call_id,
+                "digit": digit.to_string(),
+                "direction": dir,
+                "timestamp": ts,
+            }),
+        );
     }
 
     super::sip_log::emit(super::sip_log::SipLogEvent {
@@ -139,11 +142,14 @@ struct CallMedia {
 }
 
 static CALLS: Lazy<Mutex<HashMap<String, CallMedia>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static METRICS: Lazy<Mutex<HashMap<String, Arc<Mutex<CallMetrics>>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static METRICS: Lazy<Mutex<HashMap<String, Arc<Mutex<CallMetrics>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 /// Input gain per call (f32 stored as bits); 1.0 = 100%.
-static INPUT_GAIN: Lazy<Mutex<HashMap<String, Arc<AtomicU32>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static INPUT_GAIN: Lazy<Mutex<HashMap<String, Arc<AtomicU32>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 /// Active recording writer thread handles, keyed by call_id.
-static RECORDING_HANDLES: Lazy<Mutex<HashMap<String, RecordingHandle>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static RECORDING_HANDLES: Lazy<Mutex<HashMap<String, RecordingHandle>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 struct RecordingHandle {
     /// Signal to the writer thread to stop.
@@ -159,7 +165,8 @@ struct WaveformBuffers {
     recv: Mutex<RingBuf>,
 }
 
-static WAVEFORMS: Lazy<Mutex<HashMap<String, Arc<WaveformBuffers>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static WAVEFORMS: Lazy<Mutex<HashMap<String, Arc<WaveformBuffers>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 // ── Conference mixer ──────────────────────────────────────────────────────
 // Maps conference_id → { call_id → latest decoded PCM frame }
@@ -219,14 +226,21 @@ fn conference_mix(call_id: &str, own_pcm: &[i16]) -> Option<Vec<i16>> {
     let frame_len = own_pcm.len();
     let mut mixed = vec![0i32; frame_len];
     for (mid, frame) in members.iter() {
-        if mid == call_id { continue; }
+        if mid == call_id {
+            continue;
+        }
         for (i, &s) in frame.iter().enumerate() {
             if i < frame_len {
                 mixed[i] += s as i32;
             }
         }
     }
-    Some(mixed.iter().map(|&s| s.clamp(-32768, 32767) as i16).collect())
+    Some(
+        mixed
+            .iter()
+            .map(|&s| s.clamp(-32768, 32767) as i16)
+            .collect(),
+    )
 }
 
 fn run_sender(
@@ -288,7 +302,8 @@ fn run_sender(
             // packets that arrive after higher-sequenced audio packets.
             let seq_base = shared_seq.load(Ordering::SeqCst);
             let ts_base = shared_ts.load(Ordering::SeqCst);
-            let packets = generate_dtmf_packets(dtmf.event_code, dtmf.dtmf_pt, ssrc, seq_base, ts_base);
+            let packets =
+                generate_dtmf_packets(dtmf.event_code, dtmf.dtmf_pt, ssrc, seq_base, ts_base);
 
             for (pkt, delay_ms) in &packets {
                 let _ = socket.send_to(&pkt.serialize(), remote_addr);
@@ -300,7 +315,10 @@ fn run_sender(
             let total_dtmf_packets = packets.len() as u16;
             shared_seq.fetch_add(total_dtmf_packets, Ordering::SeqCst);
             // Advance timestamp by the DTMF event duration so audio resumes at the right offset
-            shared_ts.fetch_add(EVENT_DURATION_FRAMES * (SAMPLES_PER_FRAME as u32), Ordering::SeqCst);
+            shared_ts.fetch_add(
+                EVENT_DURATION_FRAMES * (SAMPLES_PER_FRAME as u32),
+                Ordering::SeqCst,
+            );
             // Reset pacing so next audio frame goes out immediately
             next_send = Instant::now();
             continue;
@@ -371,7 +389,13 @@ fn run_receiver(
                 if let Some(packet) = RtpPacket::deserialize(&buf[..n]) {
                     packets_received += 1;
                     if packets_received <= 3 {
-                        tracing::info!("[RTP Receiver:{}] RX #{} from {} ({} bytes)", call_id, packets_received, from, n);
+                        tracing::info!(
+                            "[RTP Receiver:{}] RX #{} from {} ({} bytes)",
+                            call_id,
+                            packets_received,
+                            from,
+                            n
+                        );
                     }
 
                     // RFC 2833 telephone-event: detect inbound DTMF
@@ -567,7 +591,10 @@ pub fn start_media(
         jitter_max_ms.min(500),
     )));
     let metrics = Arc::new(Mutex::new(CallMetrics::new()));
-    METRICS.lock().map_err(|e| e.to_string())?.insert(call_id.clone(), metrics.clone());
+    METRICS
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(call_id.clone(), metrics.clone());
 
     let waveform_buffers = Arc::new(WaveformBuffers {
         send: Mutex::new(RingBuf::new(WAVEFORM_CAP)),
@@ -594,7 +621,23 @@ pub fn start_media(
     let codec_sender = audio_codec.clone();
     let seq_sender = shared_seq.clone();
     let ts_sender = shared_ts.clone();
-    thread::spawn(move || run_sender(s, remote_addr, DEFAULT_SSRC, pt, rx_capture, sh, mu, oh_send, codec_sender, moh, seq_sender, ts_sender, dtmf_rx));
+    thread::spawn(move || {
+        run_sender(
+            s,
+            remote_addr,
+            DEFAULT_SSRC,
+            pt,
+            rx_capture,
+            sh,
+            mu,
+            oh_send,
+            codec_sender,
+            moh,
+            seq_sender,
+            ts_sender,
+            dtmf_rx,
+        )
+    });
 
     let s = socket.clone();
     let j = jitter.clone();
@@ -617,7 +660,21 @@ pub fn start_media(
     let call_id_playout = call_id.clone();
     let tx_fax_play = tx_fax_receive.clone();
     let send_proc_playout = send_proc.clone();
-    thread::spawn(move || run_playout(j, tx_playout, codec_playout, Some(m_playout), recv_waveform, sh, rec_flag_play, rec_recv_buf_play, call_id_playout, tx_fax_play, send_proc_playout));
+    thread::spawn(move || {
+        run_playout(
+            j,
+            tx_playout,
+            codec_playout,
+            Some(m_playout),
+            recv_waveform,
+            sh,
+            rec_flag_play,
+            rec_recv_buf_play,
+            call_id_playout,
+            tx_fax_play,
+            send_proc_playout,
+        )
+    });
 
     let shutdown_media = shutdown.clone();
     let shutdown_loop = shutdown.clone();
@@ -633,12 +690,22 @@ pub fn start_media(
     let rec_send_buf_cap = recording_send_buf.clone();
 
     let audio_restart = Arc::new(AtomicBool::new(false));
-    let desired_input_device: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(
-        input_device_id.as_ref().and_then(|s| if s.is_empty() { None } else { Some(s.clone()) })
-    ));
-    let desired_output_device: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(
-        output_device_id.as_ref().and_then(|s| if s.is_empty() { None } else { Some(s.clone()) })
-    ));
+    let desired_input_device: Arc<Mutex<Option<String>>> =
+        Arc::new(Mutex::new(input_device_id.as_ref().and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.clone())
+            }
+        })));
+    let desired_output_device: Arc<Mutex<Option<String>>> =
+        Arc::new(Mutex::new(output_device_id.as_ref().and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.clone())
+            }
+        })));
 
     let audio_restart_thread = audio_restart.clone();
     let desired_input_thread = desired_input_device.clone();
@@ -649,7 +716,8 @@ pub fn start_media(
     let call_id_for_media = call_id.clone();
     let media_handle = thread::spawn(move || {
         // rx_playout is wrapped in Arc<Mutex<>> so it survives across audio device restarts.
-        let rx_playout_shared: Arc<Mutex<mpsc::Receiver<Vec<i16>>>> = Arc::new(Mutex::new(rx_playout));
+        let rx_playout_shared: Arc<Mutex<mpsc::Receiver<Vec<i16>>>> =
+            Arc::new(Mutex::new(rx_playout));
         let mut first_iteration = true;
         // Clone call_id for use in capture closures within the audio loop.
         let call_id = call_id_for_media;
@@ -663,7 +731,9 @@ pub fn start_media(
             let input_device = if let Some(ref id) = input_id {
                 host.input_devices()
                     .ok()
-                    .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(id.as_str())))
+                    .and_then(|mut devices| {
+                        devices.find(|d| d.name().ok().as_deref() == Some(id.as_str()))
+                    })
                     .or_else(|| host.default_input_device())
             } else {
                 host.default_input_device()
@@ -713,7 +783,10 @@ pub fn start_media(
                         if chunk.len() == target_frame {
                             let mut processed = chunk.to_vec();
                             let is_voice = send_proc_native.process(&mut processed);
-                            if !muted_native.load(Ordering::SeqCst) && !on_hold_native.load(Ordering::SeqCst) && !fax_mode_native.load(Ordering::SeqCst) {
+                            if !muted_native.load(Ordering::SeqCst)
+                                && !on_hold_native.load(Ordering::SeqCst)
+                                && !fax_mode_native.load(Ordering::SeqCst)
+                            {
                                 if is_voice || !send_proc_native.vad_enabled {
                                     let encoded = codec_cap.encode_frame(&processed);
                                     let _ = tx_cap_native.try_send(encoded);
@@ -726,10 +799,16 @@ pub fn start_media(
                             }
                             super::transcription::feed_send_pcm(&call_id_cap_native, &processed);
                             if let Ok(mut met) = metrics_native.lock() {
-                                let peak = processed.iter().map(|&s| (s as i32).abs()).max().unwrap_or(0) as f32 / 32768.0;
+                                let peak = processed
+                                    .iter()
+                                    .map(|&s| (s as i32).abs())
+                                    .max()
+                                    .unwrap_or(0) as f32
+                                    / 32768.0;
                                 met.set_send_peak(peak);
                             }
-                            let send_f32: Vec<f32> = processed.iter().map(|&s| s as f32 / 32768.0).collect();
+                            let send_f32: Vec<f32> =
+                                processed.iter().map(|&s| s as f32 / 32768.0).collect();
                             if let Ok(mut buf) = send_waveform_native.send.lock() {
                                 buf.push(&send_f32);
                             }
@@ -747,7 +826,10 @@ pub fn start_media(
                         Ok(c) => c,
                         Err(de) => {
                             if first_iteration {
-                                let _ = setup_tx.send(Err(format!("Input stream: {}; default config: {}", err_msg, de)));
+                                let _ = setup_tx.send(Err(format!(
+                                    "Input stream: {}; default config: {}",
+                                    err_msg, de
+                                )));
                             }
                             return;
                         }
@@ -791,7 +873,10 @@ pub fn start_media(
                                         })
                                         .collect();
                                     let is_voice = send_proc_fb.process(&mut decimated);
-                                    if !muted_fb.load(Ordering::SeqCst) && !on_hold_fb.load(Ordering::SeqCst) && !fax_mode_fb.load(Ordering::SeqCst) {
+                                    if !muted_fb.load(Ordering::SeqCst)
+                                        && !on_hold_fb.load(Ordering::SeqCst)
+                                        && !fax_mode_fb.load(Ordering::SeqCst)
+                                    {
                                         if is_voice || !send_proc_fb.vad_enabled {
                                             let encoded = codec_cap2.encode_frame(&decimated);
                                             let _ = tx_cap_fb.try_send(encoded);
@@ -802,17 +887,22 @@ pub fn start_media(
                                             rbuf.extend_from_slice(&decimated);
                                         }
                                     }
-                                    super::transcription::feed_send_pcm(&call_id_cap_fb, &decimated);
+                                    super::transcription::feed_send_pcm(
+                                        &call_id_cap_fb,
+                                        &decimated,
+                                    );
                                     if let Ok(mut met) = metrics_fb.lock() {
                                         let peak = decimated
                                             .iter()
                                             .map(|&s| (s as i32).abs())
                                             .max()
-                                            .unwrap_or(0) as f32
+                                            .unwrap_or(0)
+                                            as f32
                                             / 32768.0;
                                         met.set_send_peak(peak);
                                     }
-                                    let send_f32: Vec<f32> = decimated.iter().map(|&s| s as f32 / 32768.0).collect();
+                                    let send_f32: Vec<f32> =
+                                        decimated.iter().map(|&s| s as f32 / 32768.0).collect();
                                     if let Ok(mut w) = send_waveform_fb.send.lock() {
                                         w.push(&send_f32);
                                     }
@@ -838,7 +928,9 @@ pub fn start_media(
             let output_device = if let Some(ref id) = output_id {
                 host.output_devices()
                     .ok()
-                    .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(id.as_str())))
+                    .and_then(|mut devices| {
+                        devices.find(|d| d.name().ok().as_deref() == Some(id.as_str()))
+                    })
                     .or_else(|| host.default_output_device())
             } else {
                 host.default_output_device()
@@ -864,7 +956,11 @@ pub fn start_media(
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     for out in data.iter_mut() {
                         while playout_buf.is_empty() {
-                            match rx_playout_native.lock().map(|r| r.try_recv()).unwrap_or(Err(mpsc::TryRecvError::Disconnected)) {
+                            match rx_playout_native
+                                .lock()
+                                .map(|r| r.try_recv())
+                                .unwrap_or(Err(mpsc::TryRecvError::Disconnected))
+                            {
                                 Ok(pcm) => playout_buf.extend(pcm),
                                 Err(_) => break,
                             }
@@ -886,7 +982,10 @@ pub fn start_media(
                         Ok(c) => c,
                         Err(de) => {
                             if first_iteration {
-                                let _ = setup_tx.send(Err(format!("Output stream: {}; default config: {}", err_msg, de)));
+                                let _ = setup_tx.send(Err(format!(
+                                    "Output stream: {}; default config: {}",
+                                    err_msg, de
+                                )));
                             }
                             return;
                         }
@@ -905,7 +1004,11 @@ pub fn start_media(
                             while pos < data.len() {
                                 if let Ok(mut buf) = playout_device_buf_cb.lock() {
                                     if buf.is_empty() {
-                                        match rx_playout_fb.lock().map(|r| r.try_recv()).unwrap_or(Err(mpsc::TryRecvError::Disconnected)) {
+                                        match rx_playout_fb
+                                            .lock()
+                                            .map(|r| r.try_recv())
+                                            .unwrap_or(Err(mpsc::TryRecvError::Disconnected))
+                                        {
                                             Ok(pcm) => {
                                                 for &s in &pcm {
                                                     let v = s as f32 / 32768.0;
@@ -959,7 +1062,9 @@ pub fn start_media(
             }
 
             // Wait for shutdown or audio device restart request
-            while !shutdown_loop.load(Ordering::SeqCst) && !audio_restart_thread.load(Ordering::SeqCst) {
+            while !shutdown_loop.load(Ordering::SeqCst)
+                && !audio_restart_thread.load(Ordering::SeqCst)
+            {
                 thread::sleep(Duration::from_millis(50));
             }
 
@@ -976,8 +1081,12 @@ pub fn start_media(
     match setup_rx.recv_timeout(Duration::from_secs(5)) {
         Ok(Ok(())) => {}
         Ok(Err(e)) => return Err(e),
-        Err(mpsc::RecvTimeoutError::Timeout) => return Err("Audio setup timeout (no device or stream)".to_string()),
-        Err(mpsc::RecvTimeoutError::Disconnected) => return Err("Audio thread exited before ready".to_string()),
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            return Err("Audio setup timeout (no device or stream)".to_string())
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            return Err("Audio thread exited before ready".to_string())
+        }
     }
 
     let call_media = CallMedia {
@@ -1019,7 +1128,10 @@ pub fn stop_media(call_id: &str) -> Result<(), String> {
     if is_recording(call_id) {
         let _ = stop_recording(call_id);
     }
-    INPUT_GAIN.lock().map_err(|e| e.to_string())?.remove(call_id);
+    INPUT_GAIN
+        .lock()
+        .map_err(|e| e.to_string())?
+        .remove(call_id);
     let mut calls = CALLS.lock().map_err(|e| e.to_string())?;
     if let Some(call) = calls.remove(call_id) {
         call.shutdown.store(true, Ordering::SeqCst);
@@ -1103,7 +1215,12 @@ pub fn set_muted(call_id: &str, muted: bool) -> Result<(), String> {
         call.muted.store(muted, Ordering::SeqCst);
         tracing::info!("set_muted call_id={} muted={}", call_id, muted);
     } else {
-        tracing::info!("set_muted: call_id={} NOT FOUND in CALLS ({} active calls: {:?})", call_id, calls.len(), calls.keys().collect::<Vec<_>>());
+        tracing::info!(
+            "set_muted: call_id={} NOT FOUND in CALLS ({} active calls: {:?})",
+            call_id,
+            calls.len(),
+            calls.keys().collect::<Vec<_>>()
+        );
     }
     Ok(())
 }
@@ -1157,7 +1274,11 @@ pub fn unregister_fax_receive(call_id: &str) -> Result<(), String> {
 
 /// Switch audio input/output devices for an active call without restarting RTP.
 /// The media thread will restart capture/playback with the new devices.
-pub fn set_audio_devices(call_id: &str, input_device_id: Option<String>, output_device_id: Option<String>) -> Result<(), String> {
+pub fn set_audio_devices(
+    call_id: &str,
+    input_device_id: Option<String>,
+    output_device_id: Option<String>,
+) -> Result<(), String> {
     let calls = CALLS.lock().map_err(|e| e.to_string())?;
     if let Some(call) = calls.get(call_id) {
         if let Ok(mut d) = call.desired_input_device.lock() {
@@ -1184,8 +1305,8 @@ pub fn set_audio_devices(call_id: &str, input_device_id: Option<String>, output_
 pub fn send_dtmf(call_id: &str, digit: char, dtmf_pt: u8) -> Result<(), String> {
     use super::dtmf::digit_to_event;
 
-    let event_code = digit_to_event(digit)
-        .ok_or_else(|| format!("Invalid DTMF digit: '{}'", digit))?;
+    let event_code =
+        digit_to_event(digit).ok_or_else(|| format!("Invalid DTMF digit: '{}'", digit))?;
 
     let dtmf_tx = {
         let calls = CALLS.lock().map_err(|e| e.to_string())?;
@@ -1194,11 +1315,20 @@ pub fn send_dtmf(call_id: &str, digit: char, dtmf_pt: u8) -> Result<(), String> 
     };
 
     dtmf_tx
-        .send(DtmfRequest { event_code, dtmf_pt })
+        .send(DtmfRequest {
+            event_code,
+            dtmf_pt,
+        })
         .map_err(|e| format!("Failed to queue DTMF event: {}", e))?;
 
     emit_dtmf_event(call_id, digit, "send");
-    tracing::info!("Queued digit '{}' (event={}) pt={} for call {}", digit, event_code, dtmf_pt, call_id);
+    tracing::info!(
+        "Queued digit '{}' (event={}) pt={} for call {}",
+        digit,
+        event_code,
+        dtmf_pt,
+        call_id
+    );
     Ok(())
 }
 
@@ -1265,7 +1395,17 @@ pub fn start_recording(call_id: &str) -> Result<String, String> {
     let dir = recordings_dir()?;
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
     // Sanitize call_id for filename
-    let safe_id: String = call_id.chars().take(24).map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).collect();
+    let safe_id: String = call_id
+        .chars()
+        .take(24)
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
     let filename = format!("{}_{}.wav", safe_id, timestamp);
     let path = dir.join(&filename);
 
@@ -1323,8 +1463,14 @@ pub fn start_recording(call_id: &str) -> Result<String, String> {
         }
 
         // Final drain: flush any remaining samples
-        let send_samples: Vec<i16> = send_buf.lock().map(|mut b| b.drain(..).collect()).unwrap_or_default();
-        let recv_samples: Vec<i16> = recv_buf.lock().map(|mut b| b.drain(..).collect()).unwrap_or_default();
+        let send_samples: Vec<i16> = send_buf
+            .lock()
+            .map(|mut b| b.drain(..).collect())
+            .unwrap_or_default();
+        let recv_samples: Vec<i16> = recv_buf
+            .lock()
+            .map(|mut b| b.drain(..).collect())
+            .unwrap_or_default();
         let len = send_samples.len().max(recv_samples.len());
         if len > 0 {
             if let Ok(mut w) = writer_clone.lock() {
@@ -1348,14 +1494,14 @@ pub fn start_recording(call_id: &str) -> Result<String, String> {
         }
     });
 
-    RECORDING_HANDLES
-        .lock()
-        .map_err(|e| e.to_string())?
-        .insert(call_id.to_string(), RecordingHandle {
+    RECORDING_HANDLES.lock().map_err(|e| e.to_string())?.insert(
+        call_id.to_string(),
+        RecordingHandle {
             stop,
             _handle: handle,
             path: path_clone.clone(),
-        });
+        },
+    );
 
     Ok(path_clone.to_string_lossy().to_string())
 }
@@ -1414,7 +1560,11 @@ pub fn list_recordings() -> Result<Vec<RecordingInfo>, String> {
         };
         let path = entry.path();
         if path.extension().map(|e| e == "wav").unwrap_or(false) {
-            let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let filename = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let meta = std::fs::metadata(&path).ok();
             let size_bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
             let created_at = meta

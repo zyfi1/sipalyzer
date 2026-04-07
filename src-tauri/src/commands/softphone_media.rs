@@ -97,7 +97,9 @@ pub struct CallJitterHistoryResult {
 
 #[command]
 #[tracing::instrument(skip_all)]
-pub fn softphone_get_call_jitter_history(call_id: String) -> Result<CallJitterHistoryResult, String> {
+pub fn softphone_get_call_jitter_history(
+    call_id: String,
+) -> Result<CallJitterHistoryResult, String> {
     let (t, j) = softphone::get_call_jitter_history(&call_id)?;
     Ok(CallJitterHistoryResult {
         timestamps_sec: t,

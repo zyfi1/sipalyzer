@@ -9,20 +9,41 @@ fn build_ipv4_udp_frame(payload: &[u8], src_port: u16, dst_port: u16) -> Vec<u8>
 
     let mut frame = vec![
         // Ethernet
-        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, // dst
-        0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, // src
-        0x08, 0x00, // ethertype = IPv4
+        0x00,
+        0x11,
+        0x22,
+        0x33,
+        0x44,
+        0x55, // dst
+        0x66,
+        0x77,
+        0x88,
+        0x99,
+        0xaa,
+        0xbb, // src
+        0x08,
+        0x00, // ethertype = IPv4
         // IPv4
-        0x45, 0x00, // version+ihl, dscp/ecn
+        0x45,
+        0x00, // version+ihl, dscp/ecn
         ((ip_len >> 8) & 0xff) as u8,
         (ip_len & 0xff) as u8, // total length
-        0x00, 0x01, // identification
-        0x40, 0x00, // flags/fragment
+        0x00,
+        0x01, // identification
+        0x40,
+        0x00, // flags/fragment
         64,   // ttl
         17,   // protocol = UDP
-        0x00, 0x00, // checksum (unused by parser)
-        192, 0, 2, 1, // src ip
-        198, 51, 100, 2, // dst ip
+        0x00,
+        0x00, // checksum (unused by parser)
+        192,
+        0,
+        2,
+        1, // src ip
+        198,
+        51,
+        100,
+        2, // dst ip
         // UDP
         ((src_port >> 8) & 0xff) as u8,
         (src_port & 0xff) as u8,
@@ -30,7 +51,8 @@ fn build_ipv4_udp_frame(payload: &[u8], src_port: u16, dst_port: u16) -> Vec<u8>
         (dst_port & 0xff) as u8,
         ((udp_len >> 8) & 0xff) as u8,
         (udp_len & 0xff) as u8,
-        0x00, 0x00, // checksum
+        0x00,
+        0x00, // checksum
     ];
     frame.extend_from_slice(payload);
     frame
@@ -67,7 +89,11 @@ fn packet_fidelity_scaffold_rules_pass_for_valid_frame() {
 
 #[test]
 fn differential_decode_scaffold_is_explicitly_gated() {
-    if std::env::var("SIPALYZER_ENABLE_DIFFERENTIAL_TESTS").ok().as_deref() != Some("1") {
+    if std::env::var("SIPALYZER_ENABLE_DIFFERENTIAL_TESTS")
+        .ok()
+        .as_deref()
+        != Some("1")
+    {
         eprintln!(
             "Skipping differential decode scaffold: set SIPALYZER_ENABLE_DIFFERENTIAL_TESTS=1 to enable."
         );

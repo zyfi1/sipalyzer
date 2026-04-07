@@ -1,8 +1,8 @@
+use crate::network_test::traceroute::{self, TracerouteConfig, TracerouteHop};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use crate::network_test::traceroute::{self, TracerouteConfig, TracerouteHop};
 
 static MTR_CANCELLED: AtomicBool = AtomicBool::new(false);
 
@@ -126,7 +126,8 @@ where
             timeout_ms: per_hop_timeout_ms,
             probes_per_hop: 1,
             allow_shell_fallback: false,
-        }).await;
+        })
+        .await;
         destination_reached = destination_reached || trace.reached_destination;
 
         if !trace.hops.is_empty() {
@@ -166,7 +167,8 @@ where
     }
 
     let hops = build_hops(&accums, max_hop_seen);
-    destination_reached = destination_reached || infer_destination_reached(&hops, dest_ip, max_hops);
+    destination_reached =
+        destination_reached || infer_destination_reached(&hops, dest_ip, max_hops);
     let total_received: u32 = hops.iter().map(|h| h.received).sum();
     if successful_rounds == 0 || hops.is_empty() || total_received == 0 {
         return MtrResult {
@@ -218,7 +220,11 @@ fn ingest_traceroute_round(
         }
         let a = &mut accums[idx];
         a.sent += 1;
-        if let Some(ip) = hop.ip.as_ref().and_then(|value| value.parse::<IpAddr>().ok()) {
+        if let Some(ip) = hop
+            .ip
+            .as_ref()
+            .and_then(|value| value.parse::<IpAddr>().ok())
+        {
             a.ip = Some(ip);
         }
         if let Some(avg_rtt) = hop.avg_rtt_ms {
@@ -248,7 +254,8 @@ fn build_hops(accums: &[HopAccum], max_hop_seen: u8) -> Vec<MtrHop> {
             let avg = sum / a.rtts.len() as f64;
             let best = a.rtts.iter().cloned().fold(f64::INFINITY, f64::min);
             let worst = a.rtts.iter().cloned().fold(0.0f64, f64::max);
-            let variance: f64 = a.rtts.iter().map(|r| (r - avg).powi(2)).sum::<f64>() / a.rtts.len() as f64;
+            let variance: f64 =
+                a.rtts.iter().map(|r| (r - avg).powi(2)).sum::<f64>() / a.rtts.len() as f64;
             let stdev = variance.sqrt();
             let jitter = if a.rtts.len() > 1 {
                 let jsum: f64 = a.rtts.windows(2).map(|w| (w[1] - w[0]).abs()).sum();

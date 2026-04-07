@@ -1,10 +1,10 @@
+use super::sip_parser::ParsedSipMessage;
+use super::{
+    ApplicationLayer, EvidenceType, ExpertFinding, FindingCategory, FindingEvidence,
+    FindingSeverity, PacketInfo, Protocol,
+};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use super::{
-    ExpertFinding, FindingSeverity, FindingCategory, FindingEvidence, EvidenceType,
-    PacketInfo, Protocol, ApplicationLayer,
-};
-use super::sip_parser::ParsedSipMessage;
 
 pub struct InputSipDialog {
     pub call_id: String,
@@ -291,11 +291,7 @@ fn check_bye_no_response(
             .collect();
         if !unanswered.is_empty() {
             let ts = dialog.start_time.clone();
-            let end = dialog
-                .end_time
-                .as_deref()
-                .unwrap_or(&ts)
-                .to_string();
+            let end = dialog.end_time.as_deref().unwrap_or(&ts).to_string();
             findings.push(ExpertFinding {
                 id: finding_id("bye-no-response", &dialog.call_id),
                 rule_id: "bye-no-response".into(),
@@ -382,11 +378,7 @@ fn check_session_timer_expiry(
                     related_call_id: Some(dialog.call_id.clone()),
                     count: 1,
                     first_seen: first_ts.clone(),
-                    last_seen: dialog
-                        .end_time
-                        .as_deref()
-                        .unwrap_or(first_ts)
-                        .to_string(),
+                    last_seen: dialog.end_time.as_deref().unwrap_or(first_ts).to_string(),
                 });
             }
         }
@@ -406,11 +398,7 @@ fn check_unexpected_responses(packets: &[PacketInfo], findings: &mut Vec<ExpertF
             _ => continue,
         };
         let call_id = sip.call_id.as_deref().unwrap_or("").to_string();
-        let method = sip
-            .cseq
-            .as_deref()
-            .map(cseq_method)
-            .unwrap_or("?");
+        let method = sip.cseq.as_deref().map(cseq_method).unwrap_or("?");
         let reason = sip.response_text.as_deref().unwrap_or("");
         let severity = if code >= 600 {
             FindingSeverity::Warning
@@ -495,7 +483,10 @@ fn check_auth_failure_burst(packets: &[PacketInfo], findings: &mut Vec<ExpertFin
             {
                 burst_start += 1;
             }
-            let window: Vec<usize> = events[burst_start..=i].iter().map(|(idx, _)| *idx).collect();
+            let window: Vec<usize> = events[burst_start..=i]
+                .iter()
+                .map(|(idx, _)| *idx)
+                .collect();
             if window.len() > max_burst.len() {
                 max_burst = window;
             }
@@ -509,10 +500,7 @@ fn check_auth_failure_burst(packets: &[PacketInfo], findings: &mut Vec<ExpertFin
                 rule_id: "auth-failure-burst".into(),
                 severity: FindingSeverity::Warning,
                 category: FindingCategory::Signaling,
-                title: format!(
-                    "Authentication failure burst ({}× in 60s)",
-                    max_burst.len()
-                ),
+                title: format!("Authentication failure burst ({}× in 60s)", max_burst.len()),
                 description: format!(
                     "{}× 401/403 responses for {} within 60 seconds",
                     max_burst.len(),
@@ -549,8 +537,8 @@ fn check_missing_sdp(
         };
 
         let is_invite = sip.method.as_deref() == Some("INVITE");
-        let is_200_for_invite =
-            sip.response_code == Some(200) && sip.cseq.as_deref().map(cseq_method) == Some("INVITE");
+        let is_200_for_invite = sip.response_code == Some(200)
+            && sip.cseq.as_deref().map(cseq_method) == Some("INVITE");
 
         if !is_invite && !is_200_for_invite {
             continue;
@@ -604,10 +592,7 @@ fn check_missing_sdp(
 
 // ── Rule 8: RTP quality degraded ─────────────────────────────────────────────
 
-fn check_rtp_quality_degraded(
-    rtp_streams: &[InputRtpStream],
-    findings: &mut Vec<ExpertFinding>,
-) {
+fn check_rtp_quality_degraded(rtp_streams: &[InputRtpStream], findings: &mut Vec<ExpertFinding>) {
     for stream in rtp_streams {
         let mut issues: Vec<String> = Vec::new();
         let mut article = "poor-mos-score";
@@ -629,13 +614,12 @@ fn check_rtp_quality_degraded(
             continue;
         }
 
-        let severity = if stream.mos_score > 0.0 && stream.mos_score < 2.5
-            || stream.loss_percentage > 10.0
-        {
-            FindingSeverity::Critical
-        } else {
-            FindingSeverity::Warning
-        };
+        let severity =
+            if stream.mos_score > 0.0 && stream.mos_score < 2.5 || stream.loss_percentage > 10.0 {
+                FindingSeverity::Critical
+            } else {
+                FindingSeverity::Warning
+            };
 
         findings.push(ExpertFinding {
             id: finding_id("rtp-quality-degraded", &format!("{}", stream.ssrc)),
@@ -645,7 +629,11 @@ fn check_rtp_quality_degraded(
             title: format!("RTP quality degraded: {}", issues.join(", ")),
             description: format!(
                 "Stream SSRC 0x{:08X} ({}:{} → {}:{}) — {}",
-                stream.ssrc, stream.src_ip, stream.src_port, stream.dst_ip, stream.dst_port,
+                stream.ssrc,
+                stream.src_ip,
+                stream.src_port,
+                stream.dst_ip,
+                stream.dst_port,
                 issues.join(", ")
             ),
             detail: Some(format!(
@@ -693,10 +681,7 @@ fn check_rtp_timeout(
             continue;
         }
         for window in pkt_list.windows(2) {
-            let gap = window[1]
-                .1
-                .signed_duration_since(window[0].1)
-                .num_seconds();
+            let gap = window[1].1.signed_duration_since(window[0].1).num_seconds();
             if gap > 5 {
                 findings.push(ExpertFinding {
                     id: finding_id("rtp-timeout", &format!("{}:{}", ssrc, window[0].0)),
@@ -807,8 +792,7 @@ fn check_codec_mismatch(
                                 for attr in &media.attributes {
                                     if let Some(rest) = attr.strip_prefix("rtpmap:") {
                                         if let Some(codec) = rest.split_whitespace().nth(1) {
-                                            let name =
-                                                codec.split('/').next().unwrap_or(codec);
+                                            let name = codec.split('/').next().unwrap_or(codec);
                                             codecs.insert(name.to_uppercase());
                                         }
                                     }
@@ -887,7 +871,11 @@ fn check_dtmf_mode_conflict(
                 if let Some(ref body) = sip.body {
                     if let Some(ref sdp) = body.sdp {
                         for media in &sdp.media {
-                            if media.attributes.iter().any(|a| a.contains("telephone-event")) {
+                            if media
+                                .attributes
+                                .iter()
+                                .any(|a| a.contains("telephone-event"))
+                            {
                                 has_rfc2833 = true;
                                 evidence_indices.push(pkt_idx);
                             }
@@ -1159,9 +1147,7 @@ fn check_fragmented_packets(packets: &[PacketInfo], findings: &mut Vec<ExpertFin
             None => continue,
         };
         let is_fragmented = (ip.flags & 0x01) != 0 || ip.fragment_offset > 0;
-        if is_fragmented
-            && matches!(p.protocol, Protocol::RTP | Protocol::SIP | Protocol::SRTP)
-        {
+        if is_fragmented && matches!(p.protocol, Protocol::RTP | Protocol::SIP | Protocol::SRTP) {
             frag_indices.push(idx);
         }
     }
@@ -1188,7 +1174,9 @@ fn check_fragmented_packets(packets: &[PacketInfo], findings: &mut Vec<ExpertFin
             related_call_id: None,
             count: frag_indices.len() as u32,
             first_seen: packets[frag_indices[0]].timestamp.to_rfc3339(),
-            last_seen: packets[*frag_indices.last().unwrap()].timestamp.to_rfc3339(),
+            last_seen: packets[*frag_indices.last().unwrap()]
+                .timestamp
+                .to_rfc3339(),
         });
     }
 }
@@ -1199,10 +1187,7 @@ fn check_tls_downgrade(packets: &[PacketInfo], findings: &mut Vec<ExpertFinding>
     let mut flow_types: HashMap<String, (Option<usize>, Option<usize>)> = HashMap::new();
 
     for (idx, p) in packets.iter().enumerate() {
-        let flow = format!(
-            "{}:{}-{}:{}",
-            p.src_ip, p.src_port, p.dst_ip, p.dst_port
-        );
+        let flow = format!("{}:{}-{}:{}", p.src_ip, p.src_port, p.dst_ip, p.dst_port);
         match p.decoded.as_ref().map(|d| &d.application) {
             Some(ApplicationLayer::Srtp(_)) => {
                 let entry = flow_types.entry(flow).or_insert((None, None));
@@ -1284,12 +1269,7 @@ fn check_registration_flood(packets: &[PacketInfo], findings: &mut Vec<ExpertFin
         let mut max_burst: Vec<usize> = Vec::new();
 
         for i in 0..regs.len() {
-            while regs[i]
-                .1
-                .signed_duration_since(regs[start].1)
-                .num_seconds()
-                > 30
-            {
+            while regs[i].1.signed_duration_since(regs[start].1).num_seconds() > 30 {
                 start += 1;
             }
             let window: Vec<usize> = regs[start..=i].iter().map(|(idx, _)| *idx).collect();
@@ -1362,10 +1342,7 @@ fn check_t38_switchover_failure(
                                         .unwrap_or(false)
                             });
                             if has_t38 {
-                                t38_invite = Some((
-                                    pkt_idx,
-                                    msg.cseq.clone().unwrap_or_default(),
-                                ));
+                                t38_invite = Some((pkt_idx, msg.cseq.clone().unwrap_or_default()));
                             }
                         }
                     }

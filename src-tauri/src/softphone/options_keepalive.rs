@@ -61,7 +61,10 @@ fn run_keepalive_loop(registrar_id: &str, stop: Arc<AtomicBool>) {
     let remote_addr = match resolve_registrar(&config) {
         Some(a) => a,
         None => {
-            tracing::info!("[OptionsKeepalive:{}] Could not resolve registrar address", registrar_id);
+            tracing::info!(
+                "[OptionsKeepalive:{}] Could not resolve registrar address",
+                registrar_id
+            );
             return;
         }
     };
@@ -71,7 +74,11 @@ fn run_keepalive_loop(registrar_id: &str, stop: Arc<AtomicBool>) {
     let socket = match crate::sip::transport::bind_udp_reuse(bind_addr) {
         Ok(s) => s,
         Err(e) => {
-            tracing::error!("[OptionsKeepalive:{}] Failed to bind socket: {}", registrar_id, e);
+            tracing::error!(
+                "[OptionsKeepalive:{}] Failed to bind socket: {}",
+                registrar_id,
+                e
+            );
             return;
         }
     };
@@ -82,7 +89,12 @@ fn run_keepalive_loop(registrar_id: &str, stop: Arc<AtomicBool>) {
         .flatten()
         .unwrap_or_else(|| "0.0.0.0".to_string());
 
-    tracing::info!("[OptionsKeepalive:{}] Started (interval={}s, remote={})", registrar_id, KEEPALIVE_INTERVAL_SECS, remote_addr);
+    tracing::info!(
+        "[OptionsKeepalive:{}] Started (interval={}s, remote={})",
+        registrar_id,
+        KEEPALIVE_INTERVAL_SECS,
+        remote_addr
+    );
 
     while !stop.load(Ordering::SeqCst) {
         std::thread::sleep(Duration::from_secs(KEEPALIVE_INTERVAL_SECS));
@@ -95,13 +107,25 @@ fn run_keepalive_loop(registrar_id: &str, stop: Arc<AtomicBool>) {
         let from_tag = generate_tag();
 
         let mut req = SipMessage::new_request("OPTIONS", &request_uri);
-        req.add_header("Via", &format!("SIP/2.0/UDP {}:{};rport;branch={}", local_ip, local_port, branch));
+        req.add_header(
+            "Via",
+            &format!(
+                "SIP/2.0/UDP {}:{};rport;branch={}",
+                local_ip, local_port, branch
+            ),
+        );
         req.add_header("Max-Forwards", "70");
-        req.add_header("From", &format!("<sip:{}@{}>;tag={}", config.username, domain, from_tag));
+        req.add_header(
+            "From",
+            &format!("<sip:{}@{}>;tag={}", config.username, domain, from_tag),
+        );
         req.add_header("To", &format!("<sip:{}>", domain));
         req.add_header("Call-ID", &call_id);
         req.add_header("CSeq", "1 OPTIONS");
-        req.add_header("Contact", &format!("<sip:{}@{}:{}>", config.username, local_ip, local_port));
+        req.add_header(
+            "Contact",
+            &format!("<sip:{}@{}:{}>", config.username, local_ip, local_port),
+        );
         req.add_header("Accept", "application/sdp");
         req.add_header("User-Agent", &user_agent::get_effective_user_agent());
 

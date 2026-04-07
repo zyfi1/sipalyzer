@@ -1,14 +1,14 @@
-use anyhow::{Context, Result, bail};
+use crate::core::config;
+use anyhow::{bail, Context, Result};
 use getrandom::fill as fill_random;
 use hmac::{Hmac, Mac};
-use rusqlite::{Connection, params, Row};
-use serde_json;
+use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
+use serde_json;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
-use crate::core::config;
 
 type HmacSha256 = Hmac<Sha256>;
 const INSTALL_SECRET_FILE: &str = "install_secret_v1.key";
@@ -165,8 +165,10 @@ impl Database {
         let conn = Connection::open(db_path).context("Failed to open database")?;
         conn.pragma_update(None, "key", key)
             .context("Failed to set encryption key")?;
-        conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| row.get::<_, i64>(0))
-            .context("Failed to validate SQLCipher key")?;
+        conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .context("Failed to validate SQLCipher key")?;
         Ok(conn)
     }
 
@@ -185,8 +187,10 @@ impl Database {
         if current_key != legacy_key {
             if let Err(err) = legacy_conn.pragma_update(None, "rekey", current_key.as_str()) {
                 tracing::warn!("database key migration failed, continuing with legacy key: {err}");
-            } else if let Err(err) = legacy_conn
-                .query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| row.get::<_, i64>(0))
+            } else if let Err(err) =
+                legacy_conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |row| {
+                    row.get::<_, i64>(0)
+                })
             {
                 tracing::warn!("database validation failed after key migration: {err}");
             } else {
@@ -209,10 +213,10 @@ impl Database {
         let db_path = Self::get_db_path()?;
         let config_dir = config::get_config_dir()?;
         let conn = Self::get_connection_with_paths(&db_path, &config_dir)?;
-        
+
         // Initialize schema if needed
         Self::init_schema(&conn)?;
-        
+
         Ok(conn)
     }
 
@@ -388,7 +392,7 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_notes_search ON notes(search_vector)",
             [],
         )?;
-        
+
         // Only create indexes for new columns if they exist
         let has_category = Self::column_exists(conn, "notes", "category")?;
         if has_category {
@@ -397,7 +401,7 @@ impl Database {
                 [],
             )?;
         }
-        
+
         let has_pinned = Self::column_exists(conn, "notes", "is_pinned")?;
         if has_pinned {
             conn.execute(
@@ -575,7 +579,10 @@ impl Database {
 
         // Add is_pinned column if it doesn't exist
         if !Self::column_exists(conn, "notes", "is_pinned")? {
-            conn.execute("ALTER TABLE notes ADD COLUMN is_pinned INTEGER DEFAULT 0", [])?;
+            conn.execute(
+                "ALTER TABLE notes ADD COLUMN is_pinned INTEGER DEFAULT 0",
+                [],
+            )?;
         }
 
         // Add linked_note_ids column if it doesn't exist
@@ -630,24 +637,42 @@ impl Database {
             conn.execute("ALTER TABLE registrars ADD COLUMN rtp_port INTEGER", [])?;
         }
         if !Self::column_exists(conn, "registrars", "listening_port")? {
-            conn.execute("ALTER TABLE registrars ADD COLUMN listening_port INTEGER", [])?;
+            conn.execute(
+                "ALTER TABLE registrars ADD COLUMN listening_port INTEGER",
+                [],
+            )?;
         }
         if !Self::column_exists(conn, "registrars", "use_case")? {
             conn.execute("ALTER TABLE registrars ADD COLUMN use_case TEXT", [])?;
         }
         if !Self::column_exists(conn, "registrars", "voicemail_number")? {
-            conn.execute("ALTER TABLE registrars ADD COLUMN voicemail_number TEXT", [])?;
+            conn.execute(
+                "ALTER TABLE registrars ADD COLUMN voicemail_number TEXT",
+                [],
+            )?;
         }
         if !Self::column_exists(conn, "registrars", "mwi_enabled")? {
-            conn.execute("ALTER TABLE registrars ADD COLUMN mwi_enabled INTEGER NOT NULL DEFAULT 0", [])?;
+            conn.execute(
+                "ALTER TABLE registrars ADD COLUMN mwi_enabled INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
         }
         if !Self::column_exists(conn, "registrars", "auto_register")? {
-            conn.execute("ALTER TABLE registrars ADD COLUMN auto_register INTEGER NOT NULL DEFAULT 0", [])?;
+            conn.execute(
+                "ALTER TABLE registrars ADD COLUMN auto_register INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
         }
         if !Self::column_exists(conn, "registrars", "sort_order")? {
-            conn.execute("ALTER TABLE registrars ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0", [])?;
+            conn.execute(
+                "ALTER TABLE registrars ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
             // Backfill: assign sort_order based on rowid so existing registrars keep stable order
-            conn.execute("UPDATE registrars SET sort_order = rowid WHERE sort_order = 0", [])?;
+            conn.execute(
+                "UPDATE registrars SET sort_order = rowid WHERE sort_order = 0",
+                [],
+            )?;
         }
         Ok(())
     }
@@ -672,7 +697,10 @@ impl Database {
         }
         // Tags stored as JSON array (e.g. '["sip","debug"]')
         if !Self::column_exists(conn, "capture_sessions", "tags")? {
-            conn.execute("ALTER TABLE capture_sessions ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'", [])?;
+            conn.execute(
+                "ALTER TABLE capture_sessions ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+                [],
+            )?;
         }
         // Flat folder table for organizing capture sessions
         conn.execute(
@@ -691,7 +719,7 @@ impl Database {
     pub fn save_registrar(registrar: &crate::core::config::RegistrarConfig) -> Result<()> {
         let conn = Self::get_connection()?;
         let now = chrono::Utc::now().to_rfc3339();
-        
+
         let tags_json = serde_json::to_string(&registrar.tags)?;
         let headers_json = serde_json::to_string(&registrar.custom_headers)?;
         let transport_str = match registrar.transport {
@@ -702,11 +730,13 @@ impl Database {
         };
 
         // Check if registrar exists to preserve created_at
-        let existing_created_at: Option<String> = conn.query_row(
-            "SELECT created_at FROM registrars WHERE id = ?1",
-            params![registrar.id],
-            |row| row.get(0)
-        ).ok();
+        let existing_created_at: Option<String> = conn
+            .query_row(
+                "SELECT created_at FROM registrars WHERE id = ?1",
+                params![registrar.id],
+                |row| row.get(0),
+            )
+            .ok();
 
         let created_at = existing_created_at.unwrap_or_else(|| now.clone());
 
@@ -759,12 +789,10 @@ impl Database {
                     timeout_seconds, retry_count, register_interval_seconds,
                     tags, group_name, use_case, rtp_port, listening_port, custom_headers,
                     voicemail_number, mwi_enabled, auto_register, sort_order
-             FROM registrars ORDER BY sort_order, name"
+             FROM registrars ORDER BY sort_order, name",
         )?;
 
-        let rows = stmt.query_map([], |row| {
-            Self::row_to_registrar(row)
-        })?;
+        let rows = stmt.query_map([], |row| Self::row_to_registrar(row))?;
 
         let mut registrars = Vec::new();
         for row in rows {
@@ -775,7 +803,9 @@ impl Database {
     }
 
     /// Convert database row to RegistrarConfig
-    fn row_to_registrar(row: &Row) -> Result<crate::core::config::RegistrarConfig, rusqlite::Error> {
+    fn row_to_registrar(
+        row: &Row,
+    ) -> Result<crate::core::config::RegistrarConfig, rusqlite::Error> {
         let transport_str: String = row.get(5)?;
         let transport = match transport_str.as_str() {
             "udp" => crate::core::config::TransportType::Udp,
@@ -793,16 +823,34 @@ impl Database {
 
         let tags_json: String = row.get(13)?;
         let use_case: Option<String> = row.get::<_, Option<String>>(15).unwrap_or(None);
-        let rtp_port: Option<u16> = row.get::<_, Option<i64>>(16).ok().flatten().and_then(|v| v.try_into().ok());
-        let listening_port: Option<u16> = row.get::<_, Option<i64>>(17).ok().flatten().and_then(|v| v.try_into().ok());
+        let rtp_port: Option<u16> = row
+            .get::<_, Option<i64>>(16)
+            .ok()
+            .flatten()
+            .and_then(|v| v.try_into().ok());
+        let listening_port: Option<u16> = row
+            .get::<_, Option<i64>>(17)
+            .ok()
+            .flatten()
+            .and_then(|v| v.try_into().ok());
         let headers_json: String = row.get(18)?;
         let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-        let headers: Vec<crate::core::config::CustomHeader> = serde_json::from_str(&headers_json).unwrap_or_default();
+        let headers: Vec<crate::core::config::CustomHeader> =
+            serde_json::from_str(&headers_json).unwrap_or_default();
 
         let voicemail_number: Option<String> = row.get::<_, Option<String>>(19).unwrap_or(None);
-        let mwi_enabled: bool = row.get::<_, Option<bool>>(20).unwrap_or(Some(false)).unwrap_or(false);
-        let auto_register: bool = row.get::<_, Option<bool>>(21).unwrap_or(Some(false)).unwrap_or(false);
-        let sort_order: i64 = row.get::<_, Option<i64>>(22).unwrap_or(Some(0)).unwrap_or(0);
+        let mwi_enabled: bool = row
+            .get::<_, Option<bool>>(20)
+            .unwrap_or(Some(false))
+            .unwrap_or(false);
+        let auto_register: bool = row
+            .get::<_, Option<bool>>(21)
+            .unwrap_or(Some(false))
+            .unwrap_or(false);
+        let sort_order: i64 = row
+            .get::<_, Option<i64>>(22)
+            .unwrap_or(Some(0))
+            .unwrap_or(0);
 
         Ok(crate::core::config::RegistrarConfig {
             id: row.get(0)?,
@@ -862,7 +910,12 @@ impl Database {
     }
 
     /// Save a registrar folder (insert or replace).
-    pub fn save_registrar_folder(id: &str, name: &str, sort_order: i64, created_at: &str) -> Result<()> {
+    pub fn save_registrar_folder(
+        id: &str,
+        name: &str,
+        sort_order: i64,
+        created_at: &str,
+    ) -> Result<()> {
         let conn = Self::get_connection()?;
         conn.execute(
             "INSERT OR REPLACE INTO registrar_folders (id, name, sort_order, created_at) VALUES (?1, ?2, ?3, ?4)",
@@ -921,7 +974,7 @@ impl Database {
     pub fn load_global_settings() -> Result<crate::core::config::GlobalSettings> {
         let conn = Self::get_connection()?;
         let mut stmt = conn.prepare("SELECT key, value FROM global_settings")?;
-        
+
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
@@ -946,14 +999,14 @@ impl Database {
     /// Save global settings
     pub fn save_global_settings(settings: &crate::core::config::GlobalSettings) -> Result<()> {
         let conn = Self::get_connection()?;
-        
+
         if let Some(port) = settings.default_local_port {
             conn.execute(
                 "INSERT OR REPLACE INTO global_settings (key, value) VALUES ('default_local_port', ?1)",
                 params![port.to_string()],
             )?;
         }
-        
+
         conn.execute(
             "INSERT OR REPLACE INTO global_settings (key, value) VALUES ('log_level', ?1)",
             params![&settings.log_level],
@@ -972,7 +1025,7 @@ impl Database {
         let conn = Self::get_connection()?;
         let id = Uuid::new_v4().to_string();
         let timestamp = chrono::Utc::now().to_rfc3339();
-        
+
         let result_json = serde_json::to_string(result)?;
         let diagnostics_json = diagnostics.map(|d| serde_json::to_string(d)).transpose()?;
 
@@ -992,7 +1045,7 @@ impl Database {
     ) -> Result<Vec<serde_json::Value>> {
         let conn = Self::get_connection()?;
         let limit = limit.unwrap_or(50);
-        
+
         let mut results = Vec::new();
 
         if let Some(reg_id) = registrar_id {
@@ -1004,11 +1057,13 @@ impl Database {
                 let timestamp: String = row.get(1)?;
                 let test_type: String = row.get(2)?;
                 let mut result_value: serde_json::Value = serde_json::from_str(&result_json)
-                    .map_err(|_| rusqlite::Error::InvalidColumnType(
-                        0,
-                        "Invalid JSON in test result".to_string(),
-                        rusqlite::types::Type::Text,
-                    ))?;
+                    .map_err(|_| {
+                        rusqlite::Error::InvalidColumnType(
+                            0,
+                            "Invalid JSON in test result".to_string(),
+                            rusqlite::types::Type::Text,
+                        )
+                    })?;
                 // Add timestamp and test_type to the result
                 if let Some(obj) = result_value.as_object_mut() {
                     obj.insert("_timestamp".to_string(), serde_json::json!(timestamp));
@@ -1028,11 +1083,13 @@ impl Database {
                 let timestamp: String = row.get(1)?;
                 let test_type: String = row.get(2)?;
                 let mut result_value: serde_json::Value = serde_json::from_str(&result_json)
-                    .map_err(|_| rusqlite::Error::InvalidColumnType(
-                        0,
-                        "Invalid JSON in test result".to_string(),
-                        rusqlite::types::Type::Text,
-                    ))?;
+                    .map_err(|_| {
+                        rusqlite::Error::InvalidColumnType(
+                            0,
+                            "Invalid JSON in test result".to_string(),
+                            rusqlite::types::Type::Text,
+                        )
+                    })?;
                 // Add timestamp and test_type to the result
                 if let Some(obj) = result_value.as_object_mut() {
                     obj.insert("_timestamp".to_string(), serde_json::json!(timestamp));
@@ -1051,7 +1108,7 @@ impl Database {
     /// Clear test results for a registrar (or all if registrar_id is None)
     pub fn clear_test_results(registrar_id: Option<&str>) -> Result<usize> {
         let conn = Self::get_connection()?;
-        
+
         let deleted_count = if let Some(reg_id) = registrar_id {
             conn.execute(
                 "DELETE FROM test_results WHERE registrar_id = ?1",
@@ -1069,17 +1126,21 @@ impl Database {
         let conn = Self::get_connection()?;
         let now = chrono::Utc::now().to_rfc3339();
         let tags_json = serde_json::to_string(&note.tags)?;
-        let linked_note_ids_json = note.linked_note_ids.as_ref()
+        let linked_note_ids_json = note
+            .linked_note_ids
+            .as_ref()
             .map(|ids| serde_json::to_string(ids))
             .transpose()?;
         let is_pinned = note.is_pinned.unwrap_or(false) as i32;
 
         // Check if note exists to preserve created_at and get current version
-        let existing: Option<(String, i32)> = conn.query_row(
-            "SELECT created_at, version FROM notes WHERE id = ?1",
-            params![note.id],
-            |row| Ok((row.get(0)?, row.get(1)?))
-        ).ok();
+        let existing: Option<(String, i32)> = conn
+            .query_row(
+                "SELECT created_at, version FROM notes WHERE id = ?1",
+                params![note.id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .ok();
 
         // For new notes: start at version 1
         // For existing notes: increment version
@@ -1138,7 +1199,7 @@ impl Database {
                 let linked_note_ids = linked_note_ids_json
                     .and_then(|json| serde_json::from_str::<Vec<String>>(&json).ok());
                 let version: Option<i32> = row.get(9)?;
-                
+
                 Ok(crate::commands::notes::Note {
                     id: row.get(0)?,
                     title: row.get(1)?,
@@ -1167,7 +1228,7 @@ impl Database {
         linked_agent_id: Option<&str>,
     ) -> Result<Vec<crate::commands::notes::Note>> {
         let conn = Self::get_connection()?;
-        
+
         fn parse_note_row(row: &rusqlite::Row) -> rusqlite::Result<crate::commands::notes::Note> {
             let tags_json: String = row.get(3)?;
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
@@ -1176,7 +1237,7 @@ impl Database {
             let linked_note_ids = linked_note_ids_json
                 .and_then(|json| serde_json::from_str::<Vec<String>>(&json).ok());
             let version: Option<i32> = row.get(9)?;
-            
+
             Ok(crate::commands::notes::Note {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -1194,7 +1255,7 @@ impl Database {
                 updated_at: row.get(12)?,
             })
         }
-        
+
         let notes: Vec<crate::commands::notes::Note> = if let Some(reg_id) = linked_registrar_id {
             let mut stmt = conn.prepare(
                 "SELECT id, title, content, tags, linked_registrar_id, category, is_pinned, linked_note_ids, folder_id, version, template_id, created_at, updated_at, linked_agent_id 
@@ -1241,7 +1302,8 @@ impl Database {
             if tags.is_empty() {
                 notes
             } else {
-                notes.into_iter()
+                notes
+                    .into_iter()
                     .filter(|note| tags.iter().all(|t| note.tags.contains(t)))
                     .collect()
             }
@@ -1267,7 +1329,7 @@ impl Database {
         // Escape special characters and use prefix search
         let escaped_query = query.replace('"', "\"\"");
         let search_query = format!("\"{}\"*", escaped_query);
-        
+
         let mut stmt = conn.prepare(
             "SELECT n.id, n.title, n.content, n.tags, n.linked_registrar_id, n.category, n.is_pinned, n.linked_note_ids, n.folder_id, n.version, n.template_id, n.created_at, n.updated_at, n.linked_agent_id
              FROM notes n
@@ -1284,7 +1346,7 @@ impl Database {
             let linked_note_ids = linked_note_ids_json
                 .and_then(|json| serde_json::from_str::<Vec<String>>(&json).ok());
             let version: Option<i32> = row.get(9)?;
-            
+
             Ok(crate::commands::notes::Note {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -1314,7 +1376,8 @@ impl Database {
     /// Get all unique tags from notes
     pub fn get_all_tags() -> Result<Vec<String>> {
         let conn = Self::get_connection()?;
-        let mut stmt = conn.prepare("SELECT tags FROM notes WHERE tags IS NOT NULL AND tags != ''")?;
+        let mut stmt =
+            conn.prepare("SELECT tags FROM notes WHERE tags IS NOT NULL AND tags != ''")?;
         let rows = stmt.query_map([], |row| {
             let tags_json: String = row.get(0)?;
             Ok(serde_json::from_str::<Vec<String>>(&tags_json).unwrap_or_default())
@@ -1339,12 +1402,14 @@ impl Database {
     pub fn save_note_folder(folder: &NoteFolder) -> Result<()> {
         let conn = Self::get_connection()?;
         let now = chrono::Utc::now().to_rfc3339();
-        
-        let existing_created_at: Option<String> = conn.query_row(
-            "SELECT created_at FROM note_folders WHERE id = ?1",
-            params![folder.id],
-            |row| row.get(0)
-        ).ok();
+
+        let existing_created_at: Option<String> = conn
+            .query_row(
+                "SELECT created_at FROM note_folders WHERE id = ?1",
+                params![folder.id],
+                |row| row.get(0),
+            )
+            .ok();
 
         let created_at = existing_created_at.unwrap_or_else(|| now.clone());
 
@@ -1426,7 +1491,7 @@ impl Database {
             "SELECT id, note_id, title, content, version_number, created_at 
              FROM note_versions 
              WHERE note_id = ?1 
-             ORDER BY version_number DESC"
+             ORDER BY version_number DESC",
         )?;
         let rows = stmt.query_map(params![note_id], |row| {
             Ok(NoteVersion {
@@ -1469,12 +1534,14 @@ impl Database {
         let conn = Self::get_connection()?;
         let now = chrono::Utc::now().to_rfc3339();
         let tags_json = serde_json::to_string(&template.tags)?;
-        
-        let existing_created_at: Option<String> = conn.query_row(
-            "SELECT created_at FROM note_templates WHERE id = ?1",
-            params![template.id],
-            |row| row.get(0)
-        ).ok();
+
+        let existing_created_at: Option<String> = conn
+            .query_row(
+                "SELECT created_at FROM note_templates WHERE id = ?1",
+                params![template.id],
+                |row| row.get(0),
+            )
+            .ok();
 
         let created_at = existing_created_at.unwrap_or_else(|| now.clone());
 
@@ -1551,9 +1618,7 @@ impl Database {
     pub fn get_all_categories() -> Result<Vec<String>> {
         let conn = Self::get_connection()?;
         let mut stmt = conn.prepare("SELECT DISTINCT category FROM notes WHERE category IS NOT NULL AND category != '' ORDER BY category")?;
-        let rows = stmt.query_map([], |row| {
-            Ok(row.get::<_, String>(0)?)
-        })?;
+        let rows = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
         let mut categories = Vec::new();
         for row in rows {
             categories.push(row?);
@@ -1598,13 +1663,19 @@ impl Database {
     pub fn soft_delete_note(id: &str) -> Result<()> {
         let conn = Self::get_connection()?;
         let now = chrono::Utc::now().to_rfc3339();
-        conn.execute("UPDATE notes SET deleted_at = ?1 WHERE id = ?2", params![now, id])?;
+        conn.execute(
+            "UPDATE notes SET deleted_at = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
         Ok(())
     }
 
     pub fn restore_note(id: &str) -> Result<()> {
         let conn = Self::get_connection()?;
-        conn.execute("UPDATE notes SET deleted_at = NULL WHERE id = ?1", params![id])?;
+        conn.execute(
+            "UPDATE notes SET deleted_at = NULL WHERE id = ?1",
+            params![id],
+        )?;
         Ok(())
     }
 
@@ -1642,7 +1713,9 @@ impl Database {
             })
         })?;
         let mut notes = Vec::new();
-        for row in rows { notes.push(row?); }
+        for row in rows {
+            notes.push(row?);
+        }
         Ok(notes)
     }
 
@@ -1657,7 +1730,10 @@ impl Database {
     pub fn empty_trash() -> Result<i32> {
         let conn = Self::get_connection()?;
         let mut stmt = conn.prepare("SELECT id FROM notes WHERE deleted_at IS NOT NULL")?;
-        let ids: Vec<String> = stmt.query_map([], |row| row.get(0))?.filter_map(|r| r.ok()).collect();
+        let ids: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
         let count = ids.len() as i32;
         for id in &ids {
             conn.execute("DELETE FROM notes_fts WHERE id = ?1", params![id])?;
@@ -1677,7 +1753,8 @@ mod tests {
     fn install_secret_is_stable_for_config_dir() {
         let temp = tempdir().expect("tempdir");
         let first = Database::load_or_create_install_secret_at(temp.path()).expect("first secret");
-        let second = Database::load_or_create_install_secret_at(temp.path()).expect("second secret");
+        let second =
+            Database::load_or_create_install_secret_at(temp.path()).expect("second secret");
         assert_eq!(first.len(), 32);
         assert_eq!(first, second);
     }

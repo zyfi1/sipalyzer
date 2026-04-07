@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -36,7 +36,13 @@ impl Logger {
         }
     }
 
-    pub fn log(&self, level: LogLevel, message: String, registrar_id: Option<String>, component: String) {
+    pub fn log(
+        &self,
+        level: LogLevel,
+        message: String,
+        registrar_id: Option<String>,
+        component: String,
+    ) {
         let entry = LogEntry {
             timestamp: Utc::now(),
             level,
@@ -47,7 +53,7 @@ impl Logger {
 
         let mut entries = self.entries.lock().unwrap();
         entries.push_back(entry);
-        
+
         if entries.len() > self.max_entries {
             entries.pop_front();
         }
@@ -66,7 +72,7 @@ impl Logger {
             })
             .cloned()
             .collect();
-        
+
         if let Some(limit) = limit {
             filtered.into_iter().rev().take(limit).collect()
         } else {

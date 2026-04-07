@@ -10,8 +10,8 @@
 //! - CCITT Group 3 (T.4 MH) or Group 4 (T.6 MMR) compression
 //! - PhotometricInterpretation = 0 (WhiteIsZero)
 
-use std::path::Path;
 use image::{DynamicImage, GenericImageView, GrayImage};
+use std::path::Path;
 
 /// Standard fax width in pixels at 204 DPI (A4 = 8.27 inches, Letter = 8.5 inches)
 const FAX_WIDTH: u32 = 1728;
@@ -96,8 +96,7 @@ fn convert_tiff_to_fax_tiff(
     resolution: FaxResolution,
 ) -> Result<(), String> {
     // Load and convert like any other image
-    let img = image::open(input_path)
-        .map_err(|e| format!("Failed to open TIFF: {}", e))?;
+    let img = image::open(input_path).map_err(|e| format!("Failed to open TIFF: {}", e))?;
 
     write_fax_tiff(&img, output_path, resolution)
 }
@@ -108,8 +107,7 @@ fn convert_image_to_fax_tiff(
     output_path: &str,
     resolution: FaxResolution,
 ) -> Result<(), String> {
-    let img = image::open(input_path)
-        .map_err(|e| format!("Failed to open image: {}", e))?;
+    let img = image::open(input_path).map_err(|e| format!("Failed to open image: {}", e))?;
 
     write_fax_tiff(&img, output_path, resolution)
 }
@@ -203,7 +201,11 @@ fn write_1bit_tiff(
     let image_data_size = bytes_per_row * height as usize;
 
     if bitmap.len() < image_data_size {
-        return Err(format!("Bitmap too small: {} < {}", bitmap.len(), image_data_size));
+        return Err(format!(
+            "Bitmap too small: {} < {}",
+            bitmap.len(),
+            image_data_size
+        ));
     }
 
     let mut tiff = Vec::with_capacity(512 + image_data_size);
@@ -222,28 +224,28 @@ fn write_1bit_tiff(
     let strip_offset = values_offset + 16; // 16 bytes for resolution rationals
 
     // IFD Entries
-    write_ifd_entry(&mut tiff, 256, 3, 1, width);           // ImageWidth
-    write_ifd_entry(&mut tiff, 257, 3, 1, height);          // ImageLength
-    write_ifd_entry(&mut tiff, 258, 3, 1, 1);               // BitsPerSample
-    write_ifd_entry(&mut tiff, 259, 3, 1, 1);               // Compression (1=None)
-    write_ifd_entry(&mut tiff, 262, 3, 1, 0);               // PhotometricInterpretation (WhiteIsZero)
-    write_ifd_entry(&mut tiff, 273, 4, 1, strip_offset);    // StripOffsets
-    write_ifd_entry(&mut tiff, 277, 3, 1, 1);               // SamplesPerPixel
-    write_ifd_entry(&mut tiff, 278, 3, 1, height);          // RowsPerStrip
+    write_ifd_entry(&mut tiff, 256, 3, 1, width); // ImageWidth
+    write_ifd_entry(&mut tiff, 257, 3, 1, height); // ImageLength
+    write_ifd_entry(&mut tiff, 258, 3, 1, 1); // BitsPerSample
+    write_ifd_entry(&mut tiff, 259, 3, 1, 1); // Compression (1=None)
+    write_ifd_entry(&mut tiff, 262, 3, 1, 0); // PhotometricInterpretation (WhiteIsZero)
+    write_ifd_entry(&mut tiff, 273, 4, 1, strip_offset); // StripOffsets
+    write_ifd_entry(&mut tiff, 277, 3, 1, 1); // SamplesPerPixel
+    write_ifd_entry(&mut tiff, 278, 3, 1, height); // RowsPerStrip
     write_ifd_entry(&mut tiff, 279, 4, 1, image_data_size as u32); // StripByteCounts
-    write_ifd_entry(&mut tiff, 282, 5, 1, values_offset);   // XResolution
+    write_ifd_entry(&mut tiff, 282, 5, 1, values_offset); // XResolution
     write_ifd_entry(&mut tiff, 283, 5, 1, values_offset + 8); // YResolution
-    write_ifd_entry(&mut tiff, 296, 3, 1, 2);               // ResolutionUnit (inches)
+    write_ifd_entry(&mut tiff, 296, 3, 1, 2); // ResolutionUnit (inches)
 
     // Next IFD (0 = none)
     tiff.extend_from_slice(&0u32.to_le_bytes());
 
     // Resolution rational values
-    tiff.extend_from_slice(&204u32.to_le_bytes());  // XResolution num
-    tiff.extend_from_slice(&1u32.to_le_bytes());    // XResolution den
+    tiff.extend_from_slice(&204u32.to_le_bytes()); // XResolution num
+    tiff.extend_from_slice(&1u32.to_le_bytes()); // XResolution den
     let y_res = resolution.y_dpi() as u32;
-    tiff.extend_from_slice(&y_res.to_le_bytes());   // YResolution num
-    tiff.extend_from_slice(&1u32.to_le_bytes());    // YResolution den
+    tiff.extend_from_slice(&y_res.to_le_bytes()); // YResolution num
+    tiff.extend_from_slice(&1u32.to_le_bytes()); // YResolution den
 
     // Pad to strip offset
     while tiff.len() < strip_offset as usize {
@@ -253,8 +255,7 @@ fn write_1bit_tiff(
     // Image data
     tiff.extend_from_slice(&bitmap[..image_data_size]);
 
-    std::fs::write(path, &tiff)
-        .map_err(|e| format!("Failed to write TIFF: {}", e))?;
+    std::fs::write(path, &tiff).map_err(|e| format!("Failed to write TIFF: {}", e))?;
 
     Ok(())
 }
@@ -295,7 +296,9 @@ pub fn combine_single_page_tiffs(pages: &[&[u8]]) -> Result<Vec<u8>, String> {
         // Find the previous page's IFD: read its "next IFD" location
         // In our format, the IFD starts at offset 8, num_entries is first 2 bytes,
         // then num_entries * 12 bytes of entries, then 4 bytes of next-IFD pointer.
-        let prev_page_start = if i == 1 { 0u32 } else {
+        let prev_page_start = if i == 1 {
+            0u32
+        } else {
             // We need to track where previous pages started.
             // For simplicity, find the next-IFD pointer location by walking the IFD.
             // Actually, for our specific TIFF format (12 entries), the next-IFD is at:
@@ -327,15 +330,22 @@ pub fn combine_single_page_tiffs(pages: &[&[u8]]) -> Result<Vec<u8>, String> {
             // - For page j>0: the adjusted_ifd_offset we computed when we added page j
             // We need to track these. Let me restructure.
             // For now, use a simpler approach: walk the IFD chain from the start.
-            let mut ifd_off = u32::from_le_bytes([output[4], output[5], output[6], output[7]]) as usize;
-            for _ in 0..i-1 {
-                if ifd_off + 2 > output.len() { break; }
+            let mut ifd_off =
+                u32::from_le_bytes([output[4], output[5], output[6], output[7]]) as usize;
+            for _ in 0..i - 1 {
+                if ifd_off + 2 > output.len() {
+                    break;
+                }
                 let n = u16::from_le_bytes([output[ifd_off], output[ifd_off + 1]]) as usize;
                 let next_ptr_off = ifd_off + 2 + n * 12;
-                if next_ptr_off + 4 > output.len() { break; }
+                if next_ptr_off + 4 > output.len() {
+                    break;
+                }
                 ifd_off = u32::from_le_bytes([
-                    output[next_ptr_off], output[next_ptr_off + 1],
-                    output[next_ptr_off + 2], output[next_ptr_off + 3],
+                    output[next_ptr_off],
+                    output[next_ptr_off + 1],
+                    output[next_ptr_off + 2],
+                    output[next_ptr_off + 3],
                 ]) as usize;
             }
             ifd_off
@@ -345,7 +355,8 @@ pub fn combine_single_page_tiffs(pages: &[&[u8]]) -> Result<Vec<u8>, String> {
         if prev_ifd_start + 2 > output.len() {
             return Err("IFD parsing error".to_string());
         }
-        let num_entries = u16::from_le_bytes([output[prev_ifd_start], output[prev_ifd_start + 1]]) as usize;
+        let num_entries =
+            u16::from_le_bytes([output[prev_ifd_start], output[prev_ifd_start + 1]]) as usize;
         let next_ifd_ptr_offset = prev_ifd_start + 2 + num_entries * 12;
         if next_ifd_ptr_offset + 4 > output.len() {
             return Err("IFD next pointer out of bounds".to_string());
@@ -366,11 +377,14 @@ pub fn combine_single_page_tiffs(pages: &[&[u8]]) -> Result<Vec<u8>, String> {
         if new_ifd_start + 2 > output.len() {
             return Err("New IFD out of bounds".to_string());
         }
-        let new_num_entries = u16::from_le_bytes([output[new_ifd_start], output[new_ifd_start + 1]]) as usize;
+        let new_num_entries =
+            u16::from_le_bytes([output[new_ifd_start], output[new_ifd_start + 1]]) as usize;
 
         for e in 0..new_num_entries {
             let entry_off = new_ifd_start + 2 + e * 12;
-            if entry_off + 12 > output.len() { break; }
+            if entry_off + 12 > output.len() {
+                break;
+            }
             let tag = u16::from_le_bytes([output[entry_off], output[entry_off + 1]]);
             let typ = u16::from_le_bytes([output[entry_off + 2], output[entry_off + 3]]);
 
@@ -381,7 +395,10 @@ pub fn combine_single_page_tiffs(pages: &[&[u8]]) -> Result<Vec<u8>, String> {
                     // These store a LONG or offset value
                     let val_off = entry_off + 8;
                     let old_val = u32::from_le_bytes([
-                        output[val_off], output[val_off + 1], output[val_off + 2], output[val_off + 3]
+                        output[val_off],
+                        output[val_off + 1],
+                        output[val_off + 2],
+                        output[val_off + 3],
                     ]);
                     let new_val = (old_val as i64 + delta) as u32;
                     let bytes = new_val.to_le_bytes();
@@ -475,7 +492,10 @@ impl Bitmap {
                         if (row >> (4 - col)) & 1 == 1 {
                             for dy in 0..scale {
                                 for dx in 0..scale {
-                                    self.set_pixel(cx + col * scale + dx, y + row_idx as u32 * scale + dy);
+                                    self.set_pixel(
+                                        cx + col * scale + dx,
+                                        y + row_idx as u32 * scale + dy,
+                                    );
                                 }
                             }
                         }
@@ -491,7 +511,11 @@ impl Bitmap {
         let char_w = 5 * scale;
         let spacing = char_w + scale;
         let n = s.chars().count() as u32;
-        if n == 0 { 0 } else { n * spacing - scale }
+        if n == 0 {
+            0
+        } else {
+            n * spacing - scale
+        }
     }
 
     /// Draw a section header with a label and a thin rule underneath
@@ -504,10 +528,10 @@ impl Bitmap {
     fn dither_rect(&mut self, x1: u32, y1: u32, x2: u32, y2: u32, level: u8) {
         // 4×4 Bayer matrix
         const BAYER: [[u8; 4]; 4] = [
-            [  0, 128,  32, 160],
-            [192,  64, 224,  96],
-            [ 48, 176,  16, 144],
-            [240, 112, 208,  80],
+            [0, 128, 32, 160],
+            [192, 64, 224, 96],
+            [48, 176, 16, 144],
+            [240, 112, 208, 80],
         ];
         for y in y1..=y2.min(self.height.saturating_sub(1)) {
             for x in x1..=x2.min(self.width.saturating_sub(1)) {
@@ -535,7 +559,12 @@ pub struct TestPageSettings {
 
 impl Default for TestPageSettings {
     fn default() -> Self {
-        Self { protocol: "T.38".to_string(), ecm: true, baud_rate: 14400, to: None }
+        Self {
+            protocol: "T.38".to_string(),
+            ecm: true,
+            baud_rate: 14400,
+            to: None,
+        }
     }
 }
 
@@ -564,7 +593,11 @@ pub fn create_test_page(
     } else {
         format!("{} bps", s.baud_rate)
     };
-    let codec_label = if s.protocol.contains("G.711") { "PCMU (u-law)" } else { "UDPTL / IFP" };
+    let codec_label = if s.protocol.contains("G.711") {
+        "PCMU (u-law)"
+    } else {
+        "UDPTL / IFP"
+    };
 
     // ── Header ──────────────────────────────────────────────────────
     let hy: u32 = 50;
@@ -576,7 +609,12 @@ pub fn create_test_page(
     bm.text(m + 65, hy + 50, "VIRTUAL FAX - TRANSMISSION TEST", 3);
     // Protocol badge on the right — shows the actual selected protocol
     let badge_text = &s.protocol;
-    bm.text(w - m - Bitmap::text_width(badge_text, 3), hy + 12, badge_text, 3);
+    bm.text(
+        w - m - Bitmap::text_width(badge_text, 3),
+        hy + 12,
+        badge_text,
+        3,
+    );
     // Thick divider under header
     bm.fill_rect(m, hy + 78, w - m - 1, hy + 81);
 
@@ -607,7 +645,11 @@ pub fn create_test_page(
     let bar_start = m + 280;
     let bar_len: u32 = 600;
     let bar_h: u32 = 22;
-    for &(label, bar_w) in &[("3.85 LP/MM  FINE", 1u32), ("1.93 LP/MM  STANDARD", 2), ("0.96 LP/MM  COARSE", 4)] {
+    for &(label, bar_w) in &[
+        ("3.85 LP/MM  FINE", 1u32),
+        ("1.93 LP/MM  STANDARD", 2),
+        ("0.96 LP/MM  COARSE", 4),
+    ] {
         bm.text(m, cy + 3, label, 2);
         // Draw alternating bars
         for x in 0..bar_len {
@@ -630,7 +672,12 @@ pub fn create_test_page(
     cy += 40;
     bm.text(m, cy, "The quick brown fox jumps over the lazy dog.", 3);
     cy += 30;
-    bm.text(m, cy, "MINIMUM LEGIBILITY - IF YOU CAN READ THIS LINE, FINE DETAIL IS INTACT.", 2);
+    bm.text(
+        m,
+        cy,
+        "MINIMUM LEGIBILITY - IF YOU CAN READ THIS LINE, FINE DETAIL IS INTACT.",
+        2,
+    );
     cy += 28;
 
     // ── Grayscale Wedge ──────────────────────────────────────────────
@@ -661,23 +708,35 @@ pub fn create_test_page(
 
     // 2×2
     bm.text(px, cy - 3, "2X2", 2);
-    for py in 0..pat_size { for ppx in 0..pat_size {
-        if ((ppx / 2) + (py / 2)) % 2 == 0 { bm.set_pixel(px + 50 + ppx, cy + py); }
-    }}
+    for py in 0..pat_size {
+        for ppx in 0..pat_size {
+            if ((ppx / 2) + (py / 2)) % 2 == 0 {
+                bm.set_pixel(px + 50 + ppx, cy + py);
+            }
+        }
+    }
     px += 140;
 
     // 4×4
     bm.text(px, cy - 3, "4X4", 2);
-    for py in 0..pat_size { for ppx in 0..pat_size {
-        if ((ppx / 4) + (py / 4)) % 2 == 0 { bm.set_pixel(px + 50 + ppx, cy + py); }
-    }}
+    for py in 0..pat_size {
+        for ppx in 0..pat_size {
+            if ((ppx / 4) + (py / 4)) % 2 == 0 {
+                bm.set_pixel(px + 50 + ppx, cy + py);
+            }
+        }
+    }
     px += 140;
 
     // 8×8
     bm.text(px, cy - 3, "8X8", 2);
-    for py in 0..pat_size { for ppx in 0..pat_size {
-        if ((ppx / 8) + (py / 8)) % 2 == 0 { bm.set_pixel(px + 50 + ppx, cy + py); }
-    }}
+    for py in 0..pat_size {
+        for ppx in 0..pat_size {
+            if ((ppx / 8) + (py / 8)) % 2 == 0 {
+                bm.set_pixel(px + 50 + ppx, cy + py);
+            }
+        }
+    }
     px += 140;
 
     // Diagonal
@@ -698,13 +757,29 @@ pub fn create_test_page(
         let mut y: i32 = 0;
         let mut err: i32 = 1 - x;
         while x >= y {
-            for &(dx, dy) in &[(x, y), (y, x), (-x, y), (-y, x), (-x, -y), (-y, -x), (x, -y), (y, -x)] {
+            for &(dx, dy) in &[
+                (x, y),
+                (y, x),
+                (-x, y),
+                (-y, x),
+                (-x, -y),
+                (-y, -x),
+                (x, -y),
+                (y, -x),
+            ] {
                 let px2 = cx_r as i32 + dx;
                 let py2 = cy_r as i32 + dy;
-                if px2 >= 0 && py2 >= 0 { bm.set_pixel(px2 as u32, py2 as u32); }
+                if px2 >= 0 && py2 >= 0 {
+                    bm.set_pixel(px2 as u32, py2 as u32);
+                }
             }
             y += 1;
-            if err < 0 { err += 2 * y + 1; } else { x -= 1; err += 2 * (y - x) + 1; }
+            if err < 0 {
+                err += 2 * y + 1;
+            } else {
+                x -= 1;
+                err += 2 * (y - x) + 1;
+            }
         }
     }
     // Cross through center
@@ -715,7 +790,12 @@ pub fn create_test_page(
     cy += pat_size + 30;
     bm.hline(cy, m, w - m - 1);
     cy += 12;
-    let modems = [("V.27TER", "4,800 bps"), ("V.29", "9,600 bps"), ("V.17", "14,400 bps"), ("V.34", "33,600 bps")];
+    let modems = [
+        ("V.27TER", "4,800 bps"),
+        ("V.29", "9,600 bps"),
+        ("V.17", "14,400 bps"),
+        ("V.34", "33,600 bps"),
+    ];
     let modem_spacing = (w - 2 * m) / modems.len() as u32;
     for (i, (modem, speed)) in modems.iter().enumerate() {
         let mx = m + i as u32 * modem_spacing;
@@ -739,10 +819,7 @@ pub fn create_test_page(
 }
 
 /// Create a diagnostic page (page 2) — line quality & fill patterns.
-pub fn create_diagnostic_page(
-    output_path: &str,
-    resolution: FaxResolution,
-) -> Result<(), String> {
+pub fn create_diagnostic_page(output_path: &str, resolution: FaxResolution) -> Result<(), String> {
     let w = FAX_WIDTH;
     let h = resolution.page_height();
     let mut bm = Bitmap::new(w, h);
@@ -899,97 +976,267 @@ fn get_glyph(ch: char) -> Option<[u8; 7]> {
     // 5x7 font — top 5 bits of each byte represent the columns (MSB = leftmost pixel)
     match ch {
         // Uppercase
-        'A' => Some([0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001]),
-        'B' => Some([0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110]),
-        'C' => Some([0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110]),
-        'D' => Some([0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110]),
-        'E' => Some([0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111]),
-        'F' => Some([0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000]),
-        'G' => Some([0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110]),
-        'H' => Some([0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001]),
-        'I' => Some([0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110]),
-        'J' => Some([0b00111, 0b00010, 0b00010, 0b00010, 0b00010, 0b10010, 0b01100]),
-        'K' => Some([0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001]),
-        'L' => Some([0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111]),
-        'M' => Some([0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001]),
-        'N' => Some([0b10001, 0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001]),
-        'O' => Some([0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110]),
-        'P' => Some([0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000]),
-        'Q' => Some([0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101]),
-        'R' => Some([0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001]),
-        'S' => Some([0b01110, 0b10001, 0b10000, 0b01110, 0b00001, 0b10001, 0b01110]),
-        'T' => Some([0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100]),
-        'U' => Some([0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110]),
-        'V' => Some([0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100]),
-        'W' => Some([0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010]),
-        'X' => Some([0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001]),
-        'Y' => Some([0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100]),
-        'Z' => Some([0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111]),
+        'A' => Some([
+            0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+        ]),
+        'B' => Some([
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110,
+        ]),
+        'C' => Some([
+            0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110,
+        ]),
+        'D' => Some([
+            0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110,
+        ]),
+        'E' => Some([
+            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111,
+        ]),
+        'F' => Some([
+            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000,
+        ]),
+        'G' => Some([
+            0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110,
+        ]),
+        'H' => Some([
+            0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+        ]),
+        'I' => Some([
+            0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ]),
+        'J' => Some([
+            0b00111, 0b00010, 0b00010, 0b00010, 0b00010, 0b10010, 0b01100,
+        ]),
+        'K' => Some([
+            0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001,
+        ]),
+        'L' => Some([
+            0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111,
+        ]),
+        'M' => Some([
+            0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001,
+        ]),
+        'N' => Some([
+            0b10001, 0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001,
+        ]),
+        'O' => Some([
+            0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
+        ]),
+        'P' => Some([
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000,
+        ]),
+        'Q' => Some([
+            0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101,
+        ]),
+        'R' => Some([
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001,
+        ]),
+        'S' => Some([
+            0b01110, 0b10001, 0b10000, 0b01110, 0b00001, 0b10001, 0b01110,
+        ]),
+        'T' => Some([
+            0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100,
+        ]),
+        'U' => Some([
+            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
+        ]),
+        'V' => Some([
+            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100,
+        ]),
+        'W' => Some([
+            0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010,
+        ]),
+        'X' => Some([
+            0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001,
+        ]),
+        'Y' => Some([
+            0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100,
+        ]),
+        'Z' => Some([
+            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111,
+        ]),
 
         // Lowercase (descenders/ascenders approximated in 7-row grid)
-        'a' => Some([0b00000, 0b00000, 0b01110, 0b00001, 0b01111, 0b10001, 0b01111]),
-        'b' => Some([0b10000, 0b10000, 0b10110, 0b11001, 0b10001, 0b10001, 0b11110]),
-        'c' => Some([0b00000, 0b00000, 0b01110, 0b10000, 0b10000, 0b10001, 0b01110]),
-        'd' => Some([0b00001, 0b00001, 0b01101, 0b10011, 0b10001, 0b10001, 0b01111]),
-        'e' => Some([0b00000, 0b00000, 0b01110, 0b10001, 0b11111, 0b10000, 0b01110]),
-        'f' => Some([0b00110, 0b01001, 0b01000, 0b11100, 0b01000, 0b01000, 0b01000]),
-        'g' => Some([0b00000, 0b01111, 0b10001, 0b10001, 0b01111, 0b00001, 0b01110]),
-        'h' => Some([0b10000, 0b10000, 0b10110, 0b11001, 0b10001, 0b10001, 0b10001]),
-        'i' => Some([0b00100, 0b00000, 0b01100, 0b00100, 0b00100, 0b00100, 0b01110]),
-        'j' => Some([0b00010, 0b00000, 0b00110, 0b00010, 0b00010, 0b10010, 0b01100]),
-        'k' => Some([0b10000, 0b10000, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010]),
-        'l' => Some([0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110]),
-        'm' => Some([0b00000, 0b00000, 0b11010, 0b10101, 0b10101, 0b10001, 0b10001]),
-        'n' => Some([0b00000, 0b00000, 0b10110, 0b11001, 0b10001, 0b10001, 0b10001]),
-        'o' => Some([0b00000, 0b00000, 0b01110, 0b10001, 0b10001, 0b10001, 0b01110]),
-        'p' => Some([0b00000, 0b00000, 0b11110, 0b10001, 0b11110, 0b10000, 0b10000]),
-        'q' => Some([0b00000, 0b00000, 0b01101, 0b10011, 0b01111, 0b00001, 0b00001]),
-        'r' => Some([0b00000, 0b00000, 0b10110, 0b11001, 0b10000, 0b10000, 0b10000]),
-        's' => Some([0b00000, 0b00000, 0b01110, 0b10000, 0b01110, 0b00001, 0b11110]),
-        't' => Some([0b01000, 0b01000, 0b11100, 0b01000, 0b01000, 0b01001, 0b00110]),
-        'u' => Some([0b00000, 0b00000, 0b10001, 0b10001, 0b10001, 0b10011, 0b01101]),
-        'v' => Some([0b00000, 0b00000, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100]),
-        'w' => Some([0b00000, 0b00000, 0b10001, 0b10001, 0b10101, 0b10101, 0b01010]),
-        'x' => Some([0b00000, 0b00000, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001]),
-        'y' => Some([0b00000, 0b00000, 0b10001, 0b10001, 0b01111, 0b00001, 0b01110]),
-        'z' => Some([0b00000, 0b00000, 0b11111, 0b00010, 0b00100, 0b01000, 0b11111]),
+        'a' => Some([
+            0b00000, 0b00000, 0b01110, 0b00001, 0b01111, 0b10001, 0b01111,
+        ]),
+        'b' => Some([
+            0b10000, 0b10000, 0b10110, 0b11001, 0b10001, 0b10001, 0b11110,
+        ]),
+        'c' => Some([
+            0b00000, 0b00000, 0b01110, 0b10000, 0b10000, 0b10001, 0b01110,
+        ]),
+        'd' => Some([
+            0b00001, 0b00001, 0b01101, 0b10011, 0b10001, 0b10001, 0b01111,
+        ]),
+        'e' => Some([
+            0b00000, 0b00000, 0b01110, 0b10001, 0b11111, 0b10000, 0b01110,
+        ]),
+        'f' => Some([
+            0b00110, 0b01001, 0b01000, 0b11100, 0b01000, 0b01000, 0b01000,
+        ]),
+        'g' => Some([
+            0b00000, 0b01111, 0b10001, 0b10001, 0b01111, 0b00001, 0b01110,
+        ]),
+        'h' => Some([
+            0b10000, 0b10000, 0b10110, 0b11001, 0b10001, 0b10001, 0b10001,
+        ]),
+        'i' => Some([
+            0b00100, 0b00000, 0b01100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ]),
+        'j' => Some([
+            0b00010, 0b00000, 0b00110, 0b00010, 0b00010, 0b10010, 0b01100,
+        ]),
+        'k' => Some([
+            0b10000, 0b10000, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010,
+        ]),
+        'l' => Some([
+            0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ]),
+        'm' => Some([
+            0b00000, 0b00000, 0b11010, 0b10101, 0b10101, 0b10001, 0b10001,
+        ]),
+        'n' => Some([
+            0b00000, 0b00000, 0b10110, 0b11001, 0b10001, 0b10001, 0b10001,
+        ]),
+        'o' => Some([
+            0b00000, 0b00000, 0b01110, 0b10001, 0b10001, 0b10001, 0b01110,
+        ]),
+        'p' => Some([
+            0b00000, 0b00000, 0b11110, 0b10001, 0b11110, 0b10000, 0b10000,
+        ]),
+        'q' => Some([
+            0b00000, 0b00000, 0b01101, 0b10011, 0b01111, 0b00001, 0b00001,
+        ]),
+        'r' => Some([
+            0b00000, 0b00000, 0b10110, 0b11001, 0b10000, 0b10000, 0b10000,
+        ]),
+        's' => Some([
+            0b00000, 0b00000, 0b01110, 0b10000, 0b01110, 0b00001, 0b11110,
+        ]),
+        't' => Some([
+            0b01000, 0b01000, 0b11100, 0b01000, 0b01000, 0b01001, 0b00110,
+        ]),
+        'u' => Some([
+            0b00000, 0b00000, 0b10001, 0b10001, 0b10001, 0b10011, 0b01101,
+        ]),
+        'v' => Some([
+            0b00000, 0b00000, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100,
+        ]),
+        'w' => Some([
+            0b00000, 0b00000, 0b10001, 0b10001, 0b10101, 0b10101, 0b01010,
+        ]),
+        'x' => Some([
+            0b00000, 0b00000, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001,
+        ]),
+        'y' => Some([
+            0b00000, 0b00000, 0b10001, 0b10001, 0b01111, 0b00001, 0b01110,
+        ]),
+        'z' => Some([
+            0b00000, 0b00000, 0b11111, 0b00010, 0b00100, 0b01000, 0b11111,
+        ]),
 
         // Digits
-        '0' => Some([0b01110, 0b10011, 0b10101, 0b10101, 0b10101, 0b11001, 0b01110]),
-        '1' => Some([0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110]),
-        '2' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111]),
-        '3' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110]),
-        '4' => Some([0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010]),
-        '5' => Some([0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110]),
-        '6' => Some([0b01110, 0b10000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110]),
-        '7' => Some([0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000]),
-        '8' => Some([0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110]),
-        '9' => Some([0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00001, 0b01110]),
+        '0' => Some([
+            0b01110, 0b10011, 0b10101, 0b10101, 0b10101, 0b11001, 0b01110,
+        ]),
+        '1' => Some([
+            0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ]),
+        '2' => Some([
+            0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111,
+        ]),
+        '3' => Some([
+            0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110,
+        ]),
+        '4' => Some([
+            0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010,
+        ]),
+        '5' => Some([
+            0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110,
+        ]),
+        '6' => Some([
+            0b01110, 0b10000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110,
+        ]),
+        '7' => Some([
+            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000,
+        ]),
+        '8' => Some([
+            0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110,
+        ]),
+        '9' => Some([
+            0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00001, 0b01110,
+        ]),
 
         // Punctuation & symbols
-        ' ' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000]),
-        '.' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100]),
-        ',' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100, 0b01000]),
-        ':' => Some([0b00000, 0b01100, 0b01100, 0b00000, 0b01100, 0b01100, 0b00000]),
-        ';' => Some([0b00000, 0b01100, 0b01100, 0b00000, 0b01100, 0b01100, 0b01000]),
-        '-' => Some([0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000]),
-        '_' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b11111]),
-        '!' => Some([0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100]),
-        '?' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b00100, 0b00000, 0b00100]),
-        '/' => Some([0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000]),
-        '(' => Some([0b00010, 0b00100, 0b01000, 0b01000, 0b01000, 0b00100, 0b00010]),
-        ')' => Some([0b01000, 0b00100, 0b00010, 0b00010, 0b00010, 0b00100, 0b01000]),
-        '+' => Some([0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000]),
-        '=' => Some([0b00000, 0b00000, 0b11111, 0b00000, 0b11111, 0b00000, 0b00000]),
-        '@' => Some([0b01110, 0b10001, 0b10111, 0b10101, 0b10110, 0b10000, 0b01110]),
-        '#' => Some([0b01010, 0b01010, 0b11111, 0b01010, 0b11111, 0b01010, 0b01010]),
-        '$' => Some([0b00100, 0b01111, 0b10100, 0b01110, 0b00101, 0b11110, 0b00100]),
-        '%' => Some([0b11000, 0b11001, 0b00010, 0b00100, 0b01000, 0b10011, 0b00011]),
-        '&' => Some([0b01100, 0b10010, 0b10100, 0b01000, 0b10101, 0b10010, 0b01101]),
-        '*' => Some([0b00000, 0b10101, 0b01110, 0b11111, 0b01110, 0b10101, 0b00000]),
-        '\'' => Some([0b01100, 0b01100, 0b01000, 0b00000, 0b00000, 0b00000, 0b00000]),
-        '"' => Some([0b01010, 0b01010, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000]),
-        _ => Some([0b11111, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11111]), // Unknown = box
+        ' ' => Some([
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000,
+        ]),
+        '.' => Some([
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100,
+        ]),
+        ',' => Some([
+            0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100, 0b01000,
+        ]),
+        ':' => Some([
+            0b00000, 0b01100, 0b01100, 0b00000, 0b01100, 0b01100, 0b00000,
+        ]),
+        ';' => Some([
+            0b00000, 0b01100, 0b01100, 0b00000, 0b01100, 0b01100, 0b01000,
+        ]),
+        '-' => Some([
+            0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000,
+        ]),
+        '_' => Some([
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b11111,
+        ]),
+        '!' => Some([
+            0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100,
+        ]),
+        '?' => Some([
+            0b01110, 0b10001, 0b00001, 0b00110, 0b00100, 0b00000, 0b00100,
+        ]),
+        '/' => Some([
+            0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000,
+        ]),
+        '(' => Some([
+            0b00010, 0b00100, 0b01000, 0b01000, 0b01000, 0b00100, 0b00010,
+        ]),
+        ')' => Some([
+            0b01000, 0b00100, 0b00010, 0b00010, 0b00010, 0b00100, 0b01000,
+        ]),
+        '+' => Some([
+            0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000,
+        ]),
+        '=' => Some([
+            0b00000, 0b00000, 0b11111, 0b00000, 0b11111, 0b00000, 0b00000,
+        ]),
+        '@' => Some([
+            0b01110, 0b10001, 0b10111, 0b10101, 0b10110, 0b10000, 0b01110,
+        ]),
+        '#' => Some([
+            0b01010, 0b01010, 0b11111, 0b01010, 0b11111, 0b01010, 0b01010,
+        ]),
+        '$' => Some([
+            0b00100, 0b01111, 0b10100, 0b01110, 0b00101, 0b11110, 0b00100,
+        ]),
+        '%' => Some([
+            0b11000, 0b11001, 0b00010, 0b00100, 0b01000, 0b10011, 0b00011,
+        ]),
+        '&' => Some([
+            0b01100, 0b10010, 0b10100, 0b01000, 0b10101, 0b10010, 0b01101,
+        ]),
+        '*' => Some([
+            0b00000, 0b10101, 0b01110, 0b11111, 0b01110, 0b10101, 0b00000,
+        ]),
+        '\'' => Some([
+            0b01100, 0b01100, 0b01000, 0b00000, 0b00000, 0b00000, 0b00000,
+        ]),
+        '"' => Some([
+            0b01010, 0b01010, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000,
+        ]),
+        _ => Some([
+            0b11111, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11111,
+        ]), // Unknown = box
     }
 }
 
@@ -1039,7 +1286,10 @@ pub fn create_text_page(
             let chunk_len = remaining.len().min(max_chars);
             // Try to break at a space
             let break_at = if chunk_len < remaining.len() {
-                remaining[..chunk_len].rfind(' ').map(|p| p + 1).unwrap_or(chunk_len)
+                remaining[..chunk_len]
+                    .rfind(' ')
+                    .map(|p| p + 1)
+                    .unwrap_or(chunk_len)
             } else {
                 chunk_len
             };
@@ -1053,7 +1303,12 @@ pub fn create_text_page(
     // Footer
     let footer_y = h - margin;
     bmp.hline(footer_y, margin, w - margin - 1);
-    bmp.text(margin, footer_y + 6, "1-BIT TIFF  GROUP 4  A4  204X196 DPI", 2);
+    bmp.text(
+        margin,
+        footer_y + 6,
+        "1-BIT TIFF  GROUP 4  A4  204X196 DPI",
+        2,
+    );
     let page_label = "PAGE 1";
     let pw = Bitmap::text_width(page_label, 2);
     bmp.text(w - margin - pw, footer_y + 6, page_label, 2);
@@ -1074,16 +1329,17 @@ pub struct TiffInfo {
 
 /// Read TIFF file information
 pub fn get_tiff_info(path: &str) -> Result<TiffInfo, String> {
-    let file = std::fs::File::open(path)
-        .map_err(|e| format!("Failed to open TIFF: {}", e))?;
+    let file = std::fs::File::open(path).map_err(|e| format!("Failed to open TIFF: {}", e))?;
 
     let mut decoder = tiff::decoder::Decoder::new(std::io::BufReader::new(file))
         .map_err(|e| format!("Failed to decode TIFF: {}", e))?;
 
-    let (width, height) = decoder.dimensions()
+    let (width, height) = decoder
+        .dimensions()
         .map_err(|e| format!("Failed to get dimensions: {}", e))?;
 
-    let color_type = decoder.colortype()
+    let color_type = decoder
+        .colortype()
         .map_err(|e| format!("Failed to get color type: {}", e))?;
 
     let bpp = match color_type {
@@ -1109,11 +1365,17 @@ pub fn validate_fax_tiff(path: &str) -> Result<(), String> {
     let info = get_tiff_info(path)?;
 
     if info.width != FAX_WIDTH {
-        return Err(format!("TIFF width is {} but fax requires {} pixels", info.width, FAX_WIDTH));
+        return Err(format!(
+            "TIFF width is {} but fax requires {} pixels",
+            info.width, FAX_WIDTH
+        ));
     }
 
     if info.bits_per_pixel != 1 {
-        return Err(format!("TIFF is {} bpp but fax requires 1 bpp", info.bits_per_pixel));
+        return Err(format!(
+            "TIFF is {} bpp but fax requires 1 bpp",
+            info.bits_per_pixel
+        ));
     }
 
     Ok(())

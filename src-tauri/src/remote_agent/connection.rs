@@ -1,8 +1,8 @@
 //! Per-agent connection handler: auth, message routing, heartbeat tracking.
 
 use futures_util::{SinkExt, StreamExt};
-use sipalyzer_core::auth::{generate_nonce, verify_hmac, AuthChallenge, PROTOCOL_VERSION};
 use sipalyzer_core::auth::AuthResponse;
+use sipalyzer_core::auth::{generate_nonce, verify_hmac, AuthChallenge, PROTOCOL_VERSION};
 use sipalyzer_core::protocol::{AgentMessage, AgentReply, AgentResponse, HeartbeatData};
 use std::time::Duration;
 use std::time::Instant;
@@ -68,11 +68,7 @@ pub async fn handle_agent_connection(
     }
 
     // Wait for auth response
-    let auth_msg = match tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        read.next(),
-    )
-    .await
+    let auth_msg = match tokio::time::timeout(std::time::Duration::from_secs(10), read.next()).await
     {
         Ok(Some(Ok(Message::Text(text)))) => text,
         _ => {
@@ -99,29 +95,47 @@ pub async fn handle_agent_connection(
     );
     tracing::info!(
         "[RemoteAgent] Auth: agent={}, hmac_match={}",
-        auth_resp.agent_id, hmac_valid,);
+        auth_resp.agent_id,
+        hmac_valid,
+    );
     if !hmac_valid {
         tracing::error!(
             "[RemoteAgent] Auth FAILED for agent {} — token mismatch!",
-            auth_resp.agent_id);
-        let _ = app_handle.emit("remote-agent:auth-failed", serde_json::json!({
-            "agent_id": &auth_resp.agent_id,
-            "remote_addr": &remote_addr,
-            "reason": "HMAC token mismatch",
-        }));
+            auth_resp.agent_id
+        );
+        let _ = app_handle.emit(
+            "remote-agent:auth-failed",
+            serde_json::json!({
+                "agent_id": &auth_resp.agent_id,
+                "remote_addr": &remote_addr,
+                "reason": "HMAC token mismatch",
+            }),
+        );
         let _ = write.send(Message::Close(None)).await;
         return;
     }
 
     let agent_id = auth_resp.agent_id.clone();
-    let agent_profile = if auth_resp.profile.is_empty() { "standard".to_string() } else { auth_resp.profile.clone() };
+    let agent_profile = if auth_resp.profile.is_empty() {
+        "standard".to_string()
+    } else {
+        auth_resp.profile.clone()
+    };
     let agent_capabilities = auth_resp.capabilities.clone();
-    tracing::info!("Agent '{}' authenticated from {} (profile={}, caps={})", agent_id, remote_addr, agent_profile, agent_capabilities.len());
+    tracing::info!(
+        "Agent '{}' authenticated from {} (profile={}, caps={})",
+        agent_id,
+        remote_addr,
+        agent_profile,
+        agent_capabilities.len()
+    );
 
     // Send auth confirmation
     if let Err(e) = write
         .send(Message::Text(
-            serde_json::json!({"status": "authenticated"}).to_string().into(),
+            serde_json::json!({"status": "authenticated"})
+                .to_string()
+                .into(),
         ))
         .await
     {
@@ -129,7 +143,16 @@ pub async fn handle_agent_connection(
         return;
     }
 
-    run_agent_session(write, read, agent_id, agent_profile, agent_capabilities, remote_addr, app_handle).await;
+    run_agent_session(
+        write,
+        read,
+        agent_id,
+        agent_profile,
+        agent_capabilities,
+        remote_addr,
+        app_handle,
+    )
+    .await;
 }
 
 /// Post-authentication agent session: register agent, run message loop, cleanup.
@@ -173,23 +196,35 @@ pub async fn run_agent_session(
 
     {
         let mut mgr = AGENT_MANAGER.lock().await;
-        mgr.register_agent(agent_id.clone(), &placeholder_hb, cmd_tx, remote_addr.clone());
+        mgr.register_agent(
+            agent_id.clone(),
+            &placeholder_hb,
+            cmd_tx,
+            remote_addr.clone(),
+        );
     }
 
     // Emit auth success + connected events to frontend
-    let _ = app_handle.emit("remote-agent:auth-success", serde_json::json!({
-        "agent_id": &agent_id,
-        "remote_addr": &remote_addr,
-    }));
-    let _ = app_handle.emit("remote-agent:connected", serde_json::json!({
-        "agent_id": &agent_id,
-        "remote_addr": &remote_addr,
-        "profile": &agent_profile,
-        "capabilities": &agent_capabilities,
-    }));
+    let _ = app_handle.emit(
+        "remote-agent:auth-success",
+        serde_json::json!({
+            "agent_id": &agent_id,
+            "remote_addr": &remote_addr,
+        }),
+    );
+    let _ = app_handle.emit(
+        "remote-agent:connected",
+        serde_json::json!({
+            "agent_id": &agent_id,
+            "remote_addr": &remote_addr,
+            "profile": &agent_profile,
+            "capabilities": &agent_capabilities,
+        }),
+    );
 
     // --- Main message loop ---
-    let mut heartbeat_check = tokio::time::interval(Duration::from_secs(HEARTBEAT_CHECK_INTERVAL_SECS));
+    let mut heartbeat_check =
+        tokio::time::interval(Duration::from_secs(HEARTBEAT_CHECK_INTERVAL_SECS));
     heartbeat_check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
     let mut ping_interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECS));
@@ -350,10 +385,13 @@ pub async fn run_agent_session(
         mgr.mark_disconnected(&agent_id);
     }
 
-    let _ = app_handle.emit("remote-agent:disconnected", serde_json::json!({
-        "agent_id": &agent_id,
-        "reason": disconnect_reason,
-    }));
+    let _ = app_handle.emit(
+        "remote-agent:disconnected",
+        serde_json::json!({
+            "agent_id": &agent_id,
+            "reason": disconnect_reason,
+        }),
+    );
 
     let _ = write.send(Message::Close(None)).await;
 }

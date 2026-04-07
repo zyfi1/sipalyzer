@@ -6,13 +6,15 @@ use super::connection::{handle_agent_connection, run_agent_session};
 use futures_util::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use tauri::Emitter;
-use sipalyzer_core::auth::{generate_nonce, verify_hmac, AuthChallenge, AuthResponse, PROTOCOL_VERSION};
+use sipalyzer_core::auth::{
+    generate_nonce, verify_hmac, AuthChallenge, AuthResponse, PROTOCOL_VERSION,
+};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::Duration;
+use tauri::Emitter;
 use tokio::net::TcpListener;
 use tokio::sync::{watch, Mutex};
 use tokio_tungstenite::accept_async;
@@ -112,7 +114,9 @@ pub async fn start_listener(
         state.auth_token = auth_token.clone();
     }
 
-    state.listeners.insert(port, ListenerInstance { shutdown_tx });
+    state
+        .listeners
+        .insert(port, ListenerInstance { shutdown_tx });
     drop(state); // Release lock before spawning
 
     tracing::info!("Listener started on port {port}");
@@ -160,7 +164,11 @@ pub async fn is_running() -> bool {
 /// List all active listener ports.
 pub async fn list_listeners() -> Vec<ListenerInfo> {
     let state = SERVER_STATE.lock().await;
-    state.listeners.keys().map(|&port| ListenerInfo { port }).collect()
+    state
+        .listeners
+        .keys()
+        .map(|&port| ListenerInfo { port })
+        .collect()
 }
 
 /// Get the first active listener port (for backward-compat / default).
@@ -194,11 +202,17 @@ pub async fn connect_to_relay(
         .await
         .map_err(|e| format!("Relay connection failed: {e}"))?;
 
-    tracing::info!("Connected to relay session {}, waiting for agent...", session_id);
+    tracing::info!(
+        "Connected to relay session {}, waiting for agent...",
+        session_id
+    );
 
-    let _ = app_handle.emit("remote-agent:relay-waiting", serde_json::json!({
-        "session_id": &session_id,
-    }));
+    let _ = app_handle.emit(
+        "remote-agent:relay-waiting",
+        serde_json::json!({
+            "session_id": &session_id,
+        }),
+    );
 
     let (mut write, mut read) = ws_stream.split();
 
@@ -302,7 +316,16 @@ pub async fn connect_to_relay(
 
     // Phase 2: Auth succeeded — run the shared session loop
     let remote_addr = format!("relay:{}", session_id);
-    run_agent_session(write, read, agent_id, agent_profile, agent_capabilities, remote_addr, app_handle).await;
+    run_agent_session(
+        write,
+        read,
+        agent_id,
+        agent_profile,
+        agent_capabilities,
+        remote_addr,
+        app_handle,
+    )
+    .await;
 
     Ok(())
 }

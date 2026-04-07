@@ -2,7 +2,28 @@ use serde::Serialize;
 use tauri_plugin_updater::UpdaterExt;
 use url::Url;
 
-const DEFAULT_UPDATER_BASE_URL: &str = "https://raw.githubusercontent.com/zyfi1/sipalyzer/beta/updater";
+const DEFAULT_UPDATER_BASE_URL: &str =
+    "https://raw.githubusercontent.com/zyfi1/sipalyzer/beta/updater";
+#[inline]
+fn allow_runtime_updater_env_overrides() -> bool {
+    cfg!(debug_assertions)
+}
+
+#[inline]
+fn compiletime_updater_pubkey() -> &'static str {
+    match option_env!("SIPALYZER_UPDATER_PUBKEY") {
+        Some(value) => value,
+        None => "",
+    }
+}
+
+#[inline]
+fn compiletime_updater_base_url() -> &'static str {
+    match option_env!("SIPALYZER_UPDATER_BASE_URL") {
+        Some(value) => value,
+        None => DEFAULT_UPDATER_BASE_URL,
+    }
+}
 
 #[derive(Clone, Copy)]
 enum ReleaseChannel {
@@ -40,10 +61,13 @@ pub struct UpdaterReleaseInfo {
 }
 
 fn updater_pubkey() -> Result<String, String> {
-    // Prefer runtime env for local/dev smoke tests; fall back to compile-time embed.
-    let pubkey = std::env::var("SIPALYZER_UPDATER_PUBKEY")
-        .ok()
-        .unwrap_or_else(|| option_env!("SIPALYZER_UPDATER_PUBKEY").unwrap_or("").to_string());
+    // Runtime env overrides are dev-only; release builds rely on compile-time values.
+    let runtime_pubkey = if allow_runtime_updater_env_overrides() {
+        std::env::var("SIPALYZER_UPDATER_PUBKEY").ok()
+    } else {
+        None
+    };
+    let pubkey = runtime_pubkey.unwrap_or_else(|| compiletime_updater_pubkey().to_string());
     let pubkey = pubkey.trim();
     if pubkey.is_empty() {
         return Err(
@@ -55,16 +79,16 @@ fn updater_pubkey() -> Result<String, String> {
 }
 
 fn updater_endpoint_for_channel(channel: ReleaseChannel) -> String {
-    let base = std::env::var("SIPALYZER_UPDATER_BASE_URL")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| DEFAULT_UPDATER_BASE_URL.to_string());
-    format!(
-        "{}/{}.json",
-        base.trim_end_matches('/'),
-        channel.as_str()
-    )
+    let runtime_base = if allow_runtime_updater_env_overrides() {
+        std::env::var("SIPALYZER_UPDATER_BASE_URL")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+    } else {
+        None
+    };
+    let base = runtime_base.unwrap_or_else(|| compiletime_updater_base_url().to_string());
+    format!("{}/{}.json", base.trim_end_matches('/'), channel.as_str())
 }
 
 fn updater_endpoint_url(channel: ReleaseChannel) -> Result<Url, String> {

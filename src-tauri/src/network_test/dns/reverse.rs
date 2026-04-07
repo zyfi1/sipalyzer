@@ -69,11 +69,7 @@ pub async fn reverse_dns_lookup(config: ReverseDnsConfig) -> ReverseDnsResult {
     };
 
     // Create resolver
-    let resolver = match resolver::create_resolver(
-        config.server.as_deref(),
-        config.port,
-        None,
-    ) {
+    let resolver = match resolver::create_resolver(config.server.as_deref(), config.port, None) {
         Ok(r) => r,
         Err(e) => {
             return ReverseDnsResult {

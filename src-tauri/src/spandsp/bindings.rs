@@ -61,11 +61,7 @@ mod native_udptl {
         ) -> *mut udptl_state_t;
 
         /// Process a received UDPTL packet (decodes and delivers IFP via callback).
-        pub fn udptl_rx_packet(
-            s: *mut udptl_state_t,
-            buf: *const u8,
-            len: c_int,
-        ) -> c_int;
+        pub fn udptl_rx_packet(s: *mut udptl_state_t, buf: *const u8, len: c_int) -> c_int;
 
         /// Build a UDPTL packet from an IFP payload.
         /// Returns the total packet length, or -1 on error.
@@ -85,16 +81,10 @@ mod native_udptl {
         ) -> c_int;
 
         /// Set the maximum datagram size the far end accepts.
-        pub fn udptl_set_far_max_datagram(
-            s: *mut udptl_state_t,
-            max_datagram: c_int,
-        ) -> c_int;
+        pub fn udptl_set_far_max_datagram(s: *mut udptl_state_t, max_datagram: c_int) -> c_int;
 
         /// Set the maximum datagram size we accept.
-        pub fn udptl_set_local_max_datagram(
-            s: *mut udptl_state_t,
-            max_datagram: c_int,
-        ) -> c_int;
+        pub fn udptl_set_local_max_datagram(s: *mut udptl_state_t, max_datagram: c_int) -> c_int;
 
         /// Free a UDPTL context.
         pub fn udptl_free(s: *mut udptl_state_t) -> c_int;
@@ -110,7 +100,7 @@ pub use native_udptl::*;
 // Fallback definitions when native SpanDSP is not available
 #[cfg(not(feature = "spandsp-native"))]
 mod fallback {
-    use std::os::raw::{c_int, c_char, c_void};
+    use std::os::raw::{c_char, c_int, c_void};
 
     /// Opaque T.30 fax protocol state
     #[repr(C)]
@@ -163,40 +153,38 @@ mod fallback {
     }
 
     /// T.30 phase handler callback types
-    pub type t30_phase_b_handler_t = Option<unsafe extern "C" fn(
-        s: *mut t30_state_t,
-        user_data: *mut c_void,
-        result: c_int,
-    ) -> c_int>;
-    
-    pub type t30_phase_d_handler_t = Option<unsafe extern "C" fn(
-        s: *mut t30_state_t,
-        user_data: *mut c_void,
-        result: c_int,
-    ) -> c_int>;
-    
-    pub type t30_phase_e_handler_t = Option<unsafe extern "C" fn(
-        s: *mut t30_state_t,
-        user_data: *mut c_void,
-        completion_code: c_int,
-    )>;
+    pub type t30_phase_b_handler_t = Option<
+        unsafe extern "C" fn(s: *mut t30_state_t, user_data: *mut c_void, result: c_int) -> c_int,
+    >;
 
-    pub type t30_real_time_frame_handler_t = Option<unsafe extern "C" fn(
-        s: *mut t30_state_t,
-        user_data: *mut c_void,
-        direction: c_int,
-        msg: *const u8,
-        len: c_int,
-    )>;
+    pub type t30_phase_d_handler_t = Option<
+        unsafe extern "C" fn(s: *mut t30_state_t, user_data: *mut c_void, result: c_int) -> c_int,
+    >;
+
+    pub type t30_phase_e_handler_t = Option<
+        unsafe extern "C" fn(s: *mut t30_state_t, user_data: *mut c_void, completion_code: c_int),
+    >;
+
+    pub type t30_real_time_frame_handler_t = Option<
+        unsafe extern "C" fn(
+            s: *mut t30_state_t,
+            user_data: *mut c_void,
+            direction: c_int,
+            msg: *const u8,
+            len: c_int,
+        ),
+    >;
 
     /// T.38 TX packet handler callback type
-    pub type t38_tx_packet_handler_t = Option<unsafe extern "C" fn(
-        s: *mut t38_core_state_t,
-        user_data: *mut c_void,
-        buf: *const u8,
-        len: c_int,
-        count: c_int,
-    ) -> c_int>;
+    pub type t38_tx_packet_handler_t = Option<
+        unsafe extern "C" fn(
+            s: *mut t38_core_state_t,
+            user_data: *mut c_void,
+            buf: *const u8,
+            len: c_int,
+            count: c_int,
+        ) -> c_int,
+    >;
 
     /// T.30 error codes
     pub const T30_ERR_OK: c_int = 0;
@@ -208,30 +196,55 @@ mod fallback {
     // ========================================
     // Fax state functions (G.711 audio mode)
     // ========================================
-    
+
     pub unsafe fn fax_init(_s: *mut fax_state_t, _calling_party: c_int) -> *mut fax_state_t {
         std::ptr::null_mut()
     }
-    
-    pub unsafe fn fax_free(_s: *mut fax_state_t) -> c_int { 0 }
-    pub unsafe fn fax_release(_s: *mut fax_state_t) -> c_int { 0 }
-    pub unsafe fn fax_restart(_s: *mut fax_state_t, _calling_party: c_int) -> *mut fax_state_t { std::ptr::null_mut() }
-    pub unsafe fn fax_tx(_s: *mut fax_state_t, _amp: *mut i16, _max_len: c_int) -> c_int { 0 }
-    pub unsafe fn fax_rx(_s: *mut fax_state_t, _amp: *const i16, _len: c_int) -> c_int { 0 }
-    pub unsafe fn fax_rx_fillin(_s: *mut fax_state_t, _len: c_int) -> c_int { 0 }
-    pub unsafe fn fax_get_t30_state(_s: *mut fax_state_t) -> *mut t30_state_t { std::ptr::null_mut() }
-    pub unsafe fn fax_get_logging_state(_s: *mut fax_state_t) -> *mut logging_state_t { std::ptr::null_mut() }
+
+    pub unsafe fn fax_free(_s: *mut fax_state_t) -> c_int {
+        0
+    }
+    pub unsafe fn fax_release(_s: *mut fax_state_t) -> c_int {
+        0
+    }
+    pub unsafe fn fax_restart(_s: *mut fax_state_t, _calling_party: c_int) -> *mut fax_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn fax_tx(_s: *mut fax_state_t, _amp: *mut i16, _max_len: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn fax_rx(_s: *mut fax_state_t, _amp: *const i16, _len: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn fax_rx_fillin(_s: *mut fax_state_t, _len: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn fax_get_t30_state(_s: *mut fax_state_t) -> *mut t30_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn fax_get_logging_state(_s: *mut fax_state_t) -> *mut logging_state_t {
+        std::ptr::null_mut()
+    }
     pub unsafe fn fax_set_transmit_on_idle(_s: *mut fax_state_t, _val: c_int) {}
-    
+
     // ========================================
     // T.30 protocol functions
     // ========================================
-    
-    pub unsafe fn t30_set_tx_file(_s: *mut t30_state_t, _file: *const c_char, _start: c_int, _stop: c_int) -> c_int {
+
+    pub unsafe fn t30_set_tx_file(
+        _s: *mut t30_state_t,
+        _file: *const c_char,
+        _start: c_int,
+        _stop: c_int,
+    ) -> c_int {
         tracing::info!("t30_set_tx_file called without native SpanDSP");
         -1
     }
-    pub unsafe fn t30_set_rx_file(_s: *mut t30_state_t, _file: *const c_char, _start: c_int) -> c_int {
+    pub unsafe fn t30_set_rx_file(
+        _s: *mut t30_state_t,
+        _file: *const c_char,
+        _start: c_int,
+    ) -> c_int {
         tracing::info!("t30_set_rx_file called without native SpanDSP");
         -1
     }
@@ -247,39 +260,112 @@ mod fallback {
         tracing::info!("t30_set_ecm_capability called without native SpanDSP");
         -1
     }
-    pub unsafe fn t30_set_supported_resolutions(_s: *mut t30_state_t, _supported_resolutions: c_int) -> c_int {
+    pub unsafe fn t30_set_supported_resolutions(
+        _s: *mut t30_state_t,
+        _supported_resolutions: c_int,
+    ) -> c_int {
         tracing::info!("t30_set_supported_resolutions called without native SpanDSP");
         -1
     }
-    pub unsafe fn t30_set_phase_b_handler(_s: *mut t30_state_t, _handler: t30_phase_b_handler_t, _user: *mut c_void) {}
-    pub unsafe fn t30_set_phase_d_handler(_s: *mut t30_state_t, _handler: t30_phase_d_handler_t, _user: *mut c_void) {}
-    pub unsafe fn t30_set_phase_e_handler(_s: *mut t30_state_t, _handler: t30_phase_e_handler_t, _user: *mut c_void) {}
-    pub unsafe fn t30_set_real_time_frame_handler(_s: *mut t30_state_t, _handler: t30_real_time_frame_handler_t, _user: *mut c_void) {}
+    pub unsafe fn t30_set_phase_b_handler(
+        _s: *mut t30_state_t,
+        _handler: t30_phase_b_handler_t,
+        _user: *mut c_void,
+    ) {
+    }
+    pub unsafe fn t30_set_phase_d_handler(
+        _s: *mut t30_state_t,
+        _handler: t30_phase_d_handler_t,
+        _user: *mut c_void,
+    ) {
+    }
+    pub unsafe fn t30_set_phase_e_handler(
+        _s: *mut t30_state_t,
+        _handler: t30_phase_e_handler_t,
+        _user: *mut c_void,
+    ) {
+    }
+    pub unsafe fn t30_set_real_time_frame_handler(
+        _s: *mut t30_state_t,
+        _handler: t30_real_time_frame_handler_t,
+        _user: *mut c_void,
+    ) {
+    }
     pub unsafe fn t30_get_transfer_statistics(_s: *mut t30_state_t, _stats: *mut t30_stats_t) {}
-    pub unsafe fn t30_get_rx_ident(_s: *mut t30_state_t) -> *const c_char { std::ptr::null() }
+    pub unsafe fn t30_get_rx_ident(_s: *mut t30_state_t) -> *const c_char {
+        std::ptr::null()
+    }
     pub unsafe fn t30_terminate(_s: *mut t30_state_t) {}
     pub unsafe fn t30_timer_update(_s: *mut t30_state_t, _samples: c_int) {}
-    
+
     // ========================================
     // T.38 core functions
     // ========================================
-    
-    pub unsafe fn t38_core_init(_s: *mut t38_core_state_t, _handler: *mut c_void, _user: *mut c_void) -> *mut t38_core_state_t { std::ptr::null_mut() }
-    pub unsafe fn t38_core_free(_s: *mut t38_core_state_t) -> c_int { 0 }
-    pub unsafe fn t38_core_rx_ifp_packet(_s: *mut t38_core_state_t, _buf: *const u8, _len: c_int, _seq: u16) -> c_int { 0 }
-    pub unsafe fn t38_core_send_indicator(_s: *mut t38_core_state_t, _indicator: c_int) -> c_int { 0 }
-    pub unsafe fn t38_core_send_data(_s: *mut t38_core_state_t, _type: c_int, _field: c_int, _data: *const u8, _len: c_int, _count: c_int) -> c_int { 0 }
-    pub unsafe fn t38_set_t38_version(_s: *mut t38_core_state_t, _version: c_int) -> c_int { 0 }
-    pub unsafe fn t38_set_redundancy_control(_s: *mut t38_core_state_t, _category: c_int, _setting: c_int) -> c_int { 0 }
-    pub unsafe fn t38_set_data_rate_management_method(_s: *mut t38_core_state_t, _method: c_int) -> c_int { 0 }
-    pub unsafe fn t38_set_data_transport_protocol(_s: *mut t38_core_state_t, _protocol: c_int) -> c_int { 0 }
-    pub unsafe fn t38_set_max_datagram_size(_s: *mut t38_core_state_t, _max_size: c_int) -> c_int { 0 }
-    pub unsafe fn t38_set_tep_handling(_s: *mut t38_core_state_t, _use_tep: c_int) -> c_int { 0 }
-    
+
+    pub unsafe fn t38_core_init(
+        _s: *mut t38_core_state_t,
+        _handler: *mut c_void,
+        _user: *mut c_void,
+    ) -> *mut t38_core_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn t38_core_free(_s: *mut t38_core_state_t) -> c_int {
+        0
+    }
+    pub unsafe fn t38_core_rx_ifp_packet(
+        _s: *mut t38_core_state_t,
+        _buf: *const u8,
+        _len: c_int,
+        _seq: u16,
+    ) -> c_int {
+        0
+    }
+    pub unsafe fn t38_core_send_indicator(_s: *mut t38_core_state_t, _indicator: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn t38_core_send_data(
+        _s: *mut t38_core_state_t,
+        _type: c_int,
+        _field: c_int,
+        _data: *const u8,
+        _len: c_int,
+        _count: c_int,
+    ) -> c_int {
+        0
+    }
+    pub unsafe fn t38_set_t38_version(_s: *mut t38_core_state_t, _version: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn t38_set_redundancy_control(
+        _s: *mut t38_core_state_t,
+        _category: c_int,
+        _setting: c_int,
+    ) -> c_int {
+        0
+    }
+    pub unsafe fn t38_set_data_rate_management_method(
+        _s: *mut t38_core_state_t,
+        _method: c_int,
+    ) -> c_int {
+        0
+    }
+    pub unsafe fn t38_set_data_transport_protocol(
+        _s: *mut t38_core_state_t,
+        _protocol: c_int,
+    ) -> c_int {
+        0
+    }
+    pub unsafe fn t38_set_max_datagram_size(_s: *mut t38_core_state_t, _max_size: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn t38_set_tep_handling(_s: *mut t38_core_state_t, _use_tep: c_int) -> c_int {
+        0
+    }
+
     // ========================================
     // T.38 terminal functions (T.38 endpoint)
     // ========================================
-    
+
     pub unsafe fn t38_terminal_init(
         _s: *mut t38_terminal_state_t,
         _calling_party: c_int,
@@ -289,38 +375,71 @@ mod fallback {
         tracing::info!("t38_terminal_init called without native SpanDSP");
         std::ptr::null_mut()
     }
-    
-    pub unsafe fn t38_terminal_free(_s: *mut t38_terminal_state_t) -> c_int { 0 }
-    pub unsafe fn t38_terminal_release(_s: *mut t38_terminal_state_t) -> c_int { 0 }
-    pub unsafe fn t38_terminal_get_t30_state(_s: *mut t38_terminal_state_t) -> *mut t30_state_t { std::ptr::null_mut() }
-    pub unsafe fn t38_terminal_get_t38_core_state(_s: *mut t38_terminal_state_t) -> *mut t38_core_state_t { std::ptr::null_mut() }
-    pub unsafe fn t38_terminal_get_logging_state(_s: *mut t38_terminal_state_t) -> *mut logging_state_t { std::ptr::null_mut() }
-    pub unsafe fn t38_terminal_send_timeout(_s: *mut t38_terminal_state_t, _samples: c_int) -> c_int { 0 }
-    pub unsafe fn t38_terminal_restart(_s: *mut t38_terminal_state_t, _calling_party: c_int) -> c_int {
+
+    pub unsafe fn t38_terminal_free(_s: *mut t38_terminal_state_t) -> c_int {
+        0
+    }
+    pub unsafe fn t38_terminal_release(_s: *mut t38_terminal_state_t) -> c_int {
+        0
+    }
+    pub unsafe fn t38_terminal_get_t30_state(_s: *mut t38_terminal_state_t) -> *mut t30_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn t38_terminal_get_t38_core_state(
+        _s: *mut t38_terminal_state_t,
+    ) -> *mut t38_core_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn t38_terminal_get_logging_state(
+        _s: *mut t38_terminal_state_t,
+    ) -> *mut logging_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn t38_terminal_send_timeout(
+        _s: *mut t38_terminal_state_t,
+        _samples: c_int,
+    ) -> c_int {
+        0
+    }
+    pub unsafe fn t38_terminal_restart(
+        _s: *mut t38_terminal_state_t,
+        _calling_party: c_int,
+    ) -> c_int {
         tracing::info!("t38_terminal_restart called without native SpanDSP");
         -1
     }
     pub unsafe fn t38_terminal_set_tep_mode(_s: *mut t38_terminal_state_t, _use_tep: c_int) {}
-    pub unsafe fn t38_terminal_set_fill_bit_removal(_s: *mut t38_terminal_state_t, _remove: c_int) {}
-    
+    pub unsafe fn t38_terminal_set_fill_bit_removal(_s: *mut t38_terminal_state_t, _remove: c_int) {
+    }
+
     // ========================================
     // Logging functions
     // ========================================
-    
-    pub unsafe fn span_log_init(_s: *mut logging_state_t, _level: c_int, _tag: *const c_char) -> *mut logging_state_t { std::ptr::null_mut() }
-    pub unsafe fn span_log_set_level(_s: *mut logging_state_t, _level: c_int) -> c_int { 0 }
-    pub unsafe fn span_log_set_tag(_s: *mut logging_state_t, _tag: *const c_char) -> c_int { 0 }
-    
+
+    pub unsafe fn span_log_init(
+        _s: *mut logging_state_t,
+        _level: c_int,
+        _tag: *const c_char,
+    ) -> *mut logging_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn span_log_set_level(_s: *mut logging_state_t, _level: c_int) -> c_int {
+        0
+    }
+    pub unsafe fn span_log_set_tag(_s: *mut logging_state_t, _tag: *const c_char) -> c_int {
+        0
+    }
+
     // ========================================
     // UDPTL stub functions
     // ========================================
-    
+
     /// Opaque UDPTL state
     #[repr(C)]
     pub struct udptl_state_t {
         _private: [u8; 0],
     }
-    
+
     pub type udptl_rx_packet_handler_t = Option<
         unsafe extern "C" fn(
             user_data: *mut c_void,
@@ -329,19 +448,52 @@ mod fallback {
             seq_no: c_int,
         ) -> c_int,
     >;
-    
+
     pub const UDPTL_ERROR_CORRECTION_NONE: c_int = 0;
     pub const UDPTL_ERROR_CORRECTION_FEC: c_int = 1;
     pub const UDPTL_ERROR_CORRECTION_REDUNDANCY: c_int = 2;
-    
-    pub unsafe fn udptl_init(_s: *mut udptl_state_t, _ec: c_int, _span: c_int, _entries: c_int, _handler: udptl_rx_packet_handler_t, _user: *mut c_void) -> *mut udptl_state_t { std::ptr::null_mut() }
-    pub unsafe fn udptl_rx_packet(_s: *mut udptl_state_t, _buf: *const u8, _len: c_int) -> c_int { -1 }
-    pub unsafe fn udptl_build_packet(_s: *mut udptl_state_t, _buf: *mut u8, _msg: *const u8, _msg_len: c_int) -> c_int { -1 }
-    pub unsafe fn udptl_set_error_correction(_s: *mut udptl_state_t, _ec: c_int, _span: c_int, _entries: c_int) -> c_int { -1 }
-    pub unsafe fn udptl_set_far_max_datagram(_s: *mut udptl_state_t, _max: c_int) -> c_int { -1 }
-    pub unsafe fn udptl_set_local_max_datagram(_s: *mut udptl_state_t, _max: c_int) -> c_int { -1 }
-    pub unsafe fn udptl_free(_s: *mut udptl_state_t) -> c_int { 0 }
-    pub unsafe fn udptl_release(_s: *mut udptl_state_t) -> c_int { 0 }
+
+    pub unsafe fn udptl_init(
+        _s: *mut udptl_state_t,
+        _ec: c_int,
+        _span: c_int,
+        _entries: c_int,
+        _handler: udptl_rx_packet_handler_t,
+        _user: *mut c_void,
+    ) -> *mut udptl_state_t {
+        std::ptr::null_mut()
+    }
+    pub unsafe fn udptl_rx_packet(_s: *mut udptl_state_t, _buf: *const u8, _len: c_int) -> c_int {
+        -1
+    }
+    pub unsafe fn udptl_build_packet(
+        _s: *mut udptl_state_t,
+        _buf: *mut u8,
+        _msg: *const u8,
+        _msg_len: c_int,
+    ) -> c_int {
+        -1
+    }
+    pub unsafe fn udptl_set_error_correction(
+        _s: *mut udptl_state_t,
+        _ec: c_int,
+        _span: c_int,
+        _entries: c_int,
+    ) -> c_int {
+        -1
+    }
+    pub unsafe fn udptl_set_far_max_datagram(_s: *mut udptl_state_t, _max: c_int) -> c_int {
+        -1
+    }
+    pub unsafe fn udptl_set_local_max_datagram(_s: *mut udptl_state_t, _max: c_int) -> c_int {
+        -1
+    }
+    pub unsafe fn udptl_free(_s: *mut udptl_state_t) -> c_int {
+        0
+    }
+    pub unsafe fn udptl_release(_s: *mut udptl_state_t) -> c_int {
+        0
+    }
 }
 
 #[cfg(not(feature = "spandsp-native"))]
@@ -368,10 +520,10 @@ pub mod modems {
     pub const T30_SUPPORT_V17: i32 = 0x04;
     /// V.34 - 2400-33600 bps (Super G3)
     pub const T30_SUPPORT_V34: i32 = 0x08;
-    
+
     /// Standard fax modems (V.27ter + V.29 + V.17)
     pub const T30_SUPPORT_STANDARD: i32 = T30_SUPPORT_V27TER | T30_SUPPORT_V29 | T30_SUPPORT_V17;
-    
+
     /// All modems including Super G3
     pub const T30_SUPPORT_ALL: i32 = T30_SUPPORT_STANDARD | T30_SUPPORT_V34;
 }
@@ -530,7 +682,7 @@ pub mod t38 {
     pub const T38_IND_V17_12000_LONG_TRAINING: i32 = 13;
     pub const T38_IND_V17_14400_SHORT_TRAINING: i32 = 14;
     pub const T38_IND_V17_14400_LONG_TRAINING: i32 = 15;
-    
+
     /// T.38 data types
     pub const T38_DATA_V21: i32 = 0;
     pub const T38_DATA_V27TER_2400: i32 = 1;
@@ -541,7 +693,7 @@ pub mod t38 {
     pub const T38_DATA_V17_9600: i32 = 6;
     pub const T38_DATA_V17_12000: i32 = 7;
     pub const T38_DATA_V17_14400: i32 = 8;
-    
+
     /// T.38 field types
     pub const T38_FIELD_HDLC_DATA: i32 = 0;
     pub const T38_FIELD_HDLC_SIG_END: i32 = 1;

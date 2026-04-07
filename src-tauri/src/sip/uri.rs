@@ -5,7 +5,7 @@ use std::fmt;
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct SipUri {
-    pub scheme: String,      // sip or sips
+    pub scheme: String, // sip or sips
     pub user: Option<String>,
     pub host: String,
     pub port: Option<u16>,
@@ -24,11 +24,11 @@ impl SipUri {
     /// - IP addresses (with or without port)
     pub fn parse(uri: &str) -> Result<Self> {
         let uri = uri.trim();
-        
+
         // Remove angle brackets if present
         let uri = uri.strip_prefix('<').unwrap_or(uri);
         let uri = uri.strip_suffix('>').unwrap_or(uri);
-        
+
         // Check if it's a SIP URI (starts with sip: or sips:)
         let (scheme, rest) = if uri.starts_with("sips:") {
             ("sips", &uri[5..])
@@ -46,7 +46,7 @@ impl SipUri {
                 headers: Vec::new(),
             });
         };
-        
+
         // Split on ';' for parameters and '?' for headers
         let (uri_part, params_and_headers) = if let Some(pos) = rest.find(';') {
             (&rest[..pos], Some(&rest[pos..]))
@@ -55,12 +55,12 @@ impl SipUri {
         } else {
             (rest, None)
         };
-        
+
         // Parse user@host:port
         let (user, host, port) = if let Some(at_pos) = uri_part.find('@') {
             let user_part = &uri_part[..at_pos];
             let host_part = &uri_part[at_pos + 1..];
-            
+
             // Parse host:port
             let (host, port) = Self::parse_host_port(host_part)?;
             (Some(user_part.to_string()), host, port)
@@ -69,15 +69,15 @@ impl SipUri {
             let (host, port) = Self::parse_host_port(uri_part)?;
             (None, host, port)
         };
-        
+
         // Parse parameters and headers
         let mut parameters = Vec::new();
         let mut headers = Vec::new();
-        
+
         if let Some(rest) = params_and_headers {
             let mut in_headers = false;
             let parts: Vec<&str> = rest.split(';').collect();
-            
+
             for part in parts {
                 if part.starts_with('?') {
                     in_headers = true;
@@ -100,7 +100,7 @@ impl SipUri {
                 }
             }
         }
-        
+
         Ok(Self {
             scheme: scheme.to_string(),
             user,
@@ -110,7 +110,7 @@ impl SipUri {
             headers,
         })
     }
-    
+
     /// Parse host:port from a string
     fn parse_host_port(host_port: &str) -> Result<(String, Option<u16>)> {
         // Check if it's IPv6 [host]:port format
@@ -119,28 +119,28 @@ impl SipUri {
                 let host = host_port[1..close_bracket].to_string();
                 let rest = &host_port[close_bracket + 1..];
                 if rest.starts_with(':') {
-                    let port = rest[1..].parse::<u16>()
-                        .context("Invalid port number")?;
+                    let port = rest[1..].parse::<u16>().context("Invalid port number")?;
                     return Ok((host, Some(port)));
                 }
                 return Ok((host, None));
             }
         }
-        
+
         // IPv4 or hostname:port
         if let Some(colon_pos) = host_port.rfind(':') {
             // Check if it's not an IPv6 address (which would have multiple colons)
             if !host_port.contains("::") {
                 let host = host_port[..colon_pos].to_string();
-                let port = host_port[colon_pos + 1..].parse::<u16>()
+                let port = host_port[colon_pos + 1..]
+                    .parse::<u16>()
                     .context("Invalid port number")?;
                 return Ok((host, Some(port)));
             }
         }
-        
+
         Ok((host_port.to_string(), None))
     }
-    
+
     /// Convert to string representation
     #[allow(dead_code)]
     pub fn to_uri_string(&self) -> String {
@@ -151,33 +151,34 @@ impl SipUri {
 impl fmt::Display for SipUri {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:", self.scheme)?;
-        
+
         if let Some(ref user) = self.user {
             write!(f, "{}@", user)?;
         }
-        
+
         write!(f, "{}", self.host)?;
-        
+
         if let Some(port) = self.port {
             write!(f, ":{}", port)?;
         }
-        
+
         for (name, value) in &self.parameters {
             write!(f, ";{}", name)?;
             if !value.is_empty() {
                 write!(f, "={}", value)?;
             }
         }
-        
+
         if !self.headers.is_empty() {
             write!(f, "?")?;
-            let header_parts: Vec<String> = self.headers
+            let header_parts: Vec<String> = self
+                .headers
                 .iter()
                 .map(|(k, v)| format!("{}={}", k, v))
                 .collect();
             write!(f, "{}", header_parts.join("&"))?;
         }
-        
+
         Ok(())
     }
 }
@@ -191,13 +192,8 @@ impl SipUri {
     /// Get the port, with default based on scheme
     #[allow(dead_code)]
     pub fn port_with_default(&self) -> u16 {
-        self.port.unwrap_or_else(|| {
-            if self.scheme == "sips" {
-                5061
-            } else {
-                5060
-            }
-        })
+        self.port
+            .unwrap_or_else(|| if self.scheme == "sips" { 5061 } else { 5060 })
     }
 }
 
@@ -206,7 +202,18 @@ pub fn escape_user(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '.' | '_' | '!' | '~' | '*' | '\'' | '(' | ')' => out.push(c),
+            'a'..='z'
+            | 'A'..='Z'
+            | '0'..='9'
+            | '-'
+            | '.'
+            | '_'
+            | '!'
+            | '~'
+            | '*'
+            | '\''
+            | '('
+            | ')' => out.push(c),
             '&' | '=' | '+' | '$' | ',' | ';' | '?' | '/' => out.push(c), // user-unreserved
             ' ' => out.push_str("%20"),
             '@' | ':' | '%' | '"' | '<' | '>' | '[' | ']' | '#' | '\\' | '^' | '`' | '{' | '}' => {
@@ -238,8 +245,15 @@ pub fn normalize_dial_target(target: &str, domain_host: &str) -> Result<(String,
     let digits_only: String = target.chars().filter(|c| c.is_ascii_digit()).collect();
     let has_plus = target.starts_with('+');
     let looks_like_number = !digits_only.is_empty()
-        && target.chars()
-            .all(|c| c.is_ascii_digit() || c == '+' || c == ' ' || c == '-' || c == '.' || c == '(' || c == ')');
+        && target.chars().all(|c| {
+            c.is_ascii_digit()
+                || c == '+'
+                || c == ' '
+                || c == '-'
+                || c == '.'
+                || c == '('
+                || c == ')'
+        });
 
     if looks_like_number && !digits_only.is_empty() {
         // Smart E.164 normalization:
@@ -280,7 +294,11 @@ pub fn normalize_dial_target(target: &str, domain_host: &str) -> Result<(String,
             if host_part.starts_with('[') {
                 let host = host_part[..=close].to_string();
                 let rest = host_part[close + 1..].trim_start_matches(':');
-                let port = if rest.is_empty() { String::new() } else { format!(":{}", rest) };
+                let port = if rest.is_empty() {
+                    String::new()
+                } else {
+                    format!(":{}", rest)
+                };
                 (host, port)
             } else {
                 let (h, p) = parse_host_port_simple(host_part);
@@ -312,7 +330,11 @@ fn parse_host_port_simple(host_port: &str) -> (String, String) {
         if let Some(close) = host_port.find(']') {
             let host = host_port[..=close].to_string();
             let rest = host_port[close + 1..].trim_start_matches(':');
-            let port = if rest.is_empty() { String::new() } else { format!(":{}", rest) };
+            let port = if rest.is_empty() {
+                String::new()
+            } else {
+                format!(":{}", rest)
+            };
             return (host, port);
         }
     }
@@ -366,7 +388,7 @@ mod tests {
         assert_eq!(uri.port, None);
         assert_eq!(uri.user, None);
     }
-    
+
     #[test]
     fn test_parse_sip_user_host() {
         let uri = SipUri::parse("sip:user@example.com").unwrap();
@@ -375,7 +397,7 @@ mod tests {
         assert_eq!(uri.host, "example.com");
         assert_eq!(uri.port, None);
     }
-    
+
     #[test]
     fn test_parse_sip_host_port() {
         let uri = SipUri::parse("sip:example.com:5060").unwrap();
@@ -383,7 +405,7 @@ mod tests {
         assert_eq!(uri.host, "example.com");
         assert_eq!(uri.port, Some(5060));
     }
-    
+
     #[test]
     fn test_parse_sip_user_host_port() {
         let uri = SipUri::parse("sip:user@example.com:5060").unwrap();
@@ -392,20 +414,20 @@ mod tests {
         assert_eq!(uri.host, "example.com");
         assert_eq!(uri.port, Some(5060));
     }
-    
+
     #[test]
     fn test_parse_with_angle_brackets() {
         let uri = SipUri::parse("<sip:user@example.com>").unwrap();
         assert_eq!(uri.user, Some("user".to_string()));
         assert_eq!(uri.host, "example.com");
     }
-    
+
     #[test]
     fn test_parse_ip_address() {
         let uri = SipUri::parse("192.168.1.1").unwrap();
         assert_eq!(uri.host, "192.168.1.1");
     }
-    
+
     #[test]
     fn test_parse_ip_address_port() {
         let uri = SipUri::parse("192.168.1.1:5060").unwrap();

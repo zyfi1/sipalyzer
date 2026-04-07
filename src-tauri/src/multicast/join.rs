@@ -90,8 +90,8 @@ pub async fn join_group(
         return Err(format!("{} is not a multicast IPv4 address", group));
     }
 
-    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))
-        .map_err(|e| e.to_string())?;
+    let socket =
+        Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).map_err(|e| e.to_string())?;
 
     socket.set_reuse_address(true).map_err(|e| e.to_string())?;
 
@@ -111,7 +111,12 @@ pub async fn join_group(
         .set_multicast_loop_v4(true)
         .map_err(|e| e.to_string())?;
 
-    tracing::info!("Joined group {}:{} on interface {:?}", group, port, interface);
+    tracing::info!(
+        "Joined group {}:{} on interface {:?}",
+        group,
+        port,
+        interface
+    );
 
     let (cancel_tx, _cancel_rx) = tokio::sync::watch::channel(false);
     let (packet_tx, _packet_rx) = tokio::sync::broadcast::channel(BROADCAST_CAPACITY);
@@ -131,9 +136,7 @@ pub async fn join_group(
     };
 
     {
-        let mut guard = ACTIVE_GROUPS
-            .lock()
-            .map_err(|e| format!("lock: {}", e))?;
+        let mut guard = ACTIVE_GROUPS.lock().map_err(|e| format!("lock: {}", e))?;
         if let Some(existing) = guard.values().find(|g| g.group == group) {
             return Ok(super::types::JoinResult {
                 success: false,
@@ -175,9 +178,7 @@ pub async fn leave_group(group: &str) -> Result<super::types::LeaveResult, Strin
     let found_key = guard
         .keys()
         .find(|k| {
-            k.starts_with(group)
-                && k.len() > group.len()
-                && k.as_bytes()[group.len()] == b':'
+            k.starts_with(group) && k.len() > group.len() && k.as_bytes()[group.len()] == b':'
         })
         .cloned();
     let key = match found_key {
@@ -209,8 +210,12 @@ pub async fn leave_group(group: &str) -> Result<super::types::LeaveResult, Strin
 }
 
 /// Leaves a multicast group for an exact group:port key.
-pub async fn leave_group_exact(group: &str, port: u16) -> Result<super::types::LeaveResult, String> {
-    let _span = tracing::info_span!("multicast.group_leave_exact", group = %group, port = port).entered();
+pub async fn leave_group_exact(
+    group: &str,
+    port: u16,
+) -> Result<super::types::LeaveResult, String> {
+    let _span =
+        tracing::info_span!("multicast.group_leave_exact", group = %group, port = port).entered();
     let _ = super::audio_receiver::stop(group);
     let _ = super::audio_sender::stop(group);
 
@@ -235,20 +240,14 @@ pub async fn leave_group_exact(group: &str, port: u16) -> Result<super::types::L
 }
 
 /// Returns a cancel receiver for the given group:port so the caller can spawn the listener.
-pub fn get_cancel_rx(
-    group: &str,
-    port: u16,
-) -> Option<tokio::sync::watch::Receiver<bool>> {
+pub fn get_cancel_rx(group: &str, port: u16) -> Option<tokio::sync::watch::Receiver<bool>> {
     let guard = ACTIVE_GROUPS.lock().ok()?;
     let jg = guard.get(&group_key(group, port))?;
     Some(jg.cancel_tx.subscribe())
 }
 
 /// Returns a broadcast sender clone for the given group:port (used by the listener).
-pub fn get_packet_tx(
-    group: &str,
-    port: u16,
-) -> Option<tokio::sync::broadcast::Sender<PacketData>> {
+pub fn get_packet_tx(group: &str, port: u16) -> Option<tokio::sync::broadcast::Sender<PacketData>> {
     let guard = ACTIVE_GROUPS.lock().ok()?;
     let jg = guard.get(&group_key(group, port))?;
     Some(jg.packet_tx.clone())
@@ -309,15 +308,17 @@ pub async fn send_test(
         return Err(format!("{} is not a multicast IPv4 address", group));
     }
 
-    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))
-        .map_err(|e| e.to_string())?;
+    let socket =
+        Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).map_err(|e| e.to_string())?;
 
     let sock_ref = socket2::SockRef::from(&socket);
     sock_ref
         .set_multicast_loop_v4(true)
         .map_err(|e| e.to_string())?;
     if let Some(t) = ttl {
-        sock_ref.set_multicast_ttl_v4(t as u32).map_err(|e| e.to_string())?;
+        sock_ref
+            .set_multicast_ttl_v4(t as u32)
+            .map_err(|e| e.to_string())?;
     }
 
     let bind_addr = SocketAddrV4::new(std::net::Ipv4Addr::new(0, 0, 0, 0), 0);

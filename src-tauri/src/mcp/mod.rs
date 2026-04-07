@@ -118,18 +118,26 @@ pub struct McpManager {
 
 impl McpManager {
     pub fn upsert_profile(&mut self, profile: McpServerProfile) {
-        let status = self.statuses.entry(profile.id.clone()).or_insert(McpServerStatus {
-            server_id: profile.id.clone(),
-            connected: false,
-            last_error: None,
-            capabilities: vec!["tools".to_string(), "resources".to_string(), "prompts".to_string()],
-            tool_count: 0,
-            resource_count: 0,
-            prompt_count: 0,
-        });
+        let status = self
+            .statuses
+            .entry(profile.id.clone())
+            .or_insert(McpServerStatus {
+                server_id: profile.id.clone(),
+                connected: false,
+                last_error: None,
+                capabilities: vec![
+                    "tools".to_string(),
+                    "resources".to_string(),
+                    "prompts".to_string(),
+                ],
+                tool_count: 0,
+                resource_count: 0,
+                prompt_count: 0,
+            });
         status.last_error = None;
         self.profiles.insert(profile.id.clone(), profile);
     }
 }
 
-pub static MCP_MANAGER: Lazy<StdMutex<McpManager>> = Lazy::new(|| StdMutex::new(McpManager::default()));
+pub static MCP_MANAGER: Lazy<StdMutex<McpManager>> =
+    Lazy::new(|| StdMutex::new(McpManager::default()));

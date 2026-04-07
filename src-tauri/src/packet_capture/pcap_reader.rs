@@ -71,7 +71,7 @@ impl MmapPcapReader {
 
         // Read and validate header
         let magic = u32::from_le_bytes([mmap[0], mmap[1], mmap[2], mmap[3]]);
-        
+
         let (byte_swapped, nanosecond_timestamps) = match magic {
             PCAP_MAGIC_NATIVE => (false, false),
             PCAP_MAGIC_SWAPPED => (true, false),
@@ -103,7 +103,12 @@ impl MmapPcapReader {
         };
 
         let read_u32 = |offset: usize| -> u32 {
-            let bytes = [data[offset], data[offset + 1], data[offset + 2], data[offset + 3]];
+            let bytes = [
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ];
             if byte_swapped {
                 u32::from_be_bytes(bytes)
             } else {
@@ -112,7 +117,12 @@ impl MmapPcapReader {
         };
 
         let read_i32 = |offset: usize| -> i32 {
-            let bytes = [data[offset], data[offset + 1], data[offset + 2], data[offset + 3]];
+            let bytes = [
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ];
             if byte_swapped {
                 i32::from_be_bytes(bytes)
             } else {
@@ -157,7 +167,11 @@ impl MmapPcapReader {
             anyhow::bail!("Cannot seek before file header (offset 24)");
         }
         if offset > self.file_size {
-            anyhow::bail!("Seek offset {} exceeds file size {}", offset, self.file_size);
+            anyhow::bail!(
+                "Seek offset {} exceeds file size {}",
+                offset,
+                self.file_size
+            );
         }
         self.current_offset = offset;
         Ok(())
@@ -241,7 +255,12 @@ impl MmapPcapReader {
 
     fn parse_packet_header(&self, data: &[u8]) -> PcapPacketHeader {
         let read_u32 = |offset: usize| -> u32 {
-            let bytes = [data[offset], data[offset + 1], data[offset + 2], data[offset + 3]];
+            let bytes = [
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ];
             if self.byte_swapped {
                 u32::from_be_bytes(bytes)
             } else {
@@ -258,13 +277,10 @@ impl MmapPcapReader {
     }
 
     /// Iterate over all packets in the file.
-    pub fn packets(
-        &mut self,
-        rtp_port_range: Option<(u16, u16)>,
-    ) -> PcapPacketIterator<'_> {
+    pub fn packets(&mut self, rtp_port_range: Option<(u16, u16)>) -> PcapPacketIterator<'_> {
         self.reset();
         let parser = PacketParser::with_rtp_port_range(self.header.network, rtp_port_range);
-        
+
         PcapPacketIterator {
             reader: self,
             parser,

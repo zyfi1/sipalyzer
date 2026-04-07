@@ -135,7 +135,10 @@ impl SipMessage {
                 self.status_text.as_deref().unwrap_or("")
             ));
         } else {
-            message.push_str(&format!("{} {} {}\r\n", self.method, self.uri, self.version));
+            message.push_str(&format!(
+                "{} {} {}\r\n",
+                self.method, self.uri, self.version
+            ));
         }
 
         // RFC 3261 §20.14: Content-Length MUST be present when message has a body.
@@ -178,9 +181,21 @@ impl SipMessage {
         let (method, uri, version, status_code, status_text) = if parts[0].starts_with("SIP/") {
             let code: u16 = parts[1].parse().context("Invalid status code")?;
             let reason = parts[2..].join(" ");
-            (String::new(), String::new(), parts[0].to_string(), Some(code), Some(reason))
+            (
+                String::new(),
+                String::new(),
+                parts[0].to_string(),
+                Some(code),
+                Some(reason),
+            )
         } else {
-            (parts[0].to_string(), parts[1].to_string(), parts[2].to_string(), None, None)
+            (
+                parts[0].to_string(),
+                parts[1].to_string(),
+                parts[2].to_string(),
+                None,
+                None,
+            )
         };
 
         let mut headers: HashMap<String, String> = HashMap::new();
@@ -188,18 +203,18 @@ impl SipMessage {
 
         for line in lines.iter().skip(1) {
             if line.is_empty() {
-            if let Some((name, value)) = current_header.take() {
-                let canonical = canonical_header_name(&name);
-                match headers.entry(canonical) {
-                    std::collections::hash_map::Entry::Occupied(mut e) => {
-                        e.get_mut().push_str(", ");
-                        e.get_mut().push_str(&value);
-                    }
-                    std::collections::hash_map::Entry::Vacant(e) => {
-                        e.insert(value);
+                if let Some((name, value)) = current_header.take() {
+                    let canonical = canonical_header_name(&name);
+                    match headers.entry(canonical) {
+                        std::collections::hash_map::Entry::Occupied(mut e) => {
+                            e.get_mut().push_str(", ");
+                            e.get_mut().push_str(&value);
+                        }
+                        std::collections::hash_map::Entry::Vacant(e) => {
+                            e.insert(value);
+                        }
                     }
                 }
-            }
                 break;
             }
             // RFC 3261 §7.3.1: line starting with LWS (SP/HTAB) is continuation of previous header

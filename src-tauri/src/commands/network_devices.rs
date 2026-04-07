@@ -1,6 +1,6 @@
-use crate::network_discovery::scanner;
 use crate::network_discovery::ip_range;
 use crate::network_discovery::oui;
+use crate::network_discovery::scanner;
 use crate::network_discovery::wol;
 use serde::Serialize;
 
@@ -12,13 +12,20 @@ pub fn network_devices_detect_subnet() -> Result<DetectedSubnet, String> {
     let iface = default_net::get_default_interface()
         .map_err(|e| format!("Failed to detect default interface: {}", e))?;
 
-    let ipv4 = iface.ipv4.first().ok_or("No IPv4 address on default interface")?;
+    let ipv4 = iface
+        .ipv4
+        .first()
+        .ok_or("No IPv4 address on default interface")?;
     let addr = ipv4.addr;
     let prefix = ipv4.prefix_len;
 
     // Compute the network address (zero out host bits)
     let ip_u32 = u32::from(addr);
-    let mask = if prefix == 0 { 0u32 } else { !0u32 << (32 - prefix) };
+    let mask = if prefix == 0 {
+        0u32
+    } else {
+        !0u32 << (32 - prefix)
+    };
     let network_u32 = ip_u32 & mask;
     let network = std::net::Ipv4Addr::from(network_u32);
 
@@ -54,7 +61,8 @@ pub fn network_devices_list_subnets() -> Vec<SubnetInfo> {
         let gateway = iface.gateway.as_ref().map(|g| g.ip_addr.to_string());
         let mac = iface.mac_addr.map(|m| m.to_string());
 
-        let iface_type = guess_iface_type(&iface.name, iface.friendly_name.as_deref().unwrap_or(""));
+        let iface_type =
+            guess_iface_type(&iface.name, iface.friendly_name.as_deref().unwrap_or(""));
 
         for ipv4 in &iface.ipv4 {
             let addr = ipv4.addr;
@@ -67,7 +75,11 @@ pub fn network_devices_list_subnets() -> Vec<SubnetInfo> {
 
             // Compute network address
             let ip_u32 = u32::from(addr);
-            let mask = if prefix == 0 { 0u32 } else { !0u32 << (32 - prefix) };
+            let mask = if prefix == 0 {
+                0u32
+            } else {
+                !0u32 << (32 - prefix)
+            };
             let network_u32 = ip_u32 & mask;
             let network = std::net::Ipv4Addr::from(network_u32);
 
@@ -94,7 +106,8 @@ pub fn network_devices_list_subnets() -> Vec<SubnetInfo> {
 
     // Sort: default first, then by interface name
     subnets.sort_by(|a, b| {
-        b.is_default.cmp(&a.is_default)
+        b.is_default
+            .cmp(&a.is_default)
             .then(a.interface_name.cmp(&b.interface_name))
     });
 
@@ -120,13 +133,24 @@ fn guess_iface_type(name: &str, friendly_name: &str) -> String {
     let f = friendly_name.to_lowercase();
     if n.contains("lo") && !n.contains("local") && n.len() <= 3 {
         "loopback".to_string()
-    } else if n.contains("wlan") || n.contains("wl") || n.contains("wi-fi") || f.contains("wi-fi") || f.contains("wireless") || f.contains("airport") {
+    } else if n.contains("wlan")
+        || n.contains("wl")
+        || n.contains("wi-fi")
+        || f.contains("wi-fi")
+        || f.contains("wireless")
+        || f.contains("airport")
+    {
         "wifi".to_string()
-    } else if n.contains("eth") || n.contains("en") || f.contains("ethernet") || f.contains("thunderbolt") {
+    } else if n.contains("eth")
+        || n.contains("en")
+        || f.contains("ethernet")
+        || f.contains("thunderbolt")
+    {
         "ethernet".to_string()
     } else if n.contains("tun") || n.contains("tap") || n.contains("utun") || f.contains("vpn") {
         "vpn".to_string()
-    } else if n.contains("bridge") || n.contains("br") || n.contains("docker") || n.contains("veth") {
+    } else if n.contains("bridge") || n.contains("br") || n.contains("docker") || n.contains("veth")
+    {
         "virtual".to_string()
     } else if n.contains("vmnet") || n.contains("vbox") {
         "virtual".to_string()

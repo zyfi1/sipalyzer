@@ -71,18 +71,26 @@ impl JitterBuffer {
 
         // Update jitter estimate (RFC 3550 §A.8 interarrival jitter)
         if let (Some(prev_arrival), Some(prev_ts)) = (self.last_arrival, self.last_rtp_ts) {
-            let arrival_diff_ms = now.saturating_duration_since(prev_arrival).as_secs_f64() * 1000.0;
-            let ts_diff_ms = (rtp_ts.wrapping_sub(prev_ts) as f64) / (self.clock_rate as f64) * 1000.0;
+            let arrival_diff_ms =
+                now.saturating_duration_since(prev_arrival).as_secs_f64() * 1000.0;
+            let ts_diff_ms =
+                (rtp_ts.wrapping_sub(prev_ts) as f64) / (self.clock_rate as f64) * 1000.0;
             let transit_diff = (arrival_diff_ms - ts_diff_ms).abs();
-            self.ewma_jitter_ms = JITTER_ALPHA * self.ewma_jitter_ms + (1.0 - JITTER_ALPHA) * transit_diff;
+            self.ewma_jitter_ms =
+                JITTER_ALPHA * self.ewma_jitter_ms + (1.0 - JITTER_ALPHA) * transit_diff;
         }
         self.last_arrival = Some(now);
         self.last_rtp_ts = Some(rtp_ts);
 
         // Periodically adapt target delay
-        if now.saturating_duration_since(self.last_adapt) >= Duration::from_millis(ADAPT_INTERVAL_MS) {
+        if now.saturating_duration_since(self.last_adapt)
+            >= Duration::from_millis(ADAPT_INTERVAL_MS)
+        {
             let desired = self.min_delay_ms as f64 + self.ewma_jitter_ms * JITTER_MARGIN;
-            let clamped = desired.round().max(self.min_delay_ms as f64).min(self.max_delay_ms as f64) as u32;
+            let clamped = desired
+                .round()
+                .max(self.min_delay_ms as f64)
+                .min(self.max_delay_ms as f64) as u32;
             self.target_delay_ms = clamped;
             self.last_adapt = now;
         }
@@ -122,7 +130,8 @@ impl JitterBuffer {
         // Skip overdue packets that exceeded max_delay
         let mut to_skip = Vec::new();
         for (seq, (_, arrived_at)) in &self.buffer {
-            if now.saturating_duration_since(*arrived_at) > max_delay && *seq == self.next_sequence {
+            if now.saturating_duration_since(*arrived_at) > max_delay && *seq == self.next_sequence
+            {
                 to_skip.push(*seq);
             }
         }
@@ -147,8 +156,8 @@ impl JitterBuffer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::rtp::RtpPacket;
+    use super::*;
 
     fn make_pkt(seq: u16, ts: u32) -> RtpPacket {
         RtpPacket {
@@ -172,7 +181,11 @@ mod tests {
             jb.push(make_pkt(i, i as u32 * 160), arrival);
         }
         // After seeing jitter, target delay should have increased above minimum
-        assert!(jb.target_delay_ms > 20, "target_delay should adapt: {}", jb.target_delay_ms);
+        assert!(
+            jb.target_delay_ms > 20,
+            "target_delay should adapt: {}",
+            jb.target_delay_ms
+        );
     }
 
     #[test]

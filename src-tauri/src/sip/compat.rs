@@ -14,10 +14,8 @@ pub fn to_rsip(msg: &SipMessage) -> Result<rsip::SipMessage, String> {
 pub fn from_rsip(msg: &rsip::SipMessage) -> SipMessage {
     match msg {
         rsip::SipMessage::Request(req) => {
-            let mut sip_msg = SipMessage::new_request(
-                &req.method.to_string(),
-                &req.uri.to_string(),
-            );
+            let mut sip_msg =
+                SipMessage::new_request(&req.method.to_string(), &req.uri.to_string());
             for header in req.headers.iter() {
                 let s = header.to_string();
                 if let Some((name, value)) = s.split_once(':') {
@@ -33,10 +31,7 @@ pub fn from_rsip(msg: &rsip::SipMessage) -> SipMessage {
             let code = res.status_code.code();
             // StatusCode Display is "CODE Reason" (e.g. "200 OK"); extract reason after first space.
             let status_str = res.status_code.to_string();
-            let reason = status_str
-                .split_once(' ')
-                .map(|(_, r)| r)
-                .unwrap_or("");
+            let reason = status_str.split_once(' ').map(|(_, r)| r).unwrap_or("");
             let mut sip_msg = SipMessage::new_response(code, reason);
             for header in res.headers.iter() {
                 let s = header.to_string();
@@ -54,8 +49,7 @@ pub fn from_rsip(msg: &rsip::SipMessage) -> SipMessage {
 
 /// Parse raw bytes using rsip's parser (more robust than our hand-rolled one).
 pub fn parse_rsip(data: &[u8]) -> Result<rsip::SipMessage, String> {
-    rsip::SipMessage::try_from(data)
-        .map_err(|e| format!("rsip parse error: {}", e))
+    rsip::SipMessage::try_from(data).map_err(|e| format!("rsip parse error: {}", e))
 }
 
 /// Serialize an rsip message to bytes.

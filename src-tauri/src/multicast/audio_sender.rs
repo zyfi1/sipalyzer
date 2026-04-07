@@ -293,7 +293,13 @@ fn codec_from_name(name: &str) -> Option<Box<dyn AudioCodec>> {
 
 // ── Tone generation ──────────────────────────────────────────────
 
-fn generate_sine(sample_rate: u32, frequency: f32, amplitude: f32, phase: &mut f32, count: usize) -> Vec<i16> {
+fn generate_sine(
+    sample_rate: u32,
+    frequency: f32,
+    amplitude: f32,
+    phase: &mut f32,
+    count: usize,
+) -> Vec<i16> {
     let mut samples = Vec::with_capacity(count);
     let phase_inc = 2.0 * std::f32::consts::PI * frequency / sample_rate as f32;
     for _ in 0..count {
@@ -307,7 +313,13 @@ fn generate_sine(sample_rate: u32, frequency: f32, amplitude: f32, phase: &mut f
     samples
 }
 
-fn generate_sweep(sample_rate: u32, amplitude: f32, phase: &mut f32, sweep_pos: &mut f32, count: usize) -> Vec<i16> {
+fn generate_sweep(
+    sample_rate: u32,
+    amplitude: f32,
+    phase: &mut f32,
+    sweep_pos: &mut f32,
+    count: usize,
+) -> Vec<i16> {
     let mut samples = Vec::with_capacity(count);
     let sweep_rate = 2.0 / sample_rate as f32;
     for _ in 0..count {
@@ -376,7 +388,9 @@ fn start_mic_capture(
             min <= target_rate && target_rate <= max
         }) {
             selected_sample_format = range.sample_format();
-            selected_config = range.with_sample_rate(cpal::SampleRate(target_rate)).config();
+            selected_config = range
+                .with_sample_rate(cpal::SampleRate(target_rate))
+                .config();
         }
     }
 
@@ -450,7 +464,9 @@ fn start_mic_capture(
         )
         .map_err(|e| format!("Failed to build mic input stream: {}", e))?;
 
-    stream.play().map_err(|e| format!("Failed to start mic stream: {}", e))?;
+    stream
+        .play()
+        .map_err(|e| format!("Failed to start mic stream: {}", e))?;
     Ok(SendStream(stream))
 }
 
@@ -546,9 +562,13 @@ pub fn start(
         .set_send_buffer_size(1 << 20)
         .map_err(|e| format!("Failed to set send buffer size: {}", e))?;
     let sock_ref = socket2::SockRef::from(&socket);
-    sock_ref.set_multicast_loop_v4(true).map_err(|e| e.to_string())?;
+    sock_ref
+        .set_multicast_loop_v4(true)
+        .map_err(|e| e.to_string())?;
     let bind_addr = std::net::SocketAddrV4::new(std::net::Ipv4Addr::UNSPECIFIED, 0);
-    socket.bind(&socket2::SockAddr::from(bind_addr)).map_err(|e| e.to_string())?;
+    socket
+        .bind(&socket2::SockAddr::from(bind_addr))
+        .map_err(|e| e.to_string())?;
     let dest = socket2::SockAddr::from(std::net::SocketAddrV4::new(group_addr, port));
 
     // Clone shared state for the sender thread
@@ -580,7 +600,10 @@ pub fn start(
             }
             next_send += frame_duration;
 
-            let current_mode = mode_tx.lock().map(|m| m.clone()).unwrap_or(SourceMode::Tone);
+            let current_mode = mode_tx
+                .lock()
+                .map(|m| m.clone())
+                .unwrap_or(SourceMode::Tone);
 
             let pcm = match current_mode {
                 SourceMode::Tone => {
@@ -588,8 +611,16 @@ pub fn start(
                     let amp = f32::from_bits(amp_tx.load(Ordering::Relaxed));
                     let current_tone = tone_tx.lock().map(|t| *t).unwrap_or(ToneType::Sine);
                     match current_tone {
-                        ToneType::Sine => generate_sine(sample_rate, freq, amp, &mut phase, frame_samples),
-                        ToneType::Sweep => generate_sweep(sample_rate, amp, &mut phase, &mut sweep_pos, frame_samples),
+                        ToneType::Sine => {
+                            generate_sine(sample_rate, freq, amp, &mut phase, frame_samples)
+                        }
+                        ToneType::Sweep => generate_sweep(
+                            sample_rate,
+                            amp,
+                            &mut phase,
+                            &mut sweep_pos,
+                            frame_samples,
+                        ),
                         ToneType::WhiteNoise => generate_noise(amp, frame_samples),
                         ToneType::Silence => vec![0i16; frame_samples],
                     }
@@ -750,7 +781,9 @@ pub fn set_input_gain(group: &str, gain: f32) -> Result<(), String> {
 pub fn set_frequency(group: &str, frequency: f32) -> Result<(), String> {
     let guard = ACTIVE_SENDERS.lock().map_err(|e| e.to_string())?;
     let sender = find_sender(&guard, group)?;
-    sender.frequency.store(frequency.to_bits(), Ordering::Relaxed);
+    sender
+        .frequency
+        .store(frequency.to_bits(), Ordering::Relaxed);
     Ok(())
 }
 
@@ -788,11 +821,7 @@ pub fn get_state(group: &str) -> Result<AudioGeneratorState, String> {
         .lock()
         .map(|m| m.name().to_string())
         .unwrap_or_else(|_| "tone".to_string());
-    let dev_id = sender
-        .input_device_id
-        .lock()
-        .ok()
-        .and_then(|g| g.clone());
+    let dev_id = sender.input_device_id.lock().ok().and_then(|g| g.clone());
     Ok(AudioGeneratorState {
         group: sender.group.clone(),
         generating: true,
@@ -834,8 +863,16 @@ pub fn list_active() -> Vec<AudioGeneratorState> {
     guard
         .values()
         .map(|s| {
-            let tone_name = s.tone_type.lock().map(|t| t.name().to_string()).unwrap_or_default();
-            let mode_name = s.source_mode.lock().map(|m| m.name().to_string()).unwrap_or_else(|_| "tone".to_string());
+            let tone_name = s
+                .tone_type
+                .lock()
+                .map(|t| t.name().to_string())
+                .unwrap_or_default();
+            let mode_name = s
+                .source_mode
+                .lock()
+                .map(|m| m.name().to_string())
+                .unwrap_or_else(|_| "tone".to_string());
             let dev_id = s.input_device_id.lock().ok().and_then(|g| g.clone());
             AudioGeneratorState {
                 group: s.group.clone(),

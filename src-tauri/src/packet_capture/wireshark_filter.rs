@@ -1,7 +1,7 @@
-use anyhow::Result;
-use std::net::IpAddr;
-use ipnetwork::IpNetwork;
 use crate::packet_capture::ApplicationLayer;
+use anyhow::Result;
+use ipnetwork::IpNetwork;
+use std::net::IpAddr;
 
 // ─── AST ────────────────────────────────────────────────────────────────────
 
@@ -15,17 +15,36 @@ pub enum FilterCondition {
     /// Protocol existence check: `sip`, `rtp`, `udp`, `tcp`, `ip`, `dns`, etc.
     Protocol(String),
     /// IP address comparison: `ip.addr == 1.2.3.4`, `ip.src != 10.0.0.0/8`
-    IpAddr { field: IpField, operator: Operator, value: String },
+    IpAddr {
+        field: IpField,
+        operator: Operator,
+        value: String,
+    },
     /// Port comparison: `udp.port == 5060`, `tcp.dstport > 1024`
-    Port { field: PortField, operator: Operator, value: u16 },
+    Port {
+        field: PortField,
+        operator: Operator,
+        value: u16,
+    },
     /// Generic field comparison: `sip.method == "INVITE"`, `frame.len > 500`
-    Field { field: String, operator: Operator, value: FilterValue },
+    Field {
+        field: String,
+        operator: Operator,
+        value: FilterValue,
+    },
     /// Logical combination: `&&`, `||`
-    Logical { op: LogicalOp, left: Box<FilterCondition>, right: Box<FilterCondition> },
+    Logical {
+        op: LogicalOp,
+        left: Box<FilterCondition>,
+        right: Box<FilterCondition>,
+    },
     /// Negation: `!sip`, `not (ip.addr == 1.2.3.4)`
     Not(Box<FilterCondition>),
     /// Set membership: `tcp.port in {80, 443, 8080}`, `ip.addr in {1.2.3.4, 5.6.7.8}`
-    InSet { field: String, values: Vec<FilterValue> },
+    InSet {
+        field: String,
+        values: Vec<FilterValue>,
+    },
     /// Regex match: `sip.Method ~ "INVITE|REGISTER"`, `frame ~ "pattern"`
     Matches { field: String, pattern: String },
     /// Frame/payload text search: `frame contains "SIP/2.0"`
@@ -38,16 +57,16 @@ pub enum FilterCondition {
 
 #[derive(Debug, Clone)]
 pub enum IpField {
-    Addr,  // ip.addr (matches src or dst)
-    Src,   // ip.src
-    Dst,   // ip.dst
+    Addr, // ip.addr (matches src or dst)
+    Src,  // ip.src
+    Dst,  // ip.dst
 }
 
 #[derive(Debug, Clone)]
 pub enum PortField {
-    Port,     // udp.port or tcp.port (matches src or dst)
-    SrcPort,  // udp.srcport or tcp.srcport
-    DstPort,  // udp.dstport or tcp.dstport
+    Port,    // udp.port or tcp.port (matches src or dst)
+    SrcPort, // udp.srcport or tcp.srcport
+    DstPort, // udp.dstport or tcp.dstport
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -120,7 +139,7 @@ impl WiresharkFilter {
         }
 
         let (condition, pos) = Self::parse_expression(&tokens, 0)?;
-        
+
         // All tokens should be consumed; if not, report a useful error
         if pos < tokens.len() {
             // Skip stray right-parens (graceful recovery)
@@ -129,11 +148,17 @@ impl WiresharkFilter {
                 check_pos += 1;
             }
             if check_pos < tokens.len() {
-                return Err(anyhow::anyhow!("Unexpected token at position {}: {:?}", check_pos, tokens[check_pos]));
+                return Err(anyhow::anyhow!(
+                    "Unexpected token at position {}: {:?}",
+                    check_pos,
+                    tokens[check_pos]
+                ));
             }
         }
 
-        Ok(Self { conditions: vec![condition] })
+        Ok(Self {
+            conditions: vec![condition],
+        })
     }
 
     // ── Tokenizer ───────────────────────────────────────────────────────────
@@ -168,14 +193,19 @@ impl WiresharkFilter {
                             '"' => s.push('"'),
                             '\'' => s.push('\''),
                             '\\' => s.push('\\'),
-                            other => { s.push('\\'); s.push(other); }
+                            other => {
+                                s.push('\\');
+                                s.push(other);
+                            }
                         }
                     } else {
                         s.push(chars[i]);
                     }
                     i += 1;
                 }
-                if i < len { i += 1; } // skip closing quote
+                if i < len {
+                    i += 1;
+                } // skip closing quote
                 tokens.push(Token::QuotedString(s));
                 continue;
             }
@@ -184,44 +214,130 @@ impl WiresharkFilter {
             if i + 1 < len {
                 let two = format!("{}{}", chars[i], chars[i + 1]);
                 match two.as_str() {
-                    "==" => { tokens.push(Token::Equals); i += 2; continue; }
-                    "!=" => { tokens.push(Token::NotEquals); i += 2; continue; }
-                    ">=" => { tokens.push(Token::GreaterEqual); i += 2; continue; }
-                    "<=" => { tokens.push(Token::LessEqual); i += 2; continue; }
-                    "&&" => { tokens.push(Token::And); i += 2; continue; }
-                    "||" => { tokens.push(Token::Or); i += 2; continue; }
-                    "^^" => { tokens.push(Token::Xor); i += 2; continue; }
-                    ".." => { tokens.push(Token::DotDot); i += 2; continue; }
+                    "==" => {
+                        tokens.push(Token::Equals);
+                        i += 2;
+                        continue;
+                    }
+                    "!=" => {
+                        tokens.push(Token::NotEquals);
+                        i += 2;
+                        continue;
+                    }
+                    ">=" => {
+                        tokens.push(Token::GreaterEqual);
+                        i += 2;
+                        continue;
+                    }
+                    "<=" => {
+                        tokens.push(Token::LessEqual);
+                        i += 2;
+                        continue;
+                    }
+                    "&&" => {
+                        tokens.push(Token::And);
+                        i += 2;
+                        continue;
+                    }
+                    "||" => {
+                        tokens.push(Token::Or);
+                        i += 2;
+                        continue;
+                    }
+                    "^^" => {
+                        tokens.push(Token::Xor);
+                        i += 2;
+                        continue;
+                    }
+                    ".." => {
+                        tokens.push(Token::DotDot);
+                        i += 2;
+                        continue;
+                    }
                     _ => {}
                 }
             }
 
             // Single-character operators/symbols
             match ch {
-                '>' => { tokens.push(Token::GreaterThan); i += 1; continue; }
-                '<' => { tokens.push(Token::LessThan); i += 1; continue; }
-                '!' => { tokens.push(Token::Not); i += 1; continue; }
-                '~' => { tokens.push(Token::Matches); i += 1; continue; }
-                '(' => { tokens.push(Token::LeftParen); i += 1; continue; }
-                ')' => { tokens.push(Token::RightParen); i += 1; continue; }
-                '{' => { tokens.push(Token::LeftBrace); i += 1; continue; }
-                '}' => { tokens.push(Token::RightBrace); i += 1; continue; }
-                ',' => { tokens.push(Token::Comma); i += 1; continue; }
+                '>' => {
+                    tokens.push(Token::GreaterThan);
+                    i += 1;
+                    continue;
+                }
+                '<' => {
+                    tokens.push(Token::LessThan);
+                    i += 1;
+                    continue;
+                }
+                '!' => {
+                    tokens.push(Token::Not);
+                    i += 1;
+                    continue;
+                }
+                '~' => {
+                    tokens.push(Token::Matches);
+                    i += 1;
+                    continue;
+                }
+                '(' => {
+                    tokens.push(Token::LeftParen);
+                    i += 1;
+                    continue;
+                }
+                ')' => {
+                    tokens.push(Token::RightParen);
+                    i += 1;
+                    continue;
+                }
+                '{' => {
+                    tokens.push(Token::LeftBrace);
+                    i += 1;
+                    continue;
+                }
+                '}' => {
+                    tokens.push(Token::RightBrace);
+                    i += 1;
+                    continue;
+                }
+                ',' => {
+                    tokens.push(Token::Comma);
+                    i += 1;
+                    continue;
+                }
                 // Single & is bitwise AND (used for tcp.flags & 0x02)
-                '&' => { tokens.push(Token::BitwiseAnd); i += 1; continue; }
+                '&' => {
+                    tokens.push(Token::BitwiseAnd);
+                    i += 1;
+                    continue;
+                }
                 // Single ^ is bitwise XOR
-                '^' => { tokens.push(Token::BitwiseAnd); i += 1; continue; } // reuse — rare
+                '^' => {
+                    tokens.push(Token::BitwiseAnd);
+                    i += 1;
+                    continue;
+                } // reuse — rare
                 // Single | is not valid (user probably meant ||)
                 '|' => {
-                    return Err(anyhow::anyhow!("Single '|' is not a valid operator. Use '||' for logical OR"));
+                    return Err(anyhow::anyhow!(
+                        "Single '|' is not a valid operator. Use '||' for logical OR"
+                    ));
                 }
                 _ => {}
             }
 
             // Identifier or number (includes dots for field names, colons for IPv6, slashes for CIDR)
-            if ch.is_alphanumeric() || ch == '_' || ch == '.' || ch == ':' || ch == '/' || ch == '-' {
+            if ch.is_alphanumeric() || ch == '_' || ch == '.' || ch == ':' || ch == '/' || ch == '-'
+            {
                 let start = i;
-                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.' || chars[i] == ':' || chars[i] == '/' || chars[i] == '-') {
+                while i < len
+                    && (chars[i].is_alphanumeric()
+                        || chars[i] == '_'
+                        || chars[i] == '.'
+                        || chars[i] == ':'
+                        || chars[i] == '/'
+                        || chars[i] == '-')
+                {
                     i += 1;
                 }
                 let word = chars[start..i].iter().collect::<String>();
@@ -373,9 +489,19 @@ impl WiresharkFilter {
             Token::Identifier(id) => id.clone(),
             Token::Number(n) => {
                 // Bare number "1" or "0" (e.g. result of parenthesized expression)
-                return Ok((FilterCondition::Protocol(if *n != 0 { "__true__" } else { "__false__" }.to_string()), start + 1));
+                return Ok((
+                    FilterCondition::Protocol(
+                        if *n != 0 { "__true__" } else { "__false__" }.to_string(),
+                    ),
+                    start + 1,
+                ));
             }
-            _ => return Err(anyhow::anyhow!("Expected field name or protocol, got {:?}", tokens[start])),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Expected field name or protocol, got {:?}",
+                    tokens[start]
+                ))
+            }
         };
 
         let field_lower = field.to_lowercase();
@@ -404,10 +530,18 @@ impl WiresharkFilter {
             }
             let mask = match &tokens[start + 2] {
                 Token::Number(n) => *n,
-                Token::Identifier(s) => parse_number(s).ok_or_else(|| anyhow::anyhow!("Expected numeric mask after '&', got '{}'", s))?,
+                Token::Identifier(s) => parse_number(s).ok_or_else(|| {
+                    anyhow::anyhow!("Expected numeric mask after '&', got '{}'", s)
+                })?,
                 _ => return Err(anyhow::anyhow!("Expected numeric mask after '&'")),
             };
-            return Ok((FilterCondition::BitwiseAnd { field: field_lower, mask }, start + 3));
+            return Ok((
+                FilterCondition::BitwiseAnd {
+                    field: field_lower,
+                    mask,
+                },
+                start + 3,
+            ));
         }
 
         // ── "field in { ... }" ──────────────────────────────────────────────
@@ -425,7 +559,8 @@ impl WiresharkFilter {
                 Token::Identifier(s) => s.clone(),
                 Token::Number(n) => n.to_string(),
                 // Accept keyword tokens as string values
-                other => token_to_string(other).ok_or_else(|| anyhow::anyhow!("Expected search string after 'contains'"))?,
+                other => token_to_string(other)
+                    .ok_or_else(|| anyhow::anyhow!("Expected search string after 'contains'"))?,
             };
 
             // Special case: "frame contains" → FrameContains
@@ -433,11 +568,14 @@ impl WiresharkFilter {
                 return Ok((FilterCondition::FrameContains(search_str), start + 3));
             }
 
-            return Ok((FilterCondition::Field {
-                field,
-                operator: Operator::Contains,
-                value: FilterValue::String(search_str),
-            }, start + 3));
+            return Ok((
+                FilterCondition::Field {
+                    field,
+                    operator: Operator::Contains,
+                    value: FilterValue::String(search_str),
+                },
+                start + 3,
+            ));
         }
 
         // ── "field matches/~ pattern" ───────────────────────────────────────
@@ -448,7 +586,8 @@ impl WiresharkFilter {
             let pattern = match &tokens[start + 2] {
                 Token::QuotedString(s) => s.clone(),
                 Token::Identifier(s) => s.clone(),
-                other => token_to_string(other).ok_or_else(|| anyhow::anyhow!("Expected regex pattern"))?,
+                other => token_to_string(other)
+                    .ok_or_else(|| anyhow::anyhow!("Expected regex pattern"))?,
             };
             return Ok((FilterCondition::Matches { field, pattern }, start + 3));
         }
@@ -461,7 +600,13 @@ impl WiresharkFilter {
             Token::LessThan => Operator::LessThan,
             Token::GreaterEqual => Operator::GreaterEqual,
             Token::LessEqual => Operator::LessEqual,
-            _ => return Err(anyhow::anyhow!("Expected operator after '{}', got {:?}", field, tokens[start + 1])),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Expected operator after '{}', got {:?}",
+                    field,
+                    tokens[start + 1]
+                ))
+            }
         };
 
         if start + 2 >= tokens.len() {
@@ -512,7 +657,11 @@ impl WiresharkFilter {
         }
     }
 
-    fn parse_in_set(tokens: &[Token], start: usize, field: &str) -> Result<(FilterCondition, usize)> {
+    fn parse_in_set(
+        tokens: &[Token],
+        start: usize,
+        field: &str,
+    ) -> Result<(FilterCondition, usize)> {
         // field in { v1, v2, ... }
         let mut pos = start + 2; // skip field and 'in'
         if pos >= tokens.len() || !matches!(tokens[pos], Token::LeftBrace) {
@@ -552,8 +701,14 @@ impl WiresharkFilter {
                     }
                 }
                 Token::QuotedString(s) => FilterValue::String(s.clone()),
-                Token::Comma => { pos += 1; continue; }
-                _ => { pos += 1; continue; }
+                Token::Comma => {
+                    pos += 1;
+                    continue;
+                }
+                _ => {
+                    pos += 1;
+                    continue;
+                }
             };
             values.push(val);
             pos += 1;
@@ -567,10 +722,20 @@ impl WiresharkFilter {
             pos += 1;
         }
 
-        Ok((FilterCondition::InSet { field: field.to_string(), values }, pos))
+        Ok((
+            FilterCondition::InSet {
+                field: field.to_string(),
+                values,
+            },
+            pos,
+        ))
     }
 
-    fn build_comparison(field: &str, operator: Operator, value: FilterValue) -> Result<FilterCondition> {
+    fn build_comparison(
+        field: &str,
+        operator: Operator,
+        value: FilterValue,
+    ) -> Result<FilterCondition> {
         let field_lower = field.to_lowercase();
 
         // IP address fields
@@ -586,11 +751,18 @@ impl WiresharkFilter {
                 FilterValue::Ip(ip) => ip.to_string(),
                 FilterValue::Number(n) => n.to_string(),
             };
-            return Ok(FilterCondition::IpAddr { field: ip_field, operator, value: ip_str });
+            return Ok(FilterCondition::IpAddr {
+                field: ip_field,
+                operator,
+                value: ip_str,
+            });
         }
 
         // Port fields
-        if field_lower.ends_with(".port") || field_lower.ends_with(".srcport") || field_lower.ends_with(".dstport") {
+        if field_lower.ends_with(".port")
+            || field_lower.ends_with(".srcport")
+            || field_lower.ends_with(".dstport")
+        {
             let port_field = if field_lower.ends_with(".srcport") {
                 PortField::SrcPort
             } else if field_lower.ends_with(".dstport") {
@@ -600,14 +772,24 @@ impl WiresharkFilter {
             };
             let port = match &value {
                 FilterValue::Number(n) => *n as u16,
-                FilterValue::String(s) => s.parse::<u16>().map_err(|_| anyhow::anyhow!("Invalid port: {}", s))?,
+                FilterValue::String(s) => s
+                    .parse::<u16>()
+                    .map_err(|_| anyhow::anyhow!("Invalid port: {}", s))?,
                 _ => return Err(anyhow::anyhow!("Port field requires numeric value")),
             };
-            return Ok(FilterCondition::Port { field: port_field, operator, value: port });
+            return Ok(FilterCondition::Port {
+                field: port_field,
+                operator,
+                value: port,
+            });
         }
 
         // Everything else is a generic field comparison
-        Ok(FilterCondition::Field { field: field.to_string(), operator, value })
+        Ok(FilterCondition::Field {
+            field: field.to_string(),
+            operator,
+            value,
+        })
     }
 
     // ── Evaluation ──────────────────────────────────────────────────────────
@@ -616,15 +798,25 @@ impl WiresharkFilter {
         if self.conditions.is_empty() {
             return true;
         }
-        self.conditions.iter().all(|cond| self.evaluate_condition(cond, packet))
+        self.conditions
+            .iter()
+            .all(|cond| self.evaluate_condition(cond, packet))
     }
 
-    fn evaluate_condition(&self, condition: &FilterCondition, packet: &crate::packet_capture::PacketInfo) -> bool {
+    fn evaluate_condition(
+        &self,
+        condition: &FilterCondition,
+        packet: &crate::packet_capture::PacketInfo,
+    ) -> bool {
         match condition {
             FilterCondition::Protocol(proto) => {
                 // Special internal values from parenthesized expression results
-                if proto == "__true__" { return true; }
-                if proto == "__false__" { return false; }
+                if proto == "__true__" {
+                    return true;
+                }
+                if proto == "__false__" {
+                    return false;
+                }
 
                 let pkt_proto = packet.protocol;
                 match proto.as_str() {
@@ -632,23 +824,28 @@ impl WiresharkFilter {
                     "ip" | "ipv4" => true,
                     "ipv6" => matches!(packet.src_ip, IpAddr::V6(_)),
                     // Transport layer: match protocol family
-                    "tcp" => matches!(pkt_proto, 
-                        crate::packet_capture::Protocol::TCP | 
-                        crate::packet_capture::Protocol::HTTP | 
-                        crate::packet_capture::Protocol::HTTPS
+                    "tcp" => matches!(
+                        pkt_proto,
+                        crate::packet_capture::Protocol::TCP
+                            | crate::packet_capture::Protocol::HTTP
+                            | crate::packet_capture::Protocol::HTTPS
                     ),
-                    "udp" => matches!(pkt_proto,
-                        crate::packet_capture::Protocol::UDP |
-                        crate::packet_capture::Protocol::SIP |
-                        crate::packet_capture::Protocol::RTP |
-                        crate::packet_capture::Protocol::SRTP |
-                        crate::packet_capture::Protocol::RTCP |
-                        crate::packet_capture::Protocol::FAX |
-                        crate::packet_capture::Protocol::DNS
+                    "udp" => matches!(
+                        pkt_proto,
+                        crate::packet_capture::Protocol::UDP
+                            | crate::packet_capture::Protocol::SIP
+                            | crate::packet_capture::Protocol::RTP
+                            | crate::packet_capture::Protocol::SRTP
+                            | crate::packet_capture::Protocol::RTCP
+                            | crate::packet_capture::Protocol::FAX
+                            | crate::packet_capture::Protocol::DNS
                     ),
                     // Application layer: exact match
                     "sip" => pkt_proto == crate::packet_capture::Protocol::SIP,
-                    "rtp" => pkt_proto == crate::packet_capture::Protocol::RTP || pkt_proto == crate::packet_capture::Protocol::SRTP,
+                    "rtp" => {
+                        pkt_proto == crate::packet_capture::Protocol::RTP
+                            || pkt_proto == crate::packet_capture::Protocol::SRTP
+                    }
                     "srtp" => pkt_proto == crate::packet_capture::Protocol::SRTP,
                     "rtcp" => pkt_proto == crate::packet_capture::Protocol::RTCP,
                     "dns" => pkt_proto == crate::packet_capture::Protocol::DNS,
@@ -665,19 +862,23 @@ impl WiresharkFilter {
                 }
             }
 
-            FilterCondition::IpAddr { field, operator, value } => {
+            FilterCondition::IpAddr {
+                field,
+                operator,
+                value,
+            } => {
                 match field {
                     IpField::Addr => {
                         // Wireshark semantics: ip.addr == X means "src OR dst matches X"
                         // ip.addr != X means "src AND dst both don't match X" (no address is X)
                         match operator {
                             Operator::NotEquals => {
-                                compare_ip(&packet.src_ip, operator, value) &&
-                                compare_ip(&packet.dst_ip, operator, value)
+                                compare_ip(&packet.src_ip, operator, value)
+                                    && compare_ip(&packet.dst_ip, operator, value)
                             }
                             _ => {
-                                compare_ip(&packet.src_ip, operator, value) ||
-                                compare_ip(&packet.dst_ip, operator, value)
+                                compare_ip(&packet.src_ip, operator, value)
+                                    || compare_ip(&packet.dst_ip, operator, value)
                             }
                         }
                     }
@@ -686,18 +887,22 @@ impl WiresharkFilter {
                 }
             }
 
-            FilterCondition::Port { field, operator, value } => {
+            FilterCondition::Port {
+                field,
+                operator,
+                value,
+            } => {
                 match field {
                     PortField::Port => {
                         // Wireshark semantics: port != X means neither src nor dst is X
                         match operator {
                             Operator::NotEquals => {
-                                compare_port(packet.src_port, operator, *value) &&
-                                compare_port(packet.dst_port, operator, *value)
+                                compare_port(packet.src_port, operator, *value)
+                                    && compare_port(packet.dst_port, operator, *value)
                             }
                             _ => {
-                                compare_port(packet.src_port, operator, *value) ||
-                                compare_port(packet.dst_port, operator, *value)
+                                compare_port(packet.src_port, operator, *value)
+                                    || compare_port(packet.dst_port, operator, *value)
                             }
                         }
                     }
@@ -706,31 +911,27 @@ impl WiresharkFilter {
                 }
             }
 
-            FilterCondition::Field { field, operator, value } => {
-                self.evaluate_field(field, operator, value, packet)
-            }
+            FilterCondition::Field {
+                field,
+                operator,
+                value,
+            } => self.evaluate_field(field, operator, value, packet),
 
-            FilterCondition::Logical { op, left, right } => {
-                match op {
-                    LogicalOp::And => {
-                        self.evaluate_condition(left, packet) && self.evaluate_condition(right, packet)
-                    }
-                    LogicalOp::Or => {
-                        self.evaluate_condition(left, packet) || self.evaluate_condition(right, packet)
-                    }
-                    LogicalOp::Xor => {
-                        self.evaluate_condition(left, packet) ^ self.evaluate_condition(right, packet)
-                    }
+            FilterCondition::Logical { op, left, right } => match op {
+                LogicalOp::And => {
+                    self.evaluate_condition(left, packet) && self.evaluate_condition(right, packet)
                 }
-            }
+                LogicalOp::Or => {
+                    self.evaluate_condition(left, packet) || self.evaluate_condition(right, packet)
+                }
+                LogicalOp::Xor => {
+                    self.evaluate_condition(left, packet) ^ self.evaluate_condition(right, packet)
+                }
+            },
 
-            FilterCondition::Not(cond) => {
-                !self.evaluate_condition(cond, packet)
-            }
+            FilterCondition::Not(cond) => !self.evaluate_condition(cond, packet),
 
-            FilterCondition::InSet { field, values } => {
-                self.evaluate_in_set(field, values, packet)
-            }
+            FilterCondition::InSet { field, values } => self.evaluate_in_set(field, values, packet),
 
             FilterCondition::Matches { field, pattern } => {
                 self.evaluate_matches(field, pattern, packet)
@@ -743,9 +944,7 @@ impl WiresharkFilter {
                 data_str.to_lowercase().contains(&search_lower)
             }
 
-            FilterCondition::FieldExists(field) => {
-                self.evaluate_field_exists(field, packet)
-            }
+            FilterCondition::FieldExists(field) => self.evaluate_field_exists(field, packet),
 
             FilterCondition::BitwiseAnd { field, mask } => {
                 self.evaluate_bitwise_and(field, *mask, packet)
@@ -754,38 +953,56 @@ impl WiresharkFilter {
     }
 
     /// Wireshark field existence check — returns true if the field has a value.
-    fn evaluate_field_exists(&self, field: &str, packet: &crate::packet_capture::PacketInfo) -> bool {
+    fn evaluate_field_exists(
+        &self,
+        field: &str,
+        packet: &crate::packet_capture::PacketInfo,
+    ) -> bool {
         let f = field.to_lowercase();
 
         // IP fields — present on all IP packets
-        if f == "ip.src" || f == "ip.dst" || f == "ip.addr" || f == "ip.ttl" || f == "ip.proto" || f == "ip.id" || f == "ip.len" || f == "ip.version" {
+        if f == "ip.src"
+            || f == "ip.dst"
+            || f == "ip.addr"
+            || f == "ip.ttl"
+            || f == "ip.proto"
+            || f == "ip.id"
+            || f == "ip.len"
+            || f == "ip.version"
+        {
             return true; // all captured packets are IP
         }
 
         // Ethernet fields
         if f.starts_with("eth.") {
-            return packet.decoded.as_ref().and_then(|d| d.ethernet.as_ref()).is_some();
+            return packet
+                .decoded
+                .as_ref()
+                .and_then(|d| d.ethernet.as_ref())
+                .is_some();
         }
 
         // TCP fields
         if f.starts_with("tcp.") {
-            return matches!(packet.protocol,
-                crate::packet_capture::Protocol::TCP |
-                crate::packet_capture::Protocol::HTTP |
-                crate::packet_capture::Protocol::HTTPS
+            return matches!(
+                packet.protocol,
+                crate::packet_capture::Protocol::TCP
+                    | crate::packet_capture::Protocol::HTTP
+                    | crate::packet_capture::Protocol::HTTPS
             );
         }
 
         // UDP fields
         if f.starts_with("udp.") {
-            return matches!(packet.protocol,
-                crate::packet_capture::Protocol::UDP |
-                crate::packet_capture::Protocol::SIP |
-                crate::packet_capture::Protocol::RTP |
-                crate::packet_capture::Protocol::SRTP |
-                crate::packet_capture::Protocol::RTCP |
-                crate::packet_capture::Protocol::FAX |
-                crate::packet_capture::Protocol::DNS
+            return matches!(
+                packet.protocol,
+                crate::packet_capture::Protocol::UDP
+                    | crate::packet_capture::Protocol::SIP
+                    | crate::packet_capture::Protocol::RTP
+                    | crate::packet_capture::Protocol::SRTP
+                    | crate::packet_capture::Protocol::RTCP
+                    | crate::packet_capture::Protocol::FAX
+                    | crate::packet_capture::Protocol::DNS
             );
         }
 
@@ -861,7 +1078,12 @@ impl WiresharkFilter {
     }
 
     /// Evaluate `field & mask` — true if the bitwise AND result is non-zero.
-    fn evaluate_bitwise_and(&self, field: &str, mask: i64, packet: &crate::packet_capture::PacketInfo) -> bool {
+    fn evaluate_bitwise_and(
+        &self,
+        field: &str,
+        mask: i64,
+        packet: &crate::packet_capture::PacketInfo,
+    ) -> bool {
         let f = field.to_lowercase();
 
         // TCP flags
@@ -887,7 +1109,13 @@ impl WiresharkFilter {
         false
     }
 
-    fn evaluate_field(&self, field: &str, operator: &Operator, value: &FilterValue, packet: &crate::packet_capture::PacketInfo) -> bool {
+    fn evaluate_field(
+        &self,
+        field: &str,
+        operator: &Operator,
+        value: &FilterValue,
+        packet: &crate::packet_capture::PacketInfo,
+    ) -> bool {
         let field_lower = field.to_lowercase();
 
         // ── Frame / packet fields ────────────────────────────────────────────
@@ -919,7 +1147,8 @@ impl WiresharkFilter {
                             // Match either src or dst
                             let val_str = filter_value_to_string(value);
                             let val_lower = val_str.to_lowercase();
-                            return eth.src_mac.to_lowercase() == val_lower || eth.dst_mac.to_lowercase() == val_lower;
+                            return eth.src_mac.to_lowercase() == val_lower
+                                || eth.dst_mac.to_lowercase() == val_lower;
                         }
                         "eth.type" => {
                             return compare_number(eth.ethertype as i64, operator, value);
@@ -1011,7 +1240,11 @@ impl WiresharkFilter {
 
         // ── IP version ───────────────────────────────────────────────────────
         if field_lower == "ip.version" {
-            let version: i64 = if matches!(packet.src_ip, IpAddr::V6(_)) { 6 } else { 4 };
+            let version: i64 = if matches!(packet.src_ip, IpAddr::V6(_)) {
+                6
+            } else {
+                4
+            };
             return compare_number(version, operator, value);
         }
 
@@ -1054,7 +1287,12 @@ impl WiresharkFilter {
         false
     }
 
-    fn evaluate_in_set(&self, field: &str, values: &[FilterValue], packet: &crate::packet_capture::PacketInfo) -> bool {
+    fn evaluate_in_set(
+        &self,
+        field: &str,
+        values: &[FilterValue],
+        packet: &crate::packet_capture::PacketInfo,
+    ) -> bool {
         let field_lower = field.to_lowercase();
 
         // IP address sets
@@ -1077,7 +1315,10 @@ impl WiresharkFilter {
         }
 
         // Port sets
-        if field_lower.ends_with(".port") || field_lower.ends_with(".srcport") || field_lower.ends_with(".dstport") {
+        if field_lower.ends_with(".port")
+            || field_lower.ends_with(".srcport")
+            || field_lower.ends_with(".dstport")
+        {
             let ports_to_check: Vec<u16> = if field_lower.ends_with(".srcport") {
                 vec![packet.src_port]
             } else if field_lower.ends_with(".dstport") {
@@ -1101,7 +1342,12 @@ impl WiresharkFilter {
         false
     }
 
-    fn evaluate_matches(&self, field: &str, pattern: &str, packet: &crate::packet_capture::PacketInfo) -> bool {
+    fn evaluate_matches(
+        &self,
+        field: &str,
+        pattern: &str,
+        packet: &crate::packet_capture::PacketInfo,
+    ) -> bool {
         let re = match regex::Regex::new(&format!("(?i){}", pattern)) {
             Ok(r) => r,
             Err(_) => return false,
@@ -1156,14 +1402,30 @@ fn parse_number(s: &str) -> Option<i64> {
 }
 
 fn is_protocol_name(s: &str) -> bool {
-    matches!(s,
-        "ip" | "ipv4" | "ipv6" |
-        "tcp" | "udp" |
-        "sip" | "rtp" | "srtp" | "rtcp" |
-        "dns" | "http" | "https" | "tls" | "ssl" |
-        "fax" | "t38" | "udptl" |
-        "icmp" | "icmpv6" | "arp" |
-        "eth" | "ethernet" | "frame"
+    matches!(
+        s,
+        "ip" | "ipv4"
+            | "ipv6"
+            | "tcp"
+            | "udp"
+            | "sip"
+            | "rtp"
+            | "srtp"
+            | "rtcp"
+            | "dns"
+            | "http"
+            | "https"
+            | "tls"
+            | "ssl"
+            | "fax"
+            | "t38"
+            | "udptl"
+            | "icmp"
+            | "icmpv6"
+            | "arp"
+            | "eth"
+            | "ethernet"
+            | "frame"
     )
 }
 
@@ -1191,12 +1453,18 @@ fn token_to_string(token: &Token) -> Option<String> {
 }
 
 fn is_operator_token(token: &Token) -> bool {
-    matches!(token,
-        Token::Equals | Token::NotEquals |
-        Token::GreaterThan | Token::LessThan |
-        Token::GreaterEqual | Token::LessEqual |
-        Token::Contains | Token::Matches | Token::In |
-        Token::BitwiseAnd
+    matches!(
+        token,
+        Token::Equals
+            | Token::NotEquals
+            | Token::GreaterThan
+            | Token::LessThan
+            | Token::GreaterEqual
+            | Token::LessEqual
+            | Token::Contains
+            | Token::Matches
+            | Token::In
+            | Token::BitwiseAnd
     )
 }
 
@@ -1236,7 +1504,11 @@ fn compare_number(field_val: i64, operator: &Operator, value: &FilterValue) -> b
     let target = match value {
         FilterValue::Number(n) => *n,
         FilterValue::String(s) => {
-            if let Some(n) = parse_number(s) { n } else { return false; }
+            if let Some(n) = parse_number(s) {
+                n
+            } else {
+                return false;
+            }
         }
         _ => return false,
     };
@@ -1271,49 +1543,84 @@ fn filter_value_to_string(v: &FilterValue) -> String {
 
 // ─── SIP Field Evaluation ───────────────────────────────────────────────────
 
-fn get_sip_field_value(field: &str, sip: &crate::packet_capture::sip_parser::ParsedSipMessage) -> String {
+fn get_sip_field_value(
+    field: &str,
+    sip: &crate::packet_capture::sip_parser::ParsedSipMessage,
+) -> String {
     match field {
         "sip.method" | "sip.request.method" => sip.method.as_deref().unwrap_or("").to_string(),
         "sip.status-code" | "sip.status_code" | "sip.response.code" | "sip.status-line" => {
             sip.response_code.map(|c| c.to_string()).unwrap_or_default()
         }
-        "sip.call-id" | "sip.callid" | "sip.call_id" => sip.call_id.as_deref().unwrap_or("").to_string(),
+        "sip.call-id" | "sip.callid" | "sip.call_id" => {
+            sip.call_id.as_deref().unwrap_or("").to_string()
+        }
         "sip.from" | "sip.from.addr" => sip.from.as_deref().unwrap_or("").to_string(),
         "sip.to" | "sip.to.addr" => sip.to.as_deref().unwrap_or("").to_string(),
-        "sip.request-uri" | "sip.r-uri" | "sip.requesturi" => sip.request_uri.as_deref().unwrap_or("").to_string(),
-        "sip.user-agent" | "sip.user_agent" => sip.headers.get("user-agent").cloned().unwrap_or_default(),
+        "sip.request-uri" | "sip.r-uri" | "sip.requesturi" => {
+            sip.request_uri.as_deref().unwrap_or("").to_string()
+        }
+        "sip.user-agent" | "sip.user_agent" => {
+            sip.headers.get("user-agent").cloned().unwrap_or_default()
+        }
         "sip.expires" => sip.headers.get("expires").cloned().unwrap_or_default(),
         "sip.contact" | "sip.contact.addr" => sip.contact.as_deref().unwrap_or("").to_string(),
         "sip.cseq" => sip.cseq.as_deref().unwrap_or("").to_string(),
-        "sip.cseq.num" => {
-            sip.cseq.as_deref().unwrap_or("")
-                .split_whitespace().next().unwrap_or("").to_string()
-        }
-        "sip.cseq.method" => {
-            sip.cseq.as_deref().unwrap_or("")
-                .split_whitespace().nth(1).unwrap_or("").to_string()
-        }
+        "sip.cseq.num" => sip
+            .cseq
+            .as_deref()
+            .unwrap_or("")
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string(),
+        "sip.cseq.method" => sip
+            .cseq
+            .as_deref()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or("")
+            .to_string(),
         "sip.via" => sip.via.first().cloned().unwrap_or_default(),
-        "sip.content-type" | "sip.content_type" => sip.content_type.as_deref().unwrap_or("").to_string(),
-        "sip.content-length" | "sip.content_length" => {
-            sip.content_length.map(|l| l.to_string()).unwrap_or_default()
+        "sip.content-type" | "sip.content_type" => {
+            sip.content_type.as_deref().unwrap_or("").to_string()
         }
-        "sip.response_text" | "sip.reason" => sip.response_text.as_deref().unwrap_or("").to_string(),
+        "sip.content-length" | "sip.content_length" => sip
+            .content_length
+            .map(|l| l.to_string())
+            .unwrap_or_default(),
+        "sip.response_text" | "sip.reason" => {
+            sip.response_text.as_deref().unwrap_or("").to_string()
+        }
         _ => {
             // Try generic header lookup: sip.xxx → header "xxx"
-            let header_name = if field.starts_with("sip.") { &field[4..] } else { field };
-            sip.headers.get(header_name).cloned()
+            let header_name = if field.starts_with("sip.") {
+                &field[4..]
+            } else {
+                field
+            };
+            sip.headers
+                .get(header_name)
+                .cloned()
                 .or_else(|| sip.headers.get(&header_name.to_lowercase()).cloned())
                 .unwrap_or_default()
         }
     }
 }
 
-fn evaluate_sip_field(field: &str, operator: &Operator, value: &FilterValue, sip: &crate::packet_capture::sip_parser::ParsedSipMessage) -> bool {
+fn evaluate_sip_field(
+    field: &str,
+    operator: &Operator,
+    value: &FilterValue,
+    sip: &crate::packet_capture::sip_parser::ParsedSipMessage,
+) -> bool {
     // Auth parameter special handling
     if field.starts_with("sip.auth.") {
         let auth_field = &field[9..];
-        let auth_header = sip.headers.get("www-authenticate")
+        let auth_header = sip
+            .headers
+            .get("www-authenticate")
             .or_else(|| sip.headers.get("authorization"))
             .or_else(|| sip.headers.get("proxy-authenticate"))
             .or_else(|| sip.headers.get("proxy-authorization"))
@@ -1337,8 +1644,13 @@ fn evaluate_sip_field(field: &str, operator: &Operator, value: &FilterValue, sip
         return false;
     }
     if field == "sip.cseq.num" {
-        let num_str = sip.cseq.as_deref().unwrap_or("")
-            .split_whitespace().next().unwrap_or("0");
+        let num_str = sip
+            .cseq
+            .as_deref()
+            .unwrap_or("")
+            .split_whitespace()
+            .next()
+            .unwrap_or("0");
         if let Ok(n) = num_str.parse::<i64>() {
             return compare_number(n, operator, value);
         }
@@ -1368,11 +1680,18 @@ fn extract_auth_param(auth_header: &str, param_name: &str) -> String {
 
 // ─── DNS Field Evaluation ───────────────────────────────────────────────────
 
-fn evaluate_dns_field(field: &str, operator: &Operator, value: &FilterValue, dns: &crate::packet_capture::dns_parser::DnsMessage) -> bool {
+fn evaluate_dns_field(
+    field: &str,
+    operator: &Operator,
+    value: &FilterValue,
+    dns: &crate::packet_capture::dns_parser::DnsMessage,
+) -> bool {
     match field {
         "dns.qry.name" | "dns.query.name" => {
             let search = filter_value_to_string(value);
-            dns.queries.iter().any(|q| compare_string(&q.name, operator, &FilterValue::String(search.clone())))
+            dns.queries
+                .iter()
+                .any(|q| compare_string(&q.name, operator, &FilterValue::String(search.clone())))
         }
         "dns.flags.response" => {
             let is_response = if dns.is_response { 1i64 } else { 0 };
@@ -1382,19 +1701,26 @@ fn evaluate_dns_field(field: &str, operator: &Operator, value: &FilterValue, dns
             // Support type names
             let target_type = match value {
                 FilterValue::Number(n) => Some(*n as u16),
-                FilterValue::String(s) => {
-                    match s.to_uppercase().as_str() {
-                        "A" => Some(1), "NS" => Some(2), "CNAME" => Some(5),
-                        "SOA" => Some(6), "PTR" => Some(12), "MX" => Some(15),
-                        "TXT" => Some(16), "AAAA" => Some(28), "SRV" => Some(33),
-                        "NAPTR" => Some(35), "ANY" => Some(255),
-                        _ => s.parse::<u16>().ok(),
-                    }
-                }
+                FilterValue::String(s) => match s.to_uppercase().as_str() {
+                    "A" => Some(1),
+                    "NS" => Some(2),
+                    "CNAME" => Some(5),
+                    "SOA" => Some(6),
+                    "PTR" => Some(12),
+                    "MX" => Some(15),
+                    "TXT" => Some(16),
+                    "AAAA" => Some(28),
+                    "SRV" => Some(33),
+                    "NAPTR" => Some(35),
+                    "ANY" => Some(255),
+                    _ => s.parse::<u16>().ok(),
+                },
                 _ => None,
             };
             if let Some(target) = target_type {
-                dns.queries.iter().any(|q| compare_port(q.qtype, operator, target))
+                dns.queries
+                    .iter()
+                    .any(|q| compare_port(q.qtype, operator, target))
             } else {
                 false
             }
@@ -1411,11 +1737,20 @@ fn evaluate_dns_field(field: &str, operator: &Operator, value: &FilterValue, dns
 
 // ─── RTP Field Evaluation ───────────────────────────────────────────────────
 
-fn evaluate_rtp_field(field: &str, operator: &Operator, value: &FilterValue, rtp: &crate::packet_capture::rtp_analyzer::RtpHeader) -> bool {
+fn evaluate_rtp_field(
+    field: &str,
+    operator: &Operator,
+    value: &FilterValue,
+    rtp: &crate::packet_capture::rtp_analyzer::RtpHeader,
+) -> bool {
     match field {
         "rtp.version" => compare_number(rtp.version as i64, operator, value),
-        "rtp.p_type" | "rtp.payload_type" | "rtp.pt" => compare_number(rtp.payload_type as i64, operator, value),
-        "rtp.seq" | "rtp.sequence" | "rtp.sequence_number" => compare_number(rtp.sequence_number as i64, operator, value),
+        "rtp.p_type" | "rtp.payload_type" | "rtp.pt" => {
+            compare_number(rtp.payload_type as i64, operator, value)
+        }
+        "rtp.seq" | "rtp.sequence" | "rtp.sequence_number" => {
+            compare_number(rtp.sequence_number as i64, operator, value)
+        }
         "rtp.timestamp" | "rtp.ts" => compare_number(rtp.timestamp as i64, operator, value),
         "rtp.ssrc" => {
             // Support hex SSRC
@@ -1444,7 +1779,9 @@ fn evaluate_rtp_field(field: &str, operator: &Operator, value: &FilterValue, rtp
             let marker_val = if rtp.marker { 1i64 } else { 0 };
             compare_number(marker_val, operator, value)
         }
-        "rtp.csrc" | "rtp.csrc.count" | "rtp.cc" => compare_number(rtp.csrc_count as i64, operator, value),
+        "rtp.csrc" | "rtp.csrc.count" | "rtp.cc" => {
+            compare_number(rtp.csrc_count as i64, operator, value)
+        }
         "rtp.padding" => {
             let pad_val = if rtp.padding { 1i64 } else { 0 };
             compare_number(pad_val, operator, value)
@@ -1463,11 +1800,17 @@ fn evaluate_rtp_field(field: &str, operator: &Operator, value: &FilterValue, rtp
 mod tests {
     use super::*;
     use crate::packet_capture::{PacketFidelity, PacketProvenance, Protocol};
-    use std::net::IpAddr;
     use chrono::Utc;
+    use std::net::IpAddr;
 
     /// Helper to create a basic test packet.
-    fn make_packet(proto: Protocol, src_ip: &str, dst_ip: &str, src_port: u16, dst_port: u16) -> crate::packet_capture::PacketInfo {
+    fn make_packet(
+        proto: Protocol,
+        src_ip: &str,
+        dst_ip: &str,
+        src_port: u16,
+        dst_port: u16,
+    ) -> crate::packet_capture::PacketInfo {
         crate::packet_capture::PacketInfo {
             timestamp: Utc::now(),
             src_ip: src_ip.parse::<IpAddr>().unwrap(),
@@ -1565,7 +1908,13 @@ mod tests {
     #[test]
     fn test_parse_implicit_and() {
         let f = WiresharkFilter::parse("sip rtp").unwrap();
-        assert!(matches!(f.conditions[0], FilterCondition::Logical { op: LogicalOp::And, .. }));
+        assert!(matches!(
+            f.conditions[0],
+            FilterCondition::Logical {
+                op: LogicalOp::And,
+                ..
+            }
+        ));
         WiresharkFilter::parse("ip.src == 10.0.0.1 ip.dst == 10.0.0.2").unwrap();
         WiresharkFilter::parse("(ip.src == 10.0.0.1 ip.dst == 10.0.0.2)").unwrap();
     }
@@ -1573,7 +1922,10 @@ mod tests {
     #[test]
     fn test_parse_bitwise_and() {
         let f = WiresharkFilter::parse("tcp.flags & 0x02").unwrap();
-        assert!(matches!(f.conditions[0], FilterCondition::BitwiseAnd { .. }));
+        assert!(matches!(
+            f.conditions[0],
+            FilterCondition::BitwiseAnd { .. }
+        ));
     }
 
     #[test]
@@ -1594,9 +1946,10 @@ mod tests {
 
     #[test]
     fn test_parse_protocols() {
-        for proto in &["ip", "ipv4", "ipv6", "tcp", "udp", "sip", "rtp", "rtcp",
-                        "dns", "http", "https", "tls", "ssl", "fax", "t38", "icmp",
-                        "arp", "eth", "ethernet", "frame"] {
+        for proto in &[
+            "ip", "ipv4", "ipv6", "tcp", "udp", "sip", "rtp", "rtcp", "dns", "http", "https",
+            "tls", "ssl", "fax", "t38", "icmp", "arp", "eth", "ethernet", "frame",
+        ] {
             WiresharkFilter::parse(proto).unwrap();
         }
     }
@@ -1612,10 +1965,10 @@ mod tests {
         assert!(!eval("sip", &rtp_pkt));
         assert!(eval("rtp", &rtp_pkt));
         assert!(!eval("rtp", &sip_pkt));
-        assert!(eval("ip", &sip_pkt));    // All packets are IP
-        assert!(eval("udp", &sip_pkt));   // SIP is over UDP
-        assert!(!eval("tcp", &sip_pkt));  // SIP is not TCP
-        assert!(eval("eth", &sip_pkt));   // All packets have ethernet
+        assert!(eval("ip", &sip_pkt)); // All packets are IP
+        assert!(eval("udp", &sip_pkt)); // SIP is over UDP
+        assert!(!eval("tcp", &sip_pkt)); // SIP is not TCP
+        assert!(eval("eth", &sip_pkt)); // All packets have ethernet
         assert!(eval("frame", &sip_pkt)); // All packets match frame
     }
 
@@ -1637,11 +1990,11 @@ mod tests {
         let sip_pkt = make_sip_packet("10.0.0.1", "10.0.0.2");
         let dns_pkt = make_dns_packet();
 
-        assert!(eval("sip || rtp", &sip_pkt));    // SIP matches
+        assert!(eval("sip || rtp", &sip_pkt)); // SIP matches
         assert!(eval("sip || rtp", &sip_pkt));
-        assert!(!eval("dns || rtp", &sip_pkt));   // Neither matches SIP
-        assert!(eval("dns || rtp", &dns_pkt));    // DNS matches
-        // English keywords
+        assert!(!eval("dns || rtp", &sip_pkt)); // Neither matches SIP
+        assert!(eval("dns || rtp", &dns_pkt)); // DNS matches
+                                               // English keywords
         assert!(eval("sip or rtp", &sip_pkt));
     }
 
@@ -1708,7 +2061,7 @@ mod tests {
         // ip.addr != 10.0.0.1 means NEITHER src NOR dst is 10.0.0.1 (AND semantics)
         assert!(!eval("ip.addr != 10.0.0.1", &pkt)); // src IS 10.0.0.1
         assert!(!eval("ip.addr != 10.0.0.2", &pkt)); // dst IS 10.0.0.2
-        assert!(eval("ip.addr != 10.0.0.3", &pkt));  // neither is 10.0.0.3
+        assert!(eval("ip.addr != 10.0.0.3", &pkt)); // neither is 10.0.0.3
     }
 
     #[test]

@@ -11,9 +11,9 @@ use sipalyzer_core::protocol::{
 };
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
-use std::sync::Mutex as StdMutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 
@@ -276,12 +276,15 @@ pub async fn remote_agent_start_listener(
     bind_all_interfaces: Option<bool>,
 ) -> Result<(), String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "agent", "start_listener", "user", None,
+        "agent",
+        "start_listener",
+        "user",
+        None,
         Some(&format!("port={}", port)),
     );
-    // Default to all interfaces so VPN/LAN adapters are reachable without
-    // requiring a separate "advanced" toggle on the frontend.
-    server::start_listener(port, auth_token, app, bind_all_interfaces.unwrap_or(true)).await
+    // Default to localhost-only for safer out-of-box behavior.
+    // Frontend can still opt into bind-all explicitly.
+    server::start_listener(port, auth_token, app, bind_all_interfaces.unwrap_or(false)).await
 }
 
 /// Stop a specific listener by port.
@@ -400,7 +403,11 @@ pub fn remote_chat_mark_read(agent_id: Option<String>, app: tauri::AppHandle) {
             if msg.sender == "controller" {
                 continue;
             }
-            if agent_id.as_ref().map(|id| id == &msg.agent_id).unwrap_or(true) {
+            if agent_id
+                .as_ref()
+                .map(|id| id == &msg.agent_id)
+                .unwrap_or(true)
+            {
                 msg.unread = false;
             }
         }
@@ -436,7 +443,11 @@ pub async fn remote_agent_rename(agent_id: String, name: Option<String>) -> Resu
 #[tracing::instrument(skip_all)]
 pub async fn remote_agent_disconnect(agent_id: String) -> Result<String, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "agent", "disconnect", "user", Some(&agent_id), None,
+        "agent",
+        "disconnect",
+        "user",
+        Some(&agent_id),
+        None,
     );
     crate::remote_agent::manager::send_command(&agent_id, AgentCommand::Disconnect).await
 }
@@ -446,7 +457,11 @@ pub async fn remote_agent_disconnect(agent_id: String) -> Result<String, String>
 #[tracing::instrument(skip_all)]
 pub async fn remote_agent_kill(agent_id: String) -> Result<String, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "agent", "kill", "user", Some(&agent_id), None,
+        "agent",
+        "kill",
+        "user",
+        Some(&agent_id),
+        None,
     );
     crate::remote_agent::manager::send_command(&agent_id, AgentCommand::Kill).await
 }
@@ -456,7 +471,11 @@ pub async fn remote_agent_kill(agent_id: String) -> Result<String, String> {
 #[tracing::instrument(skip_all)]
 pub async fn remote_agent_self_destruct(agent_id: String) -> Result<String, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "agent", "self_destruct", "user", Some(&agent_id), None,
+        "agent",
+        "self_destruct",
+        "user",
+        Some(&agent_id),
+        None,
     );
     let msg_id =
         crate::remote_agent::manager::send_command(&agent_id, AgentCommand::SelfDestruct).await?;
@@ -493,11 +512,7 @@ pub async fn remote_agent_forget(agent_id: String) -> Result<(), String> {
 /// Spawn an interactive shell on a remote agent. Returns the session ID.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn remote_shell_spawn(
-    agent_id: String,
-    cols: u16,
-    rows: u16,
-) -> Result<String, String> {
+pub async fn remote_shell_spawn(agent_id: String, cols: u16, rows: u16) -> Result<String, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
         "agent",
         "shell_spawn",
@@ -552,7 +567,10 @@ pub async fn remote_shell_resize(
         "shell_resize",
         "user",
         Some(&agent_id),
-        Some(&format!("session_id={}, cols={}, rows={}", session_id, cols, rows)),
+        Some(&format!(
+            "session_id={}, cols={}, rows={}",
+            session_id, cols, rows
+        )),
     );
     crate::remote_agent::manager::send_command(
         &agent_id,
@@ -568,10 +586,7 @@ pub async fn remote_shell_resize(
 /// Close a remote shell session.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn remote_shell_close(
-    agent_id: String,
-    session_id: String,
-) -> Result<String, String> {
+pub async fn remote_shell_close(agent_id: String, session_id: String) -> Result<String, String> {
     let _ = crate::core::audit::AuditWriter::write_entry(
         "agent",
         "shell_close",
@@ -606,7 +621,10 @@ pub async fn remote_agent_generate(
             params.target_os,
             params.controller_address,
             params.use_tls,
-            params.experience.clone().unwrap_or_else(|| params.profile.clone()),
+            params
+                .experience
+                .clone()
+                .unwrap_or_else(|| params.profile.clone()),
             output_path
         )),
     );
@@ -715,7 +733,10 @@ pub async fn remote_agent_connect_relay(
 
         loop {
             if RELAY_SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
-                tracing::info!("Relay reconnect loop stop requested; session={}", session_id);
+                tracing::info!(
+                    "Relay reconnect loop stop requested; session={}",
+                    session_id
+                );
                 break;
             }
             let sid = session_id.clone();
@@ -746,10 +767,13 @@ pub async fn remote_agent_connect_relay(
                     );
                     // Permanent auth failure — don't retry
                     tracing::error!("Relay auth failure, stopping: {e}");
-                    let _ = app_clone.emit("remote-agent:relay-error", serde_json::json!({
-                        "session_id": &session_id,
-                        "error": &e,
-                    }));
+                    let _ = app_clone.emit(
+                        "remote-agent:relay-error",
+                        serde_json::json!({
+                            "session_id": &session_id,
+                            "error": &e,
+                        }),
+                    );
                     break;
                 }
                 Err(e) if e.contains("already active") => {
@@ -767,13 +791,14 @@ pub async fn remote_agent_connect_relay(
                         Some(&session_id),
                         Some(&e),
                     );
-                    tracing::error!(
-                        "Relay error: {e} — reconnecting in {:?}",
-                        backoff);
-                    let _ = app_clone.emit("remote-agent:relay-error", serde_json::json!({
-                        "session_id": &session_id,
-                        "error": &e,
-                    }));
+                    tracing::error!("Relay error: {e} — reconnecting in {:?}", backoff);
+                    let _ = app_clone.emit(
+                        "remote-agent:relay-error",
+                        serde_json::json!({
+                            "session_id": &session_id,
+                            "error": &e,
+                        }),
+                    );
                 }
             }
 
@@ -809,14 +834,12 @@ pub async fn remote_agent_export_audit_log(
     let scoped_path = resolve_scoped_write_path(&path, &app, "Audit log export")?;
     let json = serde_json::to_string_pretty(&entries)
         .map_err(|e| format!("Failed to serialize audit log: {e}"))?;
-    tokio::fs::write(&scoped_path, json)
-        .await
-        .map_err(|e| {
-            format!(
-                "Failed to write audit log to {}: {e}",
-                scoped_path.to_string_lossy()
-            )
-        })?;
+    tokio::fs::write(&scoped_path, json).await.map_err(|e| {
+        format!(
+            "Failed to write audit log to {}: {e}",
+            scoped_path.to_string_lossy()
+        )
+    })?;
     Ok(())
 }
 
@@ -828,15 +851,13 @@ pub async fn remote_agent_load_audit_log(
     app: tauri::AppHandle,
 ) -> Result<Vec<serde_json::Value>, String> {
     let scoped_path = resolve_scoped_existing_path(&path, &app, "Audit log load")?;
-    let data = tokio::fs::read_to_string(&scoped_path)
-        .await
-        .map_err(|e| {
-            format!(
-                "Failed to read audit log from {}: {e}",
-                scoped_path.to_string_lossy()
-            )
-        })?;
-    let entries: Vec<serde_json::Value> = serde_json::from_str(&data)
-        .map_err(|e| format!("Failed to parse audit log: {e}"))?;
+    let data = tokio::fs::read_to_string(&scoped_path).await.map_err(|e| {
+        format!(
+            "Failed to read audit log from {}: {e}",
+            scoped_path.to_string_lossy()
+        )
+    })?;
+    let entries: Vec<serde_json::Value> =
+        serde_json::from_str(&data).map_err(|e| format!("Failed to parse audit log: {e}"))?;
     Ok(entries)
 }

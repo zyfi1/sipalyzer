@@ -1,12 +1,12 @@
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{IpAddr, SocketAddr};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
-use once_cell::sync::Lazy;
-use socket2::{Domain, Protocol, Socket, Type};
 
 static TRACEROUTE_CANCELLED: AtomicBool = AtomicBool::new(false);
 static ACTIVE_TRACEROUTE_CHILD: Lazy<Mutex<Option<Child>>> = Lazy::new(|| Mutex::new(None));
@@ -71,7 +71,10 @@ pub async fn run_traceroute(config: TracerouteConfig) -> TracerouteResult {
 }
 
 #[tracing::instrument(skip_all, fields(host = %config.host))]
-pub async fn run_traceroute_with_progress<F>(config: TracerouteConfig, on_hop: F) -> TracerouteResult
+pub async fn run_traceroute_with_progress<F>(
+    config: TracerouteConfig,
+    on_hop: F,
+) -> TracerouteResult
 where
     F: FnMut(&TracerouteHop) + Send + 'static,
 {
@@ -149,9 +152,7 @@ fn run_traceroute_blocking(
         run_socket_traceroute_blocking(dest_ip, max_hops, timeout_ms, probes_per_hop, cb)
     };
     match socket_result {
-        Ok((hops, reached)) => {
-            Ok((hops, reached))
-        }
+        Ok((hops, reached)) => Ok((hops, reached)),
         Err(socket_err) => {
             if !shell_fallback_enabled(allow_shell_fallback) {
                 return Err(format!(
@@ -160,7 +161,8 @@ fn run_traceroute_blocking(
                 ));
             }
 
-            let (hops, reached) = run_system_traceroute(dest_ip, max_hops, timeout_ms, probes_per_hop)?;
+            let (hops, reached) =
+                run_system_traceroute(dest_ip, max_hops, timeout_ms, probes_per_hop)?;
             for hop in &hops {
                 if let Some(cb) = on_hop.as_mut() {
                     cb(hop);
@@ -178,7 +180,12 @@ fn shell_fallback_enabled(per_call_opt_in: bool) -> bool {
 fn env_flag_enabled(name: &str) -> bool {
     std::env::var(name)
         .ok()
-        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -189,7 +196,11 @@ fn run_socket_traceroute_blocking(
     probes_per_hop: u8,
     mut on_hop: Option<&mut dyn FnMut(&TracerouteHop)>,
 ) -> Result<(Vec<TracerouteHop>, bool), String> {
-    let domain = if dest_ip.is_ipv4() { Domain::IPV4 } else { Domain::IPV6 };
+    let domain = if dest_ip.is_ipv4() {
+        Domain::IPV4
+    } else {
+        Domain::IPV6
+    };
     let timeout = Duration::from_millis(timeout_ms);
     let mut hops = Vec::new();
     let mut reached = false;
@@ -208,9 +219,11 @@ fn run_socket_traceroute_blocking(
             let send_socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))
                 .map_err(|e| format!("Socket create error: {}", e))?;
 
-            send_socket.set_ttl(ttl as u32)
+            send_socket
+                .set_ttl(ttl as u32)
                 .map_err(|e| format!("Set TTL error: {}", e))?;
-            send_socket.set_read_timeout(Some(timeout))
+            send_socket
+                .set_read_timeout(Some(timeout))
                 .map_err(|e| format!("Set timeout error: {}", e))?;
 
             let dest_addr = SocketAddr::new(dest_ip, 33434 + ttl as u16);
@@ -412,7 +425,11 @@ fn run_system_traceroute(
                     tracing::info!("Traceroute succeeded with method {} [{}]", label, bin);
                     return Ok((hops, reached));
                 }
-                tracing::warn!("Traceroute method {} [{}] returned only star hops; trying fallback", label, bin);
+                tracing::warn!(
+                    "Traceroute method {} [{}] returned only star hops; trying fallback",
+                    label,
+                    bin
+                );
             }
             Err(e) => {
                 if first_err.is_none() {

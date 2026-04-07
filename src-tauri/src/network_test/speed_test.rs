@@ -9,8 +9,8 @@ use tokio::time::sleep;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpeedTestProgressEvent {
-    pub phase: String,        // "latency" | "download" | "upload"
-    pub progress_pct: f64,    // 0-100
+    pub phase: String,     // "latency" | "download" | "upload"
+    pub progress_pct: f64, // 0-100
     pub current_mbps: f64,
 }
 
@@ -157,7 +157,13 @@ fn cloudflare_profile() -> SpeedSourceProfile {
     }
 }
 
-fn librespeed_profile(label: &str, base_url: &str, dl_path: &str, ul_path: &str, ping_path: &str) -> SpeedSourceProfile {
+fn librespeed_profile(
+    label: &str,
+    base_url: &str,
+    dl_path: &str,
+    ul_path: &str,
+    ping_path: &str,
+) -> SpeedSourceProfile {
     SpeedSourceProfile {
         kind: SpeedSourceKind::Librespeed,
         latency_url: join_url(base_url, ping_path),
@@ -182,7 +188,12 @@ fn parse_librespeed_encoded(normalized: &str) -> Option<SpeedSourceProfile> {
     if parts.next().is_some() {
         return None;
     }
-    if label.is_empty() || base.is_empty() || dl_path.is_empty() || ul_path.is_empty() || ping_path.is_empty() {
+    if label.is_empty()
+        || base.is_empty()
+        || dl_path.is_empty()
+        || ul_path.is_empty()
+        || ping_path.is_empty()
+    {
         return None;
     }
 
@@ -220,7 +231,10 @@ fn resolve_speed_source(source: Option<String>) -> Result<SpeedSourceProfile, St
     ))
 }
 
-async fn latency_probe_once(client: &reqwest::Client, profile: &SpeedSourceProfile) -> Result<f64, String> {
+async fn latency_probe_once(
+    client: &reqwest::Client,
+    profile: &SpeedSourceProfile,
+) -> Result<f64, String> {
     let start = Instant::now();
     let url = profile.latency_url();
     let response = client.get(&url).send().await.map_err(|e| e.to_string())?;
@@ -342,12 +356,7 @@ async fn run_upload_worker(
                 break;
             }
             let req_start = Instant::now();
-            match client
-                .post(&url)
-                .body((*payload).clone())
-                .send()
-                .await
-            {
+            match client.post(&url).body((*payload).clone()).send().await {
                 Ok(response) if response.status().is_success() => {
                     ok = true;
                     req_secs = req_start.elapsed().as_secs_f64();
@@ -397,11 +406,14 @@ pub async fn run_speed_test(window: tauri::Window, source: Option<String>) -> Sp
     };
 
     // ── Phase 1: Idle Latency (robust median + MAD jitter) ───────
-    let _ = window.emit("speed-test-progress", SpeedTestProgressEvent {
-        phase: "latency".into(),
-        progress_pct: 0.0,
-        current_mbps: 0.0,
-    });
+    let _ = window.emit(
+        "speed-test-progress",
+        SpeedTestProgressEvent {
+            phase: "latency".into(),
+            progress_pct: 0.0,
+            current_mbps: 0.0,
+        },
+    );
 
     let mut idle_latencies = Vec::with_capacity(IDLE_LATENCY_SAMPLES_TARGET);
     for i in 0..IDLE_LATENCY_SAMPLES_TARGET {
@@ -409,11 +421,14 @@ pub async fn run_speed_test(window: tauri::Window, source: Option<String>) -> Sp
             idle_latencies.push(ms);
         }
 
-        let _ = window.emit("speed-test-progress", SpeedTestProgressEvent {
-            phase: "latency".into(),
-            progress_pct: ((i + 1) as f64 / IDLE_LATENCY_SAMPLES_TARGET as f64) * 100.0,
-            current_mbps: 0.0,
-        });
+        let _ = window.emit(
+            "speed-test-progress",
+            SpeedTestProgressEvent {
+                phase: "latency".into(),
+                progress_pct: ((i + 1) as f64 / IDLE_LATENCY_SAMPLES_TARGET as f64) * 100.0,
+                current_mbps: 0.0,
+            },
+        );
 
         sleep(Duration::from_millis(100)).await;
     }
@@ -423,11 +438,14 @@ pub async fn run_speed_test(window: tauri::Window, source: Option<String>) -> Sp
     let idle_latency_ok = idle_latencies.len() >= IDLE_LATENCY_MIN_SAMPLES;
 
     // ── Phase 2: Time-windowed Download + loaded latency ─────────
-    let _ = window.emit("speed-test-progress", SpeedTestProgressEvent {
-        phase: "download".into(),
-        progress_pct: 0.0,
-        current_mbps: 0.0,
-    });
+    let _ = window.emit(
+        "speed-test-progress",
+        SpeedTestProgressEvent {
+            phase: "download".into(),
+            progress_pct: 0.0,
+            current_mbps: 0.0,
+        },
+    );
 
     let download_start = Instant::now();
     let download_deadline = download_start + DOWNLOAD_WINDOW;
@@ -463,11 +481,14 @@ pub async fn run_speed_test(window: tauri::Window, source: Option<String>) -> Sp
         };
 
         let progress_pct = (elapsed / DOWNLOAD_WINDOW.as_secs_f64() * 100.0).clamp(0.0, 100.0);
-        let _ = window.emit("speed-test-progress", SpeedTestProgressEvent {
-            phase: "download".into(),
-            progress_pct,
-            current_mbps,
-        });
+        let _ = window.emit(
+            "speed-test-progress",
+            SpeedTestProgressEvent {
+                phase: "download".into(),
+                progress_pct,
+                current_mbps,
+            },
+        );
 
         sleep(LOADED_LATENCY_PROBE_INTERVAL).await;
     }
@@ -491,11 +512,14 @@ pub async fn run_speed_test(window: tauri::Window, source: Option<String>) -> Sp
         && download_mbps > 0.0;
 
     // ── Phase 3: Time-windowed Upload + loaded latency ───────────
-    let _ = window.emit("speed-test-progress", SpeedTestProgressEvent {
-        phase: "upload".into(),
-        progress_pct: 0.0,
-        current_mbps: 0.0,
-    });
+    let _ = window.emit(
+        "speed-test-progress",
+        SpeedTestProgressEvent {
+            phase: "upload".into(),
+            progress_pct: 0.0,
+            current_mbps: 0.0,
+        },
+    );
 
     let upload_start = Instant::now();
     let upload_deadline = upload_start + UPLOAD_WINDOW;
@@ -533,11 +557,14 @@ pub async fn run_speed_test(window: tauri::Window, source: Option<String>) -> Sp
         };
 
         let progress_pct = (elapsed / UPLOAD_WINDOW.as_secs_f64() * 100.0).clamp(0.0, 100.0);
-        let _ = window.emit("speed-test-progress", SpeedTestProgressEvent {
-            phase: "upload".into(),
-            progress_pct,
-            current_mbps,
-        });
+        let _ = window.emit(
+            "speed-test-progress",
+            SpeedTestProgressEvent {
+                phase: "upload".into(),
+                progress_pct,
+                current_mbps,
+            },
+        );
 
         sleep(LOADED_LATENCY_PROBE_INTERVAL).await;
     }

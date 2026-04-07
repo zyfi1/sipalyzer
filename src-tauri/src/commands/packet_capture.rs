@@ -1,36 +1,36 @@
+use crate::core::config;
+use crate::core::database;
+use crate::packet_capture::call_regression::{
+    diff_call_behaviors, CallBehaviorDiffResult, CallBehaviorSummary, CodecNegotiationSummary,
+    NormalizedSipHeaders,
+};
+use crate::packet_capture::capture::{self, CaptureStatus, NetworkInterface};
+use crate::packet_capture::live_stats::LiveStatsSnapshot;
+use crate::packet_capture::packet_parser::PacketParser;
+use crate::packet_capture::pcap_reader::MmapPcapReader;
+use crate::packet_capture::protocol_decoder::ApplicationLayer;
+use crate::packet_capture::rtp_analyzer::{calculate_mos, resolve_codec_name, RtpStreamTracker};
+use crate::packet_capture::sip_parser::ParsedSipMessage;
+use crate::packet_capture::websocket_parser::WebSocketFrame;
+use crate::packet_capture::wireshark_filter::WiresharkFilter;
+use crate::packet_capture::PcapWriter;
+use crate::packet_capture::{CaptureSession, FilterConfig, PacketInfo, Protocol};
 use anyhow::Result;
+use hickory_resolver::config::*;
+use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::Resolver;
+use once_cell::sync::Lazy;
+use pcap::Capture;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use once_cell::sync::Lazy;
 use uuid::Uuid;
-use hickory_resolver::config::*;
-use hickory_resolver::name_server::TokioConnectionProvider;
-use hickory_resolver::Resolver;
-use crate::core::config;
-use crate::core::database;
-use crate::packet_capture::{CaptureSession, FilterConfig, PacketInfo, Protocol};
-use crate::packet_capture::capture::{self, NetworkInterface, CaptureStatus};
-use crate::packet_capture::call_regression::{
-    diff_call_behaviors, CallBehaviorDiffResult, CallBehaviorSummary, CodecNegotiationSummary,
-    NormalizedSipHeaders,
-};
-use crate::packet_capture::live_stats::LiveStatsSnapshot;
-use crate::packet_capture::packet_parser::PacketParser;
-use crate::packet_capture::pcap_reader::MmapPcapReader;
-use crate::packet_capture::rtp_analyzer::{RtpStreamTracker, resolve_codec_name, calculate_mos};
-use crate::packet_capture::sip_parser::ParsedSipMessage;
-use crate::packet_capture::protocol_decoder::ApplicationLayer;
-use crate::packet_capture::websocket_parser::WebSocketFrame;
-use crate::packet_capture::PcapWriter;
-use crate::packet_capture::wireshark_filter::WiresharkFilter;
-use pcap::Capture;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::collections::HashSet;
 
 /// Maximum number of sessions to keep in memory
 const MAX_SESSIONS_IN_MEMORY: usize = 10;
@@ -98,7 +98,8 @@ impl SessionEntry {
 }
 
 // Global session manager with eviction tracking
-static SESSIONS: Lazy<Mutex<HashMap<String, SessionEntry>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static SESSIONS: Lazy<Mutex<HashMap<String, SessionEntry>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Cache for packets loaded from PCAP files (stopped/saved sessions).
 /// Key = session_id, Value = (loaded_at, Arc'd packets).
@@ -334,15 +335,18 @@ fn invalidate_session_caches(session_id: &str) {
 }
 
 /// Acquire a lock on the global session map (used by remote_capture module).
-pub fn sessions_lock() -> Result<std::sync::MutexGuard<'static, HashMap<String, SessionEntry>>, String> {
-    SESSIONS.lock().map_err(|_| "Failed to lock sessions".to_string())
+pub fn sessions_lock(
+) -> Result<std::sync::MutexGuard<'static, HashMap<String, SessionEntry>>, String> {
+    SESSIONS
+        .lock()
+        .map_err(|_| "Failed to lock sessions".to_string())
 }
 
 /// Evict stopped sessions that have timed out
 fn evict_timed_out_sessions(sessions: &mut HashMap<String, SessionEntry>) -> Vec<String> {
     let now = Instant::now();
     let timeout = Duration::from_secs(STOPPED_SESSION_TIMEOUT_SECS);
-    
+
     let to_evict: Vec<String> = sessions
         .iter()
         .filter_map(|(id, entry)| {
@@ -354,39 +358,44 @@ fn evict_timed_out_sessions(sessions: &mut HashMap<String, SessionEntry>) -> Vec
             None
         })
         .collect();
-    
+
     for id in &to_evict {
         sessions.remove(id);
         tracing::info!("Evicted timed-out session: {}", id);
     }
-    
+
     to_evict
 }
 
 /// Evict oldest stopped sessions if over memory limit
-fn evict_excess_sessions(sessions: &mut HashMap<String, SessionEntry>, max_sessions: usize) -> Vec<String> {
+fn evict_excess_sessions(
+    sessions: &mut HashMap<String, SessionEntry>,
+    max_sessions: usize,
+) -> Vec<String> {
     if sessions.len() <= max_sessions {
         return Vec::new();
     }
-    
+
     // Collect stopped sessions sorted by stopped_at time (oldest first)
     let mut stopped: Vec<_> = sessions
         .iter()
-        .filter_map(|(id, entry)| {
-            entry.stopped_at.map(|t| (id.clone(), t))
-        })
+        .filter_map(|(id, entry)| entry.stopped_at.map(|t| (id.clone(), t)))
         .collect();
-    
+
     stopped.sort_by_key(|(_, t)| *t);
-    
+
     let to_remove = sessions.len().saturating_sub(max_sessions);
-    let to_evict: Vec<String> = stopped.into_iter().take(to_remove).map(|(id, _)| id).collect();
-    
+    let to_evict: Vec<String> = stopped
+        .into_iter()
+        .take(to_remove)
+        .map(|(id, _)| id)
+        .collect();
+
     for id in &to_evict {
         sessions.remove(id);
         tracing::info!("Evicted excess session: {}", id);
     }
-    
+
     to_evict
 }
 
@@ -395,10 +404,10 @@ fn cleanup_sessions_internal(sessions: &mut HashMap<String, SessionEntry>) -> (V
     let timed_out = evict_timed_out_sessions(sessions);
     let excess = evict_excess_sessions(sessions, MAX_SESSIONS_IN_MEMORY);
     let remaining = sessions.len();
-    
+
     let mut evicted = timed_out;
     evicted.extend(excess);
-    
+
     (evicted, remaining)
 }
 
@@ -420,7 +429,6 @@ pub struct CaptureSessionInfo {
     pub folder_id: Option<String>,
     pub tags: Vec<String>,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -459,8 +467,7 @@ pub fn list_interfaces() -> Result<Vec<NetworkInterface>, String> {
     if !local_capture_allowed() {
         return Err(local_capture_gate_error());
     }
-    capture::list_interfaces()
-        .map_err(|e| e.to_string())
+    capture::list_interfaces().map_err(|e| e.to_string())
 }
 
 /// Return the pcap device name that has the given IP (e.g. the interface used for SIP).
@@ -487,7 +494,7 @@ pub fn start_capture_session(
 }
 
 /// Start a capture session with optional pipeline mode.
-/// 
+///
 /// `use_pipeline`: If true, uses multi-threaded capture pipeline (high performance for 100k+ pps).
 ///                 If false, uses single-threaded capture loop (legacy mode).
 pub fn start_capture_session_with_mode(
@@ -502,7 +509,7 @@ pub fn start_capture_session_with_mode(
     }
 
     use crate::packet_capture::CaptureMode;
-    
+
     let id = Uuid::new_v4().to_string();
     let config_dir = config::get_config_dir().map_err(|e| e.to_string())?;
     let captures_dir = config_dir.join("captures");
@@ -514,8 +521,12 @@ pub fn start_capture_session_with_mode(
     } else {
         CaptureMode::SingleThreaded
     };
-    
-    tracing::info!("Starting capture session {} with mode: {:?}", id, capture_mode);
+
+    tracing::info!(
+        "Starting capture session {} with mode: {:?}",
+        id,
+        capture_mode
+    );
 
     let mut session = CaptureSession::with_mode(
         id.clone(),
@@ -532,24 +543,34 @@ pub fn start_capture_session_with_mode(
 
     {
         let mut sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-        
+
         // Cleanup before adding new session
         let (evicted, remaining) = cleanup_sessions_internal(&mut sessions);
         if !evicted.is_empty() {
             for evicted_id in &evicted {
                 invalidate_session_caches(evicted_id);
             }
-            tracing::info!("Cleaned up {} sessions before start, {} remaining", evicted.len(), remaining);
+            tracing::info!(
+                "Cleaned up {} sessions before start, {} remaining",
+                evicted.len(),
+                remaining
+            );
         }
-        
-        sessions.insert(id.clone(), SessionEntry {
-            session: Arc::new(Mutex::new(session)),
-            stopped_at: None,
-        });
+
+        sessions.insert(
+            id.clone(),
+            SessionEntry {
+                session: Arc::new(Mutex::new(session)),
+                stopped_at: None,
+            },
+        );
     }
 
     let _ = crate::core::audit::AuditWriter::write_entry(
-        "capture", "start_capture", "user", Some(&id),
+        "capture",
+        "start_capture",
+        "user",
+        Some(&id),
         Some(&format!("name={}, interface={}", name, interface)),
     );
 
@@ -615,7 +636,7 @@ pub fn start_capture_pipeline(
 #[tracing::instrument(skip_all)]
 pub fn get_pipeline_stats(session_id: String) -> Result<Option<PipelineStatsInfo>, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-    
+
     if let Some(entry) = sessions.get(&session_id) {
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
         if let Some(stats) = session.pipeline_stats() {
@@ -630,7 +651,7 @@ pub fn get_pipeline_stats(session_id: String) -> Result<Option<PipelineStatsInfo
             }));
         }
     }
-    
+
     Ok(None)
 }
 
@@ -666,11 +687,18 @@ pub fn stop_capture(session_id: String) -> Result<(), String> {
 
         crate::core::process_registry::deregister(&session_id);
         let _ = crate::core::audit::AuditWriter::write_entry(
-            "capture", "stop_capture", "user", Some(&session_id), None,
+            "capture",
+            "stop_capture",
+            "user",
+            Some(&session_id),
+            None,
         );
 
         let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-        let stats = session.statistics.lock().map_err(|_| "Failed to lock statistics")?;
+        let stats = session
+            .statistics
+            .lock()
+            .map_err(|_| "Failed to lock statistics")?;
         conn.execute(
             "UPDATE capture_sessions SET status = ?1, end_time = ?2, packet_count = ?3 WHERE id = ?4",
             rusqlite::params![
@@ -686,11 +714,17 @@ pub fn stop_capture(session_id: String) -> Result<(), String> {
 
     // Session not in memory (e.g. restarted app). Mark as stopped in DB so UI can recover.
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let updated = conn.execute(
-        "UPDATE capture_sessions SET status = ?1, end_time = ?2 WHERE id = ?3 AND status = ?4",
-        rusqlite::params!["Stopped", chrono::Utc::now().to_rfc3339(), session_id, "Running"],
-    )
-    .map_err(|e| e.to_string())?;
+    let updated = conn
+        .execute(
+            "UPDATE capture_sessions SET status = ?1, end_time = ?2 WHERE id = ?3 AND status = ?4",
+            rusqlite::params![
+                "Stopped",
+                chrono::Utc::now().to_rfc3339(),
+                session_id,
+                "Running"
+            ],
+        )
+        .map_err(|e| e.to_string())?;
     if updated > 0 {
         return Ok(());
     }
@@ -702,7 +736,10 @@ pub fn stop_all_captures() {
     tracing::info!("stop_all_captures() — shutting down all running sessions");
 
     // 1. Collect running sessions and mark them stopped in memory
-    let running: Vec<(String, Arc<Mutex<crate::packet_capture::capture::CaptureSession>>)> = {
+    let running: Vec<(
+        String,
+        Arc<Mutex<crate::packet_capture::capture::CaptureSession>>,
+    )> = {
         let mut sessions = match SESSIONS.lock() {
             Ok(s) => s,
             Err(_) => {
@@ -727,7 +764,8 @@ pub fn stop_all_captures() {
 
     tracing::info!(
         "[PacketCapture] stop_all_captures: stopping {} session(s)",
-        running.len());
+        running.len()
+    );
 
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -766,10 +804,13 @@ pub fn stop_all_captures() {
 #[tracing::instrument(skip_all)]
 pub fn get_capture_status(session_id: String) -> Result<CaptureSessionInfo, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-    
+
     if let Some(entry) = sessions.get(&session_id) {
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
-        let stats = session.statistics.lock().map_err(|_| "Failed to lock statistics")?;
+        let stats = session
+            .statistics
+            .lock()
+            .map_err(|_| "Failed to lock statistics")?;
 
         // Fetch folder_id and tags from DB for running sessions
         let (folder_id, tags) = {
@@ -780,11 +821,14 @@ pub fn get_capture_status(session_id: String) -> Result<CaptureSessionInfo, Stri
                     rusqlite::params![session.id],
                     |row| {
                         let fid: Option<String> = row.get(0).ok().flatten();
-                        let tj: String = row.get::<_, String>(1).unwrap_or_else(|_| "[]".to_string());
+                        let tj: String =
+                            row.get::<_, String>(1).unwrap_or_else(|_| "[]".to_string());
                         Ok((fid, tj))
                     },
-                ).ok()
-            }).unwrap_or((None, "[]".to_string()))
+                )
+                .ok()
+            })
+            .unwrap_or((None, "[]".to_string()))
         };
         let tags_vec: Vec<String> = serde_json::from_str(&tags).unwrap_or_default();
 
@@ -811,29 +855,33 @@ pub fn get_capture_status(session_id: String) -> Result<CaptureSessionInfo, Stri
              FROM capture_sessions WHERE id = ?1"
         ).map_err(|e| e.to_string())?;
 
-        let row = stmt.query_row(rusqlite::params![session_id], |row| {
-            let source_json: Option<String> = row.get(10).ok();
-            let source = source_json
-                .and_then(|s| serde_json::from_str(&s).ok());
-            let folder_id: Option<String> = row.get(11).ok().flatten();
-            let tags_json: String = row.get::<_, String>(12).unwrap_or_else(|_| "[]".to_string());
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-            Ok(CaptureSessionInfo {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                interface: row.get(3)?,
-                filter_config: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
-                start_time: row.get(5)?,
-                end_time: row.get(6)?,
-                status: row.get(7)?,
-                packet_count: row.get(8)?,
-                file_path: row.get(9)?,
-                source,
-                folder_id,
-                tags,
+        let row = stmt
+            .query_row(rusqlite::params![session_id], |row| {
+                let source_json: Option<String> = row.get(10).ok();
+                let source = source_json.and_then(|s| serde_json::from_str(&s).ok());
+                let folder_id: Option<String> = row.get(11).ok().flatten();
+                let tags_json: String = row
+                    .get::<_, String>(12)
+                    .unwrap_or_else(|_| "[]".to_string());
+                let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+                Ok(CaptureSessionInfo {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: row.get(2)?,
+                    interface: row.get(3)?,
+                    filter_config: serde_json::from_str(&row.get::<_, String>(4)?)
+                        .unwrap_or_default(),
+                    start_time: row.get(5)?,
+                    end_time: row.get(6)?,
+                    status: row.get(7)?,
+                    packet_count: row.get(8)?,
+                    file_path: row.get(9)?,
+                    source,
+                    folder_id,
+                    tags,
+                })
             })
-        }).map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?;
 
         Ok(row)
     }
@@ -843,11 +891,14 @@ pub fn get_capture_status(session_id: String) -> Result<CaptureSessionInfo, Stri
 #[tracing::instrument(skip_all)]
 pub fn get_capture_statistics(session_id: String) -> Result<serde_json::Value, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-    
+
     if let Some(entry) = sessions.get(&session_id) {
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
-        let stats = session.statistics.lock().map_err(|_| "Failed to lock statistics")?;
-        
+        let stats = session
+            .statistics
+            .lock()
+            .map_err(|_| "Failed to lock statistics")?;
+
         serde_json::to_value(&*stats).map_err(|e| e.to_string())
     } else {
         Err("Session not found".to_string())
@@ -860,7 +911,7 @@ pub fn get_capture_statistics(session_id: String) -> Result<serde_json::Value, S
 #[tracing::instrument(skip_all)]
 pub fn get_live_statistics(session_id: String) -> Result<LiveStatsSnapshot, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-    
+
     if let Some(entry) = sessions.get(&session_id) {
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
         Ok(session.live_stats_snapshot())
@@ -884,16 +935,30 @@ pub fn get_capture_packets(
         let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
         if let Some(entry) = sessions.get(&session_id) {
             let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
-            let stopped = matches!(session.status, crate::packet_capture::capture::CaptureStatus::Stopped);
+            let stopped = matches!(
+                session.status,
+                crate::packet_capture::capture::CaptureStatus::Stopped
+            );
 
             let buffer_size = session.get_packet_count();
-            tracing::info!("Buffer has {} packets (mode: {:?})", buffer_size, session.capture_mode());
+            tracing::info!(
+                "Buffer has {} packets (mode: {:?})",
+                buffer_size,
+                session.capture_mode()
+            );
 
             let start = buffer_size.saturating_sub(limit);
             let packet_list = session.get_packets_range(start, limit);
-            tracing::info!("Retrieved {} packets from buffer (requested limit: {})", packet_list.len(), limit);
+            tracing::info!(
+                "Retrieved {} packets from buffer (requested limit: {})",
+                packet_list.len(),
+                limit
+            );
             let json: Vec<serde_json::Value> = if compact {
-                packet_list.iter().map(packet_info_to_json_for_diff).collect()
+                packet_list
+                    .iter()
+                    .map(packet_info_to_json_for_diff)
+                    .collect()
             } else {
                 packet_list_to_json(packet_list.iter())
             };
@@ -910,7 +975,10 @@ pub fn get_capture_packets(
 
     // Fall back to loading from saved PCAP file
     if found {
-        tracing::info!("Session {} stopped with empty buffer — loading from file", session_id);
+        tracing::info!(
+            "Session {} stopped with empty buffer — loading from file",
+            session_id
+        );
     }
     load_capture_session_range(session_id, 0, limit, compact)
 }
@@ -926,11 +994,13 @@ pub fn get_capture_packet_count(session_id: String) -> Result<u64, String> {
         return Ok(session.get_packet_count() as u64);
     }
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let count: u64 = conn.query_row(
-        "SELECT packet_count FROM capture_sessions WHERE id = ?1",
-        rusqlite::params![session_id],
-        |row| row.get(0),
-    ).map_err(|e| e.to_string())?;
+    let count: u64 = conn
+        .query_row(
+            "SELECT packet_count FROM capture_sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
     Ok(count)
 }
 
@@ -967,9 +1037,7 @@ fn packet_list_to_json<'a, I>(packet_list: I) -> Vec<serde_json::Value>
 where
     I: Iterator<Item = &'a PacketInfo>,
 {
-    packet_list
-        .map(|p| packet_info_to_json(p))
-        .collect()
+    packet_list.map(|p| packet_info_to_json(p)).collect()
 }
 
 /// SIP JSON for packet diff: drop full wire text and SDP body text (keeps structured SDP).
@@ -1133,9 +1201,9 @@ pub fn packet_info_to_json(p: &PacketInfo) -> serde_json::Value {
                 decoded_json["application"] = serde_json::json!({ "type": "Sip", "data": sip });
             }
             ApplicationLayer::SipOverWs { ws_frame, sip } => {
-                decoded_json["application"] = serde_json::json!({ 
-                    "type": "SipOverWs", 
-                    "data": { "wsFrame": ws_frame, "sip": sip } 
+                decoded_json["application"] = serde_json::json!({
+                    "type": "SipOverWs",
+                    "data": { "wsFrame": ws_frame, "sip": sip }
                 });
             }
             ApplicationLayer::Rtp(rtp) => {
@@ -1154,10 +1222,12 @@ pub fn packet_info_to_json(p: &PacketInfo) -> serde_json::Value {
                 decoded_json["application"] = serde_json::json!({ "type": "T38", "data": t38 });
             }
             ApplicationLayer::WebSocket(ws) => {
-                decoded_json["application"] = serde_json::json!({ "type": "WebSocket", "data": ws });
+                decoded_json["application"] =
+                    serde_json::json!({ "type": "WebSocket", "data": ws });
             }
             ApplicationLayer::Unknown(data) => {
-                decoded_json["application"] = serde_json::json!({ "type": "Unknown", "data": data });
+                decoded_json["application"] =
+                    serde_json::json!({ "type": "Unknown", "data": data });
             }
         }
         packet_json["decoded"] = decoded_json;
@@ -1175,21 +1245,23 @@ fn load_capture_session_range(
     for_diff: bool,
 ) -> Result<Vec<serde_json::Value>, String> {
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn.query_row(
-        "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
-        rusqlite::params![session_id],
-        |row| {
-            let path: String = row.get(0)?;
-            let filter_config_json: String = row.get(1)?;
-            let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
-                .ok()
-                .and_then(|fc| fc.rtp_port_range);
-            Ok((path, rtp_port_range))
-        },
-    ).map_err(|e| e.to_string())?;
+    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn
+        .query_row(
+            "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+            |row| {
+                let path: String = row.get(0)?;
+                let filter_config_json: String = row.get(1)?;
+                let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
+                    .ok()
+                    .and_then(|fc| fc.rtp_port_range);
+                Ok((path, rtp_port_range))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
-    let mut cap = Capture::from_file(&file_path)
-        .map_err(|e| format!("Failed to open pcap file: {}", e))?;
+    let mut cap =
+        Capture::from_file(&file_path).map_err(|e| format!("Failed to open pcap file: {}", e))?;
     let link_layer_type = cap.get_datalink().0 as u32;
     let parser = PacketParser::with_rtp_port_range(link_layer_type, rtp_port_range);
     let mut packets = Vec::new();
@@ -1281,15 +1353,26 @@ pub fn get_filtered_packets(
                     json
                 })
                 .collect();
-            return Ok(FilteredPacketsResult { packets: paginated, total_count, offset, limit });
+            return Ok(FilteredPacketsResult {
+                packets: paginated,
+                total_count,
+                offset,
+                limit,
+            });
         }
     }
 
     // Saved or filtered/sorted path: build a shared packet view.
     let all_packets = get_session_packets_shared(&session_id)?;
     let packet_count = all_packets.len();
-    let first_packet_fingerprint = all_packets.first().map(packet_fingerprint).unwrap_or_default();
-    let last_packet_fingerprint = all_packets.last().map(packet_fingerprint).unwrap_or_default();
+    let first_packet_fingerprint = all_packets
+        .first()
+        .map(packet_fingerprint)
+        .unwrap_or_default();
+    let last_packet_fingerprint = all_packets
+        .last()
+        .map(packet_fingerprint)
+        .unwrap_or_default();
 
     // Parse filter once
     let filter = match normalized_filter_expression.as_deref() {
@@ -1313,7 +1396,12 @@ pub fn get_filtered_packets(
                 json
             })
             .collect();
-        return Ok(FilteredPacketsResult { packets: paginated, total_count, offset, limit });
+        return Ok(FilteredPacketsResult {
+            packets: paginated,
+            total_count,
+            offset,
+            limit,
+        });
     }
 
     let cache_key = FilteredPacketQueryKey {
@@ -1323,7 +1411,8 @@ pub fn get_filtered_packets(
         sort_ascending: normalized_sort_ascending,
     };
 
-    let sorted_indices: Arc<Vec<usize>> = if let Ok(mut cache) = FILTERED_PACKET_QUERY_CACHE.lock() {
+    let sorted_indices: Arc<Vec<usize>> = if let Ok(mut cache) = FILTERED_PACKET_QUERY_CACHE.lock()
+    {
         if let Some(indices) = cache.get(
             &cache_key,
             packet_count,
@@ -1374,7 +1463,12 @@ pub fn get_filtered_packets(
         })
         .collect();
 
-    Ok(FilteredPacketsResult { packets: paginated, total_count, offset, limit })
+    Ok(FilteredPacketsResult {
+        packets: paginated,
+        total_count,
+        offset,
+        limit,
+    })
 }
 
 fn packet_fingerprint(packet: &PacketInfo) -> u64 {
@@ -1425,7 +1519,11 @@ fn compute_filtered_sorted_indices(
                 "dstPort" => pa.dst_port.cmp(&pb.dst_port),
                 _ => std::cmp::Ordering::Equal,
             };
-            if ascending { cmp } else { cmp.reverse() }
+            if ascending {
+                cmp
+            } else {
+                cmp.reverse()
+            }
         });
         indices
     } else {
@@ -1437,18 +1535,18 @@ fn compute_filtered_sorted_indices(
 #[inline]
 fn protocol_ordinal(p: Protocol) -> u8 {
     match p {
-        Protocol::ARP  => 0,
+        Protocol::ARP => 0,
         Protocol::ICMP => 1,
-        Protocol::DNS  => 2,
-        Protocol::UDP  => 3,
-        Protocol::TCP  => 4,
+        Protocol::DNS => 2,
+        Protocol::UDP => 3,
+        Protocol::TCP => 4,
         Protocol::HTTP => 5,
         Protocol::HTTPS => 6,
-        Protocol::SIP  => 7,
-        Protocol::RTP  => 8,
+        Protocol::SIP => 7,
+        Protocol::RTP => 8,
         Protocol::SRTP => 8,
         Protocol::RTCP => 9,
-        Protocol::FAX  => 10,
+        Protocol::FAX => 10,
         Protocol::Other => 11,
     }
 }
@@ -1550,7 +1648,10 @@ fn get_cached_or_load(session_id: &str) -> Result<Arc<Vec<PacketInfo>>, String> 
                 cache.remove(&oldest_id);
             }
         }
-        cache.insert(session_id.to_string(), (Instant::now(), Arc::clone(&packets)));
+        cache.insert(
+            session_id.to_string(),
+            (Instant::now(), Arc::clone(&packets)),
+        );
     }
     Ok(packets)
 }
@@ -1558,21 +1659,23 @@ fn get_cached_or_load(session_id: &str) -> Result<Arc<Vec<PacketInfo>>, String> 
 /// Load all packets from a saved PCAP file.
 fn load_all_packets_from_file(session_id: &str) -> Result<Vec<PacketInfo>, String> {
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn.query_row(
-        "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
-        rusqlite::params![session_id],
-        |row| {
-            let path: String = row.get(0)?;
-            let filter_config_json: String = row.get(1)?;
-            let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
-                .ok()
-                .and_then(|fc| fc.rtp_port_range);
-            Ok((path, rtp_port_range))
-        },
-    ).map_err(|e| format!("Session not found: {}", e))?;
+    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn
+        .query_row(
+            "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+            |row| {
+                let path: String = row.get(0)?;
+                let filter_config_json: String = row.get(1)?;
+                let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
+                    .ok()
+                    .and_then(|fc| fc.rtp_port_range);
+                Ok((path, rtp_port_range))
+            },
+        )
+        .map_err(|e| format!("Session not found: {}", e))?;
 
-    let mut cap = Capture::from_file(&file_path)
-        .map_err(|e| format!("Failed to open pcap file: {}", e))?;
+    let mut cap =
+        Capture::from_file(&file_path).map_err(|e| format!("Failed to open pcap file: {}", e))?;
     let link_layer_type = cap.get_datalink().0 as u32;
     let parser = PacketParser::with_rtp_port_range(link_layer_type, rtp_port_range);
     let mut packets = Vec::new();
@@ -1588,7 +1691,11 @@ fn load_all_packets_from_file(session_id: &str) -> Result<Vec<PacketInfo>, Strin
             packet_count += 1;
         }
     }
-    tracing::info!("Parsed {} packets from PCAP file for session {}", packet_count, session_id);
+    tracing::info!(
+        "Parsed {} packets from PCAP file for session {}",
+        packet_count,
+        session_id
+    );
     Ok(packets)
 }
 
@@ -1601,32 +1708,34 @@ pub fn list_capture_sessions() -> Result<Vec<CaptureSessionInfo>, String> {
          FROM capture_sessions ORDER BY created_at DESC"
     ).map_err(|e| e.to_string())?;
 
-    let sessions = stmt.query_map([], |row| {
-        let source_json: Option<String> = row.get(10).ok();
-        let source = source_json
-            .and_then(|s| serde_json::from_str(&s).ok());
-        let folder_id: Option<String> = row.get(11).ok().flatten();
-        let tags_json: String = row.get::<_, String>(12).unwrap_or_else(|_| "[]".to_string());
-        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-        Ok(CaptureSessionInfo {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            interface: row.get(3)?,
-            filter_config: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
-            start_time: row.get(5)?,
-            end_time: row.get(6)?,
-            status: row.get(7)?,
-            packet_count: row.get(8)?,
-            file_path: row.get(9)?,
-            source,
-            folder_id,
-            tags,
+    let sessions = stmt
+        .query_map([], |row| {
+            let source_json: Option<String> = row.get(10).ok();
+            let source = source_json.and_then(|s| serde_json::from_str(&s).ok());
+            let folder_id: Option<String> = row.get(11).ok().flatten();
+            let tags_json: String = row
+                .get::<_, String>(12)
+                .unwrap_or_else(|_| "[]".to_string());
+            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+            Ok(CaptureSessionInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                interface: row.get(3)?,
+                filter_config: serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default(),
+                start_time: row.get(5)?,
+                end_time: row.get(6)?,
+                status: row.get(7)?,
+                packet_count: row.get(8)?,
+                file_path: row.get(9)?,
+                source,
+                folder_id,
+                tags,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(sessions)
 }
@@ -1639,7 +1748,10 @@ pub fn get_capture_session(session_id: String) -> Result<CaptureSessionInfo, Str
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn export_pcap(session_id: String, output_path: Option<String>) -> Result<String, String> {
+pub async fn export_pcap(
+    session_id: String,
+    output_path: Option<String>,
+) -> Result<String, String> {
     let source_path: std::path::PathBuf = {
         let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
         if let Some(entry) = sessions.get(&session_id) {
@@ -1647,11 +1759,13 @@ pub async fn export_pcap(session_id: String, output_path: Option<String>) -> Res
             session.file_path.as_ref().ok_or("No file path")?.into()
         } else {
             let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-            let path: String = conn.query_row(
-                "SELECT file_path FROM capture_sessions WHERE id = ?1",
-                rusqlite::params![session_id],
-                |row| row.get(0),
-            ).map_err(|e| e.to_string())?;
+            let path: String = conn
+                .query_row(
+                    "SELECT file_path FROM capture_sessions WHERE id = ?1",
+                    rusqlite::params![session_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
             path.into()
         }
     };
@@ -1659,7 +1773,10 @@ pub async fn export_pcap(session_id: String, output_path: Option<String>) -> Res
     let final_path = if let Some(output) = output_path {
         std::path::PathBuf::from(output)
     } else {
-        let default_name = format!("capture_{}.pcap", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let default_name = format!(
+            "capture_{}.pcap",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
         let dialog_handle = rfd::AsyncFileDialog::new()
             .set_title("Save PCAP File")
             .set_file_name(&default_name)
@@ -1715,14 +1832,15 @@ pub fn duplicate_capture_to_library(session_id: String) -> Result<String, String
     let info = get_capture_status(session_id.clone())?;
     let session_name = format!("Splice · {}", info.name);
 
-    let cap = Capture::from_file(&source_path)
-        .map_err(|e| format!("Not a valid PCAP file: {}", e))?;
+    let cap =
+        Capture::from_file(&source_path).map_err(|e| format!("Not a valid PCAP file: {}", e))?;
     drop(cap);
 
-    let mut cap = Capture::from_file(&source_path)
-        .map_err(|e| format!("Failed to read PCAP file: {}", e))?;
+    let mut cap =
+        Capture::from_file(&source_path).map_err(|e| format!("Failed to read PCAP file: {}", e))?;
     let link_layer_type = cap.get_datalink().0 as u32;
-    let parser = PacketParser::with_rtp_port_range(link_layer_type, FilterConfig::default().rtp_port_range);
+    let parser =
+        PacketParser::with_rtp_port_range(link_layer_type, FilterConfig::default().rtp_port_range);
     let mut packet_count: u64 = 0;
     let mut parsed_packet_count: u64 = 0;
     while let Ok(packet) = cap.next_packet() {
@@ -1799,15 +1917,16 @@ pub async fn import_pcap(name: Option<String>) -> Result<String, String> {
     };
 
     // Validate the file can be opened as a pcap
-    let cap = Capture::from_file(&source_path)
-        .map_err(|e| format!("Not a valid PCAP file: {}", e))?;
+    let cap =
+        Capture::from_file(&source_path).map_err(|e| format!("Not a valid PCAP file: {}", e))?;
     drop(cap);
 
     // Count packets for session metadata and verify parser compatibility.
-    let mut cap = Capture::from_file(&source_path)
-        .map_err(|e| format!("Failed to read PCAP file: {}", e))?;
+    let mut cap =
+        Capture::from_file(&source_path).map_err(|e| format!("Failed to read PCAP file: {}", e))?;
     let link_layer_type = cap.get_datalink().0 as u32;
-    let parser = PacketParser::with_rtp_port_range(link_layer_type, FilterConfig::default().rtp_port_range);
+    let parser =
+        PacketParser::with_rtp_port_range(link_layer_type, FilterConfig::default().rtp_port_range);
     let mut packet_count: u64 = 0;
     let mut parsed_packet_count: u64 = 0;
     while let Ok(packet) = cap.next_packet() {
@@ -1871,7 +1990,8 @@ pub async fn import_pcap(name: Option<String>) -> Result<String, String> {
         "[Import] Imported PCAP: {} → session {} ({} packets)",
         source_path.display(),
         id,
-        parsed_packet_count);
+        parsed_packet_count
+    );
 
     Ok(id)
 }
@@ -2058,17 +2178,15 @@ pub fn reorder_capture_folders(ids: Vec<String>) -> Result<(), String> {
 pub fn cleanup_sessions() -> Result<SessionCleanupResult, String> {
     let mut sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
     let before_count = sessions.len();
-    
+
     let (evicted, remaining) = cleanup_sessions_internal(&mut sessions);
     for evicted_id in &evicted {
         invalidate_session_caches(evicted_id);
     }
-    
+
     // Count running vs stopped
-    let running_count = sessions.values()
-        .filter(|e| e.stopped_at.is_none())
-        .count();
-    
+    let running_count = sessions.values().filter(|e| e.stopped_at.is_none()).count();
+
     Ok(SessionCleanupResult {
         evicted_count: evicted.len(),
         evicted_session_ids: evicted,
@@ -2095,12 +2213,16 @@ pub struct SessionCleanupResult {
 #[tracing::instrument(skip_all)]
 pub fn get_session_memory_info() -> Result<SessionMemoryInfo, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-    
+
     let mut session_infos = Vec::new();
     for (id, entry) in sessions.iter() {
-        let status = if entry.stopped_at.is_some() { "Stopped" } else { "Running" };
+        let status = if entry.stopped_at.is_some() {
+            "Stopped"
+        } else {
+            "Running"
+        };
         let stopped_seconds = entry.stopped_at.map(|t| t.elapsed().as_secs());
-        
+
         if let Ok(session) = entry.session.lock() {
             if let Ok(buffer) = session.packet_buffer.lock() {
                 session_infos.push(SessionMemoryEntry {
@@ -2113,7 +2235,7 @@ pub fn get_session_memory_info() -> Result<SessionMemoryInfo, String> {
             }
         }
     }
-    
+
     Ok(SessionMemoryInfo {
         total_sessions: sessions.len(),
         max_sessions: MAX_SESSIONS_IN_MEMORY,
@@ -2144,11 +2266,15 @@ pub struct SessionMemoryEntry {
 // Saved Filters Commands
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn save_filter(name: String, filter_config: FilterConfig, bpf_expression: Option<String>) -> Result<String, String> {
+pub fn save_filter(
+    name: String,
+    filter_config: FilterConfig,
+    bpf_expression: Option<String>,
+) -> Result<String, String> {
     let id = Uuid::new_v4().to_string();
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
     let filter_config_json = serde_json::to_string(&filter_config).map_err(|e| e.to_string())?;
-    
+
     conn.execute(
         "INSERT INTO saved_filters (id, name, filter_config, bpf_expression, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -2173,18 +2299,19 @@ pub fn list_saved_filters() -> Result<Vec<SavedFilter>, String> {
         "SELECT id, name, filter_config, bpf_expression, created_at FROM saved_filters ORDER BY created_at DESC"
     ).map_err(|e| e.to_string())?;
 
-    let filters = stmt.query_map([], |row| {
-        Ok(SavedFilter {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            filter_config: serde_json::from_str(&row.get::<_, String>(2)?).unwrap_or_default(),
-            bpf_expression: row.get(3)?,
-            created_at: row.get(4)?,
+    let filters = stmt
+        .query_map([], |row| {
+            Ok(SavedFilter {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                filter_config: serde_json::from_str(&row.get::<_, String>(2)?).unwrap_or_default(),
+                bpf_expression: row.get(3)?,
+                created_at: row.get(4)?,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(filters)
 }
@@ -2215,7 +2342,7 @@ pub fn create_packet_bookmark(
     let id = Uuid::new_v4().to_string();
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
     let tags_json = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
-    
+
     conn.execute(
         "INSERT INTO packet_bookmarks (id, session_id, packet_index, timestamp, note, tags, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -2238,28 +2365,31 @@ pub fn create_packet_bookmark(
 #[tracing::instrument(skip_all)]
 pub fn list_packet_bookmarks(session_id: String) -> Result<Vec<PacketBookmark>, String> {
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, session_id, packet_index, timestamp, note, tags, created_at 
-         FROM packet_bookmarks WHERE session_id = ?1 ORDER BY packet_index"
-    ).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, session_id, packet_index, timestamp, note, tags, created_at 
+         FROM packet_bookmarks WHERE session_id = ?1 ORDER BY packet_index",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let bookmarks = stmt.query_map(rusqlite::params![session_id], |row| {
-        let tags_json: String = row.get(5)?;
-        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-        
-        Ok(PacketBookmark {
-            id: row.get(0)?,
-            session_id: row.get(1)?,
-            packet_index: row.get(2)?,
-            timestamp: row.get(3)?,
-            note: row.get(4)?,
-            tags,
-            created_at: row.get(6)?,
+    let bookmarks = stmt
+        .query_map(rusqlite::params![session_id], |row| {
+            let tags_json: String = row.get(5)?;
+            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+
+            Ok(PacketBookmark {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                packet_index: row.get(2)?,
+                timestamp: row.get(3)?,
+                note: row.get(4)?,
+                tags,
+                created_at: row.get(6)?,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(bookmarks)
 }
@@ -2282,8 +2412,10 @@ pub fn delete_packet_bookmark(bookmark_id: String) -> Result<(), String> {
 #[tracing::instrument(skip_all)]
 pub async fn reverse_dns_lookup(ip: String) -> Result<Option<String>, String> {
     // Parse IP address
-    let ip_addr: IpAddr = ip.parse().map_err(|e| format!("Invalid IP address: {}", e))?;
-    
+    let ip_addr: IpAddr = ip
+        .parse()
+        .map_err(|e| format!("Invalid IP address: {}", e))?;
+
     // Create async DNS resolver using 0.25 builder API
     let resolver = Resolver::builder_with_config(
         ResolverConfig::default(),
@@ -2291,7 +2423,7 @@ pub async fn reverse_dns_lookup(ip: String) -> Result<Option<String>, String> {
     )
     .with_options(ResolverOpts::default())
     .build();
-    
+
     // Perform reverse DNS lookup
     match resolver.reverse_lookup(ip_addr).await {
         Ok(ptr) => {
@@ -2304,7 +2436,7 @@ pub async fn reverse_dns_lookup(ip: String) -> Result<Option<String>, String> {
             // DNS lookup failed, return None
         }
     }
-    
+
     Ok(None)
 }
 
@@ -2344,7 +2476,10 @@ fn reverse_ip_octets(ip: &str) -> Option<String> {
     if parts.len() != 4 {
         return None;
     }
-    Some(format!("{}.{}.{}.{}", parts[3], parts[2], parts[1], parts[0]))
+    Some(format!(
+        "{}.{}.{}.{}",
+        parts[3], parts[2], parts[1], parts[0]
+    ))
 }
 
 /// Full IP intelligence lookup using DNS:
@@ -2402,16 +2537,27 @@ pub async fn ip_lookup(ip: String) -> Result<IpLookupResult, String> {
                     let parts: Vec<&str> = txt.split('|').map(|s| s.trim()).collect();
                     if parts.len() >= 3 {
                         // First field may contain multiple ASNs separated by spaces
-                        if let Ok(n) = parts[0].split_whitespace().next().unwrap_or("").parse::<u32>() {
+                        if let Ok(n) = parts[0]
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("")
+                            .parse::<u32>()
+                        {
                             asn = Some(n);
                         }
                         let p = parts[1].trim().to_string();
-                        if !p.is_empty() { prefix = Some(p); }
+                        if !p.is_empty() {
+                            prefix = Some(p);
+                        }
                         let c = parts[2].trim().to_string();
-                        if !c.is_empty() { country = Some(c); }
+                        if !c.is_empty() {
+                            country = Some(c);
+                        }
                         if parts.len() >= 4 {
                             let r = parts[3].trim().to_string();
-                            if !r.is_empty() { registry = Some(r); }
+                            if !r.is_empty() {
+                                registry = Some(r);
+                            }
                         }
                     }
                 }
@@ -2427,7 +2573,9 @@ pub async fn ip_lookup(ip: String) -> Result<IpLookupResult, String> {
                         let parts: Vec<&str> = txt.split('|').map(|s| s.trim()).collect();
                         if parts.len() >= 5 {
                             let desc = parts[4].trim().to_string();
-                            if !desc.is_empty() { org = Some(desc); }
+                            if !desc.is_empty() {
+                                org = Some(desc);
+                            }
                         }
                     }
                 }
@@ -2450,9 +2598,11 @@ pub async fn ip_lookup(ip: String) -> Result<IpLookupResult, String> {
 /// Batch reverse DNS lookup for multiple IPs
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn batch_reverse_dns_lookup(ips: Vec<String>) -> Result<HashMap<String, Option<String>>, String> {
+pub async fn batch_reverse_dns_lookup(
+    ips: Vec<String>,
+) -> Result<HashMap<String, Option<String>>, String> {
     let mut results = HashMap::new();
-    
+
     // For each IP, perform reverse DNS lookup
     for ip in ips {
         match reverse_dns_lookup(ip.clone()).await {
@@ -2464,7 +2614,7 @@ pub async fn batch_reverse_dns_lookup(ips: Vec<String>) -> Result<HashMap<String
             }
         }
     }
-    
+
     Ok(results)
 }
 
@@ -2478,7 +2628,7 @@ pub struct ScheduledCaptureInfo {
     pub description: Option<String>,
     pub interface: String,
     pub filter_config: FilterConfig,
-    pub schedule_type: String, // "one_time" or "recurring"
+    pub schedule_type: String,  // "one_time" or "recurring"
     pub scheduled_time: String, // ISO 8601 datetime or cron expression
     pub duration_seconds: Option<u64>,
     pub enabled: bool,
@@ -2501,7 +2651,7 @@ pub fn create_scheduled_capture(
     let id = Uuid::new_v4().to_string();
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
     let filter_config_json = serde_json::to_string(&filter_config).map_err(|e| e.to_string())?;
-    
+
     // Calculate next_run based on schedule_type
     let next_run = if schedule_type == "one_time" {
         Some(scheduled_time.clone())
@@ -2509,7 +2659,7 @@ pub fn create_scheduled_capture(
         // For recurring, next_run is the scheduled_time (cron expression)
         Some(scheduled_time.clone())
     };
-    
+
     conn.execute(
         "INSERT INTO scheduled_captures (id, name, description, interface, filter_config, schedule_type, scheduled_time, duration_seconds, enabled, next_run, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
@@ -2543,29 +2693,36 @@ pub fn list_scheduled_captures() -> Result<Vec<ScheduledCaptureInfo>, String> {
     )
     .map_err(|e| e.to_string())?;
 
-    let captures = stmt.query_map([], |row| {
-        let filter_config_json: String = row.get(4)?;
-        let filter_config: FilterConfig = serde_json::from_str(&filter_config_json)
-            .map_err(|_| rusqlite::Error::InvalidColumnType(4, "Invalid JSON".to_string(), rusqlite::types::Type::Text))?;
+    let captures = stmt
+        .query_map([], |row| {
+            let filter_config_json: String = row.get(4)?;
+            let filter_config: FilterConfig =
+                serde_json::from_str(&filter_config_json).map_err(|_| {
+                    rusqlite::Error::InvalidColumnType(
+                        4,
+                        "Invalid JSON".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?;
 
-        Ok(ScheduledCaptureInfo {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            interface: row.get(3)?,
-            filter_config,
-            schedule_type: row.get(5)?,
-            scheduled_time: row.get(6)?,
-            duration_seconds: row.get(7)?,
-            enabled: row.get::<_, i64>(8)? != 0,
-            last_run: row.get(9)?,
-            next_run: row.get(10)?,
-            created_at: row.get(11)?,
+            Ok(ScheduledCaptureInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                interface: row.get(3)?,
+                filter_config,
+                schedule_type: row.get(5)?,
+                scheduled_time: row.get(6)?,
+                duration_seconds: row.get(7)?,
+                enabled: row.get::<_, i64>(8)? != 0,
+                last_run: row.get(9)?,
+                next_run: row.get(10)?,
+                created_at: row.get(11)?,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(captures)
 }
@@ -2584,7 +2741,7 @@ pub fn update_scheduled_capture(
     enabled: Option<bool>,
 ) -> Result<(), String> {
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    
+
     let mut updates = Vec::new();
     let mut params: Vec<rusqlite::types::Value> = Vec::new();
     let mut param_index = 1;
@@ -2640,10 +2797,15 @@ pub fn update_scheduled_capture(
     }
 
     params.push(rusqlite::types::Value::Text(id));
-    let query = format!("UPDATE scheduled_captures SET {} WHERE id = ?{}", updates.join(", "), param_index);
-    
+    let query = format!(
+        "UPDATE scheduled_captures SET {} WHERE id = ?{}",
+        updates.join(", "),
+        param_index
+    );
+
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
-    stmt.execute(rusqlite::params_from_iter(params.iter())).map_err(|e| e.to_string())?;
+    stmt.execute(rusqlite::params_from_iter(params.iter()))
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -2666,7 +2828,7 @@ pub fn delete_scheduled_capture(id: String) -> Result<(), String> {
 pub fn get_scheduled_captures_due() -> Result<Vec<ScheduledCaptureInfo>, String> {
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().to_rfc3339();
-    
+
     // Get enabled scheduled captures where next_run is in the past or now
     let mut stmt = conn.prepare(
         "SELECT id, name, description, interface, filter_config, schedule_type, scheduled_time, duration_seconds, enabled, last_run, next_run, created_at
@@ -2676,29 +2838,36 @@ pub fn get_scheduled_captures_due() -> Result<Vec<ScheduledCaptureInfo>, String>
     )
     .map_err(|e| e.to_string())?;
 
-    let captures = stmt.query_map(rusqlite::params![now], |row| {
-        let filter_config_json: String = row.get(4)?;
-        let filter_config: FilterConfig = serde_json::from_str(&filter_config_json)
-            .map_err(|_| rusqlite::Error::InvalidColumnType(4, "Invalid JSON".to_string(), rusqlite::types::Type::Text))?;
+    let captures = stmt
+        .query_map(rusqlite::params![now], |row| {
+            let filter_config_json: String = row.get(4)?;
+            let filter_config: FilterConfig =
+                serde_json::from_str(&filter_config_json).map_err(|_| {
+                    rusqlite::Error::InvalidColumnType(
+                        4,
+                        "Invalid JSON".to_string(),
+                        rusqlite::types::Type::Text,
+                    )
+                })?;
 
-        Ok(ScheduledCaptureInfo {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            interface: row.get(3)?,
-            filter_config,
-            schedule_type: row.get(5)?,
-            scheduled_time: row.get(6)?,
-            duration_seconds: row.get(7)?,
-            enabled: row.get::<_, i64>(8)? != 0,
-            last_run: row.get(9)?,
-            next_run: row.get(10)?,
-            created_at: row.get(11)?,
+            Ok(ScheduledCaptureInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                interface: row.get(3)?,
+                filter_config,
+                schedule_type: row.get(5)?,
+                scheduled_time: row.get(6)?,
+                duration_seconds: row.get(7)?,
+                enabled: row.get::<_, i64>(8)? != 0,
+                last_run: row.get(9)?,
+                next_run: row.get(10)?,
+                created_at: row.get(11)?,
+            })
         })
-    })
-    .map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>()
-    .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(captures)
 }
@@ -2727,26 +2896,31 @@ fn get_packets_for_session(session_id: &str, limit: usize) -> Result<Vec<PacketI
     let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
     if let Some(entry) = sessions.get(session_id) {
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
-        let buffer = session.packet_buffer.lock().map_err(|_| "Failed to lock packet buffer")?;
+        let buffer = session
+            .packet_buffer
+            .lock()
+            .map_err(|_| "Failed to lock packet buffer")?;
         return Ok(buffer.get_last(limit));
     }
     drop(sessions); // Release lock before file I/O
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn.query_row(
-        "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
-        rusqlite::params![session_id],
-        |row| {
-            let path: String = row.get(0)?;
-            let filter_config_json: String = row.get(1)?;
-            let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
-                .ok()
-                .and_then(|fc| fc.rtp_port_range);
-            Ok((path, rtp_port_range))
-        },
-    ).map_err(|e| e.to_string())?;
+    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn
+        .query_row(
+            "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+            |row| {
+                let path: String = row.get(0)?;
+                let filter_config_json: String = row.get(1)?;
+                let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
+                    .ok()
+                    .and_then(|fc| fc.rtp_port_range);
+                Ok((path, rtp_port_range))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
-    let mut cap = Capture::from_file(&file_path)
-        .map_err(|e| format!("Failed to open pcap file: {}", e))?;
+    let mut cap =
+        Capture::from_file(&file_path).map_err(|e| format!("Failed to open pcap file: {}", e))?;
     let link_layer_type = cap.get_datalink().0 as u32;
     let parser = PacketParser::with_rtp_port_range(link_layer_type, rtp_port_range);
     let mut packets = Vec::new();
@@ -2776,7 +2950,10 @@ pub fn get_rtp_streams(session_id: String) -> Result<Vec<RtpStreamInfo>, String>
 
     for p in &packets {
         let is_rtp = p.protocol == Protocol::RTP
-            || matches!(p.decoded.as_ref().map(|d| &d.application), Some(crate::packet_capture::ApplicationLayer::Rtp(_)));
+            || matches!(
+                p.decoded.as_ref().map(|d| &d.application),
+                Some(crate::packet_capture::ApplicationLayer::Rtp(_))
+            );
         if !is_rtp || p.data.len() < 12 {
             continue;
         }
@@ -2836,7 +3013,10 @@ pub fn get_rtp_stream_history(
 
     for p in &packets {
         let is_rtp = p.protocol == Protocol::RTP
-            || matches!(p.decoded.as_ref().map(|d| &d.application), Some(crate::packet_capture::ApplicationLayer::Rtp(_)));
+            || matches!(
+                p.decoded.as_ref().map(|d| &d.application),
+                Some(crate::packet_capture::ApplicationLayer::Rtp(_))
+            );
         if !is_rtp || p.data.len() < 12 {
             continue;
         }
@@ -2865,7 +3045,10 @@ pub fn get_all_rtp_stream_histories(
 
     for p in &packets {
         let is_rtp = p.protocol == Protocol::RTP
-            || matches!(p.decoded.as_ref().map(|d| &d.application), Some(crate::packet_capture::ApplicationLayer::Rtp(_)));
+            || matches!(
+                p.decoded.as_ref().map(|d| &d.application),
+                Some(crate::packet_capture::ApplicationLayer::Rtp(_))
+            );
         if !is_rtp || p.data.len() < 12 {
             continue;
         }
@@ -2956,11 +3139,9 @@ pub fn get_sip_dialogs(session_id: String) -> Result<Vec<SipDialog>, String> {
 
     for (idx, p) in packets.iter().enumerate() {
         // Try to get SIP data from decoded application layer first
-        let sip_from_decoded = p.decoded.as_ref().and_then(|d| {
-            match &d.application {
-                ApplicationLayer::Sip(s) => Some(s.clone()),
-                _ => None,
-            }
+        let sip_from_decoded = p.decoded.as_ref().and_then(|d| match &d.application {
+            ApplicationLayer::Sip(s) => Some(s.clone()),
+            _ => None,
         });
 
         // If no decoded SIP but protocol is SIP, try re-parsing from raw payload
@@ -3081,7 +3262,12 @@ pub fn get_sip_dialogs(session_id: String) -> Result<Vec<SipDialog>, String> {
             let mut changed = false;
             for i in 0..buckets.len() {
                 for j in (i + 1)..buckets.len() {
-                    if buckets[i].tag_set.intersection(&buckets[j].tag_set).next().is_some() {
+                    if buckets[i]
+                        .tag_set
+                        .intersection(&buckets[j].tag_set)
+                        .next()
+                        .is_some()
+                    {
                         let mut b_j = buckets.swap_remove(j);
                         let b_i = &mut buckets[i];
                         b_i.messages.append(&mut b_j.messages);
@@ -3121,7 +3307,7 @@ pub fn get_sip_dialogs(session_id: String) -> Result<Vec<SipDialog>, String> {
             // Build participants using IP addresses for reliable directionality.
             // We use IP:port-style labels as the ground truth for which side sent a message,
             // then enrich the display label with the SIP identity (From/To header) when available.
-            
+
             // Step 1: Collect unique IP endpoints (source IPs seen in the dialog)
             let mut ip_to_sip_identity: HashMap<String, String> = HashMap::new();
             let mut ip_order: Vec<String> = Vec::new();
@@ -3160,7 +3346,8 @@ pub fn get_sip_dialogs(session_id: String) -> Result<Vec<SipDialog>, String> {
             let mut participants: Vec<String> = Vec::new();
             let mut ip_to_participant_idx: HashMap<String, usize> = HashMap::new();
             for ip in &ip_order {
-                let label = ip_to_sip_identity.get(ip)
+                let label = ip_to_sip_identity
+                    .get(ip)
                     .filter(|s| !s.is_empty())
                     .cloned()
                     .unwrap_or_else(|| ip.clone());
@@ -3442,7 +3629,9 @@ fn extract_notify_sipfrag_code(raw_upper: &str) -> Option<u16> {
     None
 }
 
-fn extract_correlation_tokens(headers: &HashMap<String, String>) -> std::collections::BTreeSet<String> {
+fn extract_correlation_tokens(
+    headers: &HashMap<String, String>,
+) -> std::collections::BTreeSet<String> {
     let mut tokens = std::collections::BTreeSet::new();
     for (name, value) in headers {
         let name_l = name.to_lowercase();
@@ -3458,7 +3647,9 @@ fn extract_correlation_tokens(headers: &HashMap<String, String>) -> std::collect
     tokens
 }
 
-fn extract_sip_message_from_packet(packet: &PacketInfo) -> Option<crate::packet_capture::sip_parser::ParsedSipMessage> {
+fn extract_sip_message_from_packet(
+    packet: &PacketInfo,
+) -> Option<crate::packet_capture::sip_parser::ParsedSipMessage> {
     if let Some(decoded) = &packet.decoded {
         match &decoded.application {
             ApplicationLayer::Sip(sip) => return Some(sip.clone()),
@@ -3484,11 +3675,20 @@ fn build_sip_packet_meta(packets: &[PacketInfo]) -> BTreeMap<u64, SipPacketMeta>
         let timestamp = packet.timestamp.to_rfc3339();
         let method = sip.method.clone().map(|m| m.to_uppercase());
         let cseq_method = cseq_method_upper(sip.cseq.as_ref());
-        let mut linked_call_ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-        if let Some(replaces) = sip.headers.get("replaces").and_then(|v| parse_replaces_call_id(v)) {
+        let mut linked_call_ids: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
+        if let Some(replaces) = sip
+            .headers
+            .get("replaces")
+            .and_then(|v| parse_replaces_call_id(v))
+        {
             linked_call_ids.insert(replaces);
         }
-        if let Some(refer_to) = sip.headers.get("refer-to").and_then(|v| parse_replaces_call_id(v)) {
+        if let Some(refer_to) = sip
+            .headers
+            .get("refer-to")
+            .and_then(|v| parse_replaces_call_id(v))
+        {
             linked_call_ids.insert(refer_to);
         }
         let body_text = sip
@@ -3521,15 +3721,21 @@ fn build_sip_packet_meta(packets: &[PacketInfo]) -> BTreeMap<u64, SipPacketMeta>
     by_index
 }
 
-fn build_call_session_legs(dialogs: &[SipDialog], packet_meta: &BTreeMap<u64, SipPacketMeta>) -> Vec<CallSessionLeg> {
+fn build_call_session_legs(
+    dialogs: &[SipDialog],
+    packet_meta: &BTreeMap<u64, SipPacketMeta>,
+) -> Vec<CallSessionLeg> {
     dialogs
         .iter()
         .enumerate()
         .map(|(dialog_index, dialog)| {
             let mut endpoints: HashSet<String> = HashSet::new();
-            let mut correlation_tokens: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-            let mut linked_call_ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-            let mut packet_indices: Vec<u64> = dialog.messages.iter().map(|m| m.packet_index).collect();
+            let mut correlation_tokens: std::collections::BTreeSet<String> =
+                std::collections::BTreeSet::new();
+            let mut linked_call_ids: std::collections::BTreeSet<String> =
+                std::collections::BTreeSet::new();
+            let mut packet_indices: Vec<u64> =
+                dialog.messages.iter().map(|m| m.packet_index).collect();
             packet_indices.sort_unstable();
             packet_indices.dedup();
             for idx in &packet_indices {
@@ -3687,12 +3893,21 @@ fn group_call_session_leg_indices(legs: &[SessionLegForGrouping]) -> Vec<Vec<usi
             if dsu.find(i) == dsu.find(j) {
                 continue;
             }
-            let endpoint_overlap = legs[i].endpoints.intersection(&legs[j].endpoints).next().is_some();
+            let endpoint_overlap = legs[i]
+                .endpoints
+                .intersection(&legs[j].endpoints)
+                .next()
+                .is_some();
             if !endpoint_overlap {
                 continue;
             }
-            if time_gap_seconds(legs[i].start_dt, legs[i].end_dt, legs[j].start_dt, legs[j].end_dt)
-                .unwrap_or(3)
+            if time_gap_seconds(
+                legs[i].start_dt,
+                legs[i].end_dt,
+                legs[j].start_dt,
+                legs[j].end_dt,
+            )
+            .unwrap_or(3)
                 <= 2
             {
                 dsu.union(i, j);
@@ -3706,12 +3921,21 @@ fn group_call_session_leg_indices(legs: &[SessionLegForGrouping]) -> Vec<Vec<usi
             if dsu.find(i) == dsu.find(j) {
                 continue;
             }
-            let ssrc_overlap = legs[i].rtp_ssrcs.intersection(&legs[j].rtp_ssrcs).next().is_some();
+            let ssrc_overlap = legs[i]
+                .rtp_ssrcs
+                .intersection(&legs[j].rtp_ssrcs)
+                .next()
+                .is_some();
             if !ssrc_overlap {
                 continue;
             }
-            if time_gap_seconds(legs[i].start_dt, legs[i].end_dt, legs[j].start_dt, legs[j].end_dt)
-                .unwrap_or(5)
+            if time_gap_seconds(
+                legs[i].start_dt,
+                legs[i].end_dt,
+                legs[j].start_dt,
+                legs[j].end_dt,
+            )
+            .unwrap_or(5)
                 <= 5
             {
                 dsu.union(i, j);
@@ -3734,9 +3958,7 @@ fn group_call_session_leg_indices(legs: &[SessionLegForGrouping]) -> Vec<Vec<usi
         let b_first = b.first().copied().unwrap_or(usize::MAX);
         let a_time = legs.get(a_first).and_then(|l| l.start_dt);
         let b_time = legs.get(b_first).and_then(|l| l.start_dt);
-        a_time
-            .cmp(&b_time)
-            .then_with(|| a_first.cmp(&b_first))
+        a_time.cmp(&b_time).then_with(|| a_first.cmp(&b_first))
     });
     grouped
 }
@@ -3749,30 +3971,41 @@ fn build_call_session_events(mut packet_meta: Vec<SipPacketMeta>) -> Vec<CallSes
     });
     let mut events: Vec<CallSessionEvent> = Vec::new();
     let mut event_counter: u64 = 0;
-    let mut push_event = |event_type: &str, label: &str, meta: &SipPacketMeta, detail: Option<String>| {
-        event_counter = event_counter.saturating_add(1);
-        events.push(CallSessionEvent {
-            id: format!("ev-{}-{}", meta.packet_index, event_counter),
-            r#type: event_type.to_string(),
-            event_type: event_type.to_string(),
-            label: label.to_string(),
-            timestamp: meta.timestamp.clone(),
-            packet_index: Some(meta.packet_index),
-            packet_indices: vec![meta.packet_index],
-            call_id: Some(meta.call_id.clone()),
-            dialog_index: None,
-            message_index: None,
-            media_ssrc: None,
-            detail,
-        });
-    };
+    let mut push_event =
+        |event_type: &str, label: &str, meta: &SipPacketMeta, detail: Option<String>| {
+            event_counter = event_counter.saturating_add(1);
+            events.push(CallSessionEvent {
+                id: format!("ev-{}-{}", meta.packet_index, event_counter),
+                r#type: event_type.to_string(),
+                event_type: event_type.to_string(),
+                label: label.to_string(),
+                timestamp: meta.timestamp.clone(),
+                packet_index: Some(meta.packet_index),
+                packet_indices: vec![meta.packet_index],
+                call_id: Some(meta.call_id.clone()),
+                dialog_index: None,
+                message_index: None,
+                media_ssrc: None,
+                detail,
+            });
+        };
     for meta in packet_meta {
         if let Some(method) = &meta.method {
             match method.as_str() {
                 "INVITE" => push_event("setup", "INVITE sent", &meta, Some("INVITE".to_string())),
                 "REFER" => push_event("transferInitiated", "Transfer initiated", &meta, None),
-                "BYE" => push_event("terminated", "Call terminated", &meta, Some("BYE".to_string())),
-                "CANCEL" => push_event("terminated", "Call cancelled", &meta, Some("CANCEL".to_string())),
+                "BYE" => push_event(
+                    "terminated",
+                    "Call terminated",
+                    &meta,
+                    Some("BYE".to_string()),
+                ),
+                "CANCEL" => push_event(
+                    "terminated",
+                    "Call cancelled",
+                    &meta,
+                    Some("CANCEL".to_string()),
+                ),
                 "NOTIFY" => {
                     if let Some(sipfrag_code) = extract_notify_sipfrag_code(&meta.raw_upper) {
                         if (200..300).contains(&sipfrag_code) {
@@ -3790,7 +4023,9 @@ fn build_call_session_events(mut packet_meta: Vec<SipPacketMeta>) -> Vec<CallSes
                                 Some(format!("SIP {}", sipfrag_code)),
                             );
                         }
-                    } else if meta.raw_upper.contains("SIPFRAG") && meta.raw_upper.contains("SIP/2.0 200") {
+                    } else if meta.raw_upper.contains("SIPFRAG")
+                        && meta.raw_upper.contains("SIP/2.0 200")
+                    {
                         push_event("transferCompleted", "Transfer completed", &meta, None);
                     } else if meta.raw_upper.contains("SIP/2.0 4")
                         || meta.raw_upper.contains("SIP/2.0 5")
@@ -3814,7 +4049,13 @@ fn build_call_session_events(mut packet_meta: Vec<SipPacketMeta>) -> Vec<CallSes
                 "transferLinked",
                 "Transfer linked",
                 &meta,
-                Some(meta.linked_call_ids.iter().cloned().collect::<Vec<_>>().join(",")),
+                Some(
+                    meta.linked_call_ids
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(","),
+                ),
             );
         }
         if let Some(code) = meta.response_code {
@@ -3826,7 +4067,12 @@ fn build_call_session_events(mut packet_meta: Vec<SipPacketMeta>) -> Vec<CallSes
                 c if c >= 400 => {
                     push_event("anomaly", "SIP anomaly", &meta, Some(format!("SIP {}", c)));
                     if meta.cseq_method.as_deref() == Some("INVITE") {
-                        push_event("terminated", "Call terminated", &meta, Some(format!("final {}", c)));
+                        push_event(
+                            "terminated",
+                            "Call terminated",
+                            &meta,
+                            Some(format!("final {}", c)),
+                        );
                     }
                 }
                 _ => {}
@@ -3836,7 +4082,13 @@ fn build_call_session_events(mut packet_meta: Vec<SipPacketMeta>) -> Vec<CallSes
     events.sort_by(|a, b| {
         parse_timestamp_utc(&a.timestamp)
             .cmp(&parse_timestamp_utc(&b.timestamp))
-            .then_with(|| a.packet_indices.first().copied().unwrap_or(u64::MAX).cmp(&b.packet_indices.first().copied().unwrap_or(u64::MAX)))
+            .then_with(|| {
+                a.packet_indices
+                    .first()
+                    .copied()
+                    .unwrap_or(u64::MAX)
+                    .cmp(&b.packet_indices.first().copied().unwrap_or(u64::MAX))
+            })
             .then_with(|| a.event_type.cmp(&b.event_type))
     });
     events
@@ -3889,13 +4141,15 @@ fn build_call_session_disposition(packet_meta: &[SipPacketMeta]) -> String {
 }
 
 fn build_call_session_anomaly_flags(packet_meta: &[SipPacketMeta]) -> SessionAnomalyFlags {
-    let has_error_response = packet_meta.iter().any(|m| m.response_code.unwrap_or(0) >= 400);
-    let has_answered = packet_meta.iter().any(|m| {
-        m.response_code == Some(200) && m.cseq_method.as_deref() == Some("INVITE")
-    });
-    let has_termination = packet_meta.iter().any(|m| {
-        matches!(m.method.as_deref(), Some("BYE") | Some("CANCEL"))
-    });
+    let has_error_response = packet_meta
+        .iter()
+        .any(|m| m.response_code.unwrap_or(0) >= 400);
+    let has_answered = packet_meta
+        .iter()
+        .any(|m| m.response_code == Some(200) && m.cseq_method.as_deref() == Some("INVITE"));
+    let has_termination = packet_meta
+        .iter()
+        .any(|m| matches!(m.method.as_deref(), Some("BYE") | Some("CANCEL")));
     let first_setup = packet_meta
         .iter()
         .find(|m| m.method.as_deref() == Some("INVITE"))
@@ -4107,7 +4361,9 @@ fn extract_sip_message(packet: &PacketInfo) -> Option<ParsedSipMessage> {
     crate::packet_capture::sip_parser::parse_sip_message(&packet.data).ok()
 }
 
-fn collect_sip_messages_by_call_id(packets: &[PacketInfo]) -> BTreeMap<String, Vec<ParsedSipMessage>> {
+fn collect_sip_messages_by_call_id(
+    packets: &[PacketInfo],
+) -> BTreeMap<String, Vec<ParsedSipMessage>> {
     let mut map: BTreeMap<String, Vec<ParsedSipMessage>> = BTreeMap::new();
     for packet in packets {
         let Some(sip) = extract_sip_message(packet) else {
@@ -4146,11 +4402,7 @@ fn build_normalized_headers(messages: &[ParsedSipMessage]) -> NormalizedSipHeade
         from: collect_unique_values(messages.iter().filter_map(|sip| sip.from.clone())),
         to: collect_unique_values(messages.iter().filter_map(|sip| sip.to.clone())),
         contact: collect_unique_values(messages.iter().filter_map(|sip| sip.contact.clone())),
-        via: collect_unique_values(
-            messages
-                .iter()
-                .flat_map(|sip| sip.via.iter().cloned()),
-        ),
+        via: collect_unique_values(messages.iter().flat_map(|sip| sip.via.iter().cloned())),
         supported: header_values_from_messages(messages, "supported"),
         allow: header_values_from_messages(messages, "allow"),
         require: header_values_from_messages(messages, "require"),
@@ -4163,7 +4415,12 @@ fn build_normalized_headers(messages: &[ParsedSipMessage]) -> NormalizedSipHeade
 fn is_sdp_offer_message(sip: &ParsedSipMessage) -> bool {
     sip.method
         .as_deref()
-        .map(|m| matches!(m.to_ascii_uppercase().as_str(), "INVITE" | "UPDATE" | "PRACK" | "ACK"))
+        .map(|m| {
+            matches!(
+                m.to_ascii_uppercase().as_str(),
+                "INVITE" | "UPDATE" | "PRACK" | "ACK"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -4197,7 +4454,9 @@ fn build_codec_negotiation_summary(
             }
             for payload_type in &media.payload_types {
                 let codec_name = resolve_codec_name(*payload_type, sdp_codec_map);
-                payload_codec_map.entry(*payload_type).or_insert_with(|| codec_name.clone());
+                payload_codec_map
+                    .entry(*payload_type)
+                    .or_insert_with(|| codec_name.clone());
                 if is_offer {
                     offer_payload_types.insert(*payload_type);
                     offer_codecs.insert(codec_name.clone());
@@ -4271,7 +4530,8 @@ fn derive_total_duration_ms(dialog: &SipDialog) -> Option<u64> {
 fn build_call_behavior_summaries(session_id: &str) -> Result<Vec<CallBehaviorSummary>, String> {
     let dialogs = get_sip_dialogs(session_id.to_string())?;
     let packets = get_session_packets_shared(session_id)?;
-    let sdp_codec_map = crate::packet_capture::rtp_analyzer::extract_sdp_codec_map(packets.as_ref());
+    let sdp_codec_map =
+        crate::packet_capture::rtp_analyzer::extract_sdp_codec_map(packets.as_ref());
     let sip_messages_by_call = collect_sip_messages_by_call_id(packets.as_ref());
 
     let mut summaries = Vec::new();
@@ -4328,7 +4588,9 @@ pub fn get_expert_findings(
     use crate::packet_capture::expert_analyzer::{
         self, InputRtpStream, InputSipDialog, InputSipDialogMessage,
     };
-    use crate::packet_capture::rtp_analyzer::{calculate_mos, resolve_codec_name, RtpStreamTracker};
+    use crate::packet_capture::rtp_analyzer::{
+        calculate_mos, resolve_codec_name, RtpStreamTracker,
+    };
 
     let packets = get_packets_for_session(&session_id, 50_000)?;
 
@@ -4344,7 +4606,12 @@ pub fn get_expert_findings(
             continue;
         }
         let _ = tracker.process_packet(
-            p.src_ip, p.src_port, p.dst_ip, p.dst_port, p.timestamp, &p.data,
+            p.src_ip,
+            p.src_port,
+            p.dst_ip,
+            p.dst_port,
+            p.timestamp,
+            &p.data,
         );
     }
     let rtp_streams: Vec<InputRtpStream> = tracker
@@ -4467,7 +4734,10 @@ pub fn export_dialog_pcap(session_id: String, dialog_index: u32) -> Result<Strin
 /// Export dialog PCAP and return contents as base64 for frontend download.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn export_dialog_pcap_base64(session_id: String, dialog_index: u32) -> Result<ExportDialogPcapResult, String> {
+pub fn export_dialog_pcap_base64(
+    session_id: String,
+    dialog_index: u32,
+) -> Result<ExportDialogPcapResult, String> {
     use base64::prelude::Engine as _;
     let path = export_dialog_pcap(session_id, dialog_index)?;
     let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
@@ -4491,7 +4761,10 @@ pub struct ExportDialogPcapResult {
 /// Export dialog PCAP and show system save dialog; write to chosen path and return it.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn export_dialog_pcap_save(session_id: String, dialog_index: u32) -> Result<String, String> {
+pub async fn export_dialog_pcap_save(
+    session_id: String,
+    dialog_index: u32,
+) -> Result<String, String> {
     let temp_path = export_dialog_pcap(session_id, dialog_index)?;
     let default_name = std::path::Path::new(&temp_path)
         .file_name()
@@ -4554,19 +4827,19 @@ pub fn generate_call_quality_report(
     format: String,
 ) -> Result<CallQualityReportResult, String> {
     use base64::prelude::Engine as _;
-    
+
     // Get the SIP dialog
     let dialogs = get_sip_dialogs(session_id.clone())?;
     let dialog = dialogs
         .get(dialog_index as usize)
         .ok_or_else(|| "Dialog index out of range".to_string())?;
-    
+
     // Get RTP streams for the session
     let rtp_streams = get_rtp_streams(session_id.clone())?;
-    
+
     // Get RTP stream histories for quality metrics
     let rtp_histories = get_all_rtp_stream_histories(session_id.clone())?;
-    
+
     // Calculate call duration
     let start_time = &dialog.start_time;
     let end_time = dialog.end_time.as_ref().unwrap_or(start_time);
@@ -4578,10 +4851,13 @@ pub fn generate_call_quality_report(
             _ => 0,
         }
     };
-    
+
     // Build report data
-    let participants = dialog.participants.clone().unwrap_or_else(|| vec!["Unknown".to_string()]);
-    
+    let participants = dialog
+        .participants
+        .clone()
+        .unwrap_or_else(|| vec!["Unknown".to_string()]);
+
     // Find issues based on RTP quality
     let mut issues: Vec<String> = Vec::new();
     for stream in &rtp_streams {
@@ -4604,7 +4880,7 @@ pub fn generate_call_quality_report(
             ));
         }
     }
-    
+
     // Generate HTML report
     let html = generate_call_quality_html(
         &dialog,
@@ -4614,7 +4890,7 @@ pub fn generate_call_quality_report(
         &rtp_histories,
         &issues,
     );
-    
+
     let content_base64 = base64::prelude::BASE64_STANDARD.encode(html.as_bytes());
     let call_snippet = dialog.call_id.chars().take(12).collect::<String>();
     let safe_name = call_snippet
@@ -4622,7 +4898,7 @@ pub fn generate_call_quality_report(
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect::<String>();
     let filename = format!("call_quality_report_{}.html", safe_name);
-    
+
     Ok(CallQualityReportResult {
         filename,
         content_base64,
@@ -4651,14 +4927,14 @@ fn generate_call_quality_html(
     } else {
         format!("{}s", duration_secs)
     };
-    
+
     // Calculate overall quality metrics
     let avg_mos = if rtp_streams.is_empty() {
         0.0
     } else {
         rtp_streams.iter().map(|s| s.mos_score).sum::<f64>() / rtp_streams.len() as f64
     };
-    
+
     let total_packets: u64 = rtp_streams.iter().map(|s| s.packet_count).sum();
     let total_lost: u32 = rtp_streams.iter().map(|s| s.lost_packets).sum();
     let overall_loss = if total_packets > 0 {
@@ -4666,17 +4942,30 @@ fn generate_call_quality_html(
     } else {
         0.0
     };
-    
+
     let avg_jitter = if rtp_streams.is_empty() {
         0.0
     } else {
         rtp_streams.iter().map(|s| s.jitter).sum::<f64>() / rtp_streams.len() as f64
     };
-    
-    let quality_class = if avg_mos >= 4.0 { "quality-good" } else if avg_mos >= 3.5 { "quality-fair" } else { "quality-poor" };
-    let quality_label = if avg_mos >= 4.0 { "Good" } else if avg_mos >= 3.5 { "Fair" } else { "Poor" };
-    
-    let mut html = format!(r#"<!DOCTYPE html>
+
+    let quality_class = if avg_mos >= 4.0 {
+        "quality-good"
+    } else if avg_mos >= 3.5 {
+        "quality-fair"
+    } else {
+        "quality-poor"
+    };
+    let quality_label = if avg_mos >= 4.0 {
+        "Good"
+    } else if avg_mos >= 3.5 {
+        "Fair"
+    } else {
+        "Poor"
+    };
+
+    let mut html = format!(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -4756,32 +5045,45 @@ fn generate_call_quality_html(
         dialog.call_id,
         chrono::Utc::now().to_rfc3339(),
         duration_display,
-        quality_class, avg_mos, quality_label,
+        quality_class,
+        avg_mos,
+        quality_label,
         overall_loss,
         avg_jitter,
         rtp_streams.len(),
         dialog.messages.len(),
     );
-    
+
     for p in participants {
-        html.push_str(&format!(r#"<span class="participant-tag">{}</span>"#, 
-            html_escape(p)));
+        html.push_str(&format!(
+            r#"<span class="participant-tag">{}</span>"#,
+            html_escape(p)
+        ));
     }
     html.push_str("</div>");
-    
+
     // Issues section
     if !issues.is_empty() {
         html.push_str(r#"<h2>Issues Detected</h2>"#);
         for issue in issues {
-            html.push_str(&format!(r#"<div class="issue-item">{}</div>"#, html_escape(issue)));
+            html.push_str(&format!(
+                r#"<div class="issue-item">{}</div>"#,
+                html_escape(issue)
+            ));
         }
     }
-    
+
     // RTP Streams section
     if !rtp_streams.is_empty() {
         html.push_str(r#"<h2>RTP Streams</h2>"#);
         for stream in rtp_streams {
-            let mos_class = if stream.mos_score >= 4.0 { "quality-good" } else if stream.mos_score >= 3.5 { "quality-fair" } else { "quality-poor" };
+            let mos_class = if stream.mos_score >= 4.0 {
+                "quality-good"
+            } else if stream.mos_score >= 3.5 {
+                "quality-fair"
+            } else {
+                "quality-poor"
+            };
             html.push_str(&format!(r#"
             <div class="section-card">
                 <h3 style="margin-top:0">SSRC: 0x{:08X} - {}</h3>
@@ -4804,36 +5106,66 @@ fn generate_call_quality_html(
             ));
         }
     }
-    
+
     // SIP Flow section
     html.push_str(r#"<h2>SIP Message Flow</h2><div class="section-card"><div class="sip-flow">"#);
     for msg in &dialog.messages {
-        let is_response = msg.method_or_code.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false);
-        let code_num: Option<u16> = if is_response { msg.method_or_code.split_whitespace().next().and_then(|s| s.parse().ok()) } else { None };
+        let is_response = msg
+            .method_or_code
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false);
+        let code_num: Option<u16> = if is_response {
+            msg.method_or_code
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+        } else {
+            None
+        };
         let msg_class = if is_response {
-            if code_num.map(|c| c >= 400).unwrap_or(false) { "sip-error" } else { "sip-response" }
-        } else { "sip-request" };
-        
-        let time_display = msg.timestamp.split('T').nth(1).unwrap_or(&msg.timestamp).chars().take(12).collect::<String>();
-        
-        html.push_str(&format!(r#"
+            if code_num.map(|c| c >= 400).unwrap_or(false) {
+                "sip-error"
+            } else {
+                "sip-response"
+            }
+        } else {
+            "sip-request"
+        };
+
+        let time_display = msg
+            .timestamp
+            .split('T')
+            .nth(1)
+            .unwrap_or(&msg.timestamp)
+            .chars()
+            .take(12)
+            .collect::<String>();
+
+        html.push_str(&format!(
+            r#"
             <div class="sip-message">
                 <span class="sip-time">{}</span>
                 <span class="sip-method {}">{}</span>
             </div>"#,
-            time_display, msg_class, html_escape(&msg.method_or_code),
+            time_display,
+            msg_class,
+            html_escape(&msg.method_or_code),
         ));
     }
     html.push_str("</div></div>");
-    
-    html.push_str(r#"
+
+    html.push_str(
+        r#"
         <div class="footer">
             <p>Generated by VoIP Toolset - Call Quality Report</p>
         </div>
     </div>
 </body>
-</html>"#);
-    
+</html>"#,
+    );
+
     html
 }
 
@@ -4850,7 +5182,9 @@ fn html_escape(s: &str) -> String {
 pub fn get_sip_message_raw(session_id: String, packet_index: u64) -> Result<String, String> {
     let packets = get_packets_for_session(&session_id, 50_000)?;
     let idx = packet_index as usize;
-    let p = packets.get(idx).ok_or_else(|| "Packet index out of range".to_string())?;
+    let p = packets
+        .get(idx)
+        .ok_or_else(|| "Packet index out of range".to_string())?;
     match &p.decoded {
         Some(d) => match &d.application {
             ApplicationLayer::Sip(sip) => Ok(sip.raw_message.clone()),
@@ -4880,10 +5214,17 @@ fn get_or_build_raw_pcap_index(
     file_path: &str,
 ) -> Result<(Arc<MmapPcapReader>, Arc<Vec<(usize, usize)>>), String> {
     {
-        let cache = RAW_PCAP_INDEX_CACHE.lock().map_err(|_| "Failed to lock raw pcap cache")?;
+        let cache = RAW_PCAP_INDEX_CACHE
+            .lock()
+            .map_err(|_| "Failed to lock raw pcap cache")?;
         if let Some(entry) = cache.get(session_id) {
-            if entry.file_path == file_path && entry.loaded_at.elapsed().as_secs() < PCAP_CACHE_TTL_SECS {
-                return Ok((Arc::clone(&entry.reader), Arc::clone(&entry.packet_data_index)));
+            if entry.file_path == file_path
+                && entry.loaded_at.elapsed().as_secs() < PCAP_CACHE_TTL_SECS
+            {
+                return Ok((
+                    Arc::clone(&entry.reader),
+                    Arc::clone(&entry.packet_data_index),
+                ));
             }
         }
     }
@@ -4901,7 +5242,9 @@ fn get_or_build_raw_pcap_index(
     let reader = Arc::new(reader);
 
     {
-        let mut cache = RAW_PCAP_INDEX_CACHE.lock().map_err(|_| "Failed to lock raw pcap cache")?;
+        let mut cache = RAW_PCAP_INDEX_CACHE
+            .lock()
+            .map_err(|_| "Failed to lock raw pcap cache")?;
         cache.insert(
             session_id.to_string(),
             RawPcapIndexCacheEntry {
@@ -4934,8 +5277,8 @@ fn read_raw_packet_from_pcap_by_index(
     }
 
     // Fidelity-preserving fallback path.
-    let mut cap = Capture::from_file(file_path)
-        .map_err(|e| format!("Failed to open pcap file: {}", e))?;
+    let mut cap =
+        Capture::from_file(file_path).map_err(|e| format!("Failed to open pcap file: {}", e))?;
     let mut current = 0usize;
     while let Ok(packet) = cap.next_packet() {
         if current == packet_index {
@@ -5051,11 +5394,13 @@ pub fn create_support_package(
     }
 
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let (file_path, name): (String, String) = conn.query_row(
-        "SELECT file_path, name FROM capture_sessions WHERE id = ?1",
-        rusqlite::params![session_id],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).map_err(|e| e.to_string())?;
+    let (file_path, name): (String, String) = conn
+        .query_row(
+            "SELECT file_path, name FROM capture_sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
 
     let config_dir = config::get_config_dir().map_err(|e| e.to_string())?;
     let support_dir = config_dir.join("captures").join("support_packages");
@@ -5075,11 +5420,19 @@ pub fn create_support_package(
         "Support package: {}\nSession: {} ({})\nCreated: {}\n\n",
         package_id,
         name,
-        if include_raw_ids { session_id.clone() } else { mask_identifier(&session_id) },
+        if include_raw_ids {
+            session_id.clone()
+        } else {
+            mask_identifier(&session_id)
+        },
         chrono::Utc::now().to_rfc3339(),
     );
     if let Some(cid) = &call_id {
-        let shown = if include_raw_ids { cid.clone() } else { mask_identifier(cid) };
+        let shown = if include_raw_ids {
+            cid.clone()
+        } else {
+            mask_identifier(cid)
+        };
         summary_content.push_str(&format!("Call-ID: {}\n", shown));
     }
     summary_content.push_str("\n--- Summary ---\n");
@@ -5096,26 +5449,31 @@ pub fn create_support_package(
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn load_capture_session(session_id: String, limit: Option<usize>) -> Result<Vec<serde_json::Value>, String> {
+pub fn load_capture_session(
+    session_id: String,
+    limit: Option<usize>,
+) -> Result<Vec<serde_json::Value>, String> {
     // Get file path and filter_config (for rtp_port_range) from database
     let conn = database::Database::get_connection().map_err(|e| e.to_string())?;
-    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn.query_row(
-        "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
-        rusqlite::params![session_id],
-        |row| {
-            let path: String = row.get(0)?;
-            let filter_config_json: String = row.get(1)?;
-            let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
-                .ok()
-                .and_then(|fc| fc.rtp_port_range);
-            Ok((path, rtp_port_range))
-        },
-    ).map_err(|e| e.to_string())?;
+    let (file_path, rtp_port_range): (String, Option<(u16, u16)>) = conn
+        .query_row(
+            "SELECT file_path, filter_config FROM capture_sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+            |row| {
+                let path: String = row.get(0)?;
+                let filter_config_json: String = row.get(1)?;
+                let rtp_port_range = serde_json::from_str::<FilterConfig>(&filter_config_json)
+                    .ok()
+                    .and_then(|fc| fc.rtp_port_range);
+                Ok((path, rtp_port_range))
+            },
+        )
+        .map_err(|e| e.to_string())?;
 
     // Read packets from pcap file using pcap::Capture
-    let mut cap = Capture::from_file(&file_path)
-        .map_err(|e| format!("Failed to open pcap file: {}", e))?;
-    
+    let mut cap =
+        Capture::from_file(&file_path).map_err(|e| format!("Failed to open pcap file: {}", e))?;
+
     // Get link layer type from the capture (convert i32 to u32)
     let link_layer_type = cap.get_datalink().0 as u32;
     let parser = PacketParser::with_rtp_port_range(link_layer_type, rtp_port_range);
@@ -5159,7 +5517,9 @@ pub struct RemoteCaptureConfigPayload {
     pub duration_seconds: Option<u64>,
 }
 
-impl From<RemoteCaptureConfigPayload> for crate::packet_capture::remote_capture::RemoteCaptureConfig {
+impl From<RemoteCaptureConfigPayload>
+    for crate::packet_capture::remote_capture::RemoteCaptureConfig
+{
     fn from(p: RemoteCaptureConfigPayload) -> Self {
         use crate::packet_capture::remote_capture::SshAuthMethod;
         let auth_method = match p.auth_method.as_str() {
@@ -5326,10 +5686,7 @@ pub fn get_capture_capabilities() -> CaptureCapabilityReport {
     } else if local_capture_probe_succeeded {
         (true, None)
     } else {
-        (
-            false,
-            local_capture_probe_reason.clone(),
-        )
+        (false, local_capture_probe_reason.clone())
     };
 
     let remote_capture_supported = true;
@@ -5358,10 +5715,7 @@ pub fn get_capture_capabilities() -> CaptureCapabilityReport {
 /// Decode an RTP stream's audio and return as base64-encoded WAV.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn rtp_stream_decode_audio(
-    session_id: String,
-    ssrc: u32,
-) -> Result<serde_json::Value, String> {
+pub fn rtp_stream_decode_audio(session_id: String, ssrc: u32) -> Result<serde_json::Value, String> {
     let packets = get_packets_for_session(&session_id, 500_000)?;
     let (audio_samples, _first_ts, _label, packet_count) = decode_ssrc_audio(&packets, ssrc)?;
 
@@ -5415,10 +5769,7 @@ fn decode_ssrc_audio(
                     // (profile + length fields), so no extra +4 needed.
                     let header_size = 12
                         + (rtp_header.csrc_count as usize * 4)
-                        + rtp_header
-                            .extension_length
-                            .map(|l| l as usize)
-                            .unwrap_or(0);
+                        + rtp_header.extension_length.map(|l| l as usize).unwrap_or(0);
 
                     if raw_data.len() > header_size {
                         let mut payload_end = raw_data.len();
@@ -5426,9 +5777,7 @@ fn decode_ssrc_audio(
                         // Strip RTP padding if present (RFC 3550 §5.1)
                         if rtp_header.padding && raw_data.len() > header_size {
                             let padding_len = raw_data[raw_data.len() - 1] as usize;
-                            if padding_len > 0
-                                && padding_len <= (raw_data.len() - header_size)
-                            {
+                            if padding_len > 0 && padding_len <= (raw_data.len() - header_size) {
                                 payload_end -= padding_len;
                             }
                         }
@@ -5581,8 +5930,7 @@ pub fn rtp_streams_decode_combined(
     right_aligned.resize(max_len, 0);
 
     let wav_data = encode_wav_stereo(&left_aligned, &right_aligned, sample_rate);
-    let wav_b64 =
-        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &wav_data);
+    let wav_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &wav_data);
     let duration_sec = max_len as f64 / sample_rate as f64;
 
     Ok(serde_json::json!({
@@ -5679,13 +6027,21 @@ pub fn rtp_stream_analyze_quality(
             if silence_count >= silence_min_samples {
                 let start_sec = silence_start.unwrap_or(0) as f64 / sample_rate as f64;
                 let duration_ms = (silence_count as f64 / sample_rate as f64) * 1000.0;
-                let severity = if duration_ms > 3000.0 { "error" } else { "warning" };
+                let severity = if duration_ms > 3000.0 {
+                    "error"
+                } else {
+                    "warning"
+                };
                 issues.push(AudioIssue {
                     issue_type: "silence".to_string(),
                     start_time_sec: start_sec,
                     duration_ms,
                     severity: severity.to_string(),
-                    description: format!("Silence detected: {:.1}s at {:.0}s", duration_ms / 1000.0, start_sec),
+                    description: format!(
+                        "Silence detected: {:.1}s at {:.0}s",
+                        duration_ms / 1000.0,
+                        start_sec
+                    ),
                 });
             }
             silence_start = None;
@@ -5726,7 +6082,11 @@ pub fn rtp_stream_analyze_quality(
                     start_time_sec: start_sec,
                     duration_ms,
                     severity: "error".to_string(),
-                    description: format!("Audio clipping: {:.1}s at {:.0}s", duration_ms / 1000.0, start_sec),
+                    description: format!(
+                        "Audio clipping: {:.1}s at {:.0}s",
+                        duration_ms / 1000.0,
+                        start_sec
+                    ),
                 });
             }
             clip_start = None;
@@ -5764,10 +6124,7 @@ pub struct CdrRecord {
 /// Export Call Detail Records from SIP dialogs in a capture session.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn export_cdrs(
-    session_id: String,
-    format: String,
-) -> Result<String, String> {
+pub fn export_cdrs(session_id: String, format: String) -> Result<String, String> {
     // Reuse existing get_sip_dialogs and get_rtp_streams commands
     let dialogs = get_sip_dialogs(session_id.clone())?;
     let rtp_streams_result = get_rtp_streams(session_id.clone())?;
@@ -5803,18 +6160,19 @@ pub fn export_cdrs(
             }
         }
 
-        let duration = if let (Some(start), Some(end)) = (dialog.messages.first(), dialog.messages.last()) {
-            if let (Ok(s), Ok(e)) = (
-                chrono::DateTime::parse_from_rfc3339(&start.timestamp),
-                chrono::DateTime::parse_from_rfc3339(&end.timestamp),
-            ) {
-                (e - s).num_milliseconds() as f64 / 1000.0
+        let duration =
+            if let (Some(start), Some(end)) = (dialog.messages.first(), dialog.messages.last()) {
+                if let (Ok(s), Ok(e)) = (
+                    chrono::DateTime::parse_from_rfc3339(&start.timestamp),
+                    chrono::DateTime::parse_from_rfc3339(&end.timestamp),
+                ) {
+                    (e - s).num_milliseconds() as f64 / 1000.0
+                } else {
+                    0.0
+                }
             } else {
                 0.0
-            }
-        } else {
-            0.0
-        };
+            };
 
         // Find matching RTP streams for quality metrics
         let mut mos: Option<f64> = None;
@@ -5828,8 +6186,18 @@ pub fn export_cdrs(
             break;
         }
 
-        let caller = dialog.participants.as_ref().and_then(|p| p.first()).cloned().unwrap_or_default();
-        let callee = dialog.participants.as_ref().and_then(|p| p.get(1)).cloned().unwrap_or_default();
+        let caller = dialog
+            .participants
+            .as_ref()
+            .and_then(|p| p.first())
+            .cloned()
+            .unwrap_or_default();
+        let callee = dialog
+            .participants
+            .as_ref()
+            .and_then(|p| p.get(1))
+            .cloned()
+            .unwrap_or_default();
 
         cdrs.push(CdrRecord {
             call_id: dialog.call_id.clone(),
@@ -5870,14 +6238,14 @@ pub fn export_cdrs(
                     cdr.codec.as_deref().unwrap_or(""),
                     cdr.mos.map(|m| format!("{:.2}", m)).unwrap_or_default(),
                     cdr.jitter.map(|j| format!("{:.1}", j)).unwrap_or_default(),
-                    cdr.packet_loss.map(|l| format!("{:.2}", l)).unwrap_or_default(),
+                    cdr.packet_loss
+                        .map(|l| format!("{:.2}", l))
+                        .unwrap_or_default(),
                 ));
             }
             Ok(csv)
         }
-        _ => {
-            serde_json::to_string_pretty(&cdrs).map_err(|e| e.to_string())
-        }
+        _ => serde_json::to_string_pretty(&cdrs).map_err(|e| e.to_string()),
     }
 }
 
@@ -5887,9 +6255,7 @@ pub fn export_cdrs(
 /// Reuses the existing get_rtp_streams logic but intended for polling during live capture.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn get_live_rtp_streams(
-    session_id: String,
-) -> Result<Vec<RtpStreamInfo>, String> {
+pub fn get_live_rtp_streams(session_id: String) -> Result<Vec<RtpStreamInfo>, String> {
     get_rtp_streams(session_id)
 }
 
@@ -6015,8 +6381,9 @@ pub fn create_agent_capture_session(
         PcapWriter::new(&file_path).map_err(|e| e.to_string())?,
     ));
 
-    let packet_buffer: crate::packet_capture::ring_buffer::SharedPacketBuffer =
-        Arc::new(std::sync::Mutex::new(PacketRingBufferCompat::new(DEFAULT_BUFFER_CAPACITY)));
+    let packet_buffer: crate::packet_capture::ring_buffer::SharedPacketBuffer = Arc::new(
+        std::sync::Mutex::new(PacketRingBufferCompat::new(DEFAULT_BUFFER_CAPACITY)),
+    );
 
     let session_obj = CaptureSession::new_external(
         session_id.clone(),
@@ -6067,16 +6434,14 @@ pub fn create_agent_capture_session(
 /// Returns the number of packets successfully parsed and injected.
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn inject_agent_raw_frames(
-    session_id: String,
-    frames: Vec<String>,
-) -> Result<u32, String> {
-    use base64::Engine;
+pub fn inject_agent_raw_frames(session_id: String, frames: Vec<String>) -> Result<u32, String> {
     use crate::packet_capture::protocol_decoder;
+    use base64::Engine;
 
     let (buffer, pcap_writer) = {
         let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-        let entry = sessions.get(&session_id)
+        let entry = sessions
+            .get(&session_id)
             .ok_or_else(|| format!("Agent session not found: {}", session_id))?;
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
         (session.packet_buffer.clone(), session.pcap_writer.clone())
@@ -6101,7 +6466,8 @@ pub fn inject_agent_raw_frames(
             Some(1), // Ethernet link type
             Some(injected as u64),
             Some((10000, 60000)),
-        ).ok();
+        )
+        .ok();
 
         let ip_data = extract_ip_layer_for_injection(&raw);
         let (src_ip, dst_ip, src_port, dst_port, _transport_proto, payload) =
@@ -6152,7 +6518,8 @@ pub fn inject_agent_packet_infos(
 ) -> Result<u32, String> {
     let buffer = {
         let sessions = SESSIONS.lock().map_err(|_| "Failed to lock sessions")?;
-        let entry = sessions.get(&session_id)
+        let entry = sessions
+            .get(&session_id)
             .ok_or_else(|| format!("Agent session not found: {}", session_id))?;
         let session = entry.session.lock().map_err(|_| "Failed to lock session")?;
         session.packet_buffer.clone()
@@ -6161,16 +6528,35 @@ pub fn inject_agent_packet_infos(
     let mut injected = 0u32;
 
     for pkt_json in &packets {
-        let src_ip_str = pkt_json.get("src_ip").and_then(|v| v.as_str()).unwrap_or("0.0.0.0");
-        let dst_ip_str = pkt_json.get("dst_ip").and_then(|v| v.as_str()).unwrap_or("0.0.0.0");
-        let protocol_str = pkt_json.get("protocol").and_then(|v| v.as_str()).unwrap_or("Unknown");
+        let src_ip_str = pkt_json
+            .get("src_ip")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0.0.0.0");
+        let dst_ip_str = pkt_json
+            .get("dst_ip")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0.0.0.0");
+        let protocol_str = pkt_json
+            .get("protocol")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown");
         let length = pkt_json.get("length").and_then(|v| v.as_i64()).unwrap_or(0) as usize;
-        let src_port = pkt_json.get("src_port").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
-        let dst_port = pkt_json.get("dst_port").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
+        let src_port = pkt_json
+            .get("src_port")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u16;
+        let dst_port = pkt_json
+            .get("dst_port")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u16;
         let info = pkt_json.get("info").and_then(|v| v.as_str()).unwrap_or("");
 
-        let src_ip: IpAddr = src_ip_str.parse().unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
-        let dst_ip: IpAddr = dst_ip_str.parse().unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let src_ip: IpAddr = src_ip_str
+            .parse()
+            .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let dst_ip: IpAddr = dst_ip_str
+            .parse()
+            .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
 
         let protocol = match protocol_str {
             "TCP" => Protocol::TCP,
@@ -6256,7 +6642,10 @@ fn parse_ip_transport(ip_data: &[u8]) -> (IpAddr, IpAddr, u16, u16, u8, &[u8]) {
         return (
             IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
             IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
-            0, 0, 0, &[],
+            0,
+            0,
+            0,
+            &[],
         );
     }
 
@@ -6264,17 +6653,49 @@ fn parse_ip_transport(ip_data: &[u8]) -> (IpAddr, IpAddr, u16, u16, u8, &[u8]) {
     let (src_ip, dst_ip, proto, transport) = if version == 4 {
         let ihl = (ip_data[0] & 0x0f) as usize * 4;
         if ip_data.len() < ihl {
-            return (IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), 0, 0, 0, &[]);
+            return (
+                IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+                IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+                0,
+                0,
+                0,
+                &[],
+            );
         }
-        let src = IpAddr::V4(std::net::Ipv4Addr::new(ip_data[12], ip_data[13], ip_data[14], ip_data[15]));
-        let dst = IpAddr::V4(std::net::Ipv4Addr::new(ip_data[16], ip_data[17], ip_data[18], ip_data[19]));
+        let src = IpAddr::V4(std::net::Ipv4Addr::new(
+            ip_data[12],
+            ip_data[13],
+            ip_data[14],
+            ip_data[15],
+        ));
+        let dst = IpAddr::V4(std::net::Ipv4Addr::new(
+            ip_data[16],
+            ip_data[17],
+            ip_data[18],
+            ip_data[19],
+        ));
         (src, dst, ip_data[9], &ip_data[ihl..])
     } else if version == 6 && ip_data.len() >= 40 {
-        let src = IpAddr::V6(std::net::Ipv6Addr::from({ let mut a = [0u8; 16]; a.copy_from_slice(&ip_data[8..24]); a }));
-        let dst = IpAddr::V6(std::net::Ipv6Addr::from({ let mut a = [0u8; 16]; a.copy_from_slice(&ip_data[24..40]); a }));
+        let src = IpAddr::V6(std::net::Ipv6Addr::from({
+            let mut a = [0u8; 16];
+            a.copy_from_slice(&ip_data[8..24]);
+            a
+        }));
+        let dst = IpAddr::V6(std::net::Ipv6Addr::from({
+            let mut a = [0u8; 16];
+            a.copy_from_slice(&ip_data[24..40]);
+            a
+        }));
         (src, dst, ip_data[6], &ip_data[40..])
     } else {
-        return (IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED), 0, 0, 0, &[]);
+        return (
+            IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+            IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+            0,
+            0,
+            0,
+            &[],
+        );
     };
 
     let (sp, dp, payload) = match proto {
@@ -6282,7 +6703,11 @@ fn parse_ip_transport(ip_data: &[u8]) -> (IpAddr, IpAddr, u16, u16, u8, &[u8]) {
             let sp = u16::from_be_bytes([transport[0], transport[1]]);
             let dp = u16::from_be_bytes([transport[2], transport[3]]);
             let offset = ((transport[12] >> 4) as usize) * 4;
-            let pl = if transport.len() > offset { &transport[offset..] } else { &[] };
+            let pl = if transport.len() > offset {
+                &transport[offset..]
+            } else {
+                &[]
+            };
             (sp, dp, pl)
         }
         17 if transport.len() >= 8 => {
@@ -6379,8 +6804,14 @@ mod tests {
         for frame in frames {
             let len = frame.len() as u32;
             let pkt_header: [u8; 16] = [
-                0x00, 0x00, 0x00, 0x00, // ts_sec
-                0x00, 0x00, 0x00, 0x00, // ts_usec
+                0x00,
+                0x00,
+                0x00,
+                0x00, // ts_sec
+                0x00,
+                0x00,
+                0x00,
+                0x00, // ts_usec
                 (len & 0xff) as u8,
                 ((len >> 8) & 0xff) as u8,
                 ((len >> 16) & 0xff) as u8,
@@ -6551,7 +6982,10 @@ mod tests {
         };
         let events = build_call_session_events(vec![meta_b, meta_a]);
         assert_eq!(events.first().map(|e| e.event_type.as_str()), Some("setup"));
-        assert_eq!(events.last().map(|e| e.event_type.as_str()), Some("answered"));
+        assert_eq!(
+            events.last().map(|e| e.event_type.as_str()),
+            Some("answered")
+        );
         assert!(events
             .windows(2)
             .all(|pair| pair[0].timestamp <= pair[1].timestamp));
@@ -6602,8 +7036,14 @@ mod tests {
         ];
 
         let index = build_packet_dialog_message_index(&dialogs);
-        assert_eq!(index.get(&10).map(|v| (v.0, v.1, v.2.as_str())), Some((0, 0, "call-a")));
-        assert_eq!(index.get(&20).map(|v| (v.0, v.1, v.2.as_str())), Some((1, 0, "call-b")));
+        assert_eq!(
+            index.get(&10).map(|v| (v.0, v.1, v.2.as_str())),
+            Some((0, 0, "call-a"))
+        );
+        assert_eq!(
+            index.get(&20).map(|v| (v.0, v.1, v.2.as_str())),
+            Some((1, 0, "call-b"))
+        );
     }
 
     #[test]
@@ -6689,4 +7129,3 @@ mod tests {
         assert!(!stream_matches_leg(&stream, &leg));
     }
 }
-

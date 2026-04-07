@@ -128,7 +128,9 @@ impl PacketStream {
         match self.sender.send(packet.clone()) {
             Ok(_) => {
                 self.stats.packets_sent.fetch_add(1, Ordering::Relaxed);
-                self.stats.bytes_sent.fetch_add(packet.size as u64, Ordering::Relaxed);
+                self.stats
+                    .bytes_sent
+                    .fetch_add(packet.size as u64, Ordering::Relaxed);
             }
             Err(_) => {
                 self.stats.packets_dropped.fetch_add(1, Ordering::Relaxed);
@@ -208,7 +210,13 @@ impl StreamManager {
     }
 
     /// Emit a packet batch to the frontend.
-    pub fn emit_batch(&self, session_id: &str, packets: Vec<StreamPacket>, total: u64, dropped: u64) {
+    pub fn emit_batch(
+        &self,
+        session_id: &str,
+        packets: Vec<StreamPacket>,
+        total: u64,
+        dropped: u64,
+    ) {
         if let Some(ref handle) = *self.app_handle.read() {
             let batch = PacketBatch {
                 session_id: session_id.to_string(),
@@ -270,28 +278,28 @@ impl BatchEmitter {
     /// Add a packet to the batch.
     pub fn push(&self, packet: &PacketInfo) {
         self.total_count.fetch_add(1, Ordering::Relaxed);
-        
+
         let stream_packet = StreamPacket::from(packet);
         let mut buffer = self.buffer.write();
-        
+
         if buffer.len() < MAX_BATCH_SIZE {
             buffer.push(stream_packet);
         } else {
             self.dropped_count.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         // Check if we should emit
         let should_emit = buffer.len() >= MAX_BATCH_SIZE || {
             let last_emit = self.last_emit.read();
             last_emit.elapsed() >= Duration::from_millis(MIN_EMIT_INTERVAL_MS)
         };
-        
+
         if should_emit && !buffer.is_empty() {
             let packets: Vec<_> = buffer.drain(..).collect();
             drop(buffer); // Release lock before emitting
-            
+
             *self.last_emit.write() = Instant::now();
-            
+
             self.manager.emit_batch(
                 &self.session_id,
                 packets,
@@ -307,9 +315,9 @@ impl BatchEmitter {
         if !buffer.is_empty() {
             let packets: Vec<_> = buffer.drain(..).collect();
             drop(buffer);
-            
+
             *self.last_emit.write() = Instant::now();
-            
+
             self.manager.emit_batch(
                 &self.session_id,
                 packets,
@@ -361,10 +369,10 @@ mod tests {
     #[test]
     fn test_stream_start_stop() {
         let stream = PacketStream::new("test-session".to_string());
-        
+
         stream.start();
         assert!(stream.is_active());
-        
+
         stream.stop();
         assert!(!stream.is_active());
     }
@@ -380,12 +388,12 @@ mod tests {
     fn test_stream_push() {
         let stream = PacketStream::new("test-session".to_string());
         stream.start();
-        
+
         let _rx = stream.subscribe();
         let packet = Arc::new(create_test_packet());
-        
+
         stream.push(packet);
-        
+
         let stats = stream.get_stats();
         assert_eq!(stats.packets_sent, 1);
     }
@@ -393,12 +401,12 @@ mod tests {
     #[test]
     fn test_stream_manager() {
         let manager = StreamManager::new();
-        
+
         let stream1 = manager.get_or_create("session-1");
         let stream2 = manager.get_or_create("session-2");
-        
+
         assert_ne!(Arc::as_ptr(&stream1), Arc::as_ptr(&stream2));
-        
+
         // Same session returns same stream
         let stream1_again = manager.get_or_create("session-1");
         assert_eq!(Arc::as_ptr(&stream1), Arc::as_ptr(&stream1_again));
@@ -408,7 +416,7 @@ mod tests {
     fn test_stream_packet_conversion() {
         let packet = create_test_packet();
         let stream_packet = StreamPacket::from(&packet);
-        
+
         assert_eq!(stream_packet.src_ip, "192.168.1.1");
         assert_eq!(stream_packet.dst_ip, "192.168.1.2");
         assert_eq!(stream_packet.src_port, 5060);

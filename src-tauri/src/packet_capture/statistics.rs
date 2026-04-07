@@ -1,6 +1,6 @@
+use serde::Serialize;
 use std::collections::HashMap;
 use std::net::IpAddr;
-use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -64,8 +64,14 @@ impl CaptureStatistics {
             crate::packet_capture::Protocol::Other => "Other",
         };
 
-        *self.packets_by_protocol.entry(protocol_str.to_string()).or_insert(0) += 1;
-        *self.bytes_by_protocol.entry(protocol_str.to_string()).or_insert(0) += packet.size as u64;
+        *self
+            .packets_by_protocol
+            .entry(protocol_str.to_string())
+            .or_insert(0) += 1;
+        *self
+            .bytes_by_protocol
+            .entry(protocol_str.to_string())
+            .or_insert(0) += packet.size as u64;
 
         // Update rates
         if let Some(start) = self.start_time {
@@ -98,9 +104,15 @@ impl CaptureStatistics {
         sorted.truncate(10);
 
         if is_src {
-            self.top_src_ips = sorted.into_iter().map(|(ip, count)| (ip.to_string(), *count)).collect();
+            self.top_src_ips = sorted
+                .into_iter()
+                .map(|(ip, count)| (ip.to_string(), *count))
+                .collect();
         } else {
-            self.top_dst_ips = sorted.into_iter().map(|(ip, count)| (ip.to_string(), *count)).collect();
+            self.top_dst_ips = sorted
+                .into_iter()
+                .map(|(ip, count)| (ip.to_string(), *count))
+                .collect();
         }
     }
 }

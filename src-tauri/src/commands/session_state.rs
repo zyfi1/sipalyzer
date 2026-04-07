@@ -33,7 +33,8 @@ pub fn pull_session_state() -> Result<Option<String>, String> {
                         tracing::info!("migrated legacy session_state.json into DB");
                         // Remove the old file (and its .tmp sibling) so we don't re-migrate
                         let _ = fs::remove_file(&legacy_path);
-                        let _ = fs::remove_file(config_dir.join(format!("{}.tmp", LEGACY_FILENAME)));
+                        let _ =
+                            fs::remove_file(config_dir.join(format!("{}.tmp", LEGACY_FILENAME)));
                         return Ok(Some(trimmed.to_string()));
                     }
                 }

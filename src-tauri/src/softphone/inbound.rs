@@ -11,16 +11,16 @@ use std::time::{Duration, Instant};
 use once_cell::sync::Lazy;
 use tauri::Emitter;
 
+use super::call_controller::{push_remote_ended_call, unregister_dialog_sender};
+use super::media_engine;
+use super::port_allocator;
+use super::sdp;
+use super::sip_log;
 use crate::core::database::Database;
+use crate::core::user_agent;
 use crate::sip::stack::{generate_tag, SipMessage};
 use crate::sip::transport::Transport;
 use crate::sip::uri::escape_user;
-use crate::core::user_agent;
-use super::call_controller::{push_remote_ended_call, unregister_dialog_sender};
-use super::media_engine;
-use super::sip_log;
-use super::port_allocator;
-use super::sdp;
 const INBOUND_READ_TIMEOUT_MS: u64 = 100;
 
 /// Extract a header value from raw SIP text by name (case-insensitive).
@@ -55,7 +55,12 @@ fn parse_header_uri(header_value: &str) -> String {
     if let (Some(start), Some(end)) = (trimmed.find('<'), trimmed.find('>')) {
         return trimmed[start + 1..end].trim().to_string();
     }
-    trimmed.split(';').next().unwrap_or(trimmed).trim().to_string()
+    trimmed
+        .split(';')
+        .next()
+        .unwrap_or(trimmed)
+        .trim()
+        .to_string()
 }
 
 fn parse_sip_user_domain(value: &str) -> (Option<String>, Option<String>) {
@@ -65,11 +70,7 @@ fn parse_sip_user_domain(value: &str) -> (Option<String>, Option<String>) {
     } else if let Some(v) = raw.strip_prefix("sips:") {
         raw = v;
     } else if let Some(v) = raw.strip_prefix("tel:") {
-        let user = v
-            .split([';', '>', ' '])
-            .next()
-            .unwrap_or(v)
-            .trim();
+        let user = v.split([';', '>', ' ']).next().unwrap_or(v).trim();
         return if user.is_empty() {
             (None, None)
         } else {
@@ -357,7 +358,10 @@ fn run_inbound_receiver_with_socket(
                         let _ = ack_tx.send(());
                     }
                 }
-                InboundCommand::RejectCall { call_id, status_code } => {
+                InboundCommand::RejectCall {
+                    call_id,
+                    status_code,
+                } => {
                     let normalized_call_id = normalize_call_id(&call_id);
                     if let Some(p) = pending.remove(&normalized_call_id) {
                         send_reject(&socket, &p, &normalized_call_id, status_code);
@@ -404,7 +408,10 @@ fn run_inbound_receiver_with_socket(
                         let method = msg.method.to_uppercase();
                         tracing::info!("[Inbound:{}] Parsed request: method={}", port, method);
                         if method == "INVITE" {
-                            let cid = msg.get_header("Call-ID").map(|s| normalize_call_id(s)).unwrap_or_default();
+                            let cid = msg
+                                .get_header("Call-ID")
+                                .map(|s| normalize_call_id(s))
+                                .unwrap_or_default();
                             if active.contains_key(&cid) {
                                 handle_reinvite(&msg, &active[&cid], &socket, peer, &app_handle);
                             } else {
@@ -414,74 +421,123 @@ fn run_inbound_receiver_with_socket(
                             // ACK is handled inside send_200_ok_and_wait_ack
                         } else if method == "NOTIFY" {
                             if !super::mwi::handle_mwi_notify(&msg, &socket, peer, &app_handle)
-                                && !super::blf::handle_dialog_notify(&msg, &socket, peer, &app_handle)
+                                && !super::blf::handle_dialog_notify(
+                                    &msg,
+                                    &socket,
+                                    peer,
+                                    &app_handle,
+                                )
                             {
                                 tracing::info!("[Inbound:{}] Unhandled NOTIFY, ignoring", port);
                             }
                         } else if method == "MESSAGE" {
-                            super::sip_message::handle_incoming_message(&msg, &socket, peer, &app_handle);
+                            super::sip_message::handle_incoming_message(
+                                &msg,
+                                &socket,
+                                peer,
+                                &app_handle,
+                            );
                         } else if method == "BYE" {
                             handle_bye(&msg, &mut active, &socket, &app_handle, peer);
                         } else if method == "CANCEL" {
                             // Handle CANCEL for pending calls
-                            if let Some(cid) = msg.get_header("Call-ID").map(|s| normalize_call_id(s)) {
+                            if let Some(cid) =
+                                msg.get_header("Call-ID").map(|s| normalize_call_id(s))
+                            {
                                 if pending.remove(&cid).is_some() {
                                     remove_call_port(&cid);
-                                    tracing::info!("[Inbound:{}] CANCEL received for pending call_id={}", port, cid);
+                                    tracing::info!(
+                                        "[Inbound:{}] CANCEL received for pending call_id={}",
+                                        port,
+                                        cid
+                                    );
                                     let mut ok = SipMessage::new_response(200, "OK");
-                                    if let Some(v) = msg.get_header("Via") { ok.add_header("Via", v); }
-                                    if let Some(v) = msg.get_header("From") { ok.add_header("From", v); }
-                                    if let Some(v) = msg.get_header("To") { ok.add_header("To", v); }
-                                    if let Some(v) = msg.get_header("Call-ID") { ok.add_header("Call-ID", v); }
-                                    if let Some(v) = msg.get_header("CSeq") { ok.add_header("CSeq", v); }
-                                    if let Ok(b) = ok.to_bytes() { let _ = socket.send_to(&b, peer); }
+                                    if let Some(v) = msg.get_header("Via") {
+                                        ok.add_header("Via", v);
+                                    }
+                                    if let Some(v) = msg.get_header("From") {
+                                        ok.add_header("From", v);
+                                    }
+                                    if let Some(v) = msg.get_header("To") {
+                                        ok.add_header("To", v);
+                                    }
+                                    if let Some(v) = msg.get_header("Call-ID") {
+                                        ok.add_header("Call-ID", v);
+                                    }
+                                    if let Some(v) = msg.get_header("CSeq") {
+                                        ok.add_header("CSeq", v);
+                                    }
+                                    if let Ok(b) = ok.to_bytes() {
+                                        let _ = socket.send_to(&b, peer);
+                                    }
                                 }
                             }
                         }
                     } else {
-                        tracing::info!("[Inbound:{}] Parsed response: {} {}", port, 
+                        tracing::info!(
+                            "[Inbound:{}] Parsed response: {} {}",
+                            port,
                             msg.status_code.unwrap_or(0),
-                            msg.status_text.as_deref().unwrap_or(""));
+                            msg.status_text.as_deref().unwrap_or("")
+                        );
                     }
                 } else {
                     // Raw fallback: parser failed but message might still be a BYE we must handle.
                     // Extract first line to check method.
                     let text = String::from_utf8_lossy(bytes);
                     let first_line = text.lines().next().unwrap_or("");
-                    tracing::error!("[Inbound:{}] Parse failed, raw first line: {}", port, first_line);
-                    
+                    tracing::error!(
+                        "[Inbound:{}] Parse failed, raw first line: {}",
+                        port,
+                        first_line
+                    );
+
                     if first_line.to_uppercase().starts_with("BYE ") {
-                        tracing::info!("[Inbound:{}] Raw BYE detected, attempting manual handling", port);
+                        tracing::info!(
+                            "[Inbound:{}] Raw BYE detected, attempting manual handling",
+                            port
+                        );
                         // Extract Call-ID from raw bytes
                         if let Some(raw_call_id) = extract_header_value(&text, "Call-ID")
                             .or_else(|| extract_header_value(&text, "i"))
                         {
                             let call_id = normalize_call_id(&raw_call_id);
                             tracing::info!("[Inbound:{}] Raw BYE call_id={}", port, call_id);
-                            
+
                             // Build 200 OK from raw headers
-                            if let Some((via, from, to_hdr, cid, cseq)) = crate::softphone::call_controller::extract_headers_for_200_ok(bytes) {
+                            if let Some((via, from, to_hdr, cid, cseq)) =
+                                crate::softphone::call_controller::extract_headers_for_200_ok(bytes)
+                            {
                                 let mut ok = SipMessage::new_response(200, "OK");
                                 ok.add_header("Via", &via);
                                 ok.add_header("From", &from);
                                 ok.add_header("To", &to_hdr);
                                 ok.add_header("Call-ID", &cid);
                                 ok.add_header("CSeq", &cseq);
-                                if let Ok(b) = ok.to_bytes() { let _ = socket.send_to(&b, peer); }
+                                if let Ok(b) = ok.to_bytes() {
+                                    let _ = socket.send_to(&b, peer);
+                                }
                             }
-                            
+
                             // Try to end active inbound call
                             if let Some(a) = active.remove(&call_id) {
-                                if !a.is_fax { let _ = media_engine::stop_media(&call_id); }
+                                if !a.is_fax {
+                                    let _ = media_engine::stop_media(&call_id);
+                                }
                                 // Release allocated ports (RTP port released by stop_media for voice; fax needs explicit release)
-                                if a.is_fax { port_allocator::release(a.local_rtp_port); }
-                                if let Some(up) = a.udptl_port { port_allocator::release(up); }
+                                if a.is_fax {
+                                    port_allocator::release(a.local_rtp_port);
+                                }
+                                if let Some(up) = a.udptl_port {
+                                    port_allocator::release(up);
+                                }
                             } else {
                                 let _ = media_engine::stop_media(&call_id);
                             }
-                            
+
                             push_remote_ended_call(call_id.clone());
-                            let payload = serde_json::json!({ "call_id": call_id, "callId": call_id });
+                            let payload =
+                                serde_json::json!({ "call_id": call_id, "callId": call_id });
                             tracing::info!("[Inbound:{}] Emitting softphone:call_ended_by_remote (raw) for call_id={}", port, call_id);
                             let _ = app_handle.emit("softphone:call_ended_by_remote", payload);
                         }
@@ -490,7 +546,9 @@ fn run_inbound_receiver_with_socket(
             }
             Err(e) => {
                 // Only log non-timeout errors
-                if e.kind() != std::io::ErrorKind::WouldBlock && e.kind() != std::io::ErrorKind::TimedOut {
+                if e.kind() != std::io::ErrorKind::WouldBlock
+                    && e.kind() != std::io::ErrorKind::TimedOut
+                {
                     tracing::error!("[Inbound:{}] recv_from error: {}", port, e);
                 }
             }
@@ -564,16 +622,31 @@ fn handle_invite(
     // dialog alive but do NOT emit another frontend event (which would create duplicate
     // call entries and potentially cause the PBX to think we're unresponsive).
     if pending.contains_key(&call_id) {
-        tracing::info!("INVITE retransmit for already-pending call_id={}, re-sending 180", call_id);
+        tracing::info!(
+            "INVITE retransmit for already-pending call_id={}, re-sending 180",
+            call_id
+        );
         send_invite_response(socket, peer, msg, 180, "Ringing");
         return;
     }
 
-    let to_header = msg.get_header("To").map(|s| s.to_string()).unwrap_or_default();
-    let from_header = msg.get_header("From").map(|s| s.to_string()).unwrap_or_default();
+    let to_header = msg
+        .get_header("To")
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    let from_header = msg
+        .get_header("From")
+        .map(|s| s.to_string())
+        .unwrap_or_default();
     let from_tag = parse_tag(&from_header).unwrap_or_else(generate_tag);
-    let via = msg.get_header("Via").map(|s| s.to_string()).unwrap_or_default();
-    let cseq = msg.get_header("CSeq").map(|s| s.to_string()).unwrap_or_default();
+    let via = msg
+        .get_header("Via")
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    let cseq = msg
+        .get_header("CSeq")
+        .map(|s| s.to_string())
+        .unwrap_or_default();
     // Extract the SIP URI from the Contact header, stripping display names and parameters
     // outside the angle brackets.  Raw Contact may look like:
     //   "Proxy" <sip:proxy@10.0.0.1:5060>;expires=3600
@@ -596,7 +669,12 @@ fn handle_invite(
         .unwrap_or_else(|| "udp".to_string());
     tracing::info!(
         "INVITE identities: request={:?}@{:?}, to={:?}@{:?}, listener_port={}, via_transport={}",
-        req_user, req_domain, to_user, to_domain, listener_port, via_transport
+        req_user,
+        req_domain,
+        to_user,
+        to_domain,
+        listener_port,
+        via_transport
     );
 
     let registrars = Database::load_registrars().unwrap_or_default();
@@ -605,7 +683,9 @@ fn handle_invite(
         .filter(|r| r.listening_port.is_some() || r.local_port.is_some())
         .collect();
     if with_ports.is_empty() {
-        tracing::warn!("No registrars configured with listening/local port; dropping inbound INVITE");
+        tracing::warn!(
+            "No registrars configured with listening/local port; dropping inbound INVITE"
+        );
         return;
     }
     let mut candidates: Vec<&crate::core::config::RegistrarConfig> = with_ports
@@ -673,9 +753,8 @@ fn handle_invite(
             if binding.listening_port == listener_port {
                 score += 120;
             }
-            let binding_user_matches = |u: &str| {
-                binding.username == u || binding.auth_username.as_deref() == Some(u)
-            };
+            let binding_user_matches =
+                |u: &str| binding.username == u || binding.auth_username.as_deref() == Some(u);
             if let Some(u) = req_user.as_deref() {
                 if binding_user_matches(u) {
                     score += 35;
@@ -727,7 +806,10 @@ fn handle_invite(
             } else {
                 tracing::info!(
                     "Matched inbound registrar id={} name={} score={} for call_id={}",
-                    r.id, r.name, best_score, call_id
+                    r.id,
+                    r.name,
+                    best_score,
+                    call_id
                 );
             }
             r
@@ -742,7 +824,9 @@ fn handle_invite(
         None => {
             tracing::warn!(
                 "No inbound registrar candidate for call_id={} request_uri={} to={}",
-                call_id, msg.uri, to_header
+                call_id,
+                msg.uri,
+                to_header
             );
             return;
         }
@@ -758,19 +842,14 @@ fn handle_invite(
     send_invite_response(socket, peer, msg, 100, "Trying");
     send_invite_response(socket, peer, msg, 180, "Ringing");
 
-    let from_display = from_header
-        .trim();
+    let from_display = from_header.trim();
     let from_display = if let Some(i) = from_display.find('<') {
         from_display[..i].trim().trim_matches('"').to_string()
     } else {
         String::new()
     };
 
-    let t38_offered = msg
-        .body
-        .as_deref()
-        .map(sdp::is_t38_invite)
-        .unwrap_or(false);
+    let t38_offered = msg.body.as_deref().map(sdp::is_t38_invite).unwrap_or(false);
     let route_to_fax = endpoint_routes_to_fax || t38_offered;
 
     pending.insert(
@@ -793,8 +872,14 @@ fn handle_invite(
 
     // Detect auto-answer / intercom headers (Call-Info: answer-after=0, Alert-Info with auto-answer)
     let auto_answer = {
-        let call_info = msg.get_header("Call-Info").unwrap_or(&String::new()).to_lowercase();
-        let alert_info = msg.get_header("Alert-Info").unwrap_or(&String::new()).to_lowercase();
+        let call_info = msg
+            .get_header("Call-Info")
+            .unwrap_or(&String::new())
+            .to_lowercase();
+        let alert_info = msg
+            .get_header("Alert-Info")
+            .unwrap_or(&String::new())
+            .to_lowercase();
         call_info.contains("answer-after=0")
             || alert_info.contains("auto-answer")
             || alert_info.contains("intercom")
@@ -848,7 +933,7 @@ fn handle_reinvite(
     let our_dir = if remote_hold { "recvonly" } else { "sendrecv" };
     let rtp_port = active_call.local_rtp_port;
     let sdp = format!(
-"v=0\r\n\
+        "v=0\r\n\
 o=- 0 0 IN IP4 {ip}\r\n\
 s=-\r\n\
 c=IN IP4 {ip}\r\n\
@@ -866,16 +951,24 @@ a={dir}\r\n",
     );
 
     let mut resp = SipMessage::new_response(200, "OK");
-    if let Some(v) = msg.get_header("Via") { resp.add_header("Via", v); }
-    if let Some(v) = msg.get_header("From") { resp.add_header("From", v); }
+    if let Some(v) = msg.get_header("Via") {
+        resp.add_header("Via", v);
+    }
+    if let Some(v) = msg.get_header("From") {
+        resp.add_header("From", v);
+    }
     let to = msg.get_header("To").cloned().unwrap_or_default();
     if to.contains("tag=") {
         resp.add_header("To", &to);
     } else {
         resp.add_header("To", &format!("{};tag={}", to, &active_call.to_tag));
     }
-    if let Some(v) = msg.get_header("Call-ID") { resp.add_header("Call-ID", v); }
-    if let Some(v) = msg.get_header("CSeq") { resp.add_header("CSeq", v); }
+    if let Some(v) = msg.get_header("Call-ID") {
+        resp.add_header("Call-ID", v);
+    }
+    if let Some(v) = msg.get_header("CSeq") {
+        resp.add_header("CSeq", v);
+    }
     resp.add_header("Contact", &format!("<sip:sipalyzer@{}>", local_ip));
     resp.add_header("Content-Type", "application/sdp");
     resp.body = Some(sdp);
@@ -885,7 +978,11 @@ a={dir}\r\n",
         sip_log::log_bytes(&call_id, "send", &bytes);
     }
 
-    let event_type = if remote_hold { "held_by_remote" } else { "resumed_by_remote" };
+    let event_type = if remote_hold {
+        "held_by_remote"
+    } else {
+        "resumed_by_remote"
+    };
     let payload = serde_json::json!({
         "callId": call_id,
         "event": event_type,
@@ -906,7 +1003,11 @@ fn handle_bye(
         None => return,
     };
 
-    tracing::info!("BYE received for call_id={}, active_calls={:?}", call_id, active.keys().collect::<Vec<_>>());
+    tracing::info!(
+        "BYE received for call_id={}, active_calls={:?}",
+        call_id,
+        active.keys().collect::<Vec<_>>()
+    );
 
     // BYE for an outbound call can arrive on the inbound port (proxy sends to REGISTER Contact).
     // If call_id is not in active, treat as outbound: send 200 OK, notify frontend, stop media.
@@ -940,7 +1041,10 @@ fn handle_bye(
         crate::commands::softphone::stop_capture_for_call(&call_id);
         push_remote_ended_call(call_id.clone());
         let payload = serde_json::json!({ "call_id": call_id, "callId": call_id });
-        tracing::info!("Emitting softphone:call_ended_by_remote for call_id={}", call_id);
+        tracing::info!(
+            "Emitting softphone:call_ended_by_remote for call_id={}",
+            call_id
+        );
         let _ = app_handle.emit("softphone:call_ended_by_remote", payload);
         remove_call_port(&call_id);
         return;
@@ -954,7 +1058,14 @@ fn handle_bye(
         (Some(bf), Some(bt)) => a.from_tag == *bf && a.to_tag == *bt,
         _ => true, // BYE without tags: accept by Call-ID only (lenient)
     };
-    tracing::info!("BYE tags_match={} bye_from={:?} bye_to={:?} active_from={} active_to={}", tags_match, bye_from_tag, bye_to_tag, a.from_tag, a.to_tag);
+    tracing::info!(
+        "BYE tags_match={} bye_from={:?} bye_to={:?} active_from={} active_to={}",
+        tags_match,
+        bye_from_tag,
+        bye_to_tag,
+        a.from_tag,
+        a.to_tag
+    );
     if !tags_match {
         tracing::info!("BYE tags don't match, ignoring");
         return;
@@ -985,11 +1096,18 @@ fn handle_bye(
         let _ = media_engine::stop_media(&call_id);
     }
     // Release allocated ports (RTP port released by stop_media for voice; fax needs explicit release)
-    if a.is_fax { port_allocator::release(a.local_rtp_port); }
-    if let Some(up) = a.udptl_port { port_allocator::release(up); }
+    if a.is_fax {
+        port_allocator::release(a.local_rtp_port);
+    }
+    if let Some(up) = a.udptl_port {
+        port_allocator::release(up);
+    }
     push_remote_ended_call(call_id.clone());
     let payload = serde_json::json!({ "call_id": call_id, "callId": call_id });
-    tracing::info!("Emitting softphone:call_ended_by_remote for active call_id={}", call_id);
+    tracing::info!(
+        "Emitting softphone:call_ended_by_remote for active call_id={}",
+        call_id
+    );
     let _ = app_handle.emit("softphone:call_ended_by_remote", payload);
     remove_call_port(&call_id);
 }
@@ -1019,14 +1137,17 @@ fn send_200_ok_and_wait_ack(
         .unwrap_or_else(|| "127.0.0.1".to_string());
     // Allocate RTP port from central pool (or use pinned port if configured).
     let local_rtp_port = if let Some(pinned) = config.rtp_port {
-        port_allocator::allocate_specific(pinned, &format!("inbound:{}", call_id))
-            .unwrap_or_else(|_| port_allocator::allocate(&format!("inbound:{}", call_id)).unwrap_or(10000))
+        port_allocator::allocate_specific(pinned, &format!("inbound:{}", call_id)).unwrap_or_else(
+            |_| port_allocator::allocate(&format!("inbound:{}", call_id)).unwrap_or(10000),
+        )
     } else {
         port_allocator::allocate(&format!("inbound:{}", call_id)).unwrap_or(10000)
     };
     // Contact header must use listening_port (where inbound SIP arrives), not local_port (outbound).
     // Per RFC 3261 §12.1.1, the Contact identifies where to send subsequent requests in the dialog.
-    let local_sip_port = config.listening_port.unwrap_or(config.local_port.unwrap_or(5060));
+    let local_sip_port = config
+        .listening_port
+        .unwrap_or(config.local_port.unwrap_or(5060));
     let is_fax = p.route_to_fax;
     let udptl_rx_port = if p.t38_offered {
         Some(allocate_udptl_receive_port(call_id).unwrap_or(4002))
@@ -1054,7 +1175,7 @@ fn send_200_ok_and_wait_ack(
         local_sip_port
     );
     tracing::info!("200 OK for call_id={}, Contact={}", call_id, contact_header);
-    
+
     let mut ok = SipMessage::new_response(200, "OK");
     ok.add_header("Via", &p.via);
     ok.add_header("From", &p.from_header);
@@ -1067,7 +1188,9 @@ fn send_200_ok_and_wait_ack(
     ok.body = Some(sdp_body);
 
     let ok_bytes = ok.to_bytes().map_err(|e| e.to_string())?;
-    socket.send_to(&ok_bytes, p.peer_addr).map_err(|e| e.to_string())?;
+    socket
+        .send_to(&ok_bytes, p.peer_addr)
+        .map_err(|e| e.to_string())?;
     sip_log::log_bytes(call_id, "send", &ok_bytes);
 
     let _ = socket.set_read_timeout(Some(Duration::from_secs(15)));
@@ -1078,22 +1201,24 @@ fn send_200_ok_and_wait_ack(
                 sip_log::log_bytes(call_id, "recv", bytes);
                 if let Ok(msg) = SipMessage::from_bytes(bytes) {
                     if msg.status_code.is_none() && msg.method.eq_ignore_ascii_case("ACK") {
-                        let msg_call_id = msg
-                            .get_header("Call-ID")
-                            .map(|s| normalize_call_id(s));
+                        let msg_call_id = msg.get_header("Call-ID").map(|s| normalize_call_id(s));
                         if msg_call_id.as_deref() == Some(call_id) {
-                            let _ = socket.set_read_timeout(Some(Duration::from_millis(INBOUND_READ_TIMEOUT_MS)));
+                            let _ = socket.set_read_timeout(Some(Duration::from_millis(
+                                INBOUND_READ_TIMEOUT_MS,
+                            )));
 
                             if !is_fax {
-                                let (remote_rtp_addr, remote_rtp_port, pt) = if let Some(ref body) = p.body {
-                                    let conn =
-                                        sdp::parse_connection(body).unwrap_or_else(|| "0.0.0.0".to_string());
-                                    let (port, pts) = sdp::parse_media(body).unwrap_or((0, vec![0]));
-                                    let pt = pts.first().copied().unwrap_or(0);
-                                    (conn, port, pt)
-                                } else {
-                                    ("0.0.0.0".to_string(), 0u16, 0u8)
-                                };
+                                let (remote_rtp_addr, remote_rtp_port, pt) =
+                                    if let Some(ref body) = p.body {
+                                        let conn = sdp::parse_connection(body)
+                                            .unwrap_or_else(|| "0.0.0.0".to_string());
+                                        let (port, pts) =
+                                            sdp::parse_media(body).unwrap_or((0, vec![0]));
+                                        let pt = pts.first().copied().unwrap_or(0);
+                                        (conn, port, pt)
+                                    } else {
+                                        ("0.0.0.0".to_string(), 0u16, 0u8)
+                                    };
                                 match media_engine::start_media(
                                     call_id.to_string(),
                                     local_rtp_port,
@@ -1108,28 +1233,43 @@ fn send_200_ok_and_wait_ack(
                                     None,
                                     1.0,
                                 ) {
-                                    Ok(()) => tracing::info!("Media started for call_id={}", call_id),
-                                    Err(e) => tracing::error!("Starting media for call_id={}: {}", call_id, e),
+                                    Ok(()) => {
+                                        tracing::info!("Media started for call_id={}", call_id)
+                                    }
+                                    Err(e) => tracing::error!(
+                                        "Starting media for call_id={}: {}",
+                                        call_id,
+                                        e
+                                    ),
                                 }
                             } else {
                                 // Fax endpoint handling: use T.38 when remote SDP includes UDPTL m=image,
                                 // otherwise fallback to G.711 fax receive.
-                                tracing::info!("Fax-routed call detected — starting fax receive session");
-                                
+                                tracing::info!(
+                                    "Fax-routed call detected — starting fax receive session"
+                                );
+
                                 // Parse remote UDPTL address from INVITE SDP
-                                let (remote_udptl_addr, remote_udptl_port) = if let Some(ref body) = p.body {
-                                    let conn = sdp::parse_connection(body).unwrap_or_else(|| "0.0.0.0".to_string());
-                                    let port = sdp::parse_t38_media(body).unwrap_or(0);
-                                    (conn, port)
-                                } else {
-                                    ("0.0.0.0".to_string(), 0u16)
-                                };
-                                
+                                let (remote_udptl_addr, remote_udptl_port) =
+                                    if let Some(ref body) = p.body {
+                                        let conn = sdp::parse_connection(body)
+                                            .unwrap_or_else(|| "0.0.0.0".to_string());
+                                        let port = sdp::parse_t38_media(body).unwrap_or(0);
+                                        (conn, port)
+                                    } else {
+                                        ("0.0.0.0".to_string(), 0u16)
+                                    };
+
                                 if remote_udptl_port > 0 {
-                                    let remote_udptl: std::net::SocketAddr = format!("{}:{}", remote_udptl_addr, remote_udptl_port)
-                                        .parse()
-                                        .unwrap_or_else(|_| format!("0.0.0.0:{}", remote_udptl_port).parse().unwrap());
-                                    
+                                    let remote_udptl: std::net::SocketAddr =
+                                        format!("{}:{}", remote_udptl_addr, remote_udptl_port)
+                                            .parse()
+                                            .unwrap_or_else(|_| {
+                                                format!("0.0.0.0:{}", remote_udptl_port)
+                                                    .parse()
+                                                    .unwrap()
+                                            });
+
                                     if let Some(local_udptl_port) = udptl_rx_port {
                                         let app_for_fax = app_handle.clone();
                                         let call_id_for_fax = call_id.to_string();
@@ -1152,29 +1292,40 @@ fn send_200_ok_and_wait_ack(
                                     }
                                 } else {
                                     tracing::info!("No UDPTL port in incoming fax INVITE");
-                                    
+
                                     // Try G.711 fax receive as fallback
-                                    let (remote_rtp_addr, remote_rtp_port, pt) = if let Some(ref body) = p.body {
-                                        let conn = sdp::parse_connection(body).unwrap_or_else(|| "0.0.0.0".to_string());
-                                        let (port, pts) = sdp::parse_media(body).unwrap_or((0, vec![0]));
-                                        let pt = pts.first().copied().unwrap_or(0);
-                                        (conn, port, pt)
-                                    } else {
-                                        ("0.0.0.0".to_string(), 0u16, 0u8)
-                                    };
-                                    
+                                    let (remote_rtp_addr, remote_rtp_port, pt) =
+                                        if let Some(ref body) = p.body {
+                                            let conn = sdp::parse_connection(body)
+                                                .unwrap_or_else(|| "0.0.0.0".to_string());
+                                            let (port, pts) =
+                                                sdp::parse_media(body).unwrap_or((0, vec![0]));
+                                            let pt = pts.first().copied().unwrap_or(0);
+                                            (conn, port, pt)
+                                        } else {
+                                            ("0.0.0.0".to_string(), 0u16, 0u8)
+                                        };
+
                                     if remote_rtp_port > 0 {
-                                        let remote_rtp: std::net::SocketAddr = format!("{}:{}", remote_rtp_addr, remote_rtp_port)
-                                            .parse()
-                                            .unwrap_or_else(|_| format!("0.0.0.0:{}", remote_rtp_port).parse().unwrap());
-                                        
+                                        let remote_rtp: std::net::SocketAddr =
+                                            format!("{}:{}", remote_rtp_addr, remote_rtp_port)
+                                                .parse()
+                                                .unwrap_or_else(|_| {
+                                                    format!("0.0.0.0:{}", remote_rtp_port)
+                                                        .parse()
+                                                        .unwrap()
+                                                });
+
                                         let app_for_fax = app_handle.clone();
                                         let call_id_for_fax = call_id.to_string();
                                         let from_header_for_fax = p.from_header.clone();
                                         let registrar_id_for_fax = p.registrar_id.clone();
-                                        let codec = crate::softphone::codecs::G711Codec::from_pt(pt)
-                                            .unwrap_or(crate::softphone::codecs::G711Codec::PCMU);
-                                        
+                                        let codec =
+                                            crate::softphone::codecs::G711Codec::from_pt(pt)
+                                                .unwrap_or(
+                                                    crate::softphone::codecs::G711Codec::PCMU,
+                                                );
+
                                         std::thread::spawn(move || {
                                             start_fax_receive_g711(
                                                 app_for_fax,
@@ -1233,7 +1384,8 @@ fn send_200_ok_and_wait_ack(
                                 "peerAddr": p.peer_addr.to_string(),
                             });
                             tracing::info!("Emitting softphone:inbound_dialog_info for call_id={}: fromTag(ours)={}, toTag(remote)={}, targetUri={}, remoteContact={:?}", call_id, to_tag, p.from_tag, remote_uri, p.remote_contact);
-                            let _ = app_handle.emit("softphone:inbound_dialog_info", dialog_payload);
+                            let _ =
+                                app_handle.emit("softphone:inbound_dialog_info", dialog_payload);
 
                             let _ = ack_tx.send(());
                             return Ok(());
@@ -1321,7 +1473,9 @@ fn extract_sender(from_header: &str) -> String {
     // Try tel: URI
     if let Some(start) = from_header.find("tel:") {
         let rest = &from_header[start + 4..];
-        let end = rest.find(|c: char| c == '>' || c == ';' || c == ' ').unwrap_or(rest.len());
+        let end = rest
+            .find(|c: char| c == '>' || c == ';' || c == ' ')
+            .unwrap_or(rest.len());
         return rest[..end].to_string();
     }
     from_header.to_string()
@@ -1337,41 +1491,52 @@ fn start_fax_receive_t38(
     remote_udptl: std::net::SocketAddr,
 ) {
     use crate::spandsp::t38_session;
-    
+
     let receive_id = uuid::Uuid::new_v4().to_string();
     let sender = extract_sender(&from_header);
-    
-    tracing::info!("Starting T.38 receive: id={}, from={}, remote={}", receive_id, sender, remote_udptl);
-    
+
+    tracing::info!(
+        "Starting T.38 receive: id={}, from={}, remote={}",
+        receive_id,
+        sender,
+        remote_udptl
+    );
+
     // Emit receive started event
-    let _ = app.emit("fax:receive_progress", serde_json::json!({
-        "receiveId": receive_id,
-        "callId": call_id,
-        "sender": sender,
-        "registrarId": registrar_id,
-        "phase": "receiving",
-        "transport": "T.38",
-    }));
-    
+    let _ = app.emit(
+        "fax:receive_progress",
+        serde_json::json!({
+            "receiveId": receive_id,
+            "callId": call_id,
+            "sender": sender,
+            "registrarId": registrar_id,
+            "phase": "receiving",
+            "transport": "T.38",
+        }),
+    );
+
     // Create temp file for received TIFF
     let temp_dir = std::env::temp_dir();
     let tiff_path = temp_dir.join(format!("fax_rx_{}.tiff", &receive_id));
     let tiff_path_str = tiff_path.to_string_lossy().to_string();
-    
+
     let shutdown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    
+
     let progress_app = app.clone();
     let progress_id = receive_id.clone();
     let on_progress: t38_session::T38ProgressCallback = Box::new(move |tx, rx, elapsed| {
-        let _ = progress_app.emit("fax:receive_progress", serde_json::json!({
-            "receiveId": progress_id,
-            "phase": "receiving",
-            "udptlPacketsSent": tx,
-            "udptlPacketsReceived": rx,
-            "elapsedSecs": elapsed,
-        }));
+        let _ = progress_app.emit(
+            "fax:receive_progress",
+            serde_json::json!({
+                "receiveId": progress_id,
+                "phase": "receiving",
+                "udptlPacketsSent": tx,
+                "udptlPacketsReceived": rx,
+                "elapsedSecs": elapsed,
+            }),
+        );
     });
-    
+
     let result = t38_session::run_t38_fax_receive(
         &tiff_path_str,
         local_udptl_port,
@@ -1380,45 +1545,53 @@ fn start_fax_receive_t38(
         None,
         Some(on_progress),
     );
-    
+
     match result {
         Ok(fax_result) => {
-            tracing::info!("T.38 receive complete: success={}, pages={}", fax_result.success, fax_result.pages_sent);
-            
+            tracing::info!(
+                "T.38 receive complete: success={}, pages={}",
+                fax_result.success,
+                fax_result.pages_sent
+            );
+
             // Read TIFF and encode as base64 for frontend
-            let tiff_b64 = std::fs::read(&tiff_path)
-                .ok()
-                .map(|data| {
-                    use base64::Engine;
-                    base64::engine::general_purpose::STANDARD.encode(&data)
-                });
-            
-            let _ = app.emit("fax:receive_complete", serde_json::json!({
-                "receiveId": receive_id,
-                "callId": call_id,
-                "sender": sender,
-                "registrarId": registrar_id,
-                "success": fax_result.success,
-                "pageCount": fax_result.pages_sent,
-                "transport": "T.38",
-                "remoteStationId": fax_result.remote_station_id,
-                "tiffBase64": tiff_b64,
-                "error": fax_result.error,
-            }));
-            
+            let tiff_b64 = std::fs::read(&tiff_path).ok().map(|data| {
+                use base64::Engine;
+                base64::engine::general_purpose::STANDARD.encode(&data)
+            });
+
+            let _ = app.emit(
+                "fax:receive_complete",
+                serde_json::json!({
+                    "receiveId": receive_id,
+                    "callId": call_id,
+                    "sender": sender,
+                    "registrarId": registrar_id,
+                    "success": fax_result.success,
+                    "pageCount": fax_result.pages_sent,
+                    "transport": "T.38",
+                    "remoteStationId": fax_result.remote_station_id,
+                    "tiffBase64": tiff_b64,
+                    "error": fax_result.error,
+                }),
+            );
+
             let _ = std::fs::remove_file(&tiff_path);
         }
         Err(e) => {
             tracing::error!("T.38 receive failed: {}", e);
-            let _ = app.emit("fax:receive_complete", serde_json::json!({
-                "receiveId": receive_id,
-                "callId": call_id,
-                "sender": sender,
-                "registrarId": registrar_id,
-                "success": false,
-                "error": e,
-                "transport": "T.38",
-            }));
+            let _ = app.emit(
+                "fax:receive_complete",
+                serde_json::json!({
+                    "receiveId": receive_id,
+                    "callId": call_id,
+                    "sender": sender,
+                    "registrarId": registrar_id,
+                    "success": false,
+                    "error": e,
+                    "transport": "T.38",
+                }),
+            );
             let _ = std::fs::remove_file(&tiff_path);
         }
     }
@@ -1434,30 +1607,38 @@ fn start_fax_receive_g711(
     remote_rtp: std::net::SocketAddr,
     codec: crate::softphone::codecs::G711Codec,
 ) {
-    use crate::spandsp::session::{FaxSession, FaxSendOptions};
     use crate::spandsp::fax_media;
-    
+    use crate::spandsp::session::{FaxSendOptions, FaxSession};
+
     let receive_id = uuid::Uuid::new_v4().to_string();
     let sender = extract_sender(&from_header);
-    
-    tracing::info!("Starting G.711 receive: id={}, from={}, remote={}", receive_id, sender, remote_rtp);
-    
-    let _ = app.emit("fax:receive_progress", serde_json::json!({
-        "receiveId": receive_id,
-        "callId": call_id,
-        "sender": sender,
-        "registrarId": registrar_id,
-        "phase": "receiving",
-        "transport": "G.711",
-    }));
-    
+
+    tracing::info!(
+        "Starting G.711 receive: id={}, from={}, remote={}",
+        receive_id,
+        sender,
+        remote_rtp
+    );
+
+    let _ = app.emit(
+        "fax:receive_progress",
+        serde_json::json!({
+            "receiveId": receive_id,
+            "callId": call_id,
+            "sender": sender,
+            "registrarId": registrar_id,
+            "phase": "receiving",
+            "transport": "G.711",
+        }),
+    );
+
     let temp_dir = std::env::temp_dir();
     let tiff_path = temp_dir.join(format!("fax_rx_{}.tiff", &receive_id));
     let tiff_path_str = tiff_path.to_string_lossy().to_string();
-    
+
     let options = FaxSendOptions::default();
     let shutdown = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    
+
     match FaxSession::new_receive(&tiff_path_str, &options) {
         Ok(mut session) => {
             let result = fax_media::run_fax_receive_over_rtp(
@@ -1469,58 +1650,69 @@ fn start_fax_receive_g711(
                 Some(app.clone()),
                 Some(receive_id.clone()),
             );
-            
+
             match result {
                 Ok(fax_result) => {
-                    tracing::info!("G.711 receive complete: success={}, pages={}", fax_result.success, fax_result.pages_sent);
-                    
-                    let tiff_b64 = std::fs::read(&tiff_path)
-                        .ok()
-                        .map(|data| {
-                            use base64::Engine;
-                            base64::engine::general_purpose::STANDARD.encode(&data)
-                        });
-                    
-                    let _ = app.emit("fax:receive_complete", serde_json::json!({
-                        "receiveId": receive_id,
-                        "callId": call_id,
-                        "sender": sender,
-                        "registrarId": registrar_id,
-                        "success": fax_result.success,
-                        "pageCount": fax_result.pages_sent,
-                        "transport": "G.711",
-                        "remoteStationId": fax_result.remote_station_id,
-                        "tiffBase64": tiff_b64,
-                        "error": fax_result.error,
-                    }));
+                    tracing::info!(
+                        "G.711 receive complete: success={}, pages={}",
+                        fax_result.success,
+                        fax_result.pages_sent
+                    );
+
+                    let tiff_b64 = std::fs::read(&tiff_path).ok().map(|data| {
+                        use base64::Engine;
+                        base64::engine::general_purpose::STANDARD.encode(&data)
+                    });
+
+                    let _ = app.emit(
+                        "fax:receive_complete",
+                        serde_json::json!({
+                            "receiveId": receive_id,
+                            "callId": call_id,
+                            "sender": sender,
+                            "registrarId": registrar_id,
+                            "success": fax_result.success,
+                            "pageCount": fax_result.pages_sent,
+                            "transport": "G.711",
+                            "remoteStationId": fax_result.remote_station_id,
+                            "tiffBase64": tiff_b64,
+                            "error": fax_result.error,
+                        }),
+                    );
                     let _ = std::fs::remove_file(&tiff_path);
                 }
                 Err(e) => {
                     tracing::error!("G.711 receive failed: {}", e);
-                    let _ = app.emit("fax:receive_complete", serde_json::json!({
-                        "receiveId": receive_id,
-                        "callId": call_id,
-                        "sender": sender,
-                        "registrarId": registrar_id,
-                        "success": false,
-                        "error": e,
-                        "transport": "G.711",
-                    }));
+                    let _ = app.emit(
+                        "fax:receive_complete",
+                        serde_json::json!({
+                            "receiveId": receive_id,
+                            "callId": call_id,
+                            "sender": sender,
+                            "registrarId": registrar_id,
+                            "success": false,
+                            "error": e,
+                            "transport": "G.711",
+                        }),
+                    );
                     let _ = std::fs::remove_file(&tiff_path);
                 }
             }
         }
         Err(e) => {
             tracing::error!("Failed to create G.711 receive session: {}", e);
-            let _ = app.emit("fax:receive_complete", serde_json::json!({
-                "receiveId": receive_id,
-                "callId": call_id,
-                "sender": sender,
-                "registrarId": registrar_id,
-                "success": false,
-                "error": e,
-                "transport": "G.711",
-            }));
+            let _ = app.emit(
+                "fax:receive_complete",
+                serde_json::json!({
+                    "receiveId": receive_id,
+                    "callId": call_id,
+                    "sender": sender,
+                    "registrarId": registrar_id,
+                    "success": false,
+                    "error": e,
+                    "transport": "G.711",
+                }),
+            );
         }
     }
 }

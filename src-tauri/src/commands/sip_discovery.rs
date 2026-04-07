@@ -1,5 +1,5 @@
-use crate::sip_discovery::scanner;
 use crate::sip_discovery::ip_range;
+use crate::sip_discovery::scanner;
 use serde::Serialize;
 
 /// Detect the local subnet in CIDR notation (e.g., "192.168.1.0/24").
@@ -10,13 +10,20 @@ pub fn sip_discovery_detect_subnet() -> Result<DetectedSubnet, String> {
     let iface = default_net::get_default_interface()
         .map_err(|e| format!("Failed to detect default interface: {}", e))?;
 
-    let ipv4 = iface.ipv4.first().ok_or("No IPv4 address on default interface")?;
+    let ipv4 = iface
+        .ipv4
+        .first()
+        .ok_or("No IPv4 address on default interface")?;
     let addr = ipv4.addr;
     let prefix = ipv4.prefix_len;
 
     // Compute the network address (zero out host bits)
     let ip_u32 = u32::from(addr);
-    let mask = if prefix == 0 { 0u32 } else { !0u32 << (32 - prefix) };
+    let mask = if prefix == 0 {
+        0u32
+    } else {
+        !0u32 << (32 - prefix)
+    };
     let network_u32 = ip_u32 & mask;
     let network = std::net::Ipv4Addr::from(network_u32);
 

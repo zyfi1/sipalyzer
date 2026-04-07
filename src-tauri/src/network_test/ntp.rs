@@ -88,8 +88,11 @@ fn query_ntp(server: &str, timeout: Duration) -> NtpServerResult {
         Err(e) => {
             return NtpServerResult {
                 server: server.to_string(),
-                stratum: 0, offset_ms: 0.0, delay_ms: 0.0,
-                reference_id: String::new(), success: false,
+                stratum: 0,
+                offset_ms: 0.0,
+                delay_ms: 0.0,
+                reference_id: String::new(),
+                success: false,
                 error: Some(format!("bind: {}", e)),
             };
         }
@@ -101,8 +104,11 @@ fn query_ntp(server: &str, timeout: Duration) -> NtpServerResult {
     if let Err(e) = socket.connect(&host) {
         return NtpServerResult {
             server: server.to_string(),
-            stratum: 0, offset_ms: 0.0, delay_ms: 0.0,
-            reference_id: String::new(), success: false,
+            stratum: 0,
+            offset_ms: 0.0,
+            delay_ms: 0.0,
+            reference_id: String::new(),
+            success: false,
             error: Some(format!("connect: {}", e)),
         };
     }
@@ -115,8 +121,11 @@ fn query_ntp(server: &str, timeout: Duration) -> NtpServerResult {
     if let Err(e) = socket.send(&req) {
         return NtpServerResult {
             server: server.to_string(),
-            stratum: 0, offset_ms: 0.0, delay_ms: 0.0,
-            reference_id: String::new(), success: false,
+            stratum: 0,
+            offset_ms: 0.0,
+            delay_ms: 0.0,
+            reference_id: String::new(),
+            success: false,
             error: Some(format!("send: {}", e)),
         };
     }
@@ -127,16 +136,22 @@ fn query_ntp(server: &str, timeout: Duration) -> NtpServerResult {
         Ok(_) => {
             return NtpServerResult {
                 server: server.to_string(),
-                stratum: 0, offset_ms: 0.0, delay_ms: 0.0,
-                reference_id: String::new(), success: false,
+                stratum: 0,
+                offset_ms: 0.0,
+                delay_ms: 0.0,
+                reference_id: String::new(),
+                success: false,
                 error: Some("short response".to_string()),
             };
         }
         Err(e) => {
             return NtpServerResult {
                 server: server.to_string(),
-                stratum: 0, offset_ms: 0.0, delay_ms: 0.0,
-                reference_id: String::new(), success: false,
+                stratum: 0,
+                offset_ms: 0.0,
+                delay_ms: 0.0,
+                reference_id: String::new(),
+                success: false,
                 error: Some(format!("recv: {}", e)),
             };
         }
@@ -156,8 +171,8 @@ fn query_ntp(server: &str, timeout: Duration) -> NtpServerResult {
     let offset = ((t2.as_secs_f64() - t1_dur.as_secs_f64())
         + (t3.as_secs_f64() - t4_dur.as_secs_f64()))
         / 2.0;
-    let delay = (t4_dur.as_secs_f64() - t1_dur.as_secs_f64())
-        - (t3.as_secs_f64() - t2.as_secs_f64());
+    let delay =
+        (t4_dur.as_secs_f64() - t1_dur.as_secs_f64()) - (t3.as_secs_f64() - t2.as_secs_f64());
 
     NtpServerResult {
         server: server.to_string(),

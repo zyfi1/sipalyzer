@@ -70,9 +70,16 @@ impl Default for PortTestConfig {
 }
 
 /// Expand a port range string like "10000-10010" into individual entries.
-pub fn expand_port_range(range: &str, protocol: PortProtocol, label: Option<String>) -> Vec<PortTestEntry> {
+pub fn expand_port_range(
+    range: &str,
+    protocol: PortProtocol,
+    label: Option<String>,
+) -> Vec<PortTestEntry> {
     if let Some((start_str, end_str)) = range.split_once('-') {
-        if let (Ok(start), Ok(end)) = (start_str.trim().parse::<u16>(), end_str.trim().parse::<u16>()) {
+        if let (Ok(start), Ok(end)) = (
+            start_str.trim().parse::<u16>(),
+            end_str.trim().parse::<u16>(),
+        ) {
             return (start..=end)
                 .map(|p| PortTestEntry {
                     port: p,
@@ -83,7 +90,11 @@ pub fn expand_port_range(range: &str, protocol: PortProtocol, label: Option<Stri
         }
     }
     if let Ok(port) = range.trim().parse::<u16>() {
-        return vec![PortTestEntry { port, protocol, label }];
+        return vec![PortTestEntry {
+            port,
+            protocol,
+            label,
+        }];
     }
     vec![]
 }
@@ -91,22 +102,71 @@ pub fn expand_port_range(range: &str, protocol: PortProtocol, label: Option<Stri
 /// VoIP preset port sets.
 pub fn voip_presets() -> Vec<(&'static str, Vec<PortTestEntry>)> {
     vec![
-        ("SIP Signaling", vec![
-            PortTestEntry { port: 5060, protocol: PortProtocol::Udp, label: Some("SIP UDP".into()) },
-            PortTestEntry { port: 5060, protocol: PortProtocol::Tcp, label: Some("SIP TCP".into()) },
-            PortTestEntry { port: 5061, protocol: PortProtocol::Tcp, label: Some("SIP TLS".into()) },
-        ]),
-        ("WebRTC", vec![
-            PortTestEntry { port: 3478, protocol: PortProtocol::Udp, label: Some("STUN UDP".into()) },
-            PortTestEntry { port: 3478, protocol: PortProtocol::Tcp, label: Some("STUN TCP".into()) },
-            PortTestEntry { port: 5349, protocol: PortProtocol::Tcp, label: Some("STUN/TURN TLS".into()) },
-            PortTestEntry { port: 443, protocol: PortProtocol::Tcp, label: Some("WSS".into()) },
-        ]),
-        ("Common PBX", vec![
-            PortTestEntry { port: 2000, protocol: PortProtocol::Tcp, label: Some("SCCP/Skinny".into()) },
-            PortTestEntry { port: 4569, protocol: PortProtocol::Udp, label: Some("IAX2".into()) },
-            PortTestEntry { port: 8089, protocol: PortProtocol::Tcp, label: Some("WebSocket".into()) },
-        ]),
+        (
+            "SIP Signaling",
+            vec![
+                PortTestEntry {
+                    port: 5060,
+                    protocol: PortProtocol::Udp,
+                    label: Some("SIP UDP".into()),
+                },
+                PortTestEntry {
+                    port: 5060,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("SIP TCP".into()),
+                },
+                PortTestEntry {
+                    port: 5061,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("SIP TLS".into()),
+                },
+            ],
+        ),
+        (
+            "WebRTC",
+            vec![
+                PortTestEntry {
+                    port: 3478,
+                    protocol: PortProtocol::Udp,
+                    label: Some("STUN UDP".into()),
+                },
+                PortTestEntry {
+                    port: 3478,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("STUN TCP".into()),
+                },
+                PortTestEntry {
+                    port: 5349,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("STUN/TURN TLS".into()),
+                },
+                PortTestEntry {
+                    port: 443,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("WSS".into()),
+                },
+            ],
+        ),
+        (
+            "Common PBX",
+            vec![
+                PortTestEntry {
+                    port: 2000,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("SCCP/Skinny".into()),
+                },
+                PortTestEntry {
+                    port: 4569,
+                    protocol: PortProtocol::Udp,
+                    label: Some("IAX2".into()),
+                },
+                PortTestEntry {
+                    port: 8089,
+                    protocol: PortProtocol::Tcp,
+                    label: Some("WebSocket".into()),
+                },
+            ],
+        ),
     ]
 }
 
@@ -176,11 +236,17 @@ async fn test_port(ip: IpAddr, entry: &PortTestEntry, timeout: Duration) -> Port
 async fn test_tcp_port(addr: SocketAddr, timeout: Duration) -> (PortStatus, Option<f64>) {
     let start = Instant::now();
     match tokio::time::timeout(timeout, TcpStream::connect(addr)).await {
-        Ok(Ok(_)) => (PortStatus::Open, Some(start.elapsed().as_secs_f64() * 1000.0)),
+        Ok(Ok(_)) => (
+            PortStatus::Open,
+            Some(start.elapsed().as_secs_f64() * 1000.0),
+        ),
         Ok(Err(e)) => {
             let err = e.to_string().to_lowercase();
             if err.contains("refused") {
-                (PortStatus::Closed, Some(start.elapsed().as_secs_f64() * 1000.0))
+                (
+                    PortStatus::Closed,
+                    Some(start.elapsed().as_secs_f64() * 1000.0),
+                )
             } else {
                 (PortStatus::Filtered, None)
             }
@@ -209,8 +275,14 @@ async fn test_udp_port(addr: SocketAddr, timeout: Duration) -> (PortStatus, Opti
 
     let mut buf = [0u8; 512];
     match tokio::time::timeout(timeout, socket.recv_from(&mut buf)).await {
-        Ok(Ok(_)) => (PortStatus::Open, Some(start.elapsed().as_secs_f64() * 1000.0)),
-        Ok(Err(_)) => (PortStatus::Closed, Some(start.elapsed().as_secs_f64() * 1000.0)),
+        Ok(Ok(_)) => (
+            PortStatus::Open,
+            Some(start.elapsed().as_secs_f64() * 1000.0),
+        ),
+        Ok(Err(_)) => (
+            PortStatus::Closed,
+            Some(start.elapsed().as_secs_f64() * 1000.0),
+        ),
         Err(_) => {
             // UDP timeout: no response and no ICMP unreachable.
             // This typically means the port is open (most UDP services silently

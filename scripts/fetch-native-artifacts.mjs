@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { copyFileSync, createWriteStream, existsSync, mkdirSync, rmSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
+import { copyFileSync, createWriteStream, existsSync, mkdtempSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -35,6 +35,52 @@ function run(command, args) {
   });
 }
 
+function commandExists(command) {
+  const result = spawnSync(command, ["--version"], { stdio: "ignore", shell: false });
+  if (!result.error) return true;
+  const fallback = spawnSync(command, ["-version"], { stdio: "ignore", shell: false });
+  return !fallback.error;
+}
+
+function ensureCommand(command, message) {
+  if (!commandExists(command)) {
+    throw new Error(message);
+  }
+}
+
+function promoteStagedDirectory(stagedDir, destDir) {
+  const parent = dirname(destDir);
+  const backupDir = join(parent, `.native-artifacts-backup-${process.pid}-${Date.now()}`);
+  const destExists = existsSync(destDir);
+  let movedToBackup = false;
+  try {
+    if (destExists) {
+      renameSync(destDir, backupDir);
+      movedToBackup = true;
+    }
+    renameSync(stagedDir, destDir);
+    if (movedToBackup) {
+      rmSync(backupDir, { recursive: true, force: true });
+    }
+  } catch (error) {
+    try {
+      if (existsSync(destDir)) {
+        rmSync(destDir, { recursive: true, force: true });
+      }
+      if (movedToBackup) {
+        renameSync(backupDir, destDir);
+      }
+    } catch {
+      // Preserve original failure below.
+    }
+    throw error;
+  } finally {
+    if (existsSync(stagedDir)) {
+      rmSync(stagedDir, { recursive: true, force: true });
+    }
+  }
+}
+
 async function resolveArchive(source, tmpDir) {
   if (existsSync(source)) {
     const localArchive = join(tmpDir, basename(source));
@@ -65,9 +111,8 @@ async function main() {
 
   const tmpDir = join(ROOT, ".tmp");
   mkdirSync(tmpDir, { recursive: true });
-  mkdirSync(dest, { recursive: true });
-  rmSync(dest, { recursive: true, force: true });
-  mkdirSync(dest, { recursive: true });
+  mkdirSync(dirname(dest), { recursive: true });
+  const stagedDest = mkdtempSync(join(tmpDir, "native-artifacts-staged-"));
 
   const archivePath = await resolveArchive(source, tmpDir);
   if (!isTarGz(archivePath)) {
@@ -76,7 +121,9 @@ async function main() {
     );
   }
 
-  await run("tar", ["-xzf", archivePath, "-C", dest]);
+  ensureCommand("tar", "Missing required command: tar");
+  await run("tar", ["-xzf", archivePath, "-C", stagedDest]);
+  promoteStagedDirectory(stagedDest, dest);
   console.log(`==> Native artifacts extracted to: ${dest}`);
 }
 

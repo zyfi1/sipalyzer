@@ -1,5 +1,5 @@
-use crate::multicast::{join, listener, audio_receiver, audio_sender, igmp};
 use crate::multicast::types::*;
+use crate::multicast::{audio_receiver, audio_sender, igmp, join, listener};
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
@@ -32,7 +32,9 @@ pub async fn multicast_join_group(
                 packet_tx,
                 cancel_rx,
                 ready_tx,
-            ).await {
+            )
+            .await
+            {
                 Ok(()) => tracing::info!("Listener exited normally for {}:{}", g, port),
                 Err(e) => tracing::error!("Listener FAILED for {}:{}: {}", g, port, e),
             }
@@ -87,9 +89,7 @@ pub async fn multicast_send_test(
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn multicast_igmp_query(
-    interface: Option<String>,
-) -> Result<IgmpQueryResult, String> {
+pub async fn multicast_igmp_query(interface: Option<String>) -> Result<IgmpQueryResult, String> {
     let mut result = igmp::send_igmp_query(interface.as_deref()).await?;
 
     // Also include groups currently joined by this app process.
@@ -98,7 +98,8 @@ pub async fn multicast_igmp_query(
     for g in local_groups {
         if let Some(existing) = result.groups_found.iter_mut().find(|r| r.group == g.group) {
             if !existing.compatibility_mode.contains("local app joined") {
-                existing.compatibility_mode = format!("{} + local app joined", existing.compatibility_mode);
+                existing.compatibility_mode =
+                    format!("{} + local app joined", existing.compatibility_mode);
             }
         } else {
             result.groups_found.push(MulticastGroupReport {
@@ -110,9 +111,7 @@ pub async fn multicast_igmp_query(
         }
     }
 
-    result
-        .groups_found
-        .sort_by(|a, b| a.group.cmp(&b.group));
+    result.groups_found.sort_by(|a, b| a.group.cmp(&b.group));
 
     Ok(result)
 }
@@ -130,7 +129,9 @@ pub async fn multicast_snooping_verify(
 #[tracing::instrument(skip_all)]
 pub fn multicast_stop_listener(group: String, port: u16) -> Result<(), String> {
     let key = format!("{}:{}", group, port);
-    let groups = crate::multicast::join::ACTIVE_GROUPS.lock().map_err(|e| e.to_string())?;
+    let groups = crate::multicast::join::ACTIVE_GROUPS
+        .lock()
+        .map_err(|e| e.to_string())?;
     if let Some(g) = groups.get(&key) {
         let _ = g.cancel_tx.send(true);
         Ok(())
@@ -148,8 +149,12 @@ pub fn multicast_audio_start(
     output_device_id: Option<String>,
     codec: Option<String>,
 ) -> Result<(), String> {
-    let packet_rx = join::subscribe_packets(&group, port)
-        .ok_or_else(|| format!("Group {}:{} is not joined — join before starting audio", group, port))?;
+    let packet_rx = join::subscribe_packets(&group, port).ok_or_else(|| {
+        format!(
+            "Group {}:{} is not joined — join before starting audio",
+            group, port
+        )
+    })?;
 
     audio_receiver::start(
         app,
@@ -271,18 +276,12 @@ pub fn multicast_generate_set_source(
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn multicast_generate_feed_tts(
-    group: String,
-    samples: Vec<i16>,
-) -> Result<(), String> {
+pub fn multicast_generate_feed_tts(group: String, samples: Vec<i16>) -> Result<(), String> {
     audio_sender::feed_tts_pcm(&group, &samples)
 }
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub fn multicast_generate_set_input_gain(
-    group: String,
-    gain: f32,
-) -> Result<(), String> {
+pub fn multicast_generate_set_input_gain(group: String, gain: f32) -> Result<(), String> {
     audio_sender::set_input_gain(&group, gain)
 }

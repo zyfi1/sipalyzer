@@ -18,12 +18,12 @@ impl PcapWriter {
         // Magic 0xA1B2C3D4 means "standard pcap, microsecond, file is big-endian".
         // libpcap/Capture::from_file expects this; writing LE caused "unsupported version 512.1024".
         file.write_all(&0xA1B2C3D4u32.to_be_bytes())?; // Magic number (standard microsecond)
-        file.write_all(&2u16.to_be_bytes())?;         // Version major
-        file.write_all(&4u16.to_be_bytes())?;         // Version minor
-        file.write_all(&0i32.to_be_bytes())?;         // Timezone offset (GMT)
-        file.write_all(&0u32.to_be_bytes())?;         // Timestamp accuracy
-        file.write_all(&65535u32.to_be_bytes())?;     // Snaplen (max packet size)
-        file.write_all(&1u32.to_be_bytes())?;        // Data link type (Ethernet)
+        file.write_all(&2u16.to_be_bytes())?; // Version major
+        file.write_all(&4u16.to_be_bytes())?; // Version minor
+        file.write_all(&0i32.to_be_bytes())?; // Timezone offset (GMT)
+        file.write_all(&0u32.to_be_bytes())?; // Timestamp accuracy
+        file.write_all(&65535u32.to_be_bytes())?; // Snaplen (max packet size)
+        file.write_all(&1u32.to_be_bytes())?; // Data link type (Ethernet)
 
         Ok(Self {
             file,
@@ -55,7 +55,12 @@ impl PcapWriter {
         let timestamp_us = timestamp.timestamp_micros();
         let ts_sec = (timestamp_us / 1_000_000) as u32;
         let ts_usec = (timestamp_us % 1_000_000) as u32;
-        self.write_record_header(ts_sec, ts_usec, raw_frame.len() as u32, raw_frame.len() as u32)?;
+        self.write_record_header(
+            ts_sec,
+            ts_usec,
+            raw_frame.len() as u32,
+            raw_frame.len() as u32,
+        )?;
         self.file.write_all(raw_frame)?;
         self.packet_count += 1;
         Ok(())
@@ -92,7 +97,10 @@ impl PcapWriter {
         use std::io::Write;
         self.file.flush().context("Failed to flush PCAP file")?;
         self.file.sync_all().context("Failed to sync PCAP file")?;
-        tracing::info!("Flushed & synced — {} packets written to disk", self.packet_count);
+        tracing::info!(
+            "Flushed & synced — {} packets written to disk",
+            self.packet_count
+        );
         Ok(())
     }
 

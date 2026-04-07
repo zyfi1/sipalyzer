@@ -72,8 +72,7 @@ pub fn compress_pcap(
     let output_file = File::create(&out_path)
         .with_context(|| format!("Failed to create output file: {:?}", out_path))?;
     let writer = BufWriter::with_capacity(BUFFER_SIZE, output_file);
-    let mut encoder = Encoder::new(writer, level)
-        .context("Failed to create ZSTD encoder")?;
+    let mut encoder = Encoder::new(writer, level).context("Failed to create ZSTD encoder")?;
 
     // Compress data
     let mut buffer = vec![0u8; BUFFER_SIZE];
@@ -137,10 +136,7 @@ pub fn decompress_pcap(
                 .file_name()
                 .context("Invalid input path")?
                 .to_string_lossy();
-            let new_name = name
-                .strip_suffix(".zst")
-                .unwrap_or(&name)
-                .to_string();
+            let new_name = name.strip_suffix(".zst").unwrap_or(&name).to_string();
             input_path.with_file_name(new_name)
         }
     };
@@ -149,8 +145,7 @@ pub fn decompress_pcap(
     let input_file = File::open(input_path)
         .with_context(|| format!("Failed to open compressed file: {:?}", input_path))?;
     let reader = BufReader::with_capacity(BUFFER_SIZE, input_file);
-    let mut decoder = Decoder::new(reader)
-        .context("Failed to create ZSTD decoder")?;
+    let mut decoder = Decoder::new(reader).context("Failed to create ZSTD decoder")?;
 
     // Create output file
     let output_file = File::create(&out_path)
@@ -180,21 +175,13 @@ pub fn decompress_pcap(
 
 /// Check if a file is ZSTD compressed.
 pub fn is_compressed(path: &Path) -> bool {
-    path.extension()
-        .map(|ext| ext == "zst")
-        .unwrap_or(false)
+    path.extension().map(|ext| ext == "zst").unwrap_or(false)
 }
 
 /// Get the uncompressed file path from a compressed path.
 pub fn get_uncompressed_path(path: &Path) -> PathBuf {
-    let name = path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy();
-    let new_name = name
-        .strip_suffix(".zst")
-        .unwrap_or(&name)
-        .to_string();
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let new_name = name.strip_suffix(".zst").unwrap_or(&name).to_string();
     path.with_file_name(new_name)
 }
 
