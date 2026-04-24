@@ -648,7 +648,7 @@ impl FaxSession {
 
         #[cfg(feature = "spandsp-native")]
         let fax_state = unsafe {
-            let state = bindings::fax_init(ptr::null_mut(), 1);
+            let state = bindings::fax_init(ptr::null_mut(), true);
             if state.is_null() {
                 return Err("Failed to initialize SpanDSP fax state".to_string());
             }
@@ -672,7 +672,7 @@ impl FaxSession {
             bindings::t30_set_supported_modems(t30, modem_flags);
 
             // ECM from user options
-            bindings::t30_set_ecm_capability(t30, if opts.ecm { 1 } else { 0 });
+            bindings::t30_set_ecm_capability(t30, opts.ecm);
 
             // Resolution support (driven by user setting)
             bindings::t30_set_supported_resolutions(t30, opts.resolution.to_spandsp_flags());
@@ -746,7 +746,7 @@ impl FaxSession {
 
         #[cfg(feature = "spandsp-native")]
         let fax_state = unsafe {
-            let state = bindings::fax_init(ptr::null_mut(), 0);
+            let state = bindings::fax_init(ptr::null_mut(), false);
             if state.is_null() {
                 return Err("Failed to initialize SpanDSP fax state".to_string());
             }
@@ -767,7 +767,7 @@ impl FaxSession {
 
             let modem_flags = opts.modem_type.to_spandsp_flags();
             bindings::t30_set_supported_modems(t30, modem_flags);
-            bindings::t30_set_ecm_capability(t30, if opts.ecm { 1 } else { 0 });
+            bindings::t30_set_ecm_capability(t30, opts.ecm);
             bindings::t30_set_supported_resolutions(t30, opts.resolution.to_spandsp_flags());
 
             bindings::t30_set_phase_b_handler(t30, Some(phase_b_callback), state_ptr);
@@ -1013,7 +1013,7 @@ impl FaxSession {
             }
 
             let completion_code = self.completion_code();
-            let success = completion_code == bindings::T30_ERR_OK as i32;
+            let success = completion_code == bindings::t30_errors::T30_ERR_OK;
             let t30_error = T30Error::from_code(completion_code);
 
             // Get statistics
@@ -1100,24 +1100,18 @@ impl Drop for FaxSession {
 /// Safety: user_data points to a Pin<Box<PhaseEState>> owned by FaxSession.
 #[cfg(feature = "spandsp-native")]
 unsafe extern "C" fn phase_b_callback(
-    s: *mut bindings::t30_state_t,
     user_data: *mut c_void,
     result: c_int,
 ) -> c_int {
-    if user_data.is_null() || s.is_null() {
+    if user_data.is_null() {
         return 0;
     }
 
     let state = &*(user_data as *const PhaseEState);
-
-    let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
-    bindings::t30_get_transfer_statistics(s, &mut stats);
     tracing::error!(
-        "[SpanDSP:{}] Phase B: result={}, rate={}, ecm={}",
+        "[SpanDSP:{}] Phase B: result={}",
         &state.session_id[..8],
-        result,
-        stats.bit_rate,
-        stats.error_correcting_mode
+        result
     );
 
     0 // Always return 0 to proceed with fax transmission
@@ -1128,7 +1122,6 @@ unsafe extern "C" fn phase_b_callback(
 /// Safety: user_data points to a Pin<Box<PhaseEState>> owned by FaxSession.
 #[cfg(feature = "spandsp-native")]
 unsafe extern "C" fn phase_d_callback(
-    _s: *mut bindings::t30_state_t,
     user_data: *mut c_void,
     result: c_int,
 ) -> c_int {
@@ -1152,7 +1145,6 @@ unsafe extern "C" fn phase_d_callback(
 /// Safety: user_data points to a Pin<Box<PhaseEState>> owned by FaxSession.
 #[cfg(feature = "spandsp-native")]
 unsafe extern "C" fn phase_e_callback(
-    s: *mut bindings::t30_state_t,
     user_data: *mut c_void,
     completion_code: c_int,
 ) {
@@ -1174,18 +1166,7 @@ unsafe extern "C" fn phase_e_callback(
         t30_error.description()
     );
 
-    if !s.is_null() {
-        let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
-        bindings::t30_get_transfer_statistics(s, &mut stats);
-        tracing::error!(
-            "[SpanDSP:{}] Final: pages_tx={}, pages_rx={}, rate={}, ecm={}",
-            &state.session_id[..8],
-            stats.pages_tx,
-            stats.pages_rx,
-            stats.bit_rate,
-            stats.error_correcting_mode
-        );
-    }
+    tracing::error!("[SpanDSP:{}] Phase E complete", &state.session_id[..8]);
 }
 
 // Note: Additional T.30 configuration functions (set_supported_modems, set_ecm_capability,

@@ -19,6 +19,25 @@ mod generated {
 #[cfg(feature = "spandsp-native")]
 pub use generated::*;
 
+// Compatibility shim: bundled macOS SpanDSP exports t30_set_supported_resolutions
+// while newer headers may expose t30_set_supported_bilevel_resolutions instead.
+#[cfg(feature = "spandsp-native")]
+extern "C" {
+    #[link_name = "t30_set_supported_resolutions"]
+    fn t30_set_supported_resolutions_compat(
+        s: *mut t30_state_t,
+        supported_resolutions: std::os::raw::c_int,
+    ) -> std::os::raw::c_int;
+}
+
+#[cfg(feature = "spandsp-native")]
+pub unsafe fn t30_set_supported_resolutions(
+    s: *mut t30_state_t,
+    supported_resolutions: std::os::raw::c_int,
+) -> std::os::raw::c_int {
+    t30_set_supported_resolutions_compat(s, supported_resolutions)
+}
+
 // ========================================
 // Native UDPTL bindings (from vendor/spandsp/tests/udptl.c)
 // These are NOT part of the SpanDSP shared library — they come from

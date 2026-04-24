@@ -219,7 +219,7 @@ impl T38Session {
 
             let terminal = bindings::t38_terminal_init(
                 ptr::null_mut(),
-                1, // calling_party
+                true, // calling_party
                 Some(tx_packet_handler),
                 state_ptr,
             );
@@ -243,7 +243,7 @@ impl T38Session {
             let station_cstr = CString::new(config.station_id.as_str()).unwrap_or_default();
             bindings::t30_set_tx_ident(t30, station_cstr.as_ptr());
             bindings::t30_set_supported_modems(t30, config.modem_flags);
-            bindings::t30_set_ecm_capability(t30, if config.ecm_enabled { 1 } else { 0 });
+            bindings::t30_set_ecm_capability(t30, config.ecm_enabled);
             bindings::t30_set_supported_resolutions(t30, config.supported_resolutions);
 
             // Set phase handlers with per-session state pointer
@@ -252,8 +252,8 @@ impl T38Session {
             bindings::t30_set_phase_e_handler(t30, Some(phase_e_handler), state_ptr);
 
             // Configure T.38 terminal options
-            bindings::t38_terminal_set_tep_mode(terminal, 0);
-            bindings::t38_terminal_set_fill_bit_removal(terminal, 1);
+            bindings::t38_terminal_set_tep_mode(terminal, false);
+            bindings::t38_terminal_set_fill_bit_removal(terminal, true);
 
             // Configure T.38 core
             let t38_core = bindings::t38_terminal_get_t38_core_state(terminal);
@@ -265,7 +265,7 @@ impl T38Session {
                 );
                 bindings::t38_set_data_transport_protocol(t38_core, 0); // UDPTL
                 bindings::t38_set_max_datagram_size(t38_core, config.max_datagram as c_int);
-                bindings::t38_set_tep_handling(t38_core, 0);
+                bindings::t38_set_tep_handling(t38_core, false);
 
                 // Set redundancy per category
                 bindings::t38_set_redundancy_control(
@@ -333,7 +333,7 @@ impl T38Session {
         unsafe {
             let terminal = bindings::t38_terminal_init(
                 ptr::null_mut(),
-                0, // called_party
+                false, // called_party
                 Some(tx_packet_handler),
                 state_ptr,
             );
@@ -354,7 +354,7 @@ impl T38Session {
             let station_cstr = CString::new(config.station_id.as_str()).unwrap_or_default();
             bindings::t30_set_tx_ident(t30, station_cstr.as_ptr());
             bindings::t30_set_supported_modems(t30, config.modem_flags);
-            bindings::t30_set_ecm_capability(t30, if config.ecm_enabled { 1 } else { 0 });
+            bindings::t30_set_ecm_capability(t30, config.ecm_enabled);
             bindings::t30_set_supported_resolutions(t30, config.supported_resolutions);
 
             bindings::t30_set_phase_b_handler(t30, Some(phase_b_handler), state_ptr);
@@ -458,7 +458,7 @@ impl T38Session {
         unsafe {
             let result = bindings::t38_terminal_send_timeout(self.terminal, 160);
 
-            if tick < 5 || (result != 0 && tick >= 5) {
+            if tick < 5 || result != 0 {
                 tracing::info!("[T.38:{}] tick #{}: result={}", &self.id[..8], tick, result);
             }
         }
@@ -475,7 +475,7 @@ impl T38Session {
 
         unsafe {
             let result =
-                bindings::t38_terminal_restart(self.terminal, if self.is_calling { 1 } else { 0 });
+                bindings::t38_terminal_restart(self.terminal, self.is_calling);
             if result != 0 {
                 tracing::warn!(
                     "[T.38:{}] Warning: t38_terminal_restart returned {}",
@@ -639,7 +639,6 @@ unsafe extern "C" fn tx_packet_handler(
 /// MUST return 0 to tell SpanDSP to proceed. Non-zero = abort session.
 #[cfg(feature = "spandsp-native")]
 unsafe extern "C" fn phase_b_handler(
-    s: *mut bindings::t30_state_t,
     user_data: *mut c_void,
     result: c_int,
 ) -> c_int {
@@ -648,26 +647,7 @@ unsafe extern "C" fn phase_b_handler(
     }
     let state = &*(user_data as *const SessionState);
 
-    if !s.is_null() {
-        let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
-        bindings::t30_get_transfer_statistics(s, &mut stats);
-        tracing::error!(
-            "[T.38:{}] Phase B: result={}, rate={}, ecm={}",
-            &state.session_id[..8],
-            result,
-            stats.bit_rate,
-            stats.error_correcting_mode
-        );
-
-        let rx_ident = bindings::t30_get_rx_ident(s);
-        if !rx_ident.is_null() {
-            if let Ok(id) = std::ffi::CStr::from_ptr(rx_ident).to_str() {
-                if !id.is_empty() {
-                    tracing::info!("[T.38:{}] Remote station: {}", &state.session_id[..8], id);
-                }
-            }
-        }
-    }
+    tracing::error!("[T.38:{}] Phase B: result={}", &state.session_id[..8], result);
 
     0 // Always return 0 to proceed with fax transmission
 }
@@ -676,7 +656,6 @@ unsafe extern "C" fn phase_b_handler(
 /// MUST return 0 to tell SpanDSP to continue. Non-zero = abort session.
 #[cfg(feature = "spandsp-native")]
 unsafe extern "C" fn phase_d_handler(
-    _s: *mut bindings::t30_state_t,
     user_data: *mut c_void,
     result: c_int,
 ) -> c_int {
@@ -697,7 +676,6 @@ unsafe extern "C" fn phase_d_handler(
 /// Phase E handler - called when T.30 session completes
 #[cfg(feature = "spandsp-native")]
 unsafe extern "C" fn phase_e_handler(
-    s: *mut bindings::t30_state_t,
     user_data: *mut c_void,
     completion_code: c_int,
 ) {
@@ -718,18 +696,7 @@ unsafe extern "C" fn phase_e_handler(
         t30_error.description()
     );
 
-    if !s.is_null() {
-        let mut stats = std::mem::zeroed::<bindings::t30_stats_t>();
-        bindings::t30_get_transfer_statistics(s, &mut stats);
-        tracing::error!(
-            "[T.38:{}] Final stats: pages_tx={}, pages_rx={}, rate={}, ecm={}",
-            &state.session_id[..8],
-            stats.pages_tx,
-            stats.pages_rx,
-            stats.bit_rate,
-            stats.error_correcting_mode
-        );
-    }
+    tracing::error!("[T.38:{}] Phase E complete", &state.session_id[..8]);
 }
 
 /// Progress callback for T.38 transmission — called periodically with (tx_packets, rx_packets, elapsed_secs)

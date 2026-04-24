@@ -41,6 +41,10 @@ function main() {
     if (upstreamStatus !== 0) process.exit(upstreamStatus);
   }
 
+  // On macOS hosts, ensure libtiff transitive dylibs are present in vendor/libs/<host>.
+  const macDepsStatus = runNodeScript("sync-macos-libtiff-runtime-deps.mjs");
+  if (macDepsStatus !== 0) process.exit(macDepsStatus);
+
   const secondPass = runNodeScript("validate-native-artifacts.mjs", validateArgs);
   if (secondPass !== 0) {
     console.error("Native artifact auto-fetch completed but validation still failed.");

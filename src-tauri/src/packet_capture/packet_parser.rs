@@ -438,7 +438,7 @@ impl PacketParser {
 
     fn parse_timestamp(&self, header: &pcap::PacketHeader) -> chrono::DateTime<chrono::Utc> {
         chrono::DateTime::from_timestamp(
-            header.ts.tv_sec.into(),
+            header.ts.tv_sec,
             (header.ts.tv_usec as u32) * 1000,
         ).unwrap_or_else(|| chrono::Utc::now())
     }

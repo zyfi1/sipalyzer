@@ -81,9 +81,10 @@
 #include <spandsp/echo.h>
 #include <spandsp/modem_echo.h>
 #include <spandsp/crc.h>
-#include <spandsp/hdlc.h>
 #include <spandsp/async.h>
+#include <spandsp/hdlc.h>
 #include <spandsp/fsk.h>
+#include <spandsp/super_tone_rx.h>
 #include <spandsp/modem_connect_tones.h>
 #include <spandsp/silence_gen.h>
 #include <spandsp/noise.h>
@@ -95,18 +96,19 @@
 #include <spandsp/ademco_contactid.h>
 #include <spandsp/sig_tone.h>
 #include <spandsp/v8.h>
+#include <spandsp/v29rx.h>
 #include <spandsp/v17rx.h>
 #include <spandsp/v17tx.h>
 #include <spandsp/v22bis.h>
 #include <spandsp/v27ter_rx.h>
 #include <spandsp/v27ter_tx.h>
-#include <spandsp/v29rx.h>
 #include <spandsp/v29tx.h>
 #include <spandsp/v42.h>
 #include <spandsp/v42bis.h>
 #include <spandsp/v18.h>
 #include <spandsp/v80.h>
 #include <spandsp/sprt.h>
+#include <spandsp/timezone.h>
 #include <spandsp/t4_rx.h>
 #include <spandsp/t4_tx.h>
 #include <spandsp/t30.h>
@@ -120,6 +122,7 @@
 #include <spandsp/t38_gateway.h>
 #include <spandsp/fax_modems.h>
 #include <spandsp/fax.h>
+#include <spandsp/at_interpreter.h>
 #include <spandsp/data_modems.h>
 #include <spandsp/plc.h>
 #include <spandsp/playout.h>
@@ -130,8 +133,6 @@
 #include <spandsp/lpc10.h>
 #include <spandsp/ima_adpcm.h>
 #include <spandsp/oki_adpcm.h>
-#include <spandsp/timezone.h>
 #include <spandsp/adsi.h>
-#include <spandsp/at_interpreter.h>
 
 #endif

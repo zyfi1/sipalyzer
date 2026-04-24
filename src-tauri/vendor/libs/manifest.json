@@ -6,7 +6,10 @@
       "libraries": [
         "libspandsp.dylib",
         "libtiff.dylib",
-        "libvosk.dylib"
+        "libvosk.dylib",
+        "libzstd.dylib",
+        "libjpeg.dylib",
+        "liblzma.dylib"
       ],
       "includeDir": "include"
     },

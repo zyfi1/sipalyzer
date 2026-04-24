@@ -42,6 +42,7 @@
 #define SPANDSP_EXPOSE_INTERNAL_STRUCTURES
 
 #include "spandsp.h"
+#include <spandsp/private/logging.h>
 
 #include "udptl.h"
 

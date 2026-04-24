@@ -7,11 +7,12 @@
 //! For distribution builds, the libraries are bundled into the app.
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     // Always run Tauri build
     tauri_build::build();
+    println!("cargo:rerun-if-env-changed=SIPALYZER_DISABLE_NATIVE_UDPTL");
 
     // Vosk STT is a regular dependency, so always configure its library path when
     // bundled artifacts are present for the active target.
@@ -188,9 +189,14 @@ fn link_spandsp() {
         let mut native_bindings_ready = false;
         let bundled_include = bundle_dir.join("include");
         if bundled_include.exists() {
-            compile_native_udptl(&bundled_include);
-            generate_bindings(&bundled_include, &out_dir);
-            native_bindings_ready = true;
+            if compile_native_udptl(&bundled_include) {
+                generate_bindings(&bundled_include, &out_dir);
+                native_bindings_ready = true;
+            } else {
+                println!(
+                    "cargo:warning=UDPTL native compile is unavailable (disabled or incompatible headers); using non-native fax path."
+                );
+            }
         }
 
         if native_bindings_ready {
@@ -210,20 +216,27 @@ fn link_spandsp() {
 
 /// Compile SpanDSP's native UDPTL (ITU-T T.38 Annex D) implementation.
 /// This is the battle-tested encoder/decoder used by FreeSWITCH, Asterisk, etc.
-fn compile_native_udptl(spandsp_include: &PathBuf) {
+fn compile_native_udptl(spandsp_include: &Path) -> bool {
+    if env::var("SIPALYZER_DISABLE_NATIVE_UDPTL").ok().as_deref() == Some("1") {
+        println!(
+            "cargo:warning=Skipping native SpanDSP udptl.c compile because SIPALYZER_DISABLE_NATIVE_UDPTL=1."
+        );
+        return false;
+    }
+
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let udptl_c = manifest_dir.join("vendor").join("spandsp").join("tests").join("udptl.c");
     let udptl_h_dir = manifest_dir.join("vendor").join("spandsp").join("tests");
+    let compat_hdr = udptl_h_dir.join("udptl_compat.h");
     
     if !udptl_c.exists() {
         println!("cargo:warning=SpanDSP udptl.c not found at {:?}, skipping native UDPTL", udptl_c);
-        return;
+        return false;
     }
     
     eprintln!("build.rs: compiling native SpanDSP UDPTL from {:?}", udptl_c);
     println!("cargo:rerun-if-changed={}", udptl_c.display());
 
-    let compat_hdr = udptl_h_dir.join("udptl_compat.h");
     let libtiff_include = manifest_dir.join("vendor").join("libtiff").join("libtiff");
     let libtiff_config = libtiff_include.join("config");
     let mut build = cc::Build::new();
@@ -240,19 +253,27 @@ fn compile_native_udptl(spandsp_include: &PathBuf) {
     if libtiff_config.join("tiffconf.h").is_file() {
         build.include(&libtiff_config);
     }
-
     let target = env::var("TARGET").unwrap_or_default();
     if target.contains("msvc") {
-        // MSVC: force-include compat header (clang/gcc `-include` is not valid for cl.exe)
-        build.flag(&format!("/FI{}", compat_hdr.display()));
+        build.flag(format!("/FI{}", compat_hdr.display()));
     } else {
         build.flag("-include").flag(compat_hdr.to_string_lossy().as_ref());
     }
 
-    build.compile("udptl");
+    match build.try_compile("udptl") {
+        Ok(()) => true,
+        Err(err) => {
+            println!("cargo:warning=SpanDSP UDPTL compile failed: {err}");
+            false
+        }
+    }
 }
 
-fn generate_bindings(include_path: &PathBuf, out_dir: &PathBuf) {
+fn generate_bindings(include_path: &Path, out_dir: &Path) {
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let libtiff_include = manifest_dir.join("vendor").join("libtiff").join("libtiff");
+    let libtiff_config = libtiff_include.join("config");
+
     // Create a wrapper header
     let wrapper_content = r#"
 // SpanDSP wrapper header for bindgen
@@ -264,9 +285,16 @@ fn generate_bindings(include_path: &PathBuf, out_dir: &PathBuf) {
     
     println!("cargo:rerun-if-changed=build.rs");
     
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .header(wrapper_path.to_string_lossy())
-        .clang_arg(format!("-I{}", include_path.display()))
+        .clang_arg(format!("-I{}", include_path.display()));
+    if libtiff_include.join("tiffio.h").is_file() {
+        builder = builder.clang_arg(format!("-I{}", libtiff_include.display()));
+    }
+    if libtiff_config.join("tiffconf.h").is_file() {
+        builder = builder.clang_arg(format!("-I{}", libtiff_config.display()));
+    }
+    let bindings = builder
         // Only generate bindings for fax-related functions/types
         .allowlist_function("t30_.*")
         .allowlist_function("t38_.*")
