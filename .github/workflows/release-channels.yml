@@ -131,7 +131,7 @@ jobs:
 
       - name: Fetch upstream native artifacts (strict lane)
         if: inputs.build_strategy == 'github-hosted'
-        run: npm run fetch:native-artifacts:upstream
+        run: npm run fetch:native-artifacts:upstream -- --target x86_64-unknown-linux-gnu
 
       - name: Frontend build check (strict lane)
         if: inputs.build_strategy == 'github-hosted'
@@ -217,7 +217,7 @@ jobs:
 
       - name: Fetch upstream native artifacts (extended lane fallback)
         if: matrix.target != 'local-noop' && env.SIPALYZER_NATIVE_ARTIFACTS_URL == '' && env.SIPALYZER_NATIVE_ARTIFACTS_DIR == ''
-        run: npm run fetch:native-artifacts:upstream
+        run: npm run fetch:native-artifacts:upstream -- --target ${{ matrix.target }}
 
       - name: Validate target native artifacts (extended lane)
         if: matrix.target != 'local-noop'
@@ -246,15 +246,16 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libpcap-dev
+            libpcap-dev \
+            libasound2-dev
 
       - name: Build and upload channel release
         if: matrix.target != 'local-noop'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           SIPALYZER_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
         with:
           tagName: ${{ needs.prepare.outputs.release_tag }}

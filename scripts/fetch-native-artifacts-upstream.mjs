@@ -20,6 +20,17 @@ const WINDOWS_TIFF_PKG =
   "https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-libtiff-4.7.1-1-any.pkg.tar.zst";
 const WINDOWS_NPCAP_SDK = "https://npcap.com/dist/npcap-sdk-1.16.zip";
 
+function parseArgs(argv) {
+  const args = { target: "all" };
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--target") {
+      args.target = argv[i + 1] ?? "all";
+      i += 1;
+    }
+  }
+  return args;
+}
+
 function run(command, args, cwd = ROOT) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, { stdio: "inherit", shell: false, cwd });
@@ -224,11 +235,16 @@ async function installWindowsArtifacts() {
 }
 
 async function main() {
+  const { target } = parseArgs(process.argv.slice(2));
   rmSync(TMP_ROOT, { recursive: true, force: true });
   mkdirSync(TMP_ROOT, { recursive: true });
 
-  await installLinuxArtifacts();
-  await installWindowsArtifacts();
+  if (target === "all" || target === "x86_64-unknown-linux-gnu") {
+    await installLinuxArtifacts();
+  }
+  if (target === "all" || target === "x86_64-pc-windows-msvc") {
+    await installWindowsArtifacts();
+  }
 
   writeFileSync(
     join(TMP_ROOT, "SUMMARY.txt"),
