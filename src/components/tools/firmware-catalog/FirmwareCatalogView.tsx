@@ -63,17 +63,23 @@ function ConfigRow({ label, value, mono, copy }: { label: string; value: string;
   );
 }
 
-function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }: {
+function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop, serveKind }: {
   baseUrl: string;
   remote: boolean;
   entryIds: string[];
   catalog: FirmwareEntry[];
   cache: Map<string, FirmwareCacheEntry>;
   onStop: () => void;
+  serveKind: "phone-http" | "edgemarc-ftp";
 }) {
   const [showGuide, setShowGuide] = useState(false);
 
   const servedEntries = useMemo(() => catalog.filter((e) => entryIds.includes(e.id)), [catalog, entryIds]);
+  const isEdgemarcFtp = serveKind === "edgemarc-ftp";
+  const primaryEdge = useMemo(
+    () => servedEntries.find((e) => e.device_class === "edgemarc") ?? servedEntries[0],
+    [servedEntries],
+  );
 
   const servedVendors = useMemo(() => {
     const v = new Set(servedEntries.map((e) => e.vendor));
@@ -97,17 +103,18 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
   const { port, hostPort } = (() => {
     try {
       const u = new URL(baseUrl);
+      const defPort = u.protocol === "ftp:" ? (u.port || "2121") : (u.port || "8069");
       return {
-        port: u.port || "8069",
-        hostPort: `${u.hostname}:${u.port || "8069"}`,
+        port: defPort,
+        hostPort: `${u.hostname}:${defPort}`,
       };
     } catch {
-      const cleaned = baseUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
-      return { port: "8069", hostPort: cleaned };
+      const cleaned = baseUrl.replace(/^(https?|ftp):\/\//, "").replace(/\/+$/, "");
+      return { port: isEdgemarcFtp ? "2121" : "8069", hostPort: cleaned };
     }
   })();
-  const showPoly = servedVendors.poly || !servedVendors.yealink;
-  const showYealink = servedVendors.yealink || !servedVendors.poly;
+  const showPoly = !isEdgemarcFtp && (servedVendors.poly || !servedVendors.yealink);
+  const showYealink = !isEdgemarcFtp && (servedVendors.yealink || !servedVendors.poly);
 
   return (
     <div className="rounded-md surface shrink-0 animate-panel-enter overflow-hidden border-l-2 border-success">
@@ -116,7 +123,10 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
           <span className="animate-live-ripple motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
         </span>
-        <span className="text-xs font-medium text-success">Serving{remote ? " (Remote)" : ""}</span>
+        <span className="text-xs font-medium text-success">
+          {isEdgemarcFtp ? "Serving FTP" : "Serving"}
+          {remote ? " (Remote)" : ""}
+        </span>
         <code className="text-xs font-mono bg-muted/20 px-2 py-0.5 rounded-lg">{baseUrl}</code>
         <CopyTextButton text={baseUrl} />
         {servedEntries.map((e) => (
@@ -139,6 +149,40 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
 
       {showGuide && (
         <div className="px-4 pb-3 border-t border-border/20 pt-2.5 space-y-2.5">
+          {isEdgemarcFtp && primaryEdge && (
+            <div className="rounded-lg surface overflow-hidden max-w-xl">
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/20 bg-muted/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-warning" />
+                <span className="text-xs font-semibold text-foreground">EdgeMarc / Ribbon VOS</span>
+                <Badge variant="secondary" className="text-2xs py-0 px-1.5">FTP passive</Badge>
+              </div>
+              <div className="p-2.5 space-y-2">
+                <div className="bg-muted/10 rounded-lg border border-border/20 px-3 py-1.5">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-2xs font-semibold text-foreground">Admin</span>
+                    <ChevronRight className="h-2.5 w-2.5 text-muted-foreground/60" />
+                    <span className="text-2xs font-semibold text-primary">Upgrade Firmware</span>
+                  </div>
+                  <ConfigRow label="Upgrade method" value="FTP" />
+                  <ConfigRow label="Server address" value={hostPort.split(":")[0] ?? hostPort} mono copy />
+                  <ConfigRow label="FTP port" value={port} mono copy />
+                  <ConfigRow label="Username" value="anonymous" mono copy />
+                  <ConfigRow label="Password" value="(leave blank)" />
+                  <ConfigRow
+                    label="Filename / path"
+                    value={primaryEdge.storage_path ?? primaryEdge.filename}
+                    mono
+                    copy
+                  />
+                </div>
+                <p className="text-2xs text-muted-foreground/70 leading-relaxed">
+                  FTP root on this machine matches Ribbon’s <span className="font-medium text-foreground">pub/e_XXXX/</span> layout.
+                  Enable <span className="font-medium text-foreground">passive (PASV)</span> on the EdgeMarc if prompted.
+                  Default port is <span className="font-mono text-2xs">2121</span> (non-privileged); use port forwarding to 21 only if the device cannot use a custom port.
+                </p>
+              </div>
+            </div>
+          )}
           <div className={cn("grid gap-2.5", showPoly && showYealink ? "grid-cols-1 xl:grid-cols-2" : "grid-cols-1 max-w-xl")}>
             {showPoly && (
               <div className="rounded-lg surface overflow-hidden">
@@ -241,7 +285,9 @@ function DeviceSetupGuide({ baseUrl, remote, entryIds, catalog, cache, onStop }:
           <div className="flex items-center gap-2 px-1">
             <Globe className="h-3 w-3 text-muted-foreground/60 shrink-0" />
             <p className="text-2xs text-muted-foreground/60">
-              Phones must reach <code className="font-mono">{baseUrl}</code> on the same network. Firewall: allow TCP port {port}.
+              {isEdgemarcFtp
+                ? <>EdgeMarc must reach <code className="font-mono">{hostPort.split(":")[0]}</code> for FTP (control + passive data). Firewall: allow TCP {port} and the passive data port range from PASV.</>
+                : <>Phones must reach <code className="font-mono">{baseUrl}</code> on the same network. Firewall: allow TCP port {port}.</>}
             </p>
           </div>
         </div>
@@ -272,6 +318,12 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
 }) {
   const [selectedId, setSelectedId] = useState(group.entries[0]!.id);
 
+  useEffect(() => {
+    setSelectedId((cur) =>
+      group.entries.some((e) => e.id === cur) ? cur : group.entries[0]!.id,
+    );
+  }, [group.entries]);
+
   const entry = group.entries.find((e) => e.id === selectedId) ?? group.entries[0]!;
   const dl = downloads.get(entry.id);
   const isCached = isRemote ? remotePaths.has(entry.id) : cache.has(entry.id);
@@ -294,11 +346,14 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
       <div className="px-4 py-3 flex items-center gap-4">
         {/* Identity */}
         <div className="flex items-center gap-2.5 w-56 shrink-0 min-w-0">
-          <div className={cn("w-2 h-2 rounded-full shrink-0", group.vendor === "yealink" ? "bg-success" : "bg-primary")} />
+          <div className={cn(
+            "w-2 h-2 rounded-full shrink-0",
+            group.vendor === "yealink" ? "bg-success" : group.vendor === "edgemarc" ? "bg-warning" : "bg-primary",
+          )} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-medium text-foreground whitespace-nowrap">
-                {group.vendor === "yealink" ? "Yealink" : "Poly"} {group.series}
+                {group.vendor === "yealink" ? "Yealink" : group.vendor === "edgemarc" ? "EdgeMarc" : "Poly"} {group.series}
               </span>
               {readyCount > 0 && (
                 <Badge variant="secondary" className="text-2xs text-success py-0 px-1 gap-0.5 shrink-0">
@@ -322,22 +377,20 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
             const eCached = cachedForGroup(e.id);
             const eDl = downloads.get(e.id);
             const eReady = eCached || eDl?.status === "done";
+            const tip = e.notes
+              ? `${e.notes} (${formatBytes(e.size_bytes)})`
+              : `v${e.version}`;
             return (
-              <TooltipWrapper
-                key={e.id}
-                title={e.notes || `v${e.version}`}
-                description={e.notes ? `${formatBytes(e.size_bytes)}` : undefined}
-                side="right"
-              >
-                <SelectItem value={e.id}>
-                  <span className="flex items-center gap-2 w-full">
-                    {eReady && <Check className="h-3 w-3 text-success shrink-0" />}
-                    <span className="font-mono tabular-nums">v{e.version}</span>
-                    {i === 0 && <span className="text-2xs text-success font-medium">latest</span>}
-                    <span className="text-2xs text-muted-foreground ml-auto tabular-nums">{e.size_bytes > 0 ? formatBytes(e.size_bytes) : ""}</span>
+              <SelectItem key={e.id} value={e.id} title={tip} textValue={`v${e.version}`}>
+                <span className="flex items-center gap-2 w-full">
+                  {eReady && <Check className="h-3 w-3 text-success shrink-0" />}
+                  <span className="font-mono tabular-nums">v{e.version}</span>
+                  {i === 0 && <span className="text-2xs text-success font-medium">latest</span>}
+                  <span className="text-2xs text-muted-foreground ml-auto tabular-nums">
+                    {e.size_bytes > 0 ? formatBytes(e.size_bytes) : ""}
                   </span>
-                </SelectItem>
-              </TooltipWrapper>
+                </span>
+              </SelectItem>
             );
           })}
         />
@@ -384,7 +437,12 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
               <Badge variant="secondary" className="text-2xs text-success py-0 px-1.5 gap-0.5">
                 <Check className="h-2.5 w-2.5" />Cached
               </Badge>
-              <Button size="sm" variant="positive" className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]" onClick={() => onServe(entry)}>
+              <Button
+                size="sm"
+                variant="positive"
+                className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]"
+                onClick={() => onServe(entry)}
+              >
                 <Play className="h-3 w-3" />Serve
               </Button>
               {!isRemote && (
@@ -405,12 +463,22 @@ function SeriesRow({ group, downloads, cache, remotePaths, isRemote, onDownload,
               <TooltipWrapper title={dl?.error ?? "Download failed"}>
                 <Badge variant="secondary" className="text-2xs text-destructive py-0 px-1.5 cursor-help">Error</Badge>
               </TooltipWrapper>
-              <Button size="sm" variant="neutral" className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]" onClick={() => onDownload(entry)}>
+              <Button
+                size="sm"
+                variant="neutral"
+                className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]"
+                onClick={() => onDownload(entry)}
+              >
                 <Download className="h-3 w-3" />Retry
               </Button>
             </>
           ) : (
-            <Button size="sm" variant="neutral" className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]" onClick={() => onDownload(entry)}>
+            <Button
+              size="sm"
+              variant="neutral"
+              className="h-7 text-2xs px-2.5 gap-1 active:scale-[0.97]"
+              onClick={() => onDownload(entry)}
+            >
               <Download className="h-3 w-3" />Download
             </Button>
           )}
@@ -434,9 +502,10 @@ export function FirmwareCatalogView() {
   const store = useFirmwareCatalogStore();
   const {
     catalog, cache, downloads, serve, remotePaths, updateChecks,
-    checkingUpdates, filter, loaded, cacheDir, loadCatalog, setFilter,
+    checkingUpdates, filter, loaded, cacheDir, edgemarcPrefs, loadCatalog, setFilter,
     setCacheDir, checkForUpdates, downloadFirmware, downloadFirmwareRemote,
     serveFirmware, serveFirmwareRemote, stopServing, clearCache,
+    refreshEdgemarcCloudCatalog,
   } = store;
 
   const resolvedContext = useExecutionContextStore((s) => s.resolvedContext);
@@ -448,21 +517,28 @@ export function FirmwareCatalogView() {
 
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [productFamily, setProductFamily] = useState<"phones" | "edgemarc">("phones");
   const [vendor, setVendor] = useState<"all" | "yealink" | "poly">("all");
+  const [cloudCatalogBusy, setCloudCatalogBusy] = useState(false);
 
   useEffect(() => { if (!loaded) loadCatalog(); }, [loaded, loadCatalog]);
   useEffect(() => {
-    if (loaded && !updateChecks && !checkingUpdates) checkForUpdates();
-  }, [loaded, updateChecks, checkingUpdates, checkForUpdates]);
+    if (loaded && productFamily === "phones" && !updateChecks && !checkingUpdates) checkForUpdates();
+  }, [loaded, productFamily, updateChecks, checkingUpdates, checkForUpdates]);
 
   const filtered = useMemo(() => catalog.filter((e) => {
-    if (vendor !== "all" && e.vendor !== vendor) return false;
+    if (productFamily === "phones") {
+      if (e.vendor === "edgemarc") return false;
+      if (vendor !== "all" && e.vendor !== vendor) return false;
+    } else if (e.vendor !== "edgemarc") {
+      return false;
+    }
     if (filter.search) {
       const s = filter.search.toLowerCase();
       if (!`${e.models} ${e.series} ${e.version} ${e.notes}`.toLowerCase().includes(s)) return false;
     }
     return true;
-  }), [catalog, vendor, filter.search]);
+  }), [catalog, productFamily, vendor, filter.search]);
 
   const groups = useMemo((): SeriesGroup[] => {
     const m: Record<string, FirmwareEntry[]> = {};
@@ -491,7 +567,8 @@ export function FirmwareCatalogView() {
   }, [isRemote, agentId, sendCommand, waitForCommand, serveFirmware, serveFirmwareRemote]);
 
   const doDelete = useCallback((e: FirmwareEntry) => {
-    setDeleteTarget({ id: e.id, label: `${e.vendor === "yealink" ? "Yealink" : "Poly"} ${e.series} v${e.version}` });
+    const brand = e.vendor === "yealink" ? "Yealink" : e.vendor === "edgemarc" ? "EdgeMarc" : "Poly";
+    setDeleteTarget({ id: e.id, label: `${brand} ${e.series} v${e.version}` });
   }, []);
 
   const pickCacheDir = useCallback(async () => {
@@ -556,6 +633,7 @@ export function FirmwareCatalogView() {
           catalog={catalog}
           cache={cache}
           onStop={() => stopServing(agentId, sendCommand)}
+          serveKind={serve.serveKind ?? "phone-http"}
         />
       )}
 
@@ -567,19 +645,38 @@ export function FirmwareCatalogView() {
           <span className="section-title">Firmware Catalog</span>
 
           <div className="flex items-center bg-muted/20 rounded-lg p-0.5 shrink-0">
-            {(["all", "yealink", "poly"] as const).map((v) => (
+            {(["phones", "edgemarc"] as const).map((p) => (
               <button
-                key={v}
-                onClick={() => setVendor(v)}
+                key={p}
+                type="button"
+                onClick={() => setProductFamily(p)}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth active:scale-[0.97]",
-                  vendor === v ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                  productFamily === p ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {v === "all" ? "All" : v === "yealink" ? "Yealink" : "Poly"}
+                {p === "phones" ? "Phones" : "EdgeMarc"}
               </button>
             ))}
           </div>
+
+          {productFamily === "phones" && (
+            <div className="flex items-center bg-muted/20 rounded-lg p-0.5 shrink-0">
+              {(["all", "yealink", "poly"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVendor(v)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth active:scale-[0.97]",
+                    vendor === v ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {v === "all" ? "All" : v === "yealink" ? "Yealink" : "Poly"}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex-1" />
 
@@ -625,14 +722,48 @@ export function FirmwareCatalogView() {
           <AppDivider orientation="vertical" size="md" className="mx-0" />
 
           <TooltipWrapper title="Check mirrors for new firmware versions">
-            <Button size="sm" variant="neutral" className="h-8 text-xs px-3 gap-1.5 active:scale-[0.97]" disabled={checkingUpdates} onClick={checkForUpdates}>
+            <Button size="sm" variant="neutral" className="h-8 text-xs px-3 gap-1.5 active:scale-[0.97]" disabled={checkingUpdates || productFamily !== "phones"} onClick={checkForUpdates}>
               <RefreshCw className={cn("h-3.5 w-3.5", checkingUpdates && "animate-spin")} />
               Sync
             </Button>
           </TooltipWrapper>
         </div>
 
-        {/* Row 2: Search + download location */}
+        {/* Row 2: EdgeMarc source (CloudCo FTP vs local bundle) */}
+        {productFamily === "edgemarc" && edgemarcPrefs && (
+          <div className="px-4 pb-2 flex flex-wrap items-center gap-2 border-b border-border/10">
+            <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-2xs text-muted-foreground shrink-0">EdgeMarc images are listed from CloudCo public FTP.</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="neutral"
+              className="h-7 text-2xs px-2 gap-1 shrink-0 active:scale-[0.97]"
+              disabled={cloudCatalogBusy}
+              onClick={async () => {
+                setCloudCatalogBusy(true);
+                try {
+                  await refreshEdgemarcCloudCatalog();
+                } finally {
+                  setCloudCatalogBusy(false);
+                }
+              }}
+            >
+              <RefreshCw className={cn("h-3 w-3", cloudCatalogBusy && "animate-spin")} />
+              Refresh FTP list
+            </Button>
+            <a
+              href={edgemarcPrefs.support_article_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-2xs text-primary hover:underline ml-1"
+            >
+              CloudCo article (credentials)
+            </a>
+          </div>
+        )}
+
+        {/* Row 3: Search + download location */}
         <div className="px-4 pb-4 flex items-center gap-4">
           <div className="flex-1 relative max-w-sm">
             <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
@@ -675,7 +806,13 @@ export function FirmwareCatalogView() {
               compact
               icon={<HardDrive className="h-5 w-5" />}
               title="No firmware found"
-              description={filter.search || vendor !== "all" ? "Adjust your search or filter" : "Catalog is empty"}
+              description={
+                filter.search || (productFamily === "phones" && vendor !== "all")
+                  ? "Adjust your search or filter"
+                  : productFamily === "edgemarc"
+                    ? "No EdgeMarc images from CloudCo yet. Check your network, confirm credentials in the CloudCo article, then click Refresh FTP list."
+                    : "Catalog is empty"
+              }
             />
           </div>
         ) : (

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, MapPin } from "@/lib/icons";
 import { CoordinateValue } from "./CoordinateValue";
+import { GeoIpLocationMap } from "./GeoIpLocationMap";
+import { GeoIpIntelDetails } from "./GeoIpIntelDetails";
 
 export default function GeoIpPanel() {
   const { geoip, geoipIp, setGeoipIp, runGeoip } = useDnsTestStore();
@@ -22,7 +24,7 @@ export default function GeoIpPanel() {
         <MapPin className="h-4 w-4 text-destructive" />
         <div>
           <h3 className="text-sm font-medium">GeoIP Lookup</h3>
-          <p className="text-2xs text-muted-foreground">Geolocation, ISP, ASN, and organization for an IP address</p>
+          <p className="text-2xs text-muted-foreground">Geolocation, ISP, ASN, registry (RDAP), and hosting hints</p>
         </div>
       </div>
 
@@ -45,8 +47,14 @@ export default function GeoIpPanel() {
       )}
 
       {result && (
-        <div className="ui-hero-surface p-3 space-y-1.5">
-          <div className="flex items-center gap-2 mb-2">
+        <div
+          className={
+            result.lat != null && result.lon != null
+              ? "ui-hero-surface flex max-h-[min(88dvh,720px)] flex-col gap-0 overflow-hidden p-2 sm:p-3"
+              : "ui-hero-surface space-y-1.5 p-2 sm:p-3"
+          }
+        >
+          <div className="mb-1.5 flex shrink-0 items-center gap-2">
             {result.success ? (
               <Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4 bg-success/10 text-success">
                 {result.source}
@@ -58,19 +66,44 @@ export default function GeoIpPanel() {
             )}
           </div>
 
-          <GeoRow label="IP" value={result.ip} />
-          {result.country && (
-            <GeoRow label="Country" value={`${result.country_code ? countryFlag(result.country_code) + " " : ""}${result.country}${result.country_code ? ` (${result.country_code})` : ""}`} />
+          <div
+            className={
+              result.lat != null && result.lon != null
+                ? "max-h-[min(40dvh,300px)] min-h-0 shrink-0 space-y-1.5 overflow-y-auto overscroll-contain border-b border-border/25 pb-2 pr-0.5"
+                : "space-y-1.5"
+            }
+          >
+            <GeoRow label="IP" value={result.ip} />
+            {result.country && (
+              <GeoRow
+                label="Country"
+                value={`${result.country_code ? countryFlag(result.country_code) + " " : ""}${result.country}${result.country_code ? ` (${result.country_code})` : ""}`}
+              />
+            )}
+            {result.region && <GeoRow label="Region" value={result.region} />}
+            {result.city && <GeoRow label="City" value={result.city} />}
+            {(result.lat != null && result.lon != null) && (
+              <GeoRow label="Coords" value={<CoordinateValue lat={result.lat} lon={result.lon} />} />
+            )}
+            {result.isp && <GeoRow label="ISP" value={result.isp} />}
+            {result.org && <GeoRow label="Org" value={result.org} />}
+            {result.asn && <GeoRow label="ASN" value={result.asn} />}
+            {result.timezone && <GeoRow label="TZ" value={result.timezone} />}
+            <div className="pt-0.5">
+              <GeoIpIntelDetails result={result} />
+            </div>
+          </div>
+          {result.lat != null && result.lon != null && (
+            <div className="flex min-h-0 flex-1 flex-col pt-2">
+              <GeoIpLocationMap
+                fillHeight
+                className="min-h-0 flex-1"
+                lat={result.lat}
+                lon={result.lon}
+                label="Approximate location"
+              />
+            </div>
           )}
-          {result.region && <GeoRow label="Region" value={result.region} />}
-          {result.city && <GeoRow label="City" value={result.city} />}
-          {(result.lat != null && result.lon != null) && (
-            <GeoRow label="Coords" value={<CoordinateValue lat={result.lat} lon={result.lon} />} />
-          )}
-          {result.isp && <GeoRow label="ISP" value={result.isp} />}
-          {result.org && <GeoRow label="Org" value={result.org} />}
-          {result.asn && <GeoRow label="ASN" value={result.asn} />}
-          {result.timezone && <GeoRow label="TZ" value={result.timezone} />}
         </div>
       )}
     </div>
@@ -79,9 +112,9 @@ export default function GeoIpPanel() {
 
 function GeoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-muted-foreground w-16 shrink-0 text-right">{label}</span>
-      <span className="font-mono text-foreground">{value}</span>
+    <div className="grid grid-cols-[4.25rem_1fr] items-baseline gap-x-2 text-2xs leading-snug sm:grid-cols-[5rem_1fr] sm:text-xs">
+      <span className="text-right text-muted-foreground">{label}</span>
+      <span className="min-w-0 font-mono text-foreground/95">{value}</span>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Network, Globe, Loader2, Play } from "@/lib/icons";
+import { Network, Globe, Loader2, Play, Square } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { tooltips } from "@/lib/tooltips";
 import * as api from "@/api/networkTest";
@@ -205,14 +205,22 @@ export function MtrView() {
             disabled={running}
             title="Rounds"
           />
+          {running && (
+            <TooltipWrapper title="Stop MTR" description="Cancel the current MTR session and stop backend probes." side="bottom">
+              <Button type="button" variant="destructive" className="h-10 gap-2 px-4" onClick={handleStop}>
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper
             title="Run MTR"
             description="Perform repeated traceroute rounds and compute per-hop loss, latency, and jitter statistics."
             side="bottom"
           >
-            <Button className="h-10 gap-2 px-5" onClick={running ? handleStop : handleRun} disabled={!running && !target.trim()}>
+            <Button className="h-10 gap-2 px-5" onClick={handleRun} disabled={running || !target.trim()}>
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {running ? "Stop" : "Run"}
+              Run
             </Button>
           </TooltipWrapper>
           <Button

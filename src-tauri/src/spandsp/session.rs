@@ -1099,10 +1099,7 @@ impl Drop for FaxSession {
 /// MUST return 0 to tell SpanDSP to proceed. Non-zero = abort session.
 /// Safety: user_data points to a Pin<Box<PhaseEState>> owned by FaxSession.
 #[cfg(feature = "spandsp-native")]
-unsafe extern "C" fn phase_b_callback(
-    user_data: *mut c_void,
-    result: c_int,
-) -> c_int {
+unsafe extern "C" fn phase_b_callback(user_data: *mut c_void, result: c_int) -> c_int {
     if user_data.is_null() {
         return 0;
     }
@@ -1121,10 +1118,7 @@ unsafe extern "C" fn phase_b_callback(
 /// MUST return 0 to tell SpanDSP to continue. Non-zero = abort session.
 /// Safety: user_data points to a Pin<Box<PhaseEState>> owned by FaxSession.
 #[cfg(feature = "spandsp-native")]
-unsafe extern "C" fn phase_d_callback(
-    user_data: *mut c_void,
-    result: c_int,
-) -> c_int {
+unsafe extern "C" fn phase_d_callback(user_data: *mut c_void, result: c_int) -> c_int {
     if user_data.is_null() {
         return 0;
     }
@@ -1144,10 +1138,7 @@ unsafe extern "C" fn phase_d_callback(
 /// Phase E callback - called when T.30 session completes.
 /// Safety: user_data points to a Pin<Box<PhaseEState>> owned by FaxSession.
 #[cfg(feature = "spandsp-native")]
-unsafe extern "C" fn phase_e_callback(
-    user_data: *mut c_void,
-    completion_code: c_int,
-) {
+unsafe extern "C" fn phase_e_callback(user_data: *mut c_void, completion_code: c_int) {
     if user_data.is_null() {
         return;
     }

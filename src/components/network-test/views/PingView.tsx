@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Activity, Globe, Loader2, Play, Zap } from "@/lib/icons";
+import { Activity, Globe, Loader2, Play, Square, Zap } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { AppDivider } from "@/components/ui/panel-chrome";
 import { tooltips } from "@/lib/tooltips";
@@ -28,6 +28,8 @@ export function PingView() {
   const mtu = useNetworkTestStore((s) => s.mtu);
   const runPing = useNetworkTestStore((s) => s.runPing);
   const runMtu = useNetworkTestStore((s) => s.runMtu);
+  const requestStopPing = useNetworkTestStore((s) => s.requestStopPing);
+  const dismissMtu = useNetworkTestStore((s) => s.dismissMtu);
   const lastSource = useNetworkTestStore((s) => s.lastSource);
 
   const resolvedContext = useExecutionContextStore((s) => s.resolvedContext);
@@ -48,6 +50,11 @@ export function PingView() {
     runPing(target.trim(), count, ctx);
     if (showMtu) runMtu(target.trim());
   }, [target, count, showMtu, ctx, runPing, runMtu]);
+
+  const handleStop = useCallback(() => {
+    if (pingRunning) void requestStopPing();
+    if (mtuRunning) dismissMtu();
+  }, [pingRunning, mtuRunning, requestStopPing, dismissMtu]);
 
   return (
     <ToolViewShell
@@ -96,6 +103,14 @@ export function PingView() {
               <span className="text-2xs text-muted-foreground/60 font-medium cursor-help">MTU</span>
             </TooltipWrapper>
           </div>
+          {anyRunning && (
+            <TooltipWrapper entry={tooltips.netStopTest}>
+              <Button type="button" variant="destructive" className="h-10 gap-2 px-4" onClick={handleStop}>
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper entry={tooltips.netRunTest}>
             <Button
               className="h-10 gap-2 px-5"

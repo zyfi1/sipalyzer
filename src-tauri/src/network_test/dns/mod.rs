@@ -1,6 +1,7 @@
 pub mod diagnostics;
 pub mod geoip;
 pub mod pcap_correlation;
+pub mod rdap;
 pub mod records;
 pub mod resolver;
 pub mod reverse;

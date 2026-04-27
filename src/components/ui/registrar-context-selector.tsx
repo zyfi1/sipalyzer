@@ -62,16 +62,15 @@ export function RegistrarContextSelector({
     : (registrarsForUseCase.length ? noSelectionLabel : noRegistrarLabel);
 
   return (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex min-w-0 w-full max-w-[19rem] items-center gap-2">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
-              "inline-flex max-w-[320px] items-center gap-1.5 rounded-md border text-xs font-medium",
+              "inline-flex min-w-0 w-full max-w-full items-center gap-1.5 rounded-md border text-xs font-medium",
               "transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)]",
               "ui-header-picker h-7 truncate",
-              "w-[min(320px,30vw)]",
               open && "is-open",
               selectedRegistrar ? "text-foreground/80" : "is-muted",
             )}
@@ -92,9 +91,11 @@ export function RegistrarContextSelector({
         </PopoverTrigger>
 
         <PopoverContent
-          align="start"
+          align="end"
+          side="bottom"
           sideOffset={6}
-          className="ui-floating-surface w-[392px] overflow-hidden p-0"
+          collisionPadding={{ top: 4, right: 12, bottom: 8, left: 8 }}
+          className="ui-floating-surface w-[min(24.5rem,calc(100vw-1.25rem))] max-w-[calc(100vw-1.25rem)] overflow-hidden p-0"
         >
           <div className="ui-section-header-sm">
             <p className="section-label-sm">{title}</p>

@@ -220,7 +220,11 @@ export function IpBadge() {
   const geoLocation = [geoResult?.city, geoResult?.region, geoResult?.country]
     .filter((value): value is string => Boolean(value && value.trim()))
     .join(", ");
-  const geoMeta = [geoResult?.asn, geoResult?.isp || geoResult?.org]
+  const geoMeta = [
+    geoResult?.asn,
+    geoResult?.isp || geoResult?.org,
+    geoResult?.rdap?.registry ? `RDAP: ${geoResult.rdap.registry}` : null,
+  ]
     .filter((value): value is string => Boolean(value && value.trim()))
     .join(" · ");
 

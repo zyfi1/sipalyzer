@@ -84,6 +84,8 @@ export function NetworkSuiteView() {
   const bulkProgress = useNetworkTestStore((s) => s.bulkProgress);
   const runAllTests = useNetworkTestStore((s) => s.runAllTests);
   const runGroup = useNetworkTestStore((s) => s.runGroup);
+  const abortBulkTestSuite = useNetworkTestStore((s) => s.abortBulkTestSuite);
+  const stopDiagnosticGroup = useNetworkTestStore((s) => s.stopDiagnosticGroup);
 
   // Status selectors for group running indicators
   const ping = useNetworkTestStore((s) => s.ping);
@@ -129,6 +131,7 @@ export function NetworkSuiteView() {
           target={target}
           onTargetChange={setTarget}
           onRunAll={() => runAllTests(target)}
+          onStopBulk={abortBulkTestSuite}
           bulkRunning={bulkRunning}
           bulkProgress={bulkProgress}
           categories={categories}
@@ -142,6 +145,7 @@ export function NetworkSuiteView() {
           title="Performance"
           icon={Zap}
           onRunAll={() => runGroup("performance", target)}
+          onStopAll={() => stopDiagnosticGroup("performance")}
           running={perfRunning}
         >
           <SpeedThroughputTile target={target} expanded={isExpanded("speed")} onToggle={() => toggle("speed")} />
@@ -153,6 +157,7 @@ export function NetworkSuiteView() {
             title="Latency & Quality"
             icon={Activity}
             onRunAll={() => runGroup("latency", target)}
+            onStopAll={() => stopDiagnosticGroup("latency")}
             running={latencyRunning}
             gridCols="2"
           >
@@ -167,6 +172,7 @@ export function NetworkSuiteView() {
               title="Routing & DNS"
               icon={Network}
               onRunAll={() => runGroup("routing", target)}
+              onStopAll={() => stopDiagnosticGroup("routing")}
               running={routingRunning}
               gridCols="2"
             >
@@ -366,6 +372,7 @@ function EnvironmentStrip() {
 function PingTile({ target, expanded, onToggle }: { target: string; expanded: boolean; onToggle: () => void }) {
   const ping = useNetworkTestStore((s) => s.ping);
   const runPing = useNetworkTestStore((s) => s.runPing);
+  const requestStopPing = useNetworkTestStore((s) => s.requestStopPing);
   const [count, setCount] = useState("10");
   const r = ping.result;
 
@@ -374,6 +381,7 @@ function PingTile({ target, expanded, onToggle }: { target: string; expanded: bo
       icon={Activity} tint="text-success" title="Ping"
       subtitle="ICMP latency & loss"
       status={ping.status} onRun={() => runPing(target, parseInt(count) || 10)}
+      onStop={() => void requestStopPing()}
       summary={r ? `${r.avg_ms.toFixed(1)} ms` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -418,6 +426,7 @@ function PingTile({ target, expanded, onToggle }: { target: string; expanded: bo
 function JitterTile({ target, expanded, onToggle }: { target: string; expanded: boolean; onToggle: () => void }) {
   const jitterTest = useNetworkTestStore((s) => s.jitterTest);
   const runJitterTest = useNetworkTestStore((s) => s.runJitterTest);
+  const dismissJitterTest = useNetworkTestStore((s) => s.dismissJitterTest);
   const [port, setPort] = useState("");
   const [count, setCount] = useState("50");
   const [interval, setInterval_] = useState("20");
@@ -428,6 +437,7 @@ function JitterTile({ target, expanded, onToggle }: { target: string; expanded: 
       icon={Activity} tint="text-primary" title="Jitter"
       subtitle="UDP jitter measurement"
       status={jitterTest.status} onRun={() => runJitterTest(target, port ? parseInt(port) : undefined, parseInt(count) || 50, parseInt(interval) || 20)}
+      onStop={dismissJitterTest}
       summary={r ? `${r.avg_jitter_ms.toFixed(1)} ms` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -456,6 +466,7 @@ function JitterTile({ target, expanded, onToggle }: { target: string; expanded: 
 function PacketLossTile({ target, expanded, onToggle }: { target: string; expanded: boolean; onToggle: () => void }) {
   const packetLossTest = useNetworkTestStore((s) => s.packetLossTest);
   const runPacketLossTest = useNetworkTestStore((s) => s.runPacketLossTest);
+  const dismissPacketLossTest = useNetworkTestStore((s) => s.dismissPacketLossTest);
   const [port, setPort] = useState("");
   const [burst, setBurst] = useState("100");
   const r = packetLossTest.result;
@@ -465,6 +476,7 @@ function PacketLossTile({ target, expanded, onToggle }: { target: string; expand
       icon={Activity} tint="text-warning" title="Packet Loss"
       subtitle="UDP burst loss measurement"
       status={packetLossTest.status} onRun={() => runPacketLossTest(target, port ? parseInt(port) : undefined, parseInt(burst) || 100)}
+      onStop={dismissPacketLossTest}
       summary={r ? `${r.loss_pct.toFixed(1)}%` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -489,6 +501,7 @@ function PacketLossTile({ target, expanded, onToggle }: { target: string; expand
 function MtuTile({ target, expanded, onToggle }: { target: string; expanded: boolean; onToggle: () => void }) {
   const mtu = useNetworkTestStore((s) => s.mtu);
   const runMtu = useNetworkTestStore((s) => s.runMtu);
+  const dismissMtu = useNetworkTestStore((s) => s.dismissMtu);
   const r = mtu.result;
 
   return (
@@ -496,6 +509,7 @@ function MtuTile({ target, expanded, onToggle }: { target: string; expanded: boo
       icon={Zap} tint="text-warning" title="MTU Discovery"
       subtitle="Path maximum transmission unit"
       status={mtu.status} onRun={() => runMtu(target)}
+      onStop={dismissMtu}
       summary={r ? `${r.path_mtu} bytes` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -532,6 +546,7 @@ function MtuTile({ target, expanded, onToggle }: { target: string; expanded: boo
 function TracerouteTile({ target, expanded, onToggle }: { target: string; expanded: boolean; onToggle: () => void }) {
   const traceroute = useNetworkTestStore((s) => s.traceroute);
   const runTraceroute = useNetworkTestStore((s) => s.runTraceroute);
+  const requestStopTraceroute = useNetworkTestStore((s) => s.requestStopTraceroute);
   const r = traceroute.result;
 
   return (
@@ -539,6 +554,7 @@ function TracerouteTile({ target, expanded, onToggle }: { target: string; expand
       icon={Network} tint="text-primary" title="Traceroute"
       subtitle="Network path hop-by-hop"
       status={traceroute.status} onRun={() => runTraceroute(target)}
+      onStop={() => void requestStopTraceroute()}
       summary={r ? `${r.hops.length} hops` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -563,6 +579,7 @@ function TracerouteTile({ target, expanded, onToggle }: { target: string; expand
 function DnsTile({ target, expanded, onToggle }: { target: string; expanded: boolean; onToggle: () => void }) {
   const dns = useNetworkTestStore((s) => s.dns);
   const runDns = useNetworkTestStore((s) => s.runDns);
+  const dismissNetworkDns = useNetworkTestStore((s) => s.dismissNetworkDns);
   const r = dns.result;
 
   return (
@@ -570,6 +587,7 @@ function DnsTile({ target, expanded, onToggle }: { target: string; expanded: boo
       icon={Search} tint="text-info" title="DNS Lookup"
       subtitle="A, AAAA, SRV & NAPTR records"
       status={dns.status} onRun={() => runDns(target)}
+      onStop={dismissNetworkDns}
       summary={r ? `${r.a_records.length + r.srv_records.length} records` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -628,6 +646,7 @@ function RouteComparisonTile({ expanded, onToggle, fullWidth }: { expanded: bool
   const routeResultB = useNetworkTestStore((s) => s.routeResultB);
   const routeComparing = useNetworkTestStore((s) => s.routeComparing);
   const runRouteComparison = useNetworkTestStore((s) => s.runRouteComparison);
+  const stopRouteComparison = useNetworkTestStore((s) => s.stopRouteComparison);
 
   const [targetA, setA] = useState(routeTargetA || "8.8.8.8");
   const [targetB, setB] = useState(routeTargetB || "1.1.1.1");
@@ -666,6 +685,7 @@ function RouteComparisonTile({ expanded, onToggle, fullWidth }: { expanded: bool
       icon={GitCompareArrows} tint="text-primary" title="Route Comparison"
       subtitle="Compare paths to two targets"
       status={status} onRun={handleRun}
+      onStop={routeComparing ? stopRouteComparison : undefined}
       summary={rA && rB && analysis?.divergenceHop ? `diverge hop ${analysis.divergenceHop}` : undefined}
       expanded={expanded} onToggle={onToggle} fullWidth={fullWidth}
     >
@@ -750,9 +770,11 @@ function SpeedThroughputTile({ target, expanded, onToggle }: { target: string; e
   const progress = useNetworkTestStore((s) => s.speedTestProgress);
   const setProgress = useNetworkTestStore((s) => s.setSpeedTestProgress);
   const runSpeedTest = useNetworkTestStore((s) => s.runSpeedTest);
+  const dismissSpeedTest = useNetworkTestStore((s) => s.dismissSpeedTest);
   // Host throughput (UDP)
   const bandwidthTest = useNetworkTestStore((s) => s.bandwidthTest);
   const runBandwidthTest = useNetworkTestStore((s) => s.runBandwidthTest);
+  const dismissBandwidthTest = useNetworkTestStore((s) => s.dismissBandwidthTest);
   const [bwPort, setBwPort] = useState("");
   const [bwDuration, setBwDuration] = useState("5");
 
@@ -784,11 +806,17 @@ function SpeedThroughputTile({ target, expanded, onToggle }: { target: string; e
     runBandwidthTest(target, bwPort ? parseInt(bwPort) : undefined, parseInt(bwDuration) || 5);
   };
 
+  const handleStopBoth = () => {
+    if (speedRunning) dismissSpeedTest();
+    if (bwRunning) dismissBandwidthTest();
+  };
+
   return (
     <TestTile
       icon={Zap} tint="text-warning" title="Speed & Throughput"
       subtitle="Internet speed + host UDP throughput"
       status={status} onRun={handleRunBoth}
+      onStop={anyRunning ? handleStopBoth : undefined}
       summary={summary}
       expanded={expanded} onToggle={onToggle} fullWidth
     >
@@ -930,6 +958,7 @@ function SpeedThroughputTile({ target, expanded, onToggle }: { target: string; e
 export function RtpSimTile({ target, expanded, onToggle, fullWidth }: { target: string; expanded: boolean; onToggle: () => void; fullWidth?: boolean }) {
   const rtpSim = useNetworkTestStore((s) => s.rtpSim);
   const runRtpSim = useNetworkTestStore((s) => s.runRtpSim);
+  const dismissRtpSim = useNetworkTestStore((s) => s.dismissRtpSim);
   const [port, setPort] = useState("");
   const [codec, setCodec] = useState("g711");
   const [ptime, setPtime] = useState("20");
@@ -941,6 +970,7 @@ export function RtpSimTile({ target, expanded, onToggle, fullWidth }: { target: 
       icon={PhoneCall} tint="text-info" title="RTP Simulation"
       subtitle="Simulated voice stream test"
       status={rtpSim.status} onRun={() => runRtpSim(target, port ? parseInt(port) : undefined, parseInt(ptime) || 20, parseInt(duration) || 10, codec)}
+      onStop={dismissRtpSim}
       summary={r ? `MOS ${r.mos_estimate.toFixed(2)}` : undefined}
       expanded={expanded} onToggle={onToggle} fullWidth={fullWidth}
     >

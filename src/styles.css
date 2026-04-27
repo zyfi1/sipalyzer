@@ -1363,7 +1363,7 @@ input[type="checkbox"].sr-only {
     animation: fade-in var(--motion-duration-navigation) var(--motion-ease-navigation) both;
   }
 
-  /* Do not set display:flex here — Header uses CSS-module grid (`.headerRoot`) for layout. */
+  /* Do not set display:flex here — `.headerRoot` (CSS module) sets layout (flex + centered omni). */
   .app-header {
     @apply flex-shrink-0 h-9 pl-0 pr-0;
   }

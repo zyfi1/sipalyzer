@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import {
-  Activity, Globe, PhoneCall, Loader2, Play, Shield,
+  Activity, Globe, PhoneCall, Loader2, Play, Square, Shield,
   Wifi, Zap, Search, BarChart3, Award, Timer, Info,
 } from "@/lib/icons";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -88,6 +88,7 @@ export function VoipView() {
   const setVoipTarget = useNetworkTestStore((s) => s.setVoipTarget);
   const voipRunning = useNetworkTestStore((s) => s.voipRunning);
   const runVoipAssessment = useNetworkTestStore((s) => s.runVoipAssessment);
+  const abortVoipAssessment = useNetworkTestStore((s) => s.abortVoipAssessment);
   const hasTarget = voipTarget.trim().length > 0;
 
   void useExecutionContextStore((s) => s.resolvedContext);
@@ -112,6 +113,14 @@ export function VoipView() {
             disabled={voipRunning}
             onKeyDown={(e) => e.key === "Enter" && hasTarget && !voipRunning && runVoipAssessment()}
           />
+          {voipRunning && (
+            <TooltipWrapper title="Stop assessment" description="Stop ICMP ping and abandon remaining VoIP checks in the UI." side="bottom">
+              <Button type="button" variant="destructive" className="h-10 gap-2 px-4 text-sm shrink-0" onClick={() => void abortVoipAssessment()}>
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper title="Run Full Assessment" description="Runs all VoIP quality tests in parallel: ping, MOS calculation, SIP DNS, port scan, DSCP marking, STUN quality, and NAT detection." side="bottom">
             <Button className="h-10 gap-2 px-5 text-sm shrink-0" onClick={runVoipAssessment} disabled={voipRunning || !hasTarget}>
               {voipRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
@@ -308,6 +317,8 @@ function CallQuality() {
   const voipTarget = useNetworkTestStore((s) => s.voipTarget);
   const voipPing = useNetworkTestStore((s) => s.voipPing);
   const runVoipPing = useNetworkTestStore((s) => s.runVoipPing);
+  const requestStopPing = useNetworkTestStore((s) => s.requestStopPing);
+  const dismissVoipPing = useNetworkTestStore((s) => s.dismissVoipPing);
   const ping = voipPing.result;
   const running = voipPing.status === "running";
   const hasTarget = voipTarget.trim().length > 0;
@@ -316,11 +327,30 @@ function CallQuality() {
     <Card>
       <div className="flex items-center justify-between mb-3">
         <SectionHeader icon={Activity} color="text-success" title="Call Quality" />
-        <TooltipWrapper title="Run Ping Test" description="Send 50 ICMP echo requests to measure latency, jitter, and packet loss to your SIP server." side="bottom">
-          <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runVoipPing()} disabled={!hasTarget || running}>
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />} Run
-          </Button>
-        </TooltipWrapper>
+        <div className="flex items-center gap-1.5">
+          {running && (
+            <TooltipWrapper title="Stop ping" description="Cancel ICMP and clear the in-progress VoIP ping." side="bottom">
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                onClick={() => {
+                  void requestStopPing();
+                  dismissVoipPing();
+                }}
+              >
+                <Square className="h-3 w-3" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
+          <TooltipWrapper title="Run Ping Test" description="Send 50 ICMP echo requests to measure latency, jitter, and packet loss to your SIP server." side="bottom">
+            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runVoipPing()} disabled={!hasTarget || running}>
+              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />} Run
+            </Button>
+          </TooltipWrapper>
+        </div>
       </div>
       {ping && !running && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
@@ -379,6 +409,7 @@ function SipConnectivity() {
   const voipTarget = useNetworkTestStore((s) => s.voipTarget);
   const voipPortScan = useNetworkTestStore((s) => s.voipPortScan);
   const runVoipPortScan = useNetworkTestStore((s) => s.runVoipPortScan);
+  const dismissVoipPortScan = useNetworkTestStore((s) => s.dismissVoipPortScan);
   const portsInput = useNetworkTestStore((s) => s.voipCustomPorts);
   const setPortsInput = useNetworkTestStore((s) => s.setVoipCustomPorts);
   const protoMode = useNetworkTestStore((s) => s.voipProtoMode);
@@ -426,6 +457,14 @@ function SipConnectivity() {
             </TooltipWrapper>
           ))}
         </div>
+        {running && (
+          <TooltipWrapper title="Stop scan" description="Abandon the port scan in the UI; in-flight probes may still complete in the background." side="bottom">
+            <Button type="button" size="sm" variant="destructive" className="h-7 gap-1 px-2.5 text-xs shrink-0" onClick={dismissVoipPortScan}>
+              <Square className="h-2.5 w-2.5" />
+              Stop
+            </Button>
+          </TooltipWrapper>
+        )}
         <TooltipWrapper title="Run Port Scan" description={`Scan ${portCount} port${portCount !== 1 ? "s" : ""} on the target SIP server.`} side="bottom">
           <Button size="sm" className="h-7 gap-1 px-2.5 text-xs shrink-0" onClick={handleScan} disabled={!hasTarget || running || portCount === 0}>
             {running ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Search className="h-2.5 w-2.5" />} Scan
@@ -465,6 +504,7 @@ function SipDns() {
   const voipTarget = useNetworkTestStore((s) => s.voipTarget);
   const voipDns = useNetworkTestStore((s) => s.voipDns);
   const runVoipDns = useNetworkTestStore((s) => s.runVoipDns);
+  const dismissVoipDns = useNetworkTestStore((s) => s.dismissVoipDns);
   const result = voipDns.result;
   const running = voipDns.status === "running";
   const hasTarget = voipTarget.trim().length > 0;
@@ -476,11 +516,21 @@ function SipDns() {
           <SectionHeader icon={Globe} color="text-info" title="SIP DNS" />
           <TroubleshootLink articleId="dns-config-for-sip" compact />
         </div>
-        <TooltipWrapper title="Run DNS Lookup" description="Resolve SRV, NAPTR, and A records for SIP routing on the target domain." side="bottom">
-          <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runVoipDns()} disabled={!hasTarget || running}>
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />} Lookup
-          </Button>
-        </TooltipWrapper>
+        <div className="flex items-center gap-1.5">
+          {running && (
+            <TooltipWrapper title="Stop lookup" description="Cancel the in-progress DNS lookup." side="bottom">
+              <Button type="button" size="sm" variant="destructive" className="h-7 gap-1.5 px-2.5 text-xs" onClick={dismissVoipDns}>
+                <Square className="h-3 w-3" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
+          <TooltipWrapper title="Run DNS Lookup" description="Resolve SRV, NAPTR, and A records for SIP routing on the target domain." side="bottom">
+            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runVoipDns()} disabled={!hasTarget || running}>
+              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />} Lookup
+            </Button>
+          </TooltipWrapper>
+        </div>
       </div>
       {result && !running && (
         <div className="space-y-1 text-xs">
@@ -563,6 +613,7 @@ function QosDscp() {
   const voipTarget = useNetworkTestStore((s) => s.voipTarget);
   const voipDscp = useNetworkTestStore((s) => s.voipDscp);
   const runVoipDscp = useNetworkTestStore((s) => s.runVoipDscp);
+  const dismissVoipDscp = useNetworkTestStore((s) => s.dismissVoipDscp);
   const result = voipDscp.result;
   const running = voipDscp.status === "running";
   const hasTarget = voipTarget.trim().length > 0;
@@ -571,11 +622,21 @@ function QosDscp() {
     <Card>
       <div className="flex items-center justify-between mb-3">
         <SectionHeader icon={Zap} color="text-warning" title="QoS / DSCP" />
-        <TooltipWrapper title="Run DSCP Test" description="Send a packet with DSCP EF marking (Expedited Forwarding) to verify voice traffic prioritization on your network." side="bottom">
-          <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runVoipDscp()} disabled={!hasTarget || running}>
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />} Test
-          </Button>
-        </TooltipWrapper>
+        <div className="flex items-center gap-1.5">
+          {running && (
+            <TooltipWrapper title="Stop test" description="Abandon the DSCP test in the UI." side="bottom">
+              <Button type="button" size="sm" variant="destructive" className="h-7 gap-1.5 px-2.5 text-xs" onClick={dismissVoipDscp}>
+                <Square className="h-3 w-3" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
+          <TooltipWrapper title="Run DSCP Test" description="Send a packet with DSCP EF marking (Expedited Forwarding) to verify voice traffic prioritization on your network." side="bottom">
+            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runVoipDscp()} disabled={!hasTarget || running}>
+              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />} Test
+            </Button>
+          </TooltipWrapper>
+        </div>
       </div>
       {result && !running && (
         <div className="space-y-2">
@@ -605,6 +666,7 @@ function UdpQuality() {
   const stunQualityPackets = useNetworkTestStore((s) => s.stunQualityPackets);
   const addStunQualityPacket = useNetworkTestStore((s) => s.addStunQualityPacket);
   const runStunQuality = useNetworkTestStore((s) => s.runStunQuality);
+  const dismissStunQuality = useNetworkTestStore((s) => s.dismissStunQuality);
   const result = stunQuality.result;
   const running = stunQuality.status === "running";
 
@@ -627,11 +689,21 @@ function UdpQuality() {
             )}>MOS {result.mos.toFixed(2)}</Badge>
           ) : undefined}
         />
-        <TooltipWrapper title="Run UDP Quality Test" description="Send 100 STUN probes at VoIP packet rates to measure real-world UDP path quality, jitter, and loss." side="bottom">
-          <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runStunQuality()} disabled={running}>
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />} Test
-          </Button>
-        </TooltipWrapper>
+        <div className="flex items-center gap-1.5">
+          {running && (
+            <TooltipWrapper title="Stop test" description="Abandon the UDP quality probe run." side="bottom">
+              <Button type="button" size="sm" variant="destructive" className="h-7 gap-1.5 px-2.5 text-xs" onClick={dismissStunQuality}>
+                <Square className="h-3 w-3" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
+          <TooltipWrapper title="Run UDP Quality Test" description="Send 100 STUN probes at VoIP packet rates to measure real-world UDP path quality, jitter, and loss." side="bottom">
+            <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runStunQuality()} disabled={running}>
+              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />} Test
+            </Button>
+          </TooltipWrapper>
+        </div>
       </div>
 
       {running && latestPkt && (
@@ -801,6 +873,7 @@ function JitterBuffer() {
 function RtpSimTile({ target }: { target: string }) {
   const rtpSim = useNetworkTestStore((s) => s.rtpSim);
   const runRtpSim = useNetworkTestStore((s) => s.runRtpSim);
+  const dismissRtpSim = useNetworkTestStore((s) => s.dismissRtpSim);
   const [port, setPort] = useState("");
   const [codec, setCodec] = useState("g711");
   const [ptime, setPtime] = useState("20");
@@ -826,7 +899,13 @@ function RtpSimTile({ target }: { target: string }) {
             <Input value={duration} onChange={(e) => setDuration(e.target.value)} className="h-6 w-10 text-2xs text-center" type="number" />
             <span>sec</span>
           </div>
-          <Button size="sm" className="h-7 gap-1.5 px-3 text-xs" onClick={() => runRtpSim(target, port ? parseInt(port) : undefined, parseInt(ptime) || 20, parseInt(duration) || 10, codec)} disabled={running}>
+          {running && (
+            <Button type="button" size="sm" variant="destructive" className="h-7 gap-1.5 px-2.5 text-xs shrink-0" onClick={dismissRtpSim}>
+              <Square className="h-3 w-3" />
+              Stop
+            </Button>
+          )}
+          <Button size="sm" className="h-7 gap-1.5 px-3 text-xs shrink-0" onClick={() => runRtpSim(target, port ? parseInt(port) : undefined, parseInt(ptime) || 20, parseInt(duration) || 10, codec)} disabled={running}>
             {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />} Run
           </Button>
         </div>
@@ -866,6 +945,7 @@ function SipProbe() {
   const sipProbePackets = useNetworkTestStore((s) => s.sipProbePackets);
   const addSipProbePacket = useNetworkTestStore((s) => s.addSipProbePacket);
   const runSipProbe = useNetworkTestStore((s) => s.runSipProbe);
+  const dismissSipProbe = useNetworkTestStore((s) => s.dismissSipProbe);
   const voipProbeMethod = useNetworkTestStore((s) => s.voipProbeMethod);
   const setVoipProbeMethod = useNetworkTestStore((s) => s.setVoipProbeMethod);
   const resolvedContext = useExecutionContextStore((s) => s.resolvedContext);
@@ -905,6 +985,12 @@ function SipProbe() {
                 )}>{m.label}</button>
             </TooltipWrapper>
           ))}
+          {isProbing && (
+            <Button type="button" size="sm" variant="destructive" className="h-6 gap-1 px-2 text-2xs ml-1" onClick={dismissSipProbe}>
+              <Square className="h-2.5 w-2.5" />
+              Stop
+            </Button>
+          )}
           <Button
             size="sm"
             className="h-6 gap-1 px-2 text-2xs ml-1"

@@ -148,7 +148,7 @@ fn link_vosk() {
 fn link_spandsp() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let bundle_dir = native_bundle_dir();
-    
+
     let bundled_spandsp = if cfg!(target_os = "windows") {
         bundle_dir.join("spandsp.dll")
     } else if cfg!(target_os = "linux") {
@@ -163,9 +163,12 @@ fn link_spandsp() {
     } else {
         bundle_dir.join("libtiff.dylib")
     };
-    
+
     if bundled_spandsp.exists() && bundled_tiff.exists() {
-        eprintln!("build.rs: using bundled SpanDSP libraries from {}", bundle_dir.display());
+        eprintln!(
+            "build.rs: using bundled SpanDSP libraries from {}",
+            bundle_dir.display()
+        );
 
         // Bundled Windows DLLs are built with MinGW; linking + compiling UDPTL/bindgen with MSVC
         // hits incompatible CRT, missing jpeg headers, and symbol clashes. Ship DLLs next to the
@@ -211,7 +214,9 @@ fn link_spandsp() {
         "cargo:warning=Bundled SpanDSP libraries not found in {} for this target. Fax native path disabled.",
         bundle_dir.display()
     );
-    println!("cargo:warning=Provide packaged SpanDSP + libtiff artifacts to enable cross-platform fax.");
+    println!(
+        "cargo:warning=Provide packaged SpanDSP + libtiff artifacts to enable cross-platform fax."
+    );
 }
 
 /// Compile SpanDSP's native UDPTL (ITU-T T.38 Annex D) implementation.
@@ -225,16 +230,26 @@ fn compile_native_udptl(spandsp_include: &Path) -> bool {
     }
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let udptl_c = manifest_dir.join("vendor").join("spandsp").join("tests").join("udptl.c");
+    let udptl_c = manifest_dir
+        .join("vendor")
+        .join("spandsp")
+        .join("tests")
+        .join("udptl.c");
     let udptl_h_dir = manifest_dir.join("vendor").join("spandsp").join("tests");
     let compat_hdr = udptl_h_dir.join("udptl_compat.h");
-    
+
     if !udptl_c.exists() {
-        println!("cargo:warning=SpanDSP udptl.c not found at {:?}, skipping native UDPTL", udptl_c);
+        println!(
+            "cargo:warning=SpanDSP udptl.c not found at {:?}, skipping native UDPTL",
+            udptl_c
+        );
         return false;
     }
-    
-    eprintln!("build.rs: compiling native SpanDSP UDPTL from {:?}", udptl_c);
+
+    eprintln!(
+        "build.rs: compiling native SpanDSP UDPTL from {:?}",
+        udptl_c
+    );
     println!("cargo:rerun-if-changed={}", udptl_c.display());
 
     let libtiff_include = manifest_dir.join("vendor").join("libtiff").join("libtiff");
@@ -257,7 +272,9 @@ fn compile_native_udptl(spandsp_include: &Path) -> bool {
     if target.contains("msvc") {
         build.flag(format!("/FI{}", compat_hdr.display()));
     } else {
-        build.flag("-include").flag(compat_hdr.to_string_lossy().as_ref());
+        build
+            .flag("-include")
+            .flag(compat_hdr.to_string_lossy().as_ref());
     }
 
     match build.try_compile("udptl") {
@@ -279,12 +296,12 @@ fn generate_bindings(include_path: &Path, out_dir: &Path) {
 // SpanDSP wrapper header for bindgen
 #include <spandsp.h>
 "#;
-    
+
     let wrapper_path = out_dir.join("spandsp_wrapper.h");
     std::fs::write(&wrapper_path, wrapper_content).expect("Failed to write wrapper header");
-    
+
     println!("cargo:rerun-if-changed=build.rs");
-    
+
     let mut builder = bindgen::Builder::default()
         .header(wrapper_path.to_string_lossy())
         .clang_arg(format!("-I{}", include_path.display()));
@@ -324,10 +341,14 @@ fn generate_bindings(include_path: &Path, out_dir: &Path) {
         .opaque_type("_.*")
         .generate()
         .expect("Failed to generate SpanDSP bindings");
-    
-    let bindings_path = out_dir.join("spandsp_bindings.rs");
-    bindings.write_to_file(&bindings_path).expect("Failed to write bindings");
-    
-    eprintln!("build.rs: generated SpanDSP bindings at {:?}", bindings_path);
-}
 
+    let bindings_path = out_dir.join("spandsp_bindings.rs");
+    bindings
+        .write_to_file(&bindings_path)
+        .expect("Failed to write bindings");
+
+    eprintln!(
+        "build.rs: generated SpanDSP bindings at {:?}",
+        bindings_path
+    );
+}

@@ -1033,7 +1033,13 @@ mod tests {
 
     #[test]
     fn validate_controller_address_rejects_malformed_endpoints() {
-        let invalid = ["", "controller.local", "controller.local:0", "[2001:db8::1]:0", ":9147"];
+        let invalid = [
+            "",
+            "controller.local",
+            "controller.local:0",
+            "[2001:db8::1]:0",
+            ":9147",
+        ];
         for endpoint in invalid {
             assert!(
                 validate_controller_address(endpoint).is_err(),

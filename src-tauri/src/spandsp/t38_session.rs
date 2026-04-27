@@ -474,8 +474,7 @@ impl T38Session {
         }
 
         unsafe {
-            let result =
-                bindings::t38_terminal_restart(self.terminal, self.is_calling);
+            let result = bindings::t38_terminal_restart(self.terminal, self.is_calling);
             if result != 0 {
                 tracing::warn!(
                     "[T.38:{}] Warning: t38_terminal_restart returned {}",
@@ -638,16 +637,17 @@ unsafe extern "C" fn tx_packet_handler(
 /// Phase B handler - called after DIS/DCS negotiation.
 /// MUST return 0 to tell SpanDSP to proceed. Non-zero = abort session.
 #[cfg(feature = "spandsp-native")]
-unsafe extern "C" fn phase_b_handler(
-    user_data: *mut c_void,
-    result: c_int,
-) -> c_int {
+unsafe extern "C" fn phase_b_handler(user_data: *mut c_void, result: c_int) -> c_int {
     if user_data.is_null() {
         return 0;
     }
     let state = &*(user_data as *const SessionState);
 
-    tracing::error!("[T.38:{}] Phase B: result={}", &state.session_id[..8], result);
+    tracing::error!(
+        "[T.38:{}] Phase B: result={}",
+        &state.session_id[..8],
+        result
+    );
 
     0 // Always return 0 to proceed with fax transmission
 }
@@ -655,10 +655,7 @@ unsafe extern "C" fn phase_b_handler(
 /// Phase D handler - called after each page transfer.
 /// MUST return 0 to tell SpanDSP to continue. Non-zero = abort session.
 #[cfg(feature = "spandsp-native")]
-unsafe extern "C" fn phase_d_handler(
-    user_data: *mut c_void,
-    result: c_int,
-) -> c_int {
+unsafe extern "C" fn phase_d_handler(user_data: *mut c_void, result: c_int) -> c_int {
     if user_data.is_null() {
         return 0;
     }
@@ -675,10 +672,7 @@ unsafe extern "C" fn phase_d_handler(
 
 /// Phase E handler - called when T.30 session completes
 #[cfg(feature = "spandsp-native")]
-unsafe extern "C" fn phase_e_handler(
-    user_data: *mut c_void,
-    completion_code: c_int,
-) {
+unsafe extern "C" fn phase_e_handler(user_data: *mut c_void, completion_code: c_int) {
     if user_data.is_null() {
         return;
     }

@@ -273,6 +273,7 @@ function SpeedTestSection() {
   const progress = useNetworkTestStore((s) => s.speedTestProgress);
   const setProgress = useNetworkTestStore((s) => s.setSpeedTestProgress);
   const runSpeedTest = useNetworkTestStore((s) => s.runSpeedTest);
+  const dismissSpeedTest = useNetworkTestStore((s) => s.dismissSpeedTest);
   const running = speedTest.status === "running";
 
   useEffect(() => {
@@ -294,10 +295,18 @@ function SpeedTestSection() {
             <p className="text-xs text-muted-foreground">Download & upload via Cloudflare</p>
           </div>
         </div>
-        <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runSpeedTest(true)} disabled={running}>
-          {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Play className="h-3.5 w-3.5" />}
-          {running ? "Testing..." : "Run Test"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {running && (
+            <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs" onClick={dismissSpeedTest}>
+              <Square className="h-3.5 w-3.5" />
+              Stop
+            </Button>
+          )}
+          <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runSpeedTest(true)} disabled={running}>
+            {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Play className="h-3.5 w-3.5" />}
+            {running ? "Testing..." : "Run Test"}
+          </Button>
+        </div>
       </div>
 
       {/* Progress */}
@@ -363,6 +372,7 @@ function SpeedTestSection() {
 function PingSection() {
   const ping = useNetworkTestStore((s) => s.ping);
   const runPing = useNetworkTestStore((s) => s.runPing);
+  const requestStopPing = useNetworkTestStore((s) => s.requestStopPing);
   const [target, setTarget] = useState("8.8.8.8");
   const [count, setCount] = useState("10");
   const running = ping.status === "running";
@@ -389,6 +399,12 @@ function PingSection() {
         <TooltipWrapper title="Packet count">
           <Input value={count} onChange={(e) => setCount(e.target.value)} className="h-8 w-16 text-xs text-center" type="number" disabled={running} />
         </TooltipWrapper>
+        {running && (
+          <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs" onClick={() => void requestStopPing()}>
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </Button>
+        )}
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runPing(target, parseInt(count) || 10)} disabled={running}>
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Play className="h-3.5 w-3.5" />} Run
         </Button>
@@ -436,6 +452,7 @@ function PingSection() {
 function TracerouteSection() {
   const traceroute = useNetworkTestStore((s) => s.traceroute);
   const runTraceroute = useNetworkTestStore((s) => s.runTraceroute);
+  const requestStopTraceroute = useNetworkTestStore((s) => s.requestStopTraceroute);
   const [target, setTarget] = useState("google.com");
   const running = traceroute.status === "running";
 
@@ -460,6 +477,12 @@ function TracerouteSection() {
           className="h-8 text-xs flex-1 min-w-0" disabled={running}
           onKeyDown={(e) => e.key === "Enter" && !running && runTraceroute(target)}
         />
+        {running && (
+          <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs" onClick={() => void requestStopTraceroute()}>
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </Button>
+        )}
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runTraceroute(target)} disabled={running}>
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Play className="h-3.5 w-3.5" />} Trace
         </Button>
@@ -484,6 +507,7 @@ function TracerouteSection() {
 function DnsSection() {
   const dns = useNetworkTestStore((s) => s.dns);
   const runDns = useNetworkTestStore((s) => s.runDns);
+  const dismissNetworkDns = useNetworkTestStore((s) => s.dismissNetworkDns);
   const [target, setTarget] = useState("google.com");
   const running = dns.status === "running";
 
@@ -504,6 +528,12 @@ function DnsSection() {
           className="h-8 text-xs flex-1 min-w-0" disabled={running}
           onKeyDown={(e) => e.key === "Enter" && !running && runDns(target)}
         />
+        {running && (
+          <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs" onClick={dismissNetworkDns}>
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </Button>
+        )}
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runDns(target)} disabled={running}>
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Search className="h-3.5 w-3.5" />} Lookup
         </Button>
@@ -558,6 +588,7 @@ function DnsSection() {
 function MtuSection() {
   const mtu = useNetworkTestStore((s) => s.mtu);
   const runMtu = useNetworkTestStore((s) => s.runMtu);
+  const dismissMtu = useNetworkTestStore((s) => s.dismissMtu);
   const [target, setTarget] = useState("google.com");
   const running = mtu.status === "running";
 
@@ -578,6 +609,12 @@ function MtuSection() {
           className="h-8 text-xs flex-1 min-w-0" disabled={running}
           onKeyDown={(e) => e.key === "Enter" && !running && runMtu(target)}
         />
+        {running && (
+          <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs" onClick={dismissMtu}>
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </Button>
+        )}
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runMtu(target)} disabled={running}>
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Play className="h-3.5 w-3.5" />} Run
         </Button>
@@ -619,6 +656,7 @@ function MtuSection() {
 function StunSection() {
   const stun = useNetworkTestStore((s) => s.stun);
   const runStun = useNetworkTestStore((s) => s.runStun);
+  const dismissStun = useNetworkTestStore((s) => s.dismissStun);
   const [target, setTarget] = useState("stun.l.google.com");
   const running = stun.status === "running";
 
@@ -639,6 +677,12 @@ function StunSection() {
           className="h-8 text-xs flex-1 min-w-0" disabled={running}
           onKeyDown={(e) => e.key === "Enter" && !running && runStun(target || undefined)}
         />
+        {running && (
+          <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs" onClick={dismissStun}>
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </Button>
+        )}
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs" onClick={() => runStun(target || undefined)} disabled={running}>
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Search className="h-3.5 w-3.5" />} Detect
         </Button>
@@ -682,6 +726,7 @@ function RouteComparisonSection() {
   const routeResultB = useNetworkTestStore((s) => s.routeResultB);
   const routeComparing = useNetworkTestStore((s) => s.routeComparing);
   const runRouteComparison = useNetworkTestStore((s) => s.runRouteComparison);
+  const stopRouteComparison = useNetworkTestStore((s) => s.stopRouteComparison);
 
   const [targetA, setA] = useState(routeTargetA || "8.8.8.8");
   const [targetB, setB] = useState(routeTargetB || "1.1.1.1");
@@ -736,6 +781,12 @@ function RouteComparisonSection() {
         <span className="text-xs text-muted-foreground font-medium shrink-0 px-1">vs</span>
         <Input value={targetB} onChange={(e) => setB(e.target.value)} placeholder="Target B (e.g. 1.1.1.1)"
           className="h-8 text-xs flex-1 min-w-0" disabled={routeComparing} />
+        {routeComparing && (
+          <Button type="button" size="sm" variant="destructive" className="h-8 gap-1.5 px-3 text-xs shrink-0" onClick={stopRouteComparison}>
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </Button>
+        )}
         <Button size="sm" className="h-8 gap-1.5 px-4 text-xs shrink-0" onClick={handleRun} disabled={!canRun}>
           {routeComparing ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Play className="h-3.5 w-3.5" />} Compare
         </Button>

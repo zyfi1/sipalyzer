@@ -248,6 +248,14 @@ fn set_hide_dock_icon(app: tauri::AppHandle, enabled: bool) {
             let _ = app.set_activation_policy(ActivationPolicy::Accessory);
         } else {
             let _ = app.set_activation_policy(ActivationPolicy::Regular);
+            // Ensure Dock mode restores a normal app presence after menu-bar-only mode.
+            // Without this nudge, macOS can keep the app effectively accessory-like
+            // until the window is explicitly brought back.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
         }
     }
 
@@ -1022,6 +1030,13 @@ fn main() {
             tools_commands::tools_firmware_get_cache_dir,
             tools_commands::tools_firmware_set_cache_dir,
             tools_commands::tools_firmware_load_prefs,
+            tools_commands::tools_emfw_prepare,
+            tools_commands::tools_edgemarc_ftp_start,
+            tools_commands::tools_edgemarc_ftp_stop,
+            tools_commands::tools_edgemarc_cloudco_get_prefs,
+            tools_commands::tools_edgemarc_cloudco_ftp_resolve,
+            tools_commands::tools_edgemarc_cloudco_set_prefs,
+            tools_commands::tools_edgemarc_cloudco_refresh_catalog,
             // MCP commands
             mcp_commands::mcp_list_profiles,
             mcp_commands::mcp_upsert_profile,

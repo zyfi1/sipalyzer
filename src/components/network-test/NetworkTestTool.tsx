@@ -149,7 +149,7 @@ export function NetworkTestTool() {
             </div>
           </TabsContent>
           <TabsContent value={SUBVIEW_DNS} className={cn(TOOL_SUBVIEW_TABSCONTENT_ANIMATED_CLASS, "flex flex-col min-h-0 flex-1")}>
-            <div className="flex-1 min-h-0 overflow-y-auto app-view-gutter">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden app-view-gutter">
               <DnsToolView toolId="network-test" onExecToolIdChange={handleSubExecToolIdChange} />
             </div>
           </TabsContent>

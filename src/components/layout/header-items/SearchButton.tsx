@@ -359,13 +359,13 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
               "transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)]",
               "h-7 shadow-none",
               embedded
-                ? "border-0 bg-transparent px-0.5 ring-0 shadow-none"
+                ? "border border-border/60 bg-muted/52 px-2 text-muted-foreground/96 hover:border-border/80 hover:bg-muted/62 focus-within:border-border/85 focus-within:bg-muted/62 focus-within:ring-1 focus-within:ring-ring/28"
                 : "ui-header-picker max-w-[320px]",
               !embedded && open && "is-open",
-              embedded && open && "rounded-sm bg-muted/80",
+              embedded && open && "border-border/85 bg-muted/65 ring-1 ring-ring/28",
             )}
           >
-            <Search className={cn("h-3.5 w-3.5 flex-shrink-0", embedded && "text-muted-foreground/84")} />
+            <Search className={cn("h-3 w-3 flex-shrink-0", embedded && "text-muted-foreground/84")} />
             <input
               id={inputId}
               ref={inputRef}
@@ -375,7 +375,7 @@ function InlineSearchField(props: HeaderInlineSearchProps = {}) {
               onFocus={handleOpen}
               onKeyDown={handleKeyDown}
               placeholder="Search or jump…"
-              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/84 text-xs min-w-0"
+              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground/84 text-2xs sm:text-xs min-w-0"
               data-no-window-drag="true"
             />
             <kbd className="hidden sm:inline text-2xs font-mono text-muted-foreground/79 flex-shrink-0">

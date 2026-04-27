@@ -34,8 +34,8 @@ function TryThisExample({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/50 bg-gradient-to-b from-primary/[0.06] via-transparent to-transparent",
-        "p-3.5 shadow-[0_1px_0_0_hsl(var(--border)/0.35)]",
+        "rounded-xl border border-border/35 bg-card/30 p-3.5",
+        "shadow-[inset_0_1px_0_0_hsl(var(--foreground)/0.03)]",
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -43,7 +43,7 @@ function TryThisExample({
           <p className="text-xs font-semibold text-foreground tracking-tight">{title}</p>
           <p className="text-2xs text-muted-foreground mt-0.5 leading-snug">{why}</p>
         </div>
-        <span className="shrink-0 rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+        <span className="shrink-0 rounded-full border border-border/30 bg-muted/25 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Example
         </span>
       </div>
@@ -54,8 +54,8 @@ function TryThisExample({
             {before}
           </pre>
         </div>
-        <div className="rounded-lg border border-primary/20 bg-primary/[0.04] px-2.5 py-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-primary/90">After</span>
+        <div className="rounded-lg border border-border/35 bg-muted/15 px-2.5 py-2">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">After</span>
           <pre className="mt-1 text-2xs font-mono text-foreground whitespace-pre-wrap break-all leading-relaxed">
             {after}
           </pre>
@@ -200,11 +200,11 @@ export function TextForgeRegexWikiModal({ open, onOpenChange }: Props) {
           )}
         >
           <div
-            className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/70 via-primary/40 to-primary/20 rounded-none"
+            className="absolute left-0 top-0 bottom-0 w-px bg-border/60 rounded-none"
             aria-hidden
           />
           <div className="flex items-center gap-2.5 pl-1">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 text-primary border border-primary/20">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/35 bg-muted/20 text-muted-foreground">
               <BookOpen className="h-4 w-4" strokeWidth={1.75} />
             </span>
             <div>
@@ -219,7 +219,7 @@ export function TextForgeRegexWikiModal({ open, onOpenChange }: Props) {
           </div>
         </DialogHeader>
 
-        <div className="overflow-y-auto px-4 sm:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-h-[min(74vh,760px)] bg-gradient-to-b from-background via-background to-muted/15">
+        <div className="max-h-[min(74vh,760px)] space-y-5 overflow-y-auto bg-background px-4 py-5 sm:space-y-6 sm:px-8 sm:py-6">
           <section className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 px-0.5">
               <div>

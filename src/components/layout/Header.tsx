@@ -2,8 +2,8 @@
  * Header — main app header bar.
  *
  * Static layout, no user customization.
- * Left:  sidebar toggle + tool subview widget.
- * Center (absolute): history back / global search trigger / forward (⌘K opens GlobalSearchDialog).
+ * Left:  sidebar toggle + tool subview widget (registrar, etc.).
+ * Center (absolute, width-capped): history back / search / forward — flanked strips use max-width so they do not slide under it.
  * Right: global actions + IP + settings + window controls.
  */
 

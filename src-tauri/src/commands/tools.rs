@@ -11,7 +11,7 @@ use tokio::sync::watch;
 //  Network Utilities
 // ═══════════════════════════════════════════════════════════════════════
 
-fn get_lan_ip() -> Option<String> {
+pub(super) fn get_lan_ip() -> Option<String> {
     let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("8.8.8.8:53").ok()?;
     let addr = socket.local_addr().ok()?;
@@ -100,14 +100,14 @@ static SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 static ACTIVE_SESSIONS: Lazy<StdMutex<HashMap<String, watch::Sender<bool>>>> =
     Lazy::new(|| StdMutex::new(HashMap::new()));
 
-fn create_session() -> (String, watch::Receiver<bool>) {
+pub(super) fn create_session() -> (String, watch::Receiver<bool>) {
     let id = format!("local-{}", SESSION_COUNTER.fetch_add(1, Ordering::Relaxed));
     let (tx, rx) = watch::channel(false);
     ACTIVE_SESSIONS.lock().unwrap().insert(id.clone(), tx);
     (id, rx)
 }
 
-fn cancel_session(id: &str) -> bool {
+pub(super) fn cancel_session(id: &str) -> bool {
     if let Some(tx) = ACTIVE_SESSIONS.lock().unwrap().remove(id) {
         let _ = tx.send(true);
         true
@@ -1852,6 +1852,12 @@ pub struct FirmwareEntry {
     pub size_bytes: u64,
     pub notes: String,
     pub source: String,
+    /// `None` or missing = phone catalog row; `Some("edgemarc")` = bundled EdgeMarc image.
+    #[serde(default)]
+    pub device_class: Option<String>,
+    /// Relative path from FTP root (e.g. `pub/e_2900/image.bin.e2900.ewn.16.7.0`).
+    #[serde(default)]
+    pub storage_path: Option<String>,
 }
 
 fn built_in_catalog() -> Vec<FirmwareEntry> {
@@ -1871,6 +1877,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 49_945_200,
             notes: "Latest — unified .rom for all T5x models. Single file, no extraction needed.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         FirmwareEntry {
             id: "yealink-t5-96.86.0.70".into(),
@@ -1886,6 +1894,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 45_674_848,
             notes: "Stable v86 — unified .rom for all T5x models. Good for step-upgrade before v87.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         FirmwareEntry {
             id: "yealink-t5-96.86.0.45".into(),
@@ -1901,6 +1911,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 43_072_240,
             notes: "Older v86 — unified .rom for all T5x models. Use for step-upgrade path.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Yealink T4U Series (T41U/T42U/T43U/T46U/T48U) ───────────
         FirmwareEntry {
@@ -1917,6 +1929,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 37_982_288,
             notes: "Latest — unified .rom for all T4xU models. Successor to T4S series.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         FirmwareEntry {
             id: "yealink-t4u-108.86.0.45".into(),
@@ -1932,6 +1946,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 37_055_696,
             notes: "Stable v86 — unified .rom for all T4xU models. Good for step-upgrade.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         FirmwareEntry {
             id: "yealink-t4u-108.86.0.20".into(),
@@ -1947,6 +1963,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 36_793_152,
             notes: "Earliest available v86 — use as base for step-upgrade path on T4U.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Yealink T4S Series (T41S/T42S/T46S/T48S — predecessor to T4U) ──
         FirmwareEntry {
@@ -1963,6 +1981,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 23_332_560,
             notes: "Latest — unified .rom for T4xS. These models are superseded by the T4U line.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         FirmwareEntry {
             id: "yealink-t4s-66.86.0.15".into(),
@@ -1978,6 +1998,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 23_192_144,
             notes: "Older stable — use for step-upgrade before .160 on T4S models.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Yealink T46G (legacy single model — predecessor to T46S/T46U) ──
         FirmwareEntry {
@@ -1994,6 +2016,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 24_625_104,
             notes: "Final — last available firmware for T46G. Superseded by T46S → T46U.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Yealink T42G (legacy single model — predecessor to T42S/T42U) ──
         FirmwareEntry {
@@ -2010,6 +2034,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 8_159_536,
             notes: "Final — last available firmware for T42G. Superseded by T42S → T42U.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Yealink T3 Series (T30/T30P/T31/T31P/T31G/T31W/T33P/T33G/T34W) ──
         FirmwareEntry {
@@ -2026,6 +2052,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 37_613_120,
             notes: "Latest — unified .rom for all T3x entry-level models.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Poly VVX — UCS 5.9.4 ──────────────────────────────────────
         // IMPORTANT: 5.9.x is the LAST firmware stream supporting legacy
@@ -2048,6 +2076,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 344_440_843,
             notes: "Supports ALL VVX models incl. legacy 300/310/400/410/500/600. Last stream for these legacy models — they are DROPPED in UCS 6.x. Final 5.9.x is 5.9.8, but only 5.9.4 available on mirror. ~328 MB archive, extracts per-model .sip.ld and .cfg files.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Poly VVX — UCS 6.1.0 ──────────────────────────────────────
         // First 6.x release. Adds VVX x50 series (150/250/350/450).
@@ -2067,6 +2097,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 667_566_080,
             notes: "First UCS 6.x — adds VVX x50 (150/250/350/450). DROPS legacy 300/310/400/410/500/600. Use 5.9.4 for those models. ~637 MB archive, extracts per-model .sip.ld and .cfg files.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
         // ── Poly VVX — UCS 6.4.7 (latest) ────────────────────────────
         // Latest and final known release for Poly VVX. Supports the same
@@ -2085,6 +2117,8 @@ fn built_in_catalog() -> Vec<FirmwareEntry> {
             size_bytes: 956_452_360,
             notes: "Latest UCS release — all current VVX models. Does NOT support legacy 300/310/400/410/500/600 (use 5.9.4). ~912 MB archive, extracts per-model .sip.ld and .cfg files.".into(),
             source: "builtin".into(),
+            device_class: None,
+            storage_path: None,
         },
     ]
 }
@@ -2114,9 +2148,42 @@ pub struct FirmwareDownloadProgress {
 
 #[tauri::command]
 #[tracing::instrument(skip_all)]
-pub async fn tools_firmware_catalog() -> Result<Vec<FirmwareEntry>, String> {
-    let catalog = RUNTIME_CATALOG.read().await;
-    Ok(catalog.clone())
+pub async fn tools_firmware_catalog(_app: tauri::AppHandle) -> Result<Vec<FirmwareEntry>, String> {
+    let mut out = RUNTIME_CATALOG.read().await.clone();
+    let mut rows = super::edgemarc_cloudco::cloudco_rows_snapshot().await;
+    if rows.is_empty() {
+        match super::edgemarc_cloudco::refresh_catalog_from_ftp().await {
+            Ok(r) => rows = r,
+            Err(e) => {
+                tracing::warn!("CloudCo EdgeMarc catalog refresh failed: {e}");
+            }
+        }
+    }
+    for row in rows {
+        let notes = format!(
+            "{} See {}",
+            row.notes,
+            super::edgemarc_cloudco::SUPPORT_ARTICLE_URL
+        );
+        out.push(FirmwareEntry {
+            id: row.id,
+            vendor: "edgemarc".into(),
+            series: row.series,
+            models: row.models,
+            version: row.version,
+            filename: row.filename,
+            url: String::new(),
+            fallback_url: String::new(),
+            archive_format: String::new(),
+            sha256: String::new(),
+            size_bytes: row.size_bytes,
+            notes,
+            source: "cloudco-ftp".into(),
+            device_class: Some("edgemarc".into()),
+            storage_path: Some(row.storage_path),
+        });
+    }
+    Ok(out)
 }
 
 // ── Firmware Update Checks ──────────────────────────────────────────────
@@ -2359,6 +2426,8 @@ pub async fn tools_firmware_check_updates() -> Result<FirmwareCheckResult, Strin
                 size_bytes: 0,
                 notes: "Discovered on mirror".to_string(),
                 source: "mirror".to_string(),
+                device_class: None,
+                storage_path: None,
             });
         }
     }
@@ -2395,7 +2464,27 @@ fn firmware_prefs_path() -> Result<PathBuf, String> {
     Ok(config.join("firmware_prefs.json"))
 }
 
-fn firmware_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+/// Writes `firmware_prefs.json` with current cache-dir override and EdgeMarc / CloudCo prefs.
+pub(super) async fn persist_firmware_prefs_to_disk() -> Result<(), String> {
+    let prefs_path = firmware_prefs_path()?;
+    let cache_dir = {
+        let guard = FIRMWARE_CACHE_OVERRIDE.read().await;
+        guard.as_ref().map(|p| p.to_string_lossy().to_string())
+    };
+    let em = super::edgemarc_cloudco::prefs_snapshot().await;
+    let json = serde_json::json!({
+        "cache_dir": cache_dir,
+        "edgemarc_cloudco": super::edgemarc_cloudco::prefs_json_fragment(&em),
+    });
+    std::fs::write(
+        &prefs_path,
+        serde_json::to_string_pretty(&json).unwrap_or_default(),
+    )
+    .map_err(|e| format!("Failed to save preferences: {}", e))?;
+    Ok(())
+}
+
+pub(super) fn firmware_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if let Ok(guard) = FIRMWARE_CACHE_OVERRIDE.try_read() {
         if let Some(ref custom) = *guard {
             std::fs::create_dir_all(custom)
@@ -2442,13 +2531,7 @@ pub async fn tools_firmware_set_cache_dir(path: Option<String>) -> Result<String
         *guard = resolved;
     }
 
-    let prefs_path = firmware_prefs_path()?;
-    let json = serde_json::json!({ "cache_dir": path });
-    std::fs::write(
-        &prefs_path,
-        serde_json::to_string_pretty(&json).unwrap_or_default(),
-    )
-    .map_err(|e| format!("Failed to save preferences: {}", e))?;
+    persist_firmware_prefs_to_disk().await?;
 
     Ok(display)
 }
@@ -2471,6 +2554,7 @@ pub async fn tools_firmware_load_prefs() -> Result<(), String> {
                 }
             }
         }
+        super::edgemarc_cloudco::load_prefs_from_firmware_json(&obj).await;
     }
     Ok(())
 }
@@ -2633,8 +2717,50 @@ pub async fn tools_firmware_cache_clear(
                 let _ = std::fs::remove_file(&path);
             }
         }
+        let cloudco = super::edgemarc_cloudco::cloudco_pub_root(&dir);
+        let _ = std::fs::remove_dir_all(&cloudco);
+        super::edgemarc_cloudco::clear_cloudco_catalog_cache().await;
     }
     Ok(())
+}
+
+/// Resolves a catalog row from the runtime phone catalog plus CloudCo EdgeMarc cache.
+async fn resolve_firmware_entry(
+    _app: &tauri::AppHandle,
+    entry_id: &str,
+) -> Result<FirmwareEntry, String> {
+    let catalog = RUNTIME_CATALOG.read().await;
+    if let Some(e) = catalog.iter().find(|e| e.id == entry_id) {
+        return Ok(e.clone());
+    }
+    drop(catalog);
+    for row in super::edgemarc_cloudco::cloudco_rows_snapshot().await {
+        if row.id == entry_id {
+            let notes = format!(
+                "{} See {}",
+                row.notes,
+                super::edgemarc_cloudco::SUPPORT_ARTICLE_URL
+            );
+            return Ok(FirmwareEntry {
+                id: row.id,
+                vendor: "edgemarc".into(),
+                series: row.series,
+                models: row.models,
+                version: row.version,
+                filename: row.filename,
+                url: String::new(),
+                fallback_url: String::new(),
+                archive_format: String::new(),
+                sha256: String::new(),
+                size_bytes: row.size_bytes,
+                notes,
+                source: "cloudco-ftp".into(),
+                device_class: Some("edgemarc".into()),
+                storage_path: Some(row.storage_path),
+            });
+        }
+    }
+    Err(format!("Unknown firmware entry: {}", entry_id))
 }
 
 #[tauri::command]
@@ -2643,16 +2769,35 @@ pub async fn tools_firmware_download(
     app: tauri::AppHandle,
     entry_id: String,
 ) -> Result<String, String> {
-    let catalog = RUNTIME_CATALOG.read().await;
-    let entry = catalog
-        .iter()
-        .find(|e| e.id == entry_id)
-        .ok_or_else(|| format!("Unknown firmware entry: {}", entry_id))?
-        .clone();
-    drop(catalog);
+    let entry = resolve_firmware_entry(&app, &entry_id).await?;
 
     let cache_dir = firmware_cache_dir(&app)?;
     let entry_dir = cache_dir.join(&entry.id);
+
+    if entry.device_class.as_deref() == Some("edgemarc") {
+        let sp = entry
+            .storage_path
+            .clone()
+            .ok_or_else(|| "EdgeMarc entry missing storage_path".to_string())?;
+        let entry_dir = cache_dir.join(&entry.id);
+        let dest = entry_dir.join(&entry.filename);
+        if dest.is_file() {
+            let meta_len = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
+            if meta_len > 0 && (entry.size_bytes == 0 || meta_len == entry.size_bytes) {
+                return Ok(entry_dir.to_string_lossy().to_string());
+            }
+            let _ = std::fs::remove_dir_all(&entry_dir);
+        }
+        return super::edgemarc_cloudco::download_firmware_file(
+            &app,
+            &cache_dir,
+            &sp,
+            &entry.filename,
+            &entry.id,
+        )
+        .await
+        .map(|p| p.to_string_lossy().to_string());
+    }
 
     if entry_dir.exists() {
         let files: Vec<String> = std::fs::read_dir(&entry_dir)
@@ -3039,4 +3184,112 @@ pub async fn tools_firmware_serve(
     }
 
     Err("Provide either session_id (virtual server) or serve_dir".into())
+}
+
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub async fn tools_emfw_prepare(app: tauri::AppHandle) -> Result<String, String> {
+    let cache = firmware_cache_dir(&app)?;
+    let root = super::edgemarc_cloudco::cloudco_pub_root(&cache);
+    if root.join("pub").is_dir() {
+        return Ok(root.to_string_lossy().to_string());
+    }
+    Err(
+        "Download at least one EdgeMarc image first so `pub/` exists under the firmware cache \
+         (CloudCo FTP on demand)."
+            .into(),
+    )
+}
+
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub async fn tools_edgemarc_ftp_start(
+    app: tauri::AppHandle,
+    bind_all: Option<bool>,
+) -> Result<super::ftp_serve::FtpServeStartResult, String> {
+    let cache = firmware_cache_dir(&app)?;
+    let r = super::edgemarc_cloudco::cloudco_pub_root(&cache);
+    if !r.join("pub").is_dir() {
+        return Err(
+            "No `pub/` tree yet. Download an EdgeMarc firmware entry from CloudCo first."
+                .into(),
+        );
+    }
+    super::ftp_serve::ftp_serve_start(r, 2121, bind_all.unwrap_or(true)).await
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct EdgemarcCloudcoPrefsPatch {
+    #[serde(default)]
+    pub ftp_host: Option<String>,
+    #[serde(default)]
+    pub ftp_port: Option<u16>,
+    #[serde(default)]
+    pub ftp_user: Option<String>,
+    /// Set to empty string to clear a custom password and use the default from CloudCo's article.
+    #[serde(default)]
+    pub ftp_password: Option<String>,
+}
+
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub async fn tools_edgemarc_cloudco_get_prefs(
+) -> Result<super::edgemarc_cloudco::EdgemarcCloudcoPrefsPublic, String> {
+    let p = super::edgemarc_cloudco::prefs_snapshot().await;
+    Ok(super::edgemarc_cloudco::EdgemarcCloudcoPrefsPublic::from_prefs(&p))
+}
+
+/// Effective FTP dial parameters for the remote agent (includes resolved password).
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub async fn tools_edgemarc_cloudco_ftp_resolve(
+) -> Result<super::edgemarc_cloudco::EdgemarcFtpDialParams, String> {
+    Ok(super::edgemarc_cloudco::ftp_dial_params_for_remote().await)
+}
+
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub async fn tools_edgemarc_cloudco_set_prefs(
+    patch: EdgemarcCloudcoPrefsPatch,
+) -> Result<super::edgemarc_cloudco::EdgemarcCloudcoPrefsPublic, String> {
+    let mut cur = super::edgemarc_cloudco::prefs_snapshot().await;
+    if let Some(h) = patch.ftp_host {
+        let t = h.trim();
+        if !t.is_empty() {
+            cur.ftp_host = t.to_string();
+        }
+    }
+    if let Some(port) = patch.ftp_port {
+        if port > 0 {
+            cur.ftp_port = port;
+        }
+    }
+    if let Some(u) = patch.ftp_user {
+        let t = u.trim();
+        if !t.is_empty() {
+            cur.ftp_user = t.to_string();
+        }
+    }
+    if let Some(pw) = patch.ftp_password {
+        let t = pw.trim();
+        cur.ftp_password = if t.is_empty() { None } else { Some(pw) };
+    }
+    super::edgemarc_cloudco::set_prefs(cur).await;
+    persist_firmware_prefs_to_disk().await?;
+    let p = super::edgemarc_cloudco::prefs_snapshot().await;
+    Ok(super::edgemarc_cloudco::EdgemarcCloudcoPrefsPublic::from_prefs(&p))
+}
+
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub async fn tools_edgemarc_cloudco_refresh_catalog() -> Result<u32, String> {
+    let rows = super::edgemarc_cloudco::refresh_catalog_from_ftp().await?;
+    Ok(rows.len() as u32)
+}
+
+#[tauri::command]
+#[tracing::instrument(skip_all)]
+pub fn tools_edgemarc_ftp_stop(session_id: String) -> Result<(), String> {
+    let _ = super::ftp_serve::ftp_serve_stop(&session_id);
+    Ok(())
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { AppDropdown } from "@/components/ui/app-dropdown";
 import {
-  Zap, Loader2, Play, BarChart3, ArrowDownToLine, ArrowUpFromLine, HelpCircle,
+  Zap, Loader2, Play, Square, BarChart3, ArrowDownToLine, ArrowUpFromLine, HelpCircle,
   Globe, Timer, Activity, Network,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
@@ -258,8 +258,10 @@ export function SpeedTestView() {
   const progress = useNetworkTestStore((s) => s.speedTestProgress);
   const setProgress = useNetworkTestStore((s) => s.setSpeedTestProgress);
   const runSpeedTest = useNetworkTestStore((s) => s.runSpeedTest);
+  const dismissSpeedTest = useNetworkTestStore((s) => s.dismissSpeedTest);
   const bandwidthTest = useNetworkTestStore((s) => s.bandwidthTest);
   const runBandwidthTest = useNetworkTestStore((s) => s.runBandwidthTest);
+  const dismissBandwidthTest = useNetworkTestStore((s) => s.dismissBandwidthTest);
 
   const speedRunning = speedTest.status === "running";
   const bwRunning = bandwidthTest.status === "running";
@@ -288,6 +290,11 @@ export function SpeedTestView() {
       // Slightly longer run improves UDP throughput stability.
       runBandwidthTest("localhost", undefined, 8);
     }
+  };
+
+  const handleStopAll = () => {
+    if (speedRunning) dismissSpeedTest();
+    if (bwRunning) dismissBandwidthTest();
   };
   const hasValidSource = SPEED_SOURCE_PRESETS.some((s) => s.id === selectedSourceId);
 
@@ -337,6 +344,14 @@ export function SpeedTestView() {
               disabled={anyRunning}
             />
           </div>
+          {anyRunning && (
+            <TooltipWrapper title="Stop tests" description="Stop the speed test UI and local UDP throughput run." side="bottom">
+              <Button type="button" variant="destructive" size="sm" className="h-8 gap-1.5 px-3 text-xs shrink-0" onClick={handleStopAll}>
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper title="Run Speed Tests" description="Runs internet speed test against the selected source and UDP throughput in parallel." side="bottom">
             <Button size="sm" className="h-8 gap-1.5 px-3 text-xs shrink-0" onClick={handleRunAll} disabled={anyRunning || !hasValidSource}>
               {anyRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}

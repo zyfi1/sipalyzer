@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, Zap, Globe } from "@/lib/icons";
+import { Loader2, Play, Square, Zap, Globe } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
 import { tooltips } from "@/lib/tooltips";
@@ -16,6 +16,8 @@ interface CommandBarProps {
   target: string;
   onTargetChange: (value: string) => void;
   onRunAll: () => void;
+  /** Stop an in-flight “Test Everything” batch (best-effort; OS probes cancelled where supported). */
+  onStopBulk?: () => void;
   bulkRunning: boolean;
   bulkProgress: { completed: number; total: number } | null;
   categories: CategoryPill[];
@@ -25,6 +27,7 @@ export function CommandBar({
   target,
   onTargetChange,
   onRunAll,
+  onStopBulk,
   bulkRunning,
   bulkProgress,
   categories,
@@ -52,7 +55,15 @@ export function CommandBar({
             </div>
           </TooltipWrapper>
 
-          {/* Run All */}
+          {/* Run All / Stop */}
+          {bulkRunning && onStopBulk && (
+            <TooltipWrapper entry={tooltips.netStopTest}>
+              <Button type="button" variant="destructive" onClick={onStopBulk} className="h-10 gap-2 px-4 shrink-0 font-medium">
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper entry={tooltips.netTestEverything}>
             <Button
               onClick={onRunAll}

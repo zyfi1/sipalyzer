@@ -14,7 +14,7 @@
       {
         "label": "main",
         "fullscreen": false,
-        "decorations": false,
+        "decorations": true,
         "resizable": true,
         "title": "SIPalyzer",
         "titleBarStyle": "Overlay",
@@ -27,8 +27,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss: ws:; media-src 'self' data: blob:; worker-src 'self' blob:;",
-      "devCsp": "default-src 'self' http://localhost:* http://127.0.0.1:*; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-eval' http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*; img-src 'self' data: blob: https: http://localhost:* http://127.0.0.1:*; font-src 'self' data: http://localhost:* http://127.0.0.1:*; connect-src 'self' https: wss: ws: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; media-src 'self' data: blob:; worker-src 'self' blob:;",
+      "csp": "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss: ws:; media-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'self' https://www.openstreetmap.org https://openstreetmap.org;",
+      "devCsp": "default-src 'self' http://localhost:* http://127.0.0.1:*; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-eval' http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*; img-src 'self' data: blob: https: http://localhost:* http://127.0.0.1:*; font-src 'self' data: http://localhost:* http://127.0.0.1:*; connect-src 'self' https: wss: ws: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; media-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'self' https://www.openstreetmap.org https://openstreetmap.org http://localhost:* http://127.0.0.1:*;",
       "capabilities": [
         "main-capability"
       ]

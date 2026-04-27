@@ -95,6 +95,16 @@ function idle<T>(): TestState<T> {
   return { status: "idle", result: null, error: null };
 }
 
+let lookupRunId = 0;
+let sipResolveRunId = 0;
+let reverseRunId = 0;
+let reverseBatchRunId = 0;
+let digRunId = 0;
+let geoipRunId = 0;
+let geoipBatchRunId = 0;
+let asnRunId = 0;
+let multiSiteRunId = 0;
+
 // ── Store ───────────────────────────────────────────────────────────────
 
 interface DnsTestState {
@@ -183,6 +193,17 @@ interface DnsTestState {
 
   // Clear
   clearAll: () => void;
+
+  dismissLookup: () => void;
+  dismissSipResolve: () => void;
+  dismissReverse: () => void;
+  dismissReverseBatch: () => void;
+  dismissDig: () => void;
+  dismissGeoip: () => void;
+  dismissGeoipBatch: () => void;
+  dismissAsn: () => void;
+  dismissMultiSite: () => void;
+  dismissAllDnsOperations: () => void;
 }
 
 export const useDnsTestStore = create<DnsTestState>((set, get) => ({
@@ -250,6 +271,7 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
   runLookup: async (ctx) => {
     const { lookupDomain, lookupRecordType, lookupServer, lookupTransport } = get();
     if (!lookupDomain.trim()) return;
+    const runId = ++lookupRunId;
     set({ lookup: { status: "running", result: null, error: null } });
     try {
       const domain = lookupDomain.trim();
@@ -272,11 +294,13 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
         source = "local";
         agentId = undefined;
       }
+      if (runId !== lookupRunId) return;
       set((s) => ({
         lookup: { status: "done", result, error: result.error },
         lastSource: { ...s.lastSource, lookup: { source, agentId } },
       }));
     } catch (e: any) {
+      if (runId !== lookupRunId) return;
       set({ lookup: { status: "error", result: null, error: e.message } });
     }
   },
@@ -284,6 +308,7 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
   runSipResolve: async (ctx) => {
     const { sipResolveDomain, sipResolveServer } = get();
     if (!sipResolveDomain.trim()) return;
+    const runId = ++sipResolveRunId;
     set({ sipResolve: { status: "running", result: null, error: null } });
     try {
       const domain = sipResolveDomain.trim();
@@ -302,11 +327,13 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
       } else {
         result = await dnsApi.dnsSipResolve(domain, server);
       }
+      if (runId !== sipResolveRunId) return;
       set((s) => ({
         sipResolve: { status: "done", result, error: result.error },
         lastSource: { ...s.lastSource, sipResolve: { source, agentId } },
       }));
     } catch (e: any) {
+      if (runId !== sipResolveRunId) return;
       set({ sipResolve: { status: "error", result: null, error: e.message } });
     }
   },
@@ -314,6 +341,7 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
   runReverse: async (ctx) => {
     const { reverseIp, reverseServer, reverseFcrdns } = get();
     if (!reverseIp.trim()) return;
+    const runId = ++reverseRunId;
     set({ reverse: { status: "running", result: null, error: null } });
     try {
       const ip = reverseIp.trim();
@@ -332,17 +360,20 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
       } else {
         result = await dnsApi.dnsReverse(ip, server, undefined, reverseFcrdns);
       }
+      if (runId !== reverseRunId) return;
       set((s) => ({
         reverse: { status: "done", result, error: result.error },
         lastSource: { ...s.lastSource, reverse: { source, agentId } },
       }));
     } catch (e: any) {
+      if (runId !== reverseRunId) return;
       set({ reverse: { status: "error", result: null, error: e.message } });
     }
   },
 
   runReverseBatch: async (ips: string[]) => {
     const { reverseServer, reverseFcrdns } = get();
+    const runId = ++reverseBatchRunId;
     set({ reverseBatch: { status: "running", result: null, error: null } });
     try {
       const result = await dnsApi.dnsReverseBatch(
@@ -351,8 +382,10 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
         undefined,
         reverseFcrdns
       );
+      if (runId !== reverseBatchRunId) return;
       set({ reverseBatch: { status: "done", result, error: null } });
     } catch (e: any) {
+      if (runId !== reverseBatchRunId) return;
       set({ reverseBatch: { status: "error", result: null, error: e.message } });
     }
   },
@@ -360,6 +393,7 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
   runDig: async (ctx) => {
     const { digDomain, digRecordType, digServer, digUseTcp, digRd, digCd, digAd } = get();
     if (!digDomain.trim()) return;
+    const runId = ++digRunId;
     set({ dig: { status: "running", result: null, error: null } });
     try {
       const hostname = digDomain.trim();
@@ -378,11 +412,13 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
       } else {
         result = await dnsApi.dnsDig(hostname, digRecordType, server, undefined, digUseTcp, digRd, digCd, digAd);
       }
+      if (runId !== digRunId) return;
       set((s) => ({
         dig: { status: "done", result, error: result.error },
         lastSource: { ...s.lastSource, dig: { source, agentId } },
       }));
     } catch (e: any) {
+      if (runId !== digRunId) return;
       set({ dig: { status: "error", result: null, error: e.message } });
     }
   },
@@ -390,6 +426,7 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
   runGeoip: async (ctx) => {
     const { geoipIp } = get();
     if (!geoipIp.trim()) return;
+    const runId = ++geoipRunId;
     set({ geoip: { status: "running", result: null, error: null } });
     try {
       const ip = geoipIp.trim();
@@ -407,43 +444,113 @@ export const useDnsTestStore = create<DnsTestState>((set, get) => ({
       } else {
         result = await dnsApi.dnsGeoIp(ip);
       }
+      if (runId !== geoipRunId) return;
       set((s) => ({
         geoip: { status: "done", result, error: result.error },
         lastSource: { ...s.lastSource, geoip: { source, agentId } },
       }));
     } catch (e: any) {
+      if (runId !== geoipRunId) return;
       set({ geoip: { status: "error", result: null, error: e.message } });
     }
   },
 
   runGeoipBatch: async (ips: string[]) => {
+    const runId = ++geoipBatchRunId;
     set({ geoipBatch: { status: "running", result: null, error: null } });
     try {
       const result = await dnsApi.dnsGeoIpBatch(ips);
+      if (runId !== geoipBatchRunId) return;
       set({ geoipBatch: { status: "done", result, error: null } });
     } catch (e: any) {
+      if (runId !== geoipBatchRunId) return;
       set({ geoipBatch: { status: "error", result: null, error: e.message } });
     }
   },
 
   runAsnLookup: async (ip: string) => {
+    const runId = ++asnRunId;
     set({ asn: { status: "running", result: null, error: null } });
     try {
       const result = await dnsApi.dnsAsnLookup(ip);
+      if (runId !== asnRunId) return;
       set({ asn: { status: "done", result, error: result.error } });
     } catch (e: any) {
+      if (runId !== asnRunId) return;
       set({ asn: { status: "error", result: null, error: e.message } });
     }
   },
 
   runMultiSite: async (config: MultiSiteConfig) => {
+    const runId = ++multiSiteRunId;
     set({ multiSite: { status: "running", result: null, error: null } });
     try {
       const result = await dnsApi.dnsMultiSite(config);
+      if (runId !== multiSiteRunId) return;
       set({ multiSite: { status: "done", result, error: null } });
     } catch (e: any) {
+      if (runId !== multiSiteRunId) return;
       set({ multiSite: { status: "error", result: null, error: e.message } });
     }
+  },
+
+  dismissLookup: () => {
+    lookupRunId++;
+    set((s) => (s.lookup.status === "running" ? { lookup: { status: "idle", result: s.lookup.result, error: null } } : {}));
+  },
+  dismissSipResolve: () => {
+    sipResolveRunId++;
+    set((s) => (s.sipResolve.status === "running" ? { sipResolve: { status: "idle", result: s.sipResolve.result, error: null } } : {}));
+  },
+  dismissReverse: () => {
+    reverseRunId++;
+    set((s) => (s.reverse.status === "running" ? { reverse: { status: "idle", result: s.reverse.result, error: null } } : {}));
+  },
+  dismissReverseBatch: () => {
+    reverseBatchRunId++;
+    set((s) => (s.reverseBatch.status === "running" ? { reverseBatch: { status: "idle", result: s.reverseBatch.result, error: null } } : {}));
+  },
+  dismissDig: () => {
+    digRunId++;
+    set((s) => (s.dig.status === "running" ? { dig: { status: "idle", result: s.dig.result, error: null } } : {}));
+  },
+  dismissGeoip: () => {
+    geoipRunId++;
+    set((s) => (s.geoip.status === "running" ? { geoip: { status: "idle", result: s.geoip.result, error: null } } : {}));
+  },
+  dismissGeoipBatch: () => {
+    geoipBatchRunId++;
+    set((s) => (s.geoipBatch.status === "running" ? { geoipBatch: { status: "idle", result: s.geoipBatch.result, error: null } } : {}));
+  },
+  dismissAsn: () => {
+    asnRunId++;
+    set((s) => (s.asn.status === "running" ? { asn: { status: "idle", result: s.asn.result, error: null } } : {}));
+  },
+  dismissMultiSite: () => {
+    multiSiteRunId++;
+    set((s) => (s.multiSite.status === "running" ? { multiSite: { status: "idle", result: s.multiSite.result, error: null } } : {}));
+  },
+  dismissAllDnsOperations: () => {
+    lookupRunId++;
+    sipResolveRunId++;
+    reverseRunId++;
+    reverseBatchRunId++;
+    digRunId++;
+    geoipRunId++;
+    geoipBatchRunId++;
+    asnRunId++;
+    multiSiteRunId++;
+    set((s) => ({
+      lookup: s.lookup.status === "running" ? { status: "idle", result: s.lookup.result, error: null } : s.lookup,
+      sipResolve: s.sipResolve.status === "running" ? { status: "idle", result: s.sipResolve.result, error: null } : s.sipResolve,
+      reverse: s.reverse.status === "running" ? { status: "idle", result: s.reverse.result, error: null } : s.reverse,
+      reverseBatch: s.reverseBatch.status === "running" ? { status: "idle", result: s.reverseBatch.result, error: null } : s.reverseBatch,
+      dig: s.dig.status === "running" ? { status: "idle", result: s.dig.result, error: null } : s.dig,
+      geoip: s.geoip.status === "running" ? { status: "idle", result: s.geoip.result, error: null } : s.geoip,
+      geoipBatch: s.geoipBatch.status === "running" ? { status: "idle", result: s.geoipBatch.result, error: null } : s.geoipBatch,
+      asn: s.asn.status === "running" ? { status: "idle", result: s.asn.result, error: null } : s.asn,
+      multiSite: s.multiSite.status === "running" ? { status: "idle", result: s.multiSite.result, error: null } : s.multiSite,
+    }));
   },
 
   clearAll: () =>

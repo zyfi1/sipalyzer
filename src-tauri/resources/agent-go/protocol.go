@@ -216,6 +216,7 @@ type FileServeParams struct {
 	Path         string            `json:"path"`
 	HTTPPort     uint16            `json:"http_port"`
 	TFTPPort     uint16            `json:"tftp_port"`
+	FtpPort      uint16            `json:"ftp_port"`
 	Protocols    []string          `json:"protocols"`
 	DurationSecs uint32            `json:"duration_secs"`
 	Files        []PushedFile      `json:"files"`
@@ -697,6 +698,7 @@ type FetchLogResult struct {
 type FileServeStatus struct {
 	HttpURL  string `json:"http_url"`
 	TftpURL  string `json:"tftp_url"`
+	FtpURL   string `json:"ftp_url"`
 	Serving  bool   `json:"serving"`
 }
 
@@ -707,7 +709,7 @@ type FileServeRequest struct {
 	Status     int    `json:"status"`
 	BytesSent  uint64 `json:"bytes_sent"`
 	DurationMs uint64 `json:"duration_ms"`
-	Protocol   string `json:"protocol"` // "http" or "tftp"
+	Protocol   string `json:"protocol"` // "http", "tftp", or "ftp"
 }
 
 // ── Firmware Download ───────────────────────────────────────────────────
@@ -717,8 +719,14 @@ type FirmwareDownloadParams struct {
 	URL           string `json:"url"`
 	FallbackURL   string `json:"fallback_url"`
 	Filename      string `json:"filename"`
-	ArchiveFormat string `json:"archive_format"` // "" for direct, "tar.bz2" for Poly
+	ArchiveFormat string `json:"archive_format"` // "" direct, "tar.bz2" Poly, "cloudco-ftp" EdgeMarc from CloudCo public FTP
 	SHA256        string `json:"sha256"`
+	StoragePath   string `json:"storage_path,omitempty"` // e.g. pub/e_2900/image.bin... for cloudco-ftp
+	SizeBytes     uint64 `json:"size_bytes,omitempty"`
+	FtpHost       string `json:"ftp_host,omitempty"`
+	FtpPort       uint16 `json:"ftp_port,omitempty"`
+	FtpUser       string `json:"ftp_user,omitempty"`
+	FtpPassword   string `json:"ftp_password,omitempty"`
 }
 
 type FirmwareDownloadProgress struct {

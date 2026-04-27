@@ -477,6 +477,8 @@ pub struct FileServeParams {
     pub http_port: u16,
     #[serde(default = "default_tftp_port")]
     pub tftp_port: u16,
+    #[serde(default = "default_ftp_port")]
+    pub ftp_port: u16,
     #[serde(default)]
     pub protocols: Vec<String>,
     #[serde(default)]
@@ -490,6 +492,9 @@ fn default_http_port() -> u16 {
 }
 fn default_tftp_port() -> u16 {
     69
+}
+fn default_ftp_port() -> u16 {
+    2121
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -177,7 +177,7 @@ export function ExecutionContextSelector({
         <button
           disabled={disabled}
           className={cn(
-            "inline-flex max-w-[320px] items-center gap-1.5 rounded-md border text-xs font-medium",
+            "inline-flex min-w-[10rem] max-w-[17rem] items-center gap-1.5 rounded-md border text-xs font-medium",
             "transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-[var(--motion-duration-navigation)] [transition-timing-function:var(--motion-ease-navigation)]",
             "ui-header-picker",
             "h-7",
@@ -219,8 +219,10 @@ export function ExecutionContextSelector({
       </PopoverTrigger>
       <PopoverContent
         align="end"
+        side="bottom"
         sideOffset={6}
-        className="ui-floating-surface w-[392px] overflow-hidden p-0"
+        collisionPadding={{ top: 4, right: 12, bottom: 8, left: 8 }}
+        className="ui-floating-surface w-[min(24.5rem,calc(100vw-1.25rem))] max-w-[calc(100vw-1.25rem)] overflow-hidden p-0"
       >
         <div className="ui-section-header-md">
           <div className="flex items-center gap-2">

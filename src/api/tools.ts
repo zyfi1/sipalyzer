@@ -208,6 +208,10 @@ export interface FirmwareEntry {
   size_bytes: number;
   notes: string;
   source: string;
+  /** `"edgemarc"` when bundled EdgeMarc image; omit for phones. */
+  device_class?: string | null;
+  /** Relative path from FTP root, e.g. `pub/e_2900/image.bin...`. */
+  storage_path?: string | null;
 }
 
 export interface FirmwareCacheEntry {
@@ -288,10 +292,88 @@ export function toolsFirmwareLoadPrefs(): Promise<void> {
   return invokeTauri<void>("tools_firmware_load_prefs", {});
 }
 
+export interface EdgemarcCloudcoPrefsPublic {
+  ftp_host: string;
+  ftp_port: number;
+  ftp_user: string;
+  has_password_override: boolean;
+  support_article_url: string;
+}
+
+export interface EdgemarcCloudcoPrefsPatch {
+  ftp_host?: string;
+  ftp_port?: number;
+  ftp_user?: string;
+  /** Non-empty sets override; empty string clears and uses default from CloudCo article. */
+  ftp_password?: string;
+}
+
+/** Effective FTP credentials for the remote agent (same as desktop would use). */
+export interface EdgemarcFtpDialParams {
+  ftp_host: string;
+  ftp_port: number;
+  ftp_user: string;
+  ftp_password: string;
+}
+
+export function toolsEdgemarcCloudcoGetPrefs(): Promise<EdgemarcCloudcoPrefsPublic> {
+  return invokeTauri<EdgemarcCloudcoPrefsPublic>("tools_edgemarc_cloudco_get_prefs", {});
+}
+
+export function toolsEdgemarcCloudcoFtpResolve(): Promise<EdgemarcFtpDialParams> {
+  return invokeTauri<EdgemarcFtpDialParams>("tools_edgemarc_cloudco_ftp_resolve", {});
+}
+
+export function toolsEdgemarcCloudcoSetPrefs(
+  patch: EdgemarcCloudcoPrefsPatch,
+): Promise<EdgemarcCloudcoPrefsPublic> {
+  return invokeTauri<EdgemarcCloudcoPrefsPublic>(
+    "tools_edgemarc_cloudco_set_prefs",
+    patch as Record<string, unknown>,
+  );
+}
+
+/** Re-list `pub/` on CloudCo FTP and refresh the in-memory EdgeMarc catalog. */
+export function toolsEdgemarcCloudcoRefreshCatalog(): Promise<number> {
+  return invokeTauri<number>("tools_edgemarc_cloudco_refresh_catalog", {});
+}
+
 export function onFirmwareProgress(
   handler: (progress: FirmwareDownloadProgress) => void,
 ): Promise<UnlistenFn> {
   return listen<FirmwareDownloadProgress>("tools:firmware-progress", (event) => {
+    handler(event.payload);
+  });
+}
+
+export interface FtpServeStartResult {
+  session_id: string;
+  ftp_url: string;
+  host: string;
+  port: number;
+  passive_hint: string;
+}
+
+/** Returns firmware-cache `cloudco_pub` root when `pub/` exists (EdgeMarc FTP layout). */
+export function toolsEmfwPrepare(): Promise<string> {
+  return invokeTauri<string>("tools_emfw_prepare", {});
+}
+
+/** Start anonymous read-only FTP on port 2121 serving the extracted `pub/` tree. */
+export function toolsEdgemarcFtpStart(bindAll?: boolean): Promise<FtpServeStartResult> {
+  return invokeTauri<FtpServeStartResult>("tools_edgemarc_ftp_start", {
+    bind_all: bindAll ?? null,
+  });
+}
+
+export function toolsEdgemarcFtpStop(sessionId: string): Promise<void> {
+  return invokeTauri<void>("tools_edgemarc_ftp_stop", { sessionId });
+}
+
+export function onEmfwProgress(
+  handler: (progress: FirmwareDownloadProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<FirmwareDownloadProgress>("tools:emfw-progress", (event) => {
     handler(event.payload);
   });
 }

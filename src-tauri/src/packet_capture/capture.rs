@@ -1,15 +1,15 @@
+use crate::packet_capture::live_stats::{LiveStats, LiveStatsSnapshot};
+use crate::packet_capture::pipeline::{CapturePipeline, PipelineConfig, PipelineStatsSnapshot};
+use crate::packet_capture::protocol_decoder;
+use crate::packet_capture::PacketInfo;
 use anyhow::{Context, Result};
-use std::sync::{Arc, Mutex};
+use pcap::{Active, Capture, Device};
+use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use std::net::IpAddr;
-use std::collections::HashMap;
-use pcap::{Active, Capture, Device};
-use crate::packet_capture::protocol_decoder;
-use crate::packet_capture::pipeline::{CapturePipeline, PipelineConfig, PipelineStatsSnapshot};
-use crate::packet_capture::live_stats::{LiveStats, LiveStatsSnapshot};
-use crate::packet_capture::PacketInfo;
 
 /// Capture mode: single-threaded (legacy) or multi-threaded pipeline
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -39,7 +39,7 @@ pub struct CaptureSession {
     pub ip_counts: Arc<std::sync::Mutex<(HashMap<IpAddr, u64>, HashMap<IpAddr, u64>)>>,
     stop_flag: Arc<AtomicBool>,
     capture_handle: Option<thread::JoinHandle<()>>,
-    
+
     // Pipeline mode fields
     capture_mode: CaptureMode,
     pipeline: Option<CapturePipeline>,
@@ -63,9 +63,17 @@ impl CaptureSession {
         filter_config: crate::packet_capture::FilterConfig,
         file_path: String,
     ) -> Result<Self> {
-        Self::with_mode(id, name, description, interface, filter_config, file_path, CaptureMode::SingleThreaded)
+        Self::with_mode(
+            id,
+            name,
+            description,
+            interface,
+            filter_config,
+            file_path,
+            CaptureMode::SingleThreaded,
+        )
     }
-    
+
     /// Create a new capture session with the specified capture mode.
     pub fn with_mode(
         id: String,
@@ -96,9 +104,11 @@ impl CaptureSession {
             file_path: Some(file_path),
             pcap_writer: Some(pcap_writer),
             // 2M packets for enterprise-scale live capture with lock-free access
-            packet_buffer: Arc::new(Mutex::new(crate::packet_capture::ring_buffer::PacketRingBufferCompat::new(
-                crate::packet_capture::ring_buffer::DEFAULT_BUFFER_CAPACITY
-            ))),
+            packet_buffer: Arc::new(Mutex::new(
+                crate::packet_capture::ring_buffer::PacketRingBufferCompat::new(
+                    crate::packet_capture::ring_buffer::DEFAULT_BUFFER_CAPACITY,
+                ),
+            )),
             ip_counts: Arc::new(std::sync::Mutex::new((HashMap::new(), HashMap::new()))),
             stop_flag: Arc::new(AtomicBool::new(false)),
             capture_handle: None,
@@ -106,7 +116,7 @@ impl CaptureSession {
             pipeline: None,
         })
     }
-    
+
     /// Create a capture session backed by an externally-managed packet buffer
     /// (e.g. remote SSH capture). The session will NOT start a local pcap capture
     /// loop — packets are pushed into the buffer by the caller.
@@ -147,18 +157,18 @@ impl CaptureSession {
     pub fn capture_mode(&self) -> CaptureMode {
         self.capture_mode
     }
-    
+
     /// Get pipeline statistics if using pipeline mode.
     pub fn pipeline_stats(&self) -> Option<PipelineStatsSnapshot> {
         self.pipeline.as_ref().map(|p| p.stats().snapshot())
     }
-    
+
     /// Get a snapshot of the high-performance live statistics.
     pub fn live_stats_snapshot(&self) -> LiveStatsSnapshot {
         self.live_stats.update_rates();
         self.live_stats.snapshot()
     }
-    
+
     /// Get a reference to the live stats for external updates.
     pub fn get_live_stats(&self) -> Arc<LiveStats> {
         Arc::clone(&self.live_stats)
@@ -219,9 +229,13 @@ impl CaptureSession {
             mode = ?self.capture_mode,
         )
         .entered();
-        tracing::info!("start() called for session: {} (mode: {:?})", self.id, self.capture_mode);
+        tracing::info!(
+            "start() called for session: {} (mode: {:?})",
+            self.id,
+            self.capture_mode
+        );
         tracing::info!("Capture session started");
-        
+
         if matches!(self.status, CaptureStatus::Running) {
             tracing::info!("Session already running, returning");
             return Ok(());
@@ -229,40 +243,45 @@ impl CaptureSession {
 
         self.stop_flag.store(false, Ordering::Relaxed);
         self.status = CaptureStatus::Running;
-        
+
         match self.capture_mode {
             CaptureMode::Pipeline => self.start_pipeline(),
             CaptureMode::SingleThreaded => self.start_single_threaded(),
         }
     }
-    
+
     /// Start capture using the multi-threaded pipeline.
     fn start_pipeline(&mut self) -> Result<()> {
         tracing::info!("Starting multi-threaded pipeline capture...");
-        
+
         let config = PipelineConfig {
             rtp_port_range: self.filter_config.rtp_port_range,
             ..PipelineConfig::default()
         };
         let parser_threads = config.parser_threads;
-        
+
         let mut pipeline = CapturePipeline::new(config, self.filter_config.clone());
-        
+
         let pcap_writer = self.pcap_writer.clone();
         let legacy_stats = Some(Arc::clone(&self.statistics));
         let live_stats = Some(Arc::clone(&self.live_stats));
-        
-        pipeline.start(self.interface.clone(), pcap_writer, legacy_stats, live_stats)?;
-        
+
+        pipeline.start(
+            self.interface.clone(),
+            pcap_writer,
+            legacy_stats,
+            live_stats,
+        )?;
+
         // Store pipeline's ring buffer reference for packet access
         // Note: The pipeline uses its own lock-free ring buffer internally
         tracing::info!("Pipeline started with {} parser threads", parser_threads);
-        
+
         self.pipeline = Some(pipeline);
         tracing::info!("Pipeline capture started successfully");
         Ok(())
     }
-    
+
     /// Start capture using the single-threaded loop (legacy mode).
     fn start_single_threaded(&mut self) -> Result<()> {
         tracing::info!("Setting up single-threaded capture...");
@@ -272,24 +291,35 @@ impl CaptureSession {
         let statistics = Arc::clone(&self.statistics);
         let live_stats = Arc::clone(&self.live_stats);
         let pcap_writer = Arc::clone(
-            self.pcap_writer.as_ref().context("PCAP writer not initialized")?,
+            self.pcap_writer
+                .as_ref()
+                .context("PCAP writer not initialized")?,
         );
         let packet_buffer = Arc::clone(&self.packet_buffer);
         let ip_counts = Arc::clone(&self.ip_counts);
         let stop_flag = Arc::clone(&self.stop_flag);
 
         tracing::info!("Spawning capture thread for interface: {}", interface);
-        
+
         let handle = thread::spawn(move || {
             tracing::info!("===== CAPTURE THREAD STARTED =====");
             tracing::info!("Thread ID: {:?}", std::thread::current().id());
             tracing::info!("Starting capture loop for interface: {}", interface);
-            
+
             // Wrap capture loop in panic handler to prevent crashes
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                Self::capture_loop(interface.clone(), filter_config, statistics, live_stats, pcap_writer, packet_buffer, ip_counts, stop_flag)
+                Self::capture_loop(
+                    interface.clone(),
+                    filter_config,
+                    statistics,
+                    live_stats,
+                    pcap_writer,
+                    packet_buffer,
+                    ip_counts,
+                    stop_flag,
+                )
             }));
-            
+
             match result {
                 Ok(Ok(())) => {
                     tracing::info!("===== CAPTURE LOOP ENDED NORMALLY =====");
@@ -312,9 +342,13 @@ impl CaptureSession {
 
     pub fn stop(&mut self) -> Result<()> {
         let _span = tracing::info_span!("capture.session_stop").entered();
-        tracing::info!("stop() called for session: {} (mode: {:?})", self.id, self.capture_mode);
+        tracing::info!(
+            "stop() called for session: {} (mode: {:?})",
+            self.id,
+            self.capture_mode
+        );
         tracing::info!("Capture session stopped");
-        
+
         self.stop_flag.store(true, Ordering::Relaxed);
         self.status = CaptureStatus::Stopped;
 
@@ -333,7 +367,9 @@ impl CaptureSession {
         // Stop single-threaded capture if running
         if let Some(handle) = self.capture_handle.take() {
             tracing::info!("Joining capture thread...");
-            handle.join().map_err(|_| anyhow::anyhow!("Failed to join capture thread"))?;
+            handle
+                .join()
+                .map_err(|_| anyhow::anyhow!("Failed to join capture thread"))?;
         }
 
         // Flush PCAP file to disk so it is readable immediately
@@ -347,7 +383,12 @@ impl CaptureSession {
 
         // Log buffer state for diagnostics
         let buf_len = self.packet_buffer.lock().map(|b| b.len()).unwrap_or(0);
-        tracing::info!("Session {} stopped — buffer has {} packets, file={:?}", self.id, buf_len, self.file_path);
+        tracing::info!(
+            "Session {} stopped — buffer has {} packets, file={:?}",
+            self.id,
+            buf_len,
+            self.file_path
+        );
         tracing::info!(
             session_id = %self.id,
             buffer_packets = buf_len,
@@ -369,16 +410,15 @@ impl CaptureSession {
     ) -> Result<()> {
         tracing::info!("===== ENTERING capture_loop() =====");
         tracing::info!("Opening capture device: {}", interface);
-        
+
         // List all devices first for debugging
         tracing::info!("Listing all available devices...");
-        let all_devices = Device::list()
-            .context("Failed to list devices")?;
+        let all_devices = Device::list().context("Failed to list devices")?;
         tracing::info!("Found {} devices:", all_devices.len());
         for (i, dev) in all_devices.iter().enumerate() {
             tracing::info!("Device {}: name='{}', desc='{:?}'", i, dev.name, dev.desc);
         }
-        
+
         // Open device for capture
         let device = all_devices
             .into_iter()
@@ -388,7 +428,11 @@ impl CaptureSession {
                 anyhow::anyhow!("Interface not found: {}", interface)
             })?;
 
-        tracing::info!("Found matching device: name='{}', desc='{:?}'", device.name, device.desc);
+        tracing::info!(
+            "Found matching device: name='{}', desc='{:?}'",
+            device.name,
+            device.desc
+        );
 
         tracing::info!("Creating Capture object...");
         // Use a very short timeout (20ms) so we check stop_flag often and stop quickly when user clicks Stop
@@ -397,7 +441,7 @@ impl CaptureSession {
             .promisc(true)
             .snaplen(65535)
             .timeout(20);
-        
+
         tracing::info!("Opening capture device (this may require permissions)...");
         let mut cap = cap.open()
             .map_err(|e| {
@@ -407,18 +451,23 @@ impl CaptureSession {
             })?;
 
         tracing::info!("===== CAPTURE DEVICE OPENED SUCCESSFULLY =====");
-        
+
         // Get link layer type for cross-platform compatibility
         // Common types: 1=Ethernet (Linux/Windows), 113=Raw IP (macOS), 12=IEEE 802.11 (WiFi), 147=Loopback
         let link_layer_type = cap.get_datalink().0;
-        tracing::info!("Link layer type: {} (1=Ethernet, 12=802.11, 113=Raw IP, 147=Loop)", link_layer_type);
-        
+        tracing::info!(
+            "Link layer type: {} (1=Ethernet, 12=802.11, 113=Raw IP, 147=Loop)",
+            link_layer_type
+        );
+
         // Log interface addresses for debugging
         // List all interfaces and their IPs to help user find the right one
         tracing::info!("=== Available interfaces and their IPs ===");
         if let Ok(all_devices) = Device::list() {
             for dev in all_devices {
-                let ips: Vec<String> = dev.addresses.iter()
+                let ips: Vec<String> = dev
+                    .addresses
+                    .iter()
                     .map(|addr| addr.addr.to_string())
                     .collect();
                 if !ips.is_empty() {
@@ -427,29 +476,42 @@ impl CaptureSession {
             }
         }
         tracing::info!("==========================================");
-        
-        if let Some(device) = Device::list().ok().and_then(|devices| {
-            devices.into_iter().find(|d| d.name == interface)
-        }) {
-            tracing::info!("Selected interface '{}' addresses: {:?}", interface, device.addresses);
-            
+
+        if let Some(device) = Device::list()
+            .ok()
+            .and_then(|devices| devices.into_iter().find(|d| d.name == interface))
+        {
+            tracing::info!(
+                "Selected interface '{}' addresses: {:?}",
+                interface,
+                device.addresses
+            );
+
             // List all IPs on this interface for debugging
-            let interface_ips: Vec<String> = device.addresses.iter()
+            let interface_ips: Vec<String> = device
+                .addresses
+                .iter()
                 .map(|addr| addr.addr.to_string())
                 .collect();
             tracing::info!("Interface '{}' has IPs: {:?}", interface, interface_ips);
-            
+
             // Check if REGISTER IP (10.235.136.25) is on this interface
             let has_register_ip = interface_ips.iter().any(|ip| ip.contains("10.235.136.25"));
             if !has_register_ip {
-                tracing::warn!("⚠ WARNING: Interface '{}' does NOT have IP 10.235.136.25", interface);
+                tracing::warn!(
+                    "⚠ WARNING: Interface '{}' does NOT have IP 10.235.136.25",
+                    interface
+                );
                 tracing::info!("REGISTER packets are sent from 10.235.136.25:7061");
                 tracing::info!("Look for an interface above that has 10.235.136.25");
             } else {
-                tracing::info!("✓ Interface '{}' has REGISTER IP 10.235.136.25 - packets should be visible!", interface);
+                tracing::info!(
+                    "✓ Interface '{}' has REGISTER IP 10.235.136.25 - packets should be visible!",
+                    interface
+                );
             }
         }
-        
+
         tracing::info!("Entering packet capture loop...");
 
         // Track when capture started for no-packet diagnostics
@@ -489,45 +551,84 @@ impl CaptureSession {
             match cap.next_packet() {
                 Ok(packet) => {
                     packet_count += 1;
-                    
+
                     // Process packet with error handling using new parser
                     let rtp_port_range = filter_config.rtp_port_range.or(Some((10000, 60000)));
-                    let parser = crate::packet_capture::packet_parser::PacketParser::with_rtp_port_range(
-                        link_layer_type as u32,
-                        rtp_port_range,
-                    );
+                    let parser =
+                        crate::packet_capture::packet_parser::PacketParser::with_rtp_port_range(
+                            link_layer_type as u32,
+                            rtp_port_range,
+                        );
                     if packet_count <= 5 {
-                        tracing::info!("Raw packet {}: len={}, first_bytes={:?}", packet_count, packet.len(), &packet[..packet.len().min(20)]);
+                        tracing::info!(
+                            "Raw packet {}: len={}, first_bytes={:?}",
+                            packet_count,
+                            packet.len(),
+                            &packet[..packet.len().min(20)]
+                        );
                     }
                     if let Some(mut packet_info) = parser.parse(&packet, Some(packet_count)) {
-                        packet_info.provenance = crate::packet_capture::PacketProvenance::LocalCapture;
+                        packet_info.provenance =
+                            crate::packet_capture::PacketProvenance::LocalCapture;
                         if packet_count <= 5 {
-                            tracing::info!("✓ Packet {} parsed successfully: {}:{} -> {}:{}, protocol={:?}", packet_count, packet_info.src_ip, packet_info.src_port, packet_info.dst_ip, packet_info.dst_port, packet_info.protocol);
+                            tracing::info!(
+                                "✓ Packet {} parsed successfully: {}:{} -> {}:{}, protocol={:?}",
+                                packet_count,
+                                packet_info.src_ip,
+                                packet_info.src_port,
+                                packet_info.dst_ip,
+                                packet_info.dst_port,
+                                packet_info.protocol
+                            );
                         }
                         // Log SIP packets for debugging (including UDP packets on SIP ports)
-                        let is_sip_port = packet_info.dst_port == 5060 || packet_info.src_port == 5060 || 
-                                         packet_info.dst_port == 5061 || packet_info.src_port == 5061;
+                        let is_sip_port = packet_info.dst_port == 5060
+                            || packet_info.src_port == 5060
+                            || packet_info.dst_port == 5061
+                            || packet_info.src_port == 5061;
                         if matches!(packet_info.protocol, crate::packet_capture::Protocol::SIP) {
                             let matches_filter = filter_config.matches(&packet_info);
-                            tracing::info!("✓ SIP PACKET DETECTED: {}:{} -> {}:{}, size={}, matches_filter={}", packet_info.src_ip, packet_info.src_port, packet_info.dst_ip, packet_info.dst_port, packet_info.data.len(), matches_filter);
+                            tracing::info!(
+                                "✓ SIP PACKET DETECTED: {}:{} -> {}:{}, size={}, matches_filter={}",
+                                packet_info.src_ip,
+                                packet_info.src_port,
+                                packet_info.dst_ip,
+                                packet_info.dst_port,
+                                packet_info.data.len(),
+                                matches_filter
+                            );
                             if !matches_filter {
-                                tracing::info!("✗ SIP packet FILTERED OUT by filter_config (protocols={:?})", filter_config.protocols);
+                                tracing::info!(
+                                    "✗ SIP packet FILTERED OUT by filter_config (protocols={:?})",
+                                    filter_config.protocols
+                                );
                             }
-                        } else if is_sip_port && matches!(packet_info.protocol, crate::packet_capture::Protocol::UDP) {
+                        } else if is_sip_port
+                            && matches!(packet_info.protocol, crate::packet_capture::Protocol::UDP)
+                        {
                             // Log UDP packets on SIP ports that weren't detected as SIP
                             tracing::warn!("⚠ WARNING: UDP packet on SIP port {}:{} -> {}:{}, size={}, protocol={:?}", packet_info.src_ip, packet_info.src_port, packet_info.dst_ip, packet_info.dst_port, packet_info.data.len(), packet_info.protocol);
                             // Try to show first bytes for debugging
                             if packet_info.data.len() > 0 {
-                                let preview = String::from_utf8_lossy(&packet_info.data[..packet_info.data.len().min(100)]);
+                                let preview = String::from_utf8_lossy(
+                                    &packet_info.data[..packet_info.data.len().min(100)],
+                                );
                                 tracing::info!("First 100 bytes: {:?}", preview);
                             }
                         }
-                        
+
                         // Log all UDP packets on common SIP ports for debugging
                         if is_sip_port && packet_count % 10 == 0 {
-                            tracing::info!("UDP packet on SIP port {}:{} -> {}:{}, protocol={:?}", packet_info.src_ip, packet_info.src_port, packet_info.dst_ip, packet_info.dst_port, packet_info.protocol);
+                            tracing::info!(
+                                "UDP packet on SIP port {}:{} -> {}:{}, protocol={:?}",
+                                packet_info.src_ip,
+                                packet_info.src_port,
+                                packet_info.dst_ip,
+                                packet_info.dst_port,
+                                packet_info.protocol
+                            );
                         }
-                        
+
                         // Single gate for relevance: only packets matching filter_config are stored, written to PCAP, or counted in stats.
                         // BPF (if set) only reduces kernel-captured packets; application-layer protocol and IP/port filters are applied here.
                         let matches_filter = filter_config.matches(&packet_info);
@@ -539,7 +640,7 @@ impl CaptureSession {
                             if let Ok(mut stats) = statistics.lock() {
                                 stats.add_packet(&packet_info);
                             }
-                            
+
                             // Update high-performance statistics (lock-free DashMap)
                             live_stats.record(&packet_info);
 
@@ -554,20 +655,28 @@ impl CaptureSession {
                             // dramatically increase UI/render pressure at high packet rates.
                             // We retain raw frames only for SIP packets where per-packet
                             // re-export/debug workflows rely on frame-level fidelity.
-                            if !matches!(packet_info.protocol, crate::packet_capture::Protocol::SIP) {
+                            if !matches!(packet_info.protocol, crate::packet_capture::Protocol::SIP)
+                            {
                                 packet_info.raw_frame = None;
                             }
 
                             // Store in packet buffer (ring buffer handles overflow automatically)
                             if let Ok(mut buffer) = packet_buffer.lock() {
                                 // Log SIP packets when stored
-                                if matches!(packet_info.protocol, crate::packet_capture::Protocol::SIP) {
+                                if matches!(
+                                    packet_info.protocol,
+                                    crate::packet_capture::Protocol::SIP
+                                ) {
                                     tracing::info!("📦 STORING SIP packet in buffer: {}:{} -> {}:{}, buffer_size={}", packet_info.src_ip, packet_info.src_port, packet_info.dst_ip, packet_info.dst_port, buffer.len());
                                 }
                                 buffer.push(packet_info);
                                 let buffer_size = buffer.len();
                                 if packet_count <= 10 || packet_count % 100 == 0 {
-                                    tracing::info!("Added packet {} to buffer, buffer size now: {}", packet_count, buffer_size);
+                                    tracing::info!(
+                                        "Added packet {} to buffer, buffer size now: {}",
+                                        packet_count,
+                                        buffer_size
+                                    );
                                 }
                             } else {
                                 tracing::error!("ERROR: Failed to lock packet buffer!");
@@ -581,31 +690,48 @@ impl CaptureSession {
                     } else {
                         // Packet parsing failed
                         if packet_count <= 10 || packet_count % 1000 == 0 {
-                            tracing::error!("✗ Packet {} failed to parse (link_layer_type={}, data_len={})", packet_count, link_layer_type, packet.len());
+                            tracing::error!(
+                                "✗ Packet {} failed to parse (link_layer_type={}, data_len={})",
+                                packet_count,
+                                link_layer_type,
+                                packet.len()
+                            );
                         }
                     }
                 }
-                    Err(e) => {
-                        // Check error type - timeout is normal and expected
-                        let error_str = format!("{:?}", e);
-                        if error_str.contains("timeout") || error_str.contains("Timeout") || error_str.contains("TimeoutExpired") {
-                            // Diagnose: if we've been running 3+ seconds with zero packets, something is wrong
-                            if !warned_no_packets && packet_count == 0 && capture_started_at.elapsed().as_secs() >= 3 {
-                                warned_no_packets = true;
-                                tracing::warn!("⚠ WARNING: No packets captured after {}s on interface '{}'", capture_started_at.elapsed().as_secs(), interface);
-                                tracing::info!("This may indicate a permissions issue or wrong interface.");
-                                tracing::info!("Try running with sudo, or check interface selection.");
-                                // Try to get pcap stats for diagnostics
-                                Self::update_pcap_stats(&mut cap, &statistics);
-                            }
-                            continue;
+                Err(e) => {
+                    // Check error type - timeout is normal and expected
+                    let error_str = format!("{:?}", e);
+                    if error_str.contains("timeout")
+                        || error_str.contains("Timeout")
+                        || error_str.contains("TimeoutExpired")
+                    {
+                        // Diagnose: if we've been running 3+ seconds with zero packets, something is wrong
+                        if !warned_no_packets
+                            && packet_count == 0
+                            && capture_started_at.elapsed().as_secs() >= 3
+                        {
+                            warned_no_packets = true;
+                            tracing::warn!(
+                                "⚠ WARNING: No packets captured after {}s on interface '{}'",
+                                capture_started_at.elapsed().as_secs(),
+                                interface
+                            );
+                            tracing::info!(
+                                "This may indicate a permissions issue or wrong interface."
+                            );
+                            tracing::info!("Try running with sudo, or check interface selection.");
+                            // Try to get pcap stats for diagnostics
+                            Self::update_pcap_stats(&mut cap, &statistics);
                         }
-                        // Log other errors
-                        if packet_count % 1000 == 0 || packet_count == 0 {
-                            tracing::error!("Capture error (non-fatal): {:?}", e);
-                        }
-                        thread::sleep(Duration::from_millis(10));
+                        continue;
                     }
+                    // Log other errors
+                    if packet_count % 1000 == 0 || packet_count == 0 {
+                        tracing::error!("Capture error (non-fatal): {:?}", e);
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
             }
         }
         // Final best-effort stats refresh before session exit.
@@ -643,18 +769,21 @@ impl CaptureSession {
     }
 
     #[allow(dead_code)]
-    fn parse_packet_old(packet: &pcap::Packet, link_layer_type: Option<u32>) -> Option<crate::packet_capture::PacketInfo> {
+    fn parse_packet_old(
+        packet: &pcap::Packet,
+        link_layer_type: Option<u32>,
+    ) -> Option<crate::packet_capture::PacketInfo> {
         // Parse packet based on link layer type for cross-platform compatibility
         // Common link layer types:
         // 1 = DLT_EN10MB (Ethernet) - Linux, Windows, most systems
         // 12 = DLT_IEEE802_11 (802.11 WiFi) - WiFi captures
         // 113 = DLT_RAW (Raw IP) - macOS, some BSD systems
         // 147 = DLT_NULL (Loopback) - Loopback interfaces
-        
+
         if packet.data.len() < 20 {
             return None;
         }
-        
+
         let ip_data = match link_layer_type {
             Some(1) | None => {
                 // DLT_EN10MB (Ethernet) - Standard Ethernet frame
@@ -690,8 +819,18 @@ impl CaptureSession {
                 if packet.data.len() >= 24 {
                     // Check if it's IPv4 (address family = 2)
                     // Try both endianness
-                    let af_le = u32::from_le_bytes([packet.data[0], packet.data[1], packet.data[2], packet.data[3]]);
-                    let af_be = u32::from_be_bytes([packet.data[0], packet.data[1], packet.data[2], packet.data[3]]);
+                    let af_le = u32::from_le_bytes([
+                        packet.data[0],
+                        packet.data[1],
+                        packet.data[2],
+                        packet.data[3],
+                    ]);
+                    let af_be = u32::from_be_bytes([
+                        packet.data[0],
+                        packet.data[1],
+                        packet.data[2],
+                        packet.data[3],
+                    ]);
                     if (af_le == 2 || af_be == 2) && (packet.data[4] & 0xF0) == 0x40 {
                         &packet.data[4..]
                     } else {
@@ -708,12 +847,18 @@ impl CaptureSession {
             }
             Some(other) => {
                 // Unknown link layer type - try common strategies
-                tracing::warn!("Unknown link layer type: {}, trying fallback parsing", other);
-                
+                tracing::warn!(
+                    "Unknown link layer type: {}, trying fallback parsing",
+                    other
+                );
+
                 // Try raw IP first
                 if (packet.data[0] & 0xF0) == 0x40 {
                     &packet.data[..]
-                } else if packet.data.len() >= 14 && packet.data[12] == 0x08 && packet.data[13] == 0x00 {
+                } else if packet.data.len() >= 14
+                    && packet.data[12] == 0x08
+                    && packet.data[13] == 0x00
+                {
                     // Try Ethernet
                     if packet.data.len() >= 34 && (packet.data[14] & 0xF0) == 0x40 {
                         &packet.data[14..]
@@ -730,7 +875,7 @@ impl CaptureSession {
         if ip_data.len() < 20 {
             return None;
         }
-        
+
         let ip_version = (ip_data[0] >> 4) & 0x0F;
         if ip_version != 4 {
             return None;
@@ -738,15 +883,21 @@ impl CaptureSession {
 
         // Extract IP addresses
         let src_ip = IpAddr::V4(std::net::Ipv4Addr::new(
-            ip_data[12], ip_data[13], ip_data[14], ip_data[15],
+            ip_data[12],
+            ip_data[13],
+            ip_data[14],
+            ip_data[15],
         ));
         let dst_ip = IpAddr::V4(std::net::Ipv4Addr::new(
-            ip_data[16], ip_data[17], ip_data[18], ip_data[19],
+            ip_data[16],
+            ip_data[17],
+            ip_data[18],
+            ip_data[19],
         ));
 
         // Extract protocol
         let ip_protocol = ip_data[9];
-        
+
         // Handle different IP protocols
         let (src_port, dst_port, payload) = match ip_protocol {
             17 => {
@@ -791,10 +942,16 @@ impl CaptureSession {
                     )
                     .unwrap_or_else(|| chrono::Utc::now()),
                     src_ip: IpAddr::V4(std::net::Ipv4Addr::new(
-                        ip_data[12], ip_data[13], ip_data[14], ip_data[15],
+                        ip_data[12],
+                        ip_data[13],
+                        ip_data[14],
+                        ip_data[15],
                     )),
                     dst_ip: IpAddr::V4(std::net::Ipv4Addr::new(
-                        ip_data[16], ip_data[17], ip_data[18], ip_data[19],
+                        ip_data[16],
+                        ip_data[17],
+                        ip_data[18],
+                        ip_data[19],
                     )),
                     src_port: 0,
                     dst_port: 0,
@@ -802,8 +959,18 @@ impl CaptureSession {
                     size: ip_data.len().saturating_sub(20),
                     frame_length: packet.data.len(),
                     raw_frame: Some(packet.data.to_vec()),
-                    data: if ip_data.len() > 20 { ip_data[20..].to_vec() } else { Vec::new() },
-                    decoded: protocol_decoder::decode_packet(packet.data, link_layer_type, None, None).ok(),
+                    data: if ip_data.len() > 20 {
+                        ip_data[20..].to_vec()
+                    } else {
+                        Vec::new()
+                    },
+                    decoded: protocol_decoder::decode_packet(
+                        packet.data,
+                        link_layer_type,
+                        None,
+                        None,
+                    )
+                    .ok(),
                     fidelity: crate::packet_capture::PacketFidelity::Authoritative,
                     provenance: crate::packet_capture::PacketProvenance::LocalCapture,
                 });
@@ -818,10 +985,16 @@ impl CaptureSession {
                     )
                     .unwrap_or_else(|| chrono::Utc::now()),
                     src_ip: IpAddr::V4(std::net::Ipv4Addr::new(
-                        ip_data[12], ip_data[13], ip_data[14], ip_data[15],
+                        ip_data[12],
+                        ip_data[13],
+                        ip_data[14],
+                        ip_data[15],
                     )),
                     dst_ip: IpAddr::V4(std::net::Ipv4Addr::new(
-                        ip_data[16], ip_data[17], ip_data[18], ip_data[19],
+                        ip_data[16],
+                        ip_data[17],
+                        ip_data[18],
+                        ip_data[19],
                     )),
                     src_port: 0,
                     dst_port: 0,
@@ -829,8 +1002,18 @@ impl CaptureSession {
                     size: ip_data.len().saturating_sub(ip_header_len),
                     frame_length: packet.data.len(),
                     raw_frame: Some(packet.data.to_vec()),
-                    data: if ip_data.len() > ip_header_len { ip_data[ip_header_len..].to_vec() } else { Vec::new() },
-                    decoded: protocol_decoder::decode_packet(packet.data, link_layer_type, None, None).ok(),
+                    data: if ip_data.len() > ip_header_len {
+                        ip_data[ip_header_len..].to_vec()
+                    } else {
+                        Vec::new()
+                    },
+                    decoded: protocol_decoder::decode_packet(
+                        packet.data,
+                        link_layer_type,
+                        None,
+                        None,
+                    )
+                    .ok(),
                     fidelity: crate::packet_capture::PacketFidelity::Authoritative,
                     provenance: crate::packet_capture::PacketProvenance::LocalCapture,
                 });
@@ -838,15 +1021,14 @@ impl CaptureSession {
         };
 
         // Decode packet (full protocol decoding) - use full packet data
-        let decoded = protocol_decoder::decode_packet(packet.data, link_layer_type, None, None).ok();
+        let decoded =
+            protocol_decoder::decode_packet(packet.data, link_layer_type, None, None).ok();
 
         // Detect protocol using decoded application layer and transport protocol
         // Priority: RTP/RTCP (binary, structured) > SIP (text-based) > HTTP/DNS > TCP/UDP > fallback
         let protocol_type = if let Some(ref decoded_packet) = decoded {
             match &decoded_packet.application {
-                protocol_decoder::ApplicationLayer::Rtp(_) => {
-                    crate::packet_capture::Protocol::RTP
-                }
+                protocol_decoder::ApplicationLayer::Rtp(_) => crate::packet_capture::Protocol::RTP,
                 protocol_decoder::ApplicationLayer::Srtp(_) => {
                     crate::packet_capture::Protocol::SRTP
                 }
@@ -898,7 +1080,8 @@ impl CaptureSession {
                             }
                         } else {
                             // Fall back to payload-based detection
-                            let detected = crate::packet_capture::Protocol::detect(dst_port, &payload);
+                            let detected =
+                                crate::packet_capture::Protocol::detect(dst_port, &payload);
                             if detected != crate::packet_capture::Protocol::Other {
                                 detected
                             } else {
@@ -971,14 +1154,14 @@ impl CaptureSession {
         // HTTP requests start with methods, responses start with "HTTP/"
         let start = String::from_utf8_lossy(&data[..data.len().min(10)]);
         let start_upper = start.to_uppercase();
-        start_upper.starts_with("GET ") ||
-        start_upper.starts_with("POST ") ||
-        start_upper.starts_with("PUT ") ||
-        start_upper.starts_with("DELETE ") ||
-        start_upper.starts_with("HEAD ") ||
-        start_upper.starts_with("OPTIONS ") ||
-        start_upper.starts_with("PATCH ") ||
-        start_upper.starts_with("HTTP/")
+        start_upper.starts_with("GET ")
+            || start_upper.starts_with("POST ")
+            || start_upper.starts_with("PUT ")
+            || start_upper.starts_with("DELETE ")
+            || start_upper.starts_with("HEAD ")
+            || start_upper.starts_with("OPTIONS ")
+            || start_upper.starts_with("PATCH ")
+            || start_upper.starts_with("HTTP/")
     }
 
     fn is_dns(data: &[u8]) -> bool {
@@ -1005,7 +1188,8 @@ impl CaptureSession {
         if filter.protocols.is_empty()
             && filter.src_ports.is_empty()
             && filter.dst_ports.is_empty()
-            && filter.port_ranges.is_empty() {
+            && filter.port_ranges.is_empty()
+        {
             return None;
         }
 
@@ -1017,11 +1201,23 @@ impl CaptureSession {
             let mut protocols = std::collections::HashSet::new();
             let mut voip_ports = Vec::new();
 
-            let has_sip = filter.protocols.iter().any(|p| p.eq_ignore_ascii_case("sip"));
-            let has_rtp = filter.protocols.iter().any(|p| p.eq_ignore_ascii_case("rtp"));
-            let has_rtcp = filter.protocols.iter().any(|p| p.eq_ignore_ascii_case("rtcp"));
-            let has_fax = filter.protocols.iter().any(|p| p.eq_ignore_ascii_case("fax"));
-            
+            let has_sip = filter
+                .protocols
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("sip"));
+            let has_rtp = filter
+                .protocols
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("rtp"));
+            let has_rtcp = filter
+                .protocols
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("rtcp"));
+            let has_fax = filter
+                .protocols
+                .iter()
+                .any(|p| p.eq_ignore_ascii_case("fax"));
+
             // Convert all protocols to BPF equivalents
             for protocol in &filter.protocols {
                 let bpf_proto = match protocol.to_lowercase().as_str() {
@@ -1030,16 +1226,16 @@ impl CaptureSession {
                     "icmp" => "icmp",
                     "arp" => "arp",
                     "fax" => "udp", // FAX/T.38 uses UDP
-                    _ => "udp", // Default to UDP
+                    _ => "udp",     // Default to UDP
                 };
                 protocols.insert(bpf_proto.to_string());
             }
-            
+
             // IMPORTANT: SIP can use ANY port (5060, 5061, 5062, 7060, 7061, etc.).
             // REGISTER, INVITE, and other SIP methods often use non-standard ports.
             // When SIP is selected, we capture ALL UDP traffic and rely on content-based
             // SIP detection (has_sip_signature) to identify SIP packets on any port.
-            // 
+            //
             // RTP/RTCP also use dynamic ports (e.g. 10000–60000).
             // FAX/T.38 uses specific ports but we include them for convenience.
             //
@@ -1047,13 +1243,13 @@ impl CaptureSession {
             if !has_sip && !has_rtp && !has_rtcp {
                 if has_fax {
                     voip_ports.push("32896".to_string()); // T.38 FAX
-                    voip_ports.push("4000".to_string());  // T.38 UDPTL
+                    voip_ports.push("4000".to_string()); // T.38 UDPTL
                 }
             }
             // When SIP/RTP/RTCP is selected, voip_ports stays empty → all UDP captured
-            
+
             protocol_parts.extend(protocols);
-            
+
             for port in voip_ports {
                 port_parts.push(format!("port {}", port));
             }
@@ -1091,7 +1287,11 @@ impl CaptureSession {
             (false, false) => {
                 // Both protocol and port filters
                 let proto_expr: String = if protocol_parts.len() == 1 {
-                    protocol_parts.iter().next().unwrap_or(&"UDP".to_string()).clone()
+                    protocol_parts
+                        .iter()
+                        .next()
+                        .unwrap_or(&"UDP".to_string())
+                        .clone()
                 } else {
                     // Multiple protocols - use OR
                     let parts: Vec<String> = protocol_parts.iter().cloned().collect();
@@ -1148,7 +1348,11 @@ pub fn list_interfaces() -> Result<Vec<NetworkInterface>> {
         .unwrap_or_default();
     let default_name = default_iface.as_ref().map(|i| i.name.clone());
     let normalize_addr = |addr: &str| -> String {
-        addr.split('%').next().unwrap_or(addr).trim().to_ascii_lowercase()
+        addr.split('%')
+            .next()
+            .unwrap_or(addr)
+            .trim()
+            .to_ascii_lowercase()
     };
     let normalized_default_addrs: Vec<String> = default_addrs
         .iter()
@@ -1159,18 +1363,14 @@ pub fn list_interfaces() -> Result<Vec<NetworkInterface>> {
         .into_iter()
         .map(|d| {
             let is_default_name = default_name.as_ref().map_or(false, |n| n == &d.name);
-            let pcap_addrs: Vec<String> = d
-                .addresses
-                .iter()
-                .map(|a| a.addr.to_string())
-                .collect();
-            let normalized_pcap_addrs: Vec<String> = pcap_addrs
-                .iter()
-                .map(|addr| normalize_addr(addr))
-                .collect();
-            let is_default_addr = normalized_pcap_addrs
-                .iter()
-                .any(|addr| normalized_default_addrs.iter().any(|default_addr| default_addr == addr));
+            let pcap_addrs: Vec<String> = d.addresses.iter().map(|a| a.addr.to_string()).collect();
+            let normalized_pcap_addrs: Vec<String> =
+                pcap_addrs.iter().map(|addr| normalize_addr(addr)).collect();
+            let is_default_addr = normalized_pcap_addrs.iter().any(|addr| {
+                normalized_default_addrs
+                    .iter()
+                    .any(|default_addr| default_addr == addr)
+            });
             let is_default = is_default_name || is_default_addr;
             let addresses = if pcap_addrs.is_empty() && is_default && !default_addrs.is_empty() {
                 default_addrs.clone()
@@ -1190,10 +1390,7 @@ pub fn list_interfaces() -> Result<Vec<NetworkInterface>> {
         if !in_list && !default_addrs.is_empty() {
             list.push(NetworkInterface {
                 name: name.clone(),
-                description: def
-                    .description
-                    .clone()
-                    .unwrap_or_else(|| name.clone()),
+                description: def.description.clone().unwrap_or_else(|| name.clone()),
                 addresses: default_addrs,
                 is_default: true,
             });

@@ -1,7 +1,10 @@
-//! GeoIP enrichment — HTTPS geolocation provider + Cymru DNS ASN fallback.
+//! GeoIP enrichment — HTTPS geolocation (ipwho.is) + optional RDAP (WHOIS-style registry data)
+//! + Cymru DNS ASN fallback.
 
+use super::rdap::{self, GeoIpRdapInfo};
 use super::resolver;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
@@ -24,6 +27,29 @@ fn can_call_api() -> bool {
     }
 }
 
+fn is_non_routable_for_rdap(ip: &str) -> bool {
+    let Ok(addr) = ip.parse::<IpAddr>() else {
+        return true;
+    };
+    match addr {
+        IpAddr::V4(a) => {
+            a.is_private()
+                || a.is_loopback()
+                || a.is_link_local()
+                || a.is_broadcast()
+                || a.is_documentation()
+                || a.is_unspecified()
+        }
+        IpAddr::V6(a) => {
+            a.is_loopback()
+                || a.is_unspecified()
+                || a.is_unique_local()
+                || a.is_unicast_link_local()
+                || a.is_multicast()
+        }
+    }
+}
+
 // ── Types ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +68,22 @@ pub struct GeoIpResult {
     pub timezone: Option<String>,
     pub source: String,
     pub error: Option<String>,
+    /// Continent name from geolocation provider (e.g. North America).
+    pub continent: Option<String>,
+    /// ISO continent code when available (e.g. NA).
+    pub continent_code: Option<String>,
+    /// Postal / ZIP from provider when available.
+    pub postal: Option<String>,
+    /// Provider region code (e.g. US state code).
+    pub region_code: Option<String>,
+    /// Network operator domain from provider (e.g. amazon.com).
+    pub connection_domain: Option<String>,
+    /// Provider connection category when present (e.g. hosting, business, education).
+    pub connection_class: Option<String>,
+    /// IPv4 / IPv6 from provider.
+    pub ip_kind: Option<String>,
+    /// RDAP-derived registry / WHOIS-style network intelligence.
+    pub rdap: Option<GeoIpRdapInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,6 +112,9 @@ struct IpWhoIsConnection {
     isp: Option<String>,
     org: Option<String>,
     asn: Option<serde_json::Value>,
+    domain: Option<String>,
+    #[serde(rename = "type")]
+    connection_class: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -81,12 +126,18 @@ struct IpWhoIsTimezone {
 #[serde(rename_all = "camelCase")]
 struct IpWhoIsResponse {
     success: bool,
+    #[serde(rename = "type")]
+    ip_kind: Option<String>,
+    continent: Option<String>,
+    continent_code: Option<String>,
     country: Option<String>,
     country_code: Option<String>,
     region: Option<String>,
+    region_code: Option<String>,
     city: Option<String>,
     latitude: Option<f64>,
     longitude: Option<f64>,
+    postal: Option<String>,
     timezone: Option<IpWhoIsTimezone>,
     connection: Option<IpWhoIsConnection>,
     message: Option<String>,
@@ -109,6 +160,16 @@ fn normalize_asn(value: Option<&serde_json::Value>) -> Option<String> {
     })
 }
 
+fn merge_rdap(result: &mut GeoIpResult, rdap: Option<GeoIpRdapInfo>) {
+    if let Some(info) = rdap {
+        // Prefer RDAP registrant as org hint when provider org is empty.
+        if result.org.is_none() {
+            result.org = info.registrant.clone();
+        }
+        result.rdap = Some(info);
+    }
+}
+
 async fn geoip_lookup_https(ip: &str) -> Result<GeoIpResult, String> {
     let url = format!("https://ipwho.is/{}", ip);
     let response = reqwest::get(&url)
@@ -128,6 +189,7 @@ async fn geoip_lookup_https(ip: &str) -> Result<GeoIpResult, String> {
         ));
     }
 
+    let conn = data.connection.as_ref();
     Ok(GeoIpResult {
         ip: ip.to_string(),
         success: true,
@@ -137,38 +199,63 @@ async fn geoip_lookup_https(ip: &str) -> Result<GeoIpResult, String> {
         city: data.city,
         lat: data.latitude,
         lon: data.longitude,
-        isp: data.connection.as_ref().and_then(|c| c.isp.clone()),
-        org: data.connection.as_ref().and_then(|c| c.org.clone()),
-        asn: normalize_asn(data.connection.as_ref().and_then(|c| c.asn.as_ref())),
+        isp: conn.and_then(|c| c.isp.clone()),
+        org: conn.and_then(|c| c.org.clone()),
+        asn: normalize_asn(conn.and_then(|c| c.asn.as_ref())),
         timezone: data.timezone.and_then(|tz| tz.id),
         source: "ipwho.is".to_string(),
         error: None,
+        continent: data.continent,
+        continent_code: data.continent_code,
+        postal: data.postal,
+        region_code: data.region_code,
+        connection_domain: conn.and_then(|c| c.domain.clone()),
+        connection_class: conn.and_then(|c| c.connection_class.clone()),
+        ip_kind: data.ip_kind,
+        rdap: None,
     })
 }
 
-// ── Primary: HTTPS provider ─────────────────────────────────────────────
+// ── Primary: HTTPS provider + parallel RDAP ─────────────────────────────
 
-/// Look up GeoIP info for a single IP using an HTTPS provider.
+/// Look up GeoIP info for a single IP using an HTTPS provider plus RDAP when applicable.
 pub async fn geoip_lookup(ip: &str) -> GeoIpResult {
+    let skip_rdap = is_non_routable_for_rdap(ip);
+    let rdap_fut = async {
+        if skip_rdap {
+            None
+        } else {
+            rdap::enrich_ip(ip).await
+        }
+    };
+
     if !can_call_api() {
-        // Rate limited; fall back to DNS-based ASN lookup
-        return geoip_from_asn(ip).await;
+        let (mut result, rdap_opt) = tokio::join!(geoip_from_asn(ip), rdap_fut);
+        merge_rdap(&mut result, rdap_opt);
+        return result;
     }
 
-    match geoip_lookup_https(ip).await {
-        Ok(result) => result,
+    let (ipwho, rdap_opt) = tokio::join!(geoip_lookup_https(ip), rdap_fut);
+
+    match ipwho {
+        Ok(mut result) => {
+            merge_rdap(&mut result, rdap_opt);
+            result
+        }
         Err(e) => {
             tracing::error!(
                 "HTTPS GeoIP request failed for {}: {}, falling back to DNS",
                 ip,
                 e
             );
-            geoip_from_asn(ip).await
+            let mut result = geoip_from_asn(ip).await;
+            merge_rdap(&mut result, rdap_opt);
+            result
         }
     }
 }
 
-/// Batch GeoIP lookup using HTTPS provider + DNS fallback.
+/// Batch GeoIP lookup using HTTPS provider only (no RDAP — keeps latency predictable).
 pub async fn geoip_batch(ips: Vec<String>) -> BatchGeoIpResult {
     let start = Instant::now();
     let mut all_results = Vec::new();
@@ -298,6 +385,14 @@ async fn geoip_from_asn(ip: &str) -> GeoIpResult {
         timezone: None,
         source: "cymru-dns".to_string(),
         error: asn.error,
+        continent: None,
+        continent_code: None,
+        postal: None,
+        region_code: None,
+        connection_domain: None,
+        connection_class: None,
+        ip_kind: None,
+        rdap: None,
     }
 }
 
@@ -317,6 +412,14 @@ fn geoip_error(ip: &str, error: &str) -> GeoIpResult {
         timezone: None,
         source: "error".to_string(),
         error: Some(error.to_string()),
+        continent: None,
+        continent_code: None,
+        postal: None,
+        region_code: None,
+        connection_domain: None,
+        connection_class: None,
+        ip_kind: None,
+        rdap: None,
     }
 }
 

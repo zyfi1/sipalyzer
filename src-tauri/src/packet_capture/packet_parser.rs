@@ -1,7 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr};
 use crate::packet_capture::{
-    PacketFidelity, PacketProvenance, Protocol, PacketInfo, protocol_decoder,
+    protocol_decoder, PacketFidelity, PacketInfo, PacketProvenance, Protocol,
 };
+use std::net::{IpAddr, Ipv4Addr};
 
 /// Efficient, single-pass packet parser
 /// Handles all link layer types and protocols correctly
@@ -13,7 +13,7 @@ pub struct PacketParser {
 impl PacketParser {
     #[allow(dead_code)]
     pub fn new(link_layer_type: u32) -> Self {
-        Self { 
+        Self {
             link_layer_type,
             rtp_port_range: None, // Default: use hardcoded range
         }
@@ -94,29 +94,65 @@ impl PacketParser {
         let (src_ip, dst_ip, ip_protocol, _ip_header_len, transport_start) = if ip_version == 4 {
             // IPv4
             let src_ip = IpAddr::V4(std::net::Ipv4Addr::new(
-                ip_data[12], ip_data[13], ip_data[14], ip_data[15],
+                ip_data[12],
+                ip_data[13],
+                ip_data[14],
+                ip_data[15],
             ));
             let dst_ip = IpAddr::V4(std::net::Ipv4Addr::new(
-                ip_data[16], ip_data[17], ip_data[18], ip_data[19],
+                ip_data[16],
+                ip_data[17],
+                ip_data[18],
+                ip_data[19],
             ));
             let ip_header_len = ((ip_data[0] & 0x0F) * 4) as usize;
             (src_ip, dst_ip, ip_data[9], ip_header_len, ip_header_len)
         } else if ip_version == 6 && ip_data.len() >= 40 {
             // IPv6: walk extension header chain to find transport protocol
             let src_ip = IpAddr::V6(std::net::Ipv6Addr::from([
-                ip_data[8], ip_data[9], ip_data[10], ip_data[11],
-                ip_data[12], ip_data[13], ip_data[14], ip_data[15],
-                ip_data[16], ip_data[17], ip_data[18], ip_data[19],
-                ip_data[20], ip_data[21], ip_data[22], ip_data[23],
+                ip_data[8],
+                ip_data[9],
+                ip_data[10],
+                ip_data[11],
+                ip_data[12],
+                ip_data[13],
+                ip_data[14],
+                ip_data[15],
+                ip_data[16],
+                ip_data[17],
+                ip_data[18],
+                ip_data[19],
+                ip_data[20],
+                ip_data[21],
+                ip_data[22],
+                ip_data[23],
             ]));
             let dst_ip = IpAddr::V6(std::net::Ipv6Addr::from([
-                ip_data[24], ip_data[25], ip_data[26], ip_data[27],
-                ip_data[28], ip_data[29], ip_data[30], ip_data[31],
-                ip_data[32], ip_data[33], ip_data[34], ip_data[35],
-                ip_data[36], ip_data[37], ip_data[38], ip_data[39],
+                ip_data[24],
+                ip_data[25],
+                ip_data[26],
+                ip_data[27],
+                ip_data[28],
+                ip_data[29],
+                ip_data[30],
+                ip_data[31],
+                ip_data[32],
+                ip_data[33],
+                ip_data[34],
+                ip_data[35],
+                ip_data[36],
+                ip_data[37],
+                ip_data[38],
+                ip_data[39],
             ]));
             let (transport_proto, transport_offset) = Self::skip_ipv6_ext_headers(&ip_data);
-            (src_ip, dst_ip, transport_proto, transport_offset, transport_offset)
+            (
+                src_ip,
+                dst_ip,
+                transport_proto,
+                transport_offset,
+                transport_offset,
+            )
         } else {
             if self.link_layer_type == 1 {
                 return Some(self.opaque_raw_frame(packet, packet_count));
@@ -153,8 +189,18 @@ impl PacketParser {
                     size: ip_data.len().saturating_sub(transport_start),
                     frame_length: packet.data.len(),
                     raw_frame: Some(packet.data.to_vec()),
-                    data: if ip_data.len() > transport_start { ip_data[transport_start..].to_vec() } else { Vec::new() },
-                    decoded: protocol_decoder::decode_packet(packet.data, Some(self.link_layer_type), packet_count, self.rtp_port_range).ok(),
+                    data: if ip_data.len() > transport_start {
+                        ip_data[transport_start..].to_vec()
+                    } else {
+                        Vec::new()
+                    },
+                    decoded: protocol_decoder::decode_packet(
+                        packet.data,
+                        Some(self.link_layer_type),
+                        packet_count,
+                        self.rtp_port_range,
+                    )
+                    .ok(),
                     fidelity: crate::packet_capture::PacketFidelity::Authoritative,
                     provenance: crate::packet_capture::PacketProvenance::LocalCapture,
                 });
@@ -171,8 +217,18 @@ impl PacketParser {
                     size: ip_data.len().saturating_sub(transport_start),
                     frame_length: packet.data.len(),
                     raw_frame: Some(packet.data.to_vec()),
-                    data: if ip_data.len() > transport_start { ip_data[transport_start..].to_vec() } else { Vec::new() },
-                    decoded: protocol_decoder::decode_packet(packet.data, Some(self.link_layer_type), packet_count, self.rtp_port_range).ok(),
+                    data: if ip_data.len() > transport_start {
+                        ip_data[transport_start..].to_vec()
+                    } else {
+                        Vec::new()
+                    },
+                    decoded: protocol_decoder::decode_packet(
+                        packet.data,
+                        Some(self.link_layer_type),
+                        packet_count,
+                        self.rtp_port_range,
+                    )
+                    .ok(),
                     fidelity: crate::packet_capture::PacketFidelity::Authoritative,
                     provenance: crate::packet_capture::PacketProvenance::LocalCapture,
                 });
@@ -181,8 +237,14 @@ impl PacketParser {
 
         // Decode full packet for application layer detection
         // This is the SINGLE SOURCE OF TRUTH for protocol detection
-        let decoded = protocol_decoder::decode_packet(packet.data, Some(self.link_layer_type), packet_count, self.rtp_port_range).ok();
-        
+        let decoded = protocol_decoder::decode_packet(
+            packet.data,
+            Some(self.link_layer_type),
+            packet_count,
+            self.rtp_port_range,
+        )
+        .ok();
+
         // Determine protocol from decoded application layer
         // Priority: decoded > payload-based fallback > transport protocol
         let mut final_protocol = if let Some(ref decoded_packet) = decoded {
@@ -230,7 +292,12 @@ impl PacketParser {
         // override the protocol. This catches cases where the decoder misclassified
         // (e.g., SIP response mistaken for RTP due to UTF-8 encoding edge cases).
         if final_protocol != Protocol::SIP && !payload.is_empty() && Protocol::is_sip(&payload) {
-            tracing::info!("SIP safety net triggered: overriding {:?} → SIP for packet with ports {}→{}", final_protocol, src_port, dst_port);
+            tracing::info!(
+                "SIP safety net triggered: overriding {:?} → SIP for packet with ports {}→{}",
+                final_protocol,
+                src_port,
+                dst_port
+            );
             final_protocol = Protocol::SIP;
         }
 
@@ -264,9 +331,15 @@ impl PacketParser {
                         ethertype = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
                         offset += 4;
                     }
-                    if ethertype == 0x0800 && data.len() >= offset + 20 && (data[offset] & 0xF0) == 0x40 {
+                    if ethertype == 0x0800
+                        && data.len() >= offset + 20
+                        && (data[offset] & 0xF0) == 0x40
+                    {
                         offset
-                    } else if ethertype == 0x86dd && data.len() >= offset + 40 && (data[offset] & 0xF0) == 0x60 {
+                    } else if ethertype == 0x86dd
+                        && data.len() >= offset + 40
+                        && (data[offset] & 0xF0) == 0x60
+                    {
                         offset
                     } else {
                         return None;
@@ -285,9 +358,12 @@ impl PacketParser {
                     let af_be = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                     // AF_INET = 2, AF_INET6 = 30 on macOS/BSD
                     if (af_le == 2 || af_be == 2) && (data[4] & 0xF0) == 0x40 {
-                        4  // IPv4
-                    } else if (af_le == 30 || af_be == 30) && data.len() >= 44 && (data[4] & 0xF0) == 0x60 {
-                        4  // IPv6
+                        4 // IPv4
+                    } else if (af_le == 30 || af_be == 30)
+                        && data.len() >= 44
+                        && (data[4] & 0xF0) == 0x60
+                    {
+                        4 // IPv6
                     } else {
                         return None;
                     }
@@ -302,9 +378,9 @@ impl PacketParser {
                     // Check if it looks like Linux cooked capture
                     let protocol = u16::from_be_bytes([data[14], data[15]]);
                     if protocol == 0x0800 && data.len() >= 36 && (data[16] & 0xF0) == 0x40 {
-                        16  // IPv4 after 16-byte SLL header
+                        16 // IPv4 after 16-byte SLL header
                     } else if protocol == 0x86dd && data.len() >= 56 && (data[16] & 0xF0) == 0x60 {
-                        16  // IPv6 after 16-byte SLL header
+                        16 // IPv6 after 16-byte SLL header
                     } else if data.len() >= 20 && (data[0] & 0xF0) == 0x40 {
                         // Fallback: Raw IP (starts directly with IP header)
                         0
@@ -329,7 +405,10 @@ impl PacketParser {
                     let af_be = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                     if (af_le == 2 || af_be == 2) && (data[4] & 0xF0) == 0x40 {
                         4
-                    } else if (af_le == 30 || af_be == 30) && data.len() >= 44 && (data[4] & 0xF0) == 0x60 {
+                    } else if (af_le == 30 || af_be == 30)
+                        && data.len() >= 44
+                        && (data[4] & 0xF0) == 0x60
+                    {
                         4
                     } else {
                         return None;
@@ -352,10 +431,18 @@ impl PacketParser {
                 } else if data.len() >= 40 && (data[0] & 0xF0) == 0x60 {
                     // Starts with IPv6 header
                     0
-                } else if data.len() >= 34 && data[12] == 0x08 && data[13] == 0x00 && (data[14] & 0xF0) == 0x40 {
+                } else if data.len() >= 34
+                    && data[12] == 0x08
+                    && data[13] == 0x00
+                    && (data[14] & 0xF0) == 0x40
+                {
                     // Ethernet with IPv4
                     14
-                } else if data.len() >= 54 && data[12] == 0x86 && data[13] == 0xdd && (data[14] & 0xF0) == 0x60 {
+                } else if data.len() >= 54
+                    && data[12] == 0x86
+                    && data[13] == 0xdd
+                    && (data[14] & 0xF0) == 0x60
+                {
                     // Ethernet with IPv6
                     14
                 } else if data.len() >= 24 {
@@ -364,7 +451,10 @@ impl PacketParser {
                     let af_be = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
                     if (af_le == 2 || af_be == 2) && (data[4] & 0xF0) == 0x40 {
                         4
-                    } else if (af_le == 30 || af_be == 30) && data.len() >= 44 && (data[4] & 0xF0) == 0x60 {
+                    } else if (af_le == 30 || af_be == 30)
+                        && data.len() >= 44
+                        && (data[4] & 0xF0) == 0x60
+                    {
                         4
                     } else {
                         return None;
@@ -374,12 +464,16 @@ impl PacketParser {
                 }
             }
         };
-        
+
         Some(data[offset..].to_vec())
     }
 
-
-    fn parse_udp(&self, udp_data: &[u8], _src_ip: IpAddr, _dst_ip: IpAddr) -> Option<(u16, u16, Vec<u8>, Protocol)> {
+    fn parse_udp(
+        &self,
+        udp_data: &[u8],
+        _src_ip: IpAddr,
+        _dst_ip: IpAddr,
+    ) -> Option<(u16, u16, Vec<u8>, Protocol)> {
         if udp_data.len() < 8 {
             return None;
         }
@@ -405,7 +499,12 @@ impl PacketParser {
         Some((src_port, dst_port, payload, protocol))
     }
 
-    fn parse_tcp(&self, tcp_data: &[u8], _src_ip: IpAddr, _dst_ip: IpAddr) -> Option<(u16, u16, Vec<u8>, Protocol)> {
+    fn parse_tcp(
+        &self,
+        tcp_data: &[u8],
+        _src_ip: IpAddr,
+        _dst_ip: IpAddr,
+    ) -> Option<(u16, u16, Vec<u8>, Protocol)> {
         if tcp_data.len() < 20 {
             return None;
         }
@@ -413,7 +512,7 @@ impl PacketParser {
         let src_port = u16::from_be_bytes([tcp_data[0], tcp_data[1]]);
         let dst_port = u16::from_be_bytes([tcp_data[2], tcp_data[3]]);
         let data_offset = ((tcp_data[12] >> 4) & 0x0F) * 4;
-        
+
         let payload = if tcp_data.len() >= data_offset as usize {
             tcp_data[data_offset as usize..].to_vec()
         } else {
@@ -437,10 +536,8 @@ impl PacketParser {
     }
 
     fn parse_timestamp(&self, header: &pcap::PacketHeader) -> chrono::DateTime<chrono::Utc> {
-        chrono::DateTime::from_timestamp(
-            header.ts.tv_sec,
-            (header.ts.tv_usec as u32) * 1000,
-        ).unwrap_or_else(|| chrono::Utc::now())
+        chrono::DateTime::from_timestamp(header.ts.tv_sec, (header.ts.tv_usec as u32) * 1000)
+            .unwrap_or_else(|| chrono::Utc::now())
     }
 
     fn skip_ipv6_ext_headers(data: &[u8]) -> (u8, usize) {
@@ -452,25 +549,33 @@ impl PacketParser {
         for _ in 0..10 {
             match next_header {
                 0 | 43 | 60 | 135 => {
-                    if offset + 2 > data.len() { break; }
+                    if offset + 2 > data.len() {
+                        break;
+                    }
                     let ext_len = (data[offset + 1] as usize + 1) * 8;
                     next_header = data[offset];
                     offset += ext_len;
                 }
                 44 => {
-                    if offset + 8 > data.len() { break; }
+                    if offset + 8 > data.len() {
+                        break;
+                    }
                     next_header = data[offset];
                     offset += 8;
                 }
                 51 => {
-                    if offset + 2 > data.len() { break; }
+                    if offset + 2 > data.len() {
+                        break;
+                    }
                     let ext_len = (data[offset + 1] as usize + 2) * 4;
                     next_header = data[offset];
                     offset += ext_len;
                 }
                 _ => break,
             }
-            if offset >= data.len() { break; }
+            if offset >= data.len() {
+                break;
+            }
         }
         (next_header, offset)
     }
@@ -481,13 +586,13 @@ impl PacketParser {
         }
         let start = String::from_utf8_lossy(&data[..data.len().min(10)]);
         let start_upper = start.to_uppercase();
-        start_upper.starts_with("GET ") ||
-        start_upper.starts_with("POST ") ||
-        start_upper.starts_with("PUT ") ||
-        start_upper.starts_with("DELETE ") ||
-        start_upper.starts_with("HEAD ") ||
-        start_upper.starts_with("OPTIONS ") ||
-        start_upper.starts_with("PATCH ") ||
-        start_upper.starts_with("HTTP/")
+        start_upper.starts_with("GET ")
+            || start_upper.starts_with("POST ")
+            || start_upper.starts_with("PUT ")
+            || start_upper.starts_with("DELETE ")
+            || start_upper.starts_with("HEAD ")
+            || start_upper.starts_with("OPTIONS ")
+            || start_upper.starts_with("PATCH ")
+            || start_upper.starts_with("HTTP/")
     }
 }

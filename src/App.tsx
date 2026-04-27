@@ -152,6 +152,9 @@ function AppContent() {
   const highVisibility = useSettingsStore((s) => s.highVisibility);
   const reducedMotion = useSettingsStore((s) => s.reducedMotion);
   const updatePrefs = useSettingsStore((s) => s.updates);
+  const minimizeToTray = useSettingsStore((s) => s.minimizeToTray);
+  const hideDockIcon = useSettingsStore((s) => s.hideDockIcon);
+  const showTrayIcon = useSettingsStore((s) => s.showTrayIcon);
   const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
   const layout = useLayoutStore(
     useShallow((s) => ({
@@ -661,12 +664,13 @@ function AppContent() {
     useSettingsStore.getState().syncMediaPortsToBackend();
   }, []);
 
-  // Sync window behavior preferences to backend on load
+  // Keep window behavior preferences synced to backend.
+  // This must react to store changes (including restored session state), not just initial load.
   useEffect(() => {
-    useSettingsStore.getState().syncMinimizeToTrayToBackend();
-    useSettingsStore.getState().syncHideDockIconToBackend();
-    useSettingsStore.getState().syncShowTrayIconToBackend();
-  }, []);
+    void useSettingsStore.getState().syncMinimizeToTrayToBackend();
+    void useSettingsStore.getState().syncHideDockIconToBackend();
+    void useSettingsStore.getState().syncShowTrayIconToBackend();
+  }, [minimizeToTray, hideDockIcon, showTrayIcon]);
 
   // Channel-aware updater checks:
   // - immediate check after app boot (if enabled)

@@ -18,6 +18,26 @@ import (
 func RunFirmwareDownload(ctx context.Context, p FirmwareDownloadParams, ch chan<- ToolResponse) {
 	defer close(ch)
 
+	if p.ArchiveFormat == "cloudco-ftp" {
+		err := runCloudCoFTPDownload(ctx, p, ch)
+		if err != nil {
+			if ctx.Err() != nil {
+				ch <- ToolResponse{Type: "Error", Data: ErrorData{Code: "FIRMWARE_CANCELLED", Message: "Download cancelled"}}
+				return
+			}
+			ch <- ToolResponse{Type: "Error", Data: ErrorData{Code: "FIRMWARE_DOWNLOAD_ERROR", Message: err.Error()}}
+		}
+		return
+	}
+
+	if p.ArchiveFormat == "emfw-bundle" {
+		ch <- ToolResponse{Type: "Error", Data: ErrorData{
+			Code:    "FIRMWARE_DOWNLOAD_ERROR",
+			Message: "Bundled EdgeMarc archives are no longer shipped; use archive_format \"cloudco-ftp\" with storage_path.",
+		}}
+		return
+	}
+
 	urls := []string{p.URL}
 	if p.FallbackURL != "" {
 		urls = append(urls, p.FallbackURL)

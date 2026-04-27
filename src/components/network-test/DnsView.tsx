@@ -13,6 +13,8 @@ import {
   ChevronRight, Check, X,
 } from "@/lib/icons";
 import { CoordinateValue } from "./dns/CoordinateValue";
+import { GeoIpLocationMap } from "./dns/GeoIpLocationMap";
+import { GeoIpIntelDetails } from "./dns/GeoIpIntelDetails";
 import type { DnsRecordType, MultiSiteConfig } from "@/types/dns";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -79,6 +81,7 @@ function LookupTile({ expanded, onToggle }: { expanded: boolean; onToggle: () =>
   const {
     lookup, lookupDomain, lookupRecordType, lookupServer, lookupTransport,
     setLookupDomain, setLookupRecordType, setLookupServer, setLookupTransport, runLookup,
+    dismissLookup,
   } = useDnsTestStore();
 
   const r = lookup.result;
@@ -88,6 +91,7 @@ function LookupTile({ expanded, onToggle }: { expanded: boolean; onToggle: () =>
       icon={Globe} tint="text-info" title="DNS Lookup"
       subtitle="Query any record type"
       status={lookup.status} onRun={runLookup}
+      onStop={dismissLookup}
       summary={r ? `${r.records.length} rec · ${r.resolution_ms.toFixed(0)}ms` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -169,6 +173,7 @@ function SipResolveTile({ expanded, onToggle }: { expanded: boolean; onToggle: (
   const {
     sipResolve, sipResolveDomain, sipResolveServer,
     setSipResolveDomain, setSipResolveServer, runSipResolve,
+    dismissSipResolve,
   } = useDnsTestStore();
 
   const r = sipResolve.result;
@@ -178,6 +183,7 @@ function SipResolveTile({ expanded, onToggle }: { expanded: boolean; onToggle: (
       icon={Phone} tint="text-primary" title="SIP Resolution"
       subtitle="RFC 3263 NAPTR → SRV → A/AAAA"
       status={sipResolve.status} onRun={runSipResolve}
+      onStop={dismissSipResolve}
       summary={r ? `${r.targets.length} target${r.targets.length !== 1 ? "s" : ""} · ${r.total_ms.toFixed(0)}ms` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -260,6 +266,7 @@ function ReverseDnsTile({ expanded, onToggle }: { expanded: boolean; onToggle: (
   const {
     reverse, reverseIp, reverseServer, reverseFcrdns,
     setReverseIp, setReverseServer, setReverseFcrdns, runReverse,
+    dismissReverse,
   } = useDnsTestStore();
 
   const r = reverse.result;
@@ -269,6 +276,7 @@ function ReverseDnsTile({ expanded, onToggle }: { expanded: boolean; onToggle: (
       icon={ArrowLeft} tint="text-warning" title="Reverse DNS"
       subtitle="PTR + FCrDNS verification"
       status={reverse.status} onRun={runReverse}
+      onStop={dismissReverse}
       summary={r?.ptr_hostname ? r.ptr_hostname.slice(0, 24) : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -350,7 +358,7 @@ function ReverseDnsTile({ expanded, onToggle }: { expanded: boolean; onToggle: (
 // ═══════════════════════════════════════════════════════════════════
 
 function GeoIpTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
-  const { geoip, geoipIp, setGeoipIp, runGeoip } = useDnsTestStore();
+  const { geoip, geoipIp, setGeoipIp, runGeoip, dismissGeoip } = useDnsTestStore();
   const r = geoip.result;
 
   const summaryText = r?.success && r.country_code
@@ -362,6 +370,7 @@ function GeoIpTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
       icon={MapPin} tint="text-destructive" title="GeoIP Lookup"
       subtitle="Location, ISP, ASN"
       status={geoip.status} onRun={runGeoip}
+      onStop={dismissGeoip}
       summary={summaryText}
       expanded={expanded} onToggle={onToggle}
     >
@@ -377,19 +386,41 @@ function GeoIpTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
 
       {/* Results */}
       {r?.success && (
-        <div className="ui-hero-surface p-3 space-y-1.5">
-          <GeoRow label="IP" value={r.ip} />
-          {r.country && (
-            <GeoRow label="Country" value={`${r.country_code ? countryFlag(r.country_code) + " " : ""}${r.country}${r.country_code ? ` (${r.country_code})` : ""}`} />
+        <div
+          className={
+            r.lat != null && r.lon != null
+              ? "ui-hero-surface flex max-h-[min(88dvh,720px)] flex-col gap-0 overflow-hidden p-2 sm:p-3"
+              : "ui-hero-surface space-y-1.5 p-2 sm:p-3"
+          }
+        >
+          <div
+            className={
+              r.lat != null && r.lon != null
+                ? "max-h-[min(40dvh,300px)] min-h-0 shrink-0 space-y-1 overflow-y-auto overscroll-contain border-b border-border/25 pb-2 pr-0.5"
+                : "space-y-1"
+            }
+          >
+            <GeoRow label="IP" value={r.ip} />
+            {r.country && (
+              <GeoRow label="Country" value={`${r.country_code ? countryFlag(r.country_code) + " " : ""}${r.country}${r.country_code ? ` (${r.country_code})` : ""}`} />
+            )}
+            {r.region && <GeoRow label="Region" value={r.region} />}
+            {r.city && <GeoRow label="City" value={r.city} />}
+            {(r.lat != null && r.lon != null) && <GeoRow label="Coords" value={<CoordinateValue lat={r.lat} lon={r.lon} />} />}
+            {r.isp && <GeoRow label="ISP" value={r.isp} />}
+            {r.org && <GeoRow label="Org" value={r.org} />}
+            {r.asn && <GeoRow label="ASN" value={r.asn} />}
+            {r.timezone && <GeoRow label="TZ" value={r.timezone} />}
+            <div className="pt-0.5">
+              <GeoIpIntelDetails result={r} />
+            </div>
+          </div>
+          {r.lat != null && r.lon != null && (
+            <div className="flex min-h-0 flex-1 flex-col pt-2">
+              <GeoIpLocationMap fillHeight className="min-h-0 flex-1" lat={r.lat} lon={r.lon} label="Approximate location" />
+            </div>
           )}
-          {r.region && <GeoRow label="Region" value={r.region} />}
-          {r.city && <GeoRow label="City" value={r.city} />}
-          {(r.lat != null && r.lon != null) && <GeoRow label="Coords" value={<CoordinateValue lat={r.lat} lon={r.lon} />} />}
-          {r.isp && <GeoRow label="ISP" value={r.isp} />}
-          {r.org && <GeoRow label="Org" value={r.org} />}
-          {r.asn && <GeoRow label="ASN" value={r.asn} />}
-          {r.timezone && <GeoRow label="TZ" value={r.timezone} />}
-          <div className="pt-1.5">
+          <div className={r.lat != null && r.lon != null ? "shrink-0 pt-2" : "pt-1.5"}>
             <Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4 bg-success/8 text-success/80">{r.source}</Badge>
           </div>
         </div>
@@ -423,6 +454,7 @@ function DigTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
   const {
     dig, digDomain, digRecordType, digServer, digUseTcp, digRd, digCd, digAd,
     setDigDomain, setDigRecordType, setDigServer, setDigUseTcp, setDigRd, setDigCd, setDigAd, runDig,
+    dismissDig,
   } = useDnsTestStore();
 
   const r = dig.result;
@@ -432,6 +464,7 @@ function DigTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
       icon={Terminal} tint="text-success" title="Dig"
       subtitle="Raw DNS query with full diagnostics"
       status={dig.status} onRun={runDig}
+      onStop={dismissDig}
       summary={r ? `${r.header.rcode} · ${r.query_time_ms.toFixed(0)}ms` : undefined}
       expanded={expanded} onToggle={onToggle}
     >
@@ -527,7 +560,7 @@ function FlagPill({ children }: { children: string }) {
 // ═══════════════════════════════════════════════════════════════════
 
 function MultiSiteTile({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
-  const { multiSite, runMultiSite } = useDnsTestStore();
+  const { multiSite, runMultiSite, dismissMultiSite } = useDnsTestStore();
   const [target, setTarget] = useState("");
   const [testType, setTestType] = useState<"lookup" | "sip_resolve" | "reverse" | "dig">("lookup");
   const [recordType, setRecordType] = useState("A");
@@ -554,6 +587,7 @@ function MultiSiteTile({ expanded, onToggle }: { expanded: boolean; onToggle: ()
       icon={Network} tint="text-info" title="Multi-Site Comparison"
       subtitle="Compare results across remote agents"
       status={multiSite.status} onRun={handleRun}
+      onStop={dismissMultiSite}
       summary={r ? `${r.results.length} site${r.results.length !== 1 ? "s" : ""}` : undefined}
       expanded={expanded} onToggle={onToggle} fullWidth
     >
@@ -653,9 +687,9 @@ function MultiSiteTile({ expanded, onToggle }: { expanded: boolean; onToggle: ()
 
 function GeoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="section-label-sm w-14 shrink-0 text-right">{label}</span>
-      <span className="font-mono text-foreground/90">{value}</span>
+    <div className="grid grid-cols-[4.25rem_1fr] items-baseline gap-x-2 text-2xs leading-snug sm:grid-cols-[5rem_1fr] sm:text-xs">
+      <span className="text-right text-muted-foreground">{label}</span>
+      <span className="min-w-0 font-mono text-foreground/90">{value}</span>
     </div>
   );
 }

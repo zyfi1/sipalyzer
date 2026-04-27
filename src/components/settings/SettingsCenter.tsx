@@ -619,15 +619,27 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
     rtpPortRangeHigh: 60_000,
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <>
       <div
-        className={settingsStyles.overlay}
+        className="fixed inset-x-0 top-9 bottom-7 bg-black/25 z-40 transition-smooth"
         onClick={onClose}
       />
-      <div className={settingsStyles.sheet}>
+      <div className={clsx(
+        settingsStyles.sheet,
+        "animate-in slide-in-from-right duration-[var(--motion-duration-overlay)] [transition-timing-function:var(--motion-ease-overlay)]",
+      )}>
         <Tabs
           value={settingsCenterTab}
           onValueChange={(v) => setSettingsCenterTab(v as SettingsCenterTab)}
@@ -712,6 +724,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
           )}
 
           <TabsContent value="general" className={settingsStyles.tabsContentP6Space6}>
+            <div className={settingsStyles.generalLayout}>
             <div className={settingsStyles.sectionIntro}>
               <h2 className={settingsStyles.textBaseSemibold}>Date & time</h2>
               <p className={settingsStyles.textSmMuted}>
@@ -809,7 +822,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
               </p>
             </div>
             <Paper className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowDivided)}>
-              <Group className={settingsStyles.rowBetweenP4} justify="space-between" align="center" wrap="nowrap">
+              <Group className={settingsStyles.preferenceRow}>
                 <div className={settingsStyles.stack0_5}>
                   <Label htmlFor="settings-high-visibility" className={settingsStyles.cursorPointer}>
                     High visibility mode
@@ -823,9 +836,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   checked={highVisibility}
                   onCheckedChange={setHighVisibility}
                   aria-label="High visibility mode"
+                  className={settingsStyles.preferenceControl}
                 />
               </Group>
-              <Group className={settingsStyles.rowBetweenP4} justify="space-between" align="center" wrap="nowrap">
+              <Group className={settingsStyles.preferenceRow}>
                 <div className={settingsStyles.stack0_5}>
                   <Label htmlFor="settings-reduced-motion" className={settingsStyles.cursorPointer}>
                     Reduced motion
@@ -839,6 +853,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   checked={reducedMotion}
                   onCheckedChange={setReducedMotion}
                   aria-label="Reduced motion"
+                  className={settingsStyles.preferenceControl}
                 />
               </Group>
             </Paper>
@@ -895,7 +910,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   ) : null}
                 </div>
               </div>
-              <Group className={settingsStyles.rowBetweenP4} justify="space-between" align="center" wrap="nowrap">
+              <Group className={settingsStyles.preferenceRow}>
                 <div className={settingsStyles.stack0_5}>
                   <Label htmlFor="settings-update-check-launch" className={settingsStyles.cursorPointer}>
                     Check for updates on launch
@@ -909,6 +924,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   checked={updates.autoCheckOnLaunch}
                   onCheckedChange={setUpdateAutoCheckOnLaunch}
                   aria-label="Check for updates on launch"
+                  className={settingsStyles.preferenceControl}
                 />
               </Group>
               <Group className={settingsStyles.wrapGap2P4} gap="sm" align="center">
@@ -951,7 +967,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
             <div className={clsx("ui-panel-shell", settingsStyles.panelShellOverflowDivided)}>
               {isMac ? (
                 <>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label className={settingsStyles.cursorDefault}>App visibility</Label>
                       <p className={settingsStyles.textXsMuted}>
@@ -989,7 +1005,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       </div>
                     </RadioGroup>
                   </div>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label htmlFor="settings-keep-running" className={settingsStyles.cursorPointer}>
                         Keep app running when window closes
@@ -1002,9 +1018,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       id="settings-keep-running"
                       checked={minimizeToTray}
                       onCheckedChange={(v) => setMinimizeToTray(v === true)}
+                      className={settingsStyles.preferenceControl}
                     />
                   </div>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label htmlFor="settings-confirm-quit" className={settingsStyles.cursorPointer}>
                         Confirm before quit (Cmd+Q)
@@ -1019,12 +1036,13 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       id="settings-confirm-quit"
                       checked={confirmOnClose}
                       onCheckedChange={(v) => setConfirmOnClose(v === true)}
+                      className={settingsStyles.preferenceControl}
                     />
                   </div>
                 </>
               ) : isWindows ? (
                 <>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label htmlFor="settings-show-dock" className={settingsStyles.cursorPointer}>Show in taskbar</Label>
                       <p className={settingsStyles.textXsMuted}>
@@ -1037,9 +1055,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       checked={!hideDockIcon}
                       disabled={!showTrayIcon}
                       onCheckedChange={(v) => setHideDockIcon(v !== true)}
+                      className={settingsStyles.preferenceControl}
                     />
                   </div>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label htmlFor="settings-show-tray" className={settingsStyles.cursorPointer}>Show in system tray</Label>
                       <p className={settingsStyles.textXsMuted}>
@@ -1052,9 +1071,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       checked={showTrayIcon}
                       disabled={hideDockIcon}
                       onCheckedChange={(v) => setShowTrayIcon(v === true)}
+                      className={settingsStyles.preferenceControl}
                     />
                   </div>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label htmlFor="settings-keep-running" className={clsx("cursor-pointer", !showTrayIcon && settingsStyles.labelMuted)}>
                         Minimize to tray on close
@@ -1070,9 +1090,10 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       checked={minimizeToTray}
                       disabled={!showTrayIcon}
                       onCheckedChange={(v) => setMinimizeToTray(v === true)}
+                      className={settingsStyles.preferenceControl}
                     />
                   </div>
-                  <div className={settingsStyles.rowBetweenP4}>
+                  <div className={settingsStyles.preferenceRow}>
                     <div className={settingsStyles.stack0_5}>
                       <Label htmlFor="settings-confirm-quit" className={settingsStyles.cursorPointer}>
                         Confirm before exit
@@ -1087,6 +1108,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       id="settings-confirm-quit"
                       checked={confirmOnClose}
                       onCheckedChange={(v) => setConfirmOnClose(v === true)}
+                      className={settingsStyles.preferenceControl}
                     />
                   </div>
                 </>
@@ -1136,6 +1158,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                 Restore applies the backup immediately and persists it for the next launch.
               </p>
             </Paper>
+            </div>
           </TabsContent>
 
           <TabsContent value="notifications" className={settingsStyles.tabsContentBase}>

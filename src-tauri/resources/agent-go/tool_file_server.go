@@ -17,12 +17,27 @@ import (
 	"time"
 )
 
-// RunFileServe starts HTTP (and optionally TFTP) servers and streams request logs via ch.
+func hasFileServeProtocol(protocols []string, name string) bool {
+	for _, x := range protocols {
+		if x == name {
+			return true
+		}
+	}
+	return false
+}
+
+// RunFileServe starts HTTP (and optionally TFTP, FTP) servers and streams request logs via ch.
 func RunFileServe(ctx context.Context, p FileServeParams, ch chan<- ToolResponse) {
 	defer close(ch)
 
 	if p.HTTPPort == 0 {
 		p.HTTPPort = 8080
+	}
+	if p.TFTPPort == 0 {
+		p.TFTPPort = 69
+	}
+	if p.FtpPort == 0 {
+		p.FtpPort = 2121
 	}
 
 	// Determine serve directory
@@ -58,29 +73,11 @@ func RunFileServe(ctx context.Context, p FileServeParams, ch chan<- ToolResponse
 		return
 	}
 
-	// Determine local IP for URLs
 	localIP := getLocalIP()
 	if localIP == "" {
 		localIP = "0.0.0.0"
 	}
 
-	httpURL := fmt.Sprintf("http://%s:%d", localIP, p.HTTPPort)
-	tftpURL := ""
-
-	// Send initial status
-	ch <- ToolResponse{
-		Type: "Progress",
-		Data: ProgressData{
-			Message: "Starting servers",
-			Partial: FileServeStatus{
-				HttpURL: httpURL,
-				TftpURL: tftpURL,
-				Serving: true,
-			},
-		},
-	}
-
-	// Start HTTP server
 	httpServing := false
 	for _, proto := range p.Protocols {
 		if proto == "http" {
@@ -89,6 +86,31 @@ func RunFileServe(ctx context.Context, p FileServeParams, ch chan<- ToolResponse
 	}
 	if len(p.Protocols) == 0 {
 		httpServing = true
+	}
+
+	httpURL := ""
+	if httpServing {
+		httpURL = fmt.Sprintf("http://%s:%d", localIP, p.HTTPPort)
+	}
+
+	tftpURL := ""
+	if hasFileServeProtocol(p.Protocols, "tftp") {
+		tftpURL = fmt.Sprintf("tftp://%s:%d", localIP, p.TFTPPort)
+	}
+
+	ftpURL := ""
+
+	ch <- ToolResponse{
+		Type: "Progress",
+		Data: ProgressData{
+			Message: "Starting servers",
+			Partial: FileServeStatus{
+				HttpURL: httpURL,
+				TftpURL: tftpURL,
+				FtpURL:  ftpURL,
+				Serving: true,
+			},
+		},
 	}
 
 	if httpServing {
@@ -145,28 +167,50 @@ func RunFileServe(ctx context.Context, p FileServeParams, ch chan<- ToolResponse
 		log.Printf("[FileServe] HTTP serving %s on %s", serveDir, addr)
 	}
 
-	// TFTP server (simplified: serve files from directory via UDP)
 	for _, proto := range p.Protocols {
 		if proto == "tftp" {
-			tftpURL = fmt.Sprintf("tftp://%s:%d", localIP, p.TFTPPort)
 			go runSimpleTFTP(ctx, serveDir, p.TFTPPort, ch)
 		}
 	}
 
-	// Update status with full URLs
+	if hasFileServeProtocol(p.Protocols, "ftp") {
+		ready := make(chan string, 1)
+		go runSimpleFTP(ctx, serveDir, localIP, p.FtpPort, ch, ready)
+		select {
+		case u := <-ready:
+			ftpURL = u
+		case <-time.After(3 * time.Second):
+		}
+	}
+
+	statusParts := []string{}
+	if httpURL != "" {
+		statusParts = append(statusParts, "HTTP "+httpURL)
+	}
+	if tftpURL != "" {
+		statusParts = append(statusParts, "TFTP "+tftpURL)
+	}
+	if ftpURL != "" {
+		statusParts = append(statusParts, "FTP "+ftpURL)
+	}
+	statusMsg := "Serving"
+	if len(statusParts) > 0 {
+		statusMsg += ": " + strings.Join(statusParts, ", ")
+	}
+
 	ch <- ToolResponse{
 		Type: "Progress",
 		Data: ProgressData{
-			Message: fmt.Sprintf("Serving on HTTP %s", httpURL),
+			Message: statusMsg,
 			Partial: FileServeStatus{
 				HttpURL: httpURL,
 				TftpURL: tftpURL,
+				FtpURL:  ftpURL,
 				Serving: true,
 			},
 		},
 	}
 
-	// Duration timeout
 	if p.DurationSecs > 0 {
 		select {
 		case <-ctx.Done():
@@ -183,6 +227,7 @@ func RunFileServe(ctx context.Context, p FileServeParams, ch chan<- ToolResponse
 			Result: FileServeStatus{
 				HttpURL: httpURL,
 				TftpURL: tftpURL,
+				FtpURL:  ftpURL,
 				Serving: false,
 			},
 		},

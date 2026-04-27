@@ -34,6 +34,13 @@ function str(v: unknown, fallback = ""): string {
   return typeof v === "string" ? v : fallback;
 }
 
+function maybeStr(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t.length > 0 ? t : null;
+}
+
 function bool(v: unknown, fallback = false): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
@@ -372,7 +379,40 @@ export function normalizeDnsDigResult(data: unknown): any {
 
 export function normalizeDnsGeoIpResult(data: unknown): any {
   const d = asAny(data);
-  return { ...d, success: bool(d.success, true), error: d.error ?? null };
+  const rawRdap = d.rdap;
+  let rdap: Record<string, string | null> | null = null;
+  if (rawRdap && typeof rawRdap === "object") {
+    const r = rawRdap as Record<string, unknown>;
+    rdap = {
+      registry: maybeStr(r.registry),
+      net_range: maybeStr(r.net_range),
+      net_handle: maybeStr(r.net_handle),
+      net_name: maybeStr(r.net_name),
+      allocation_type: maybeStr(r.allocation_type),
+      status: maybeStr(r.status),
+      registrant: maybeStr(r.registrant),
+      abuse_email: maybeStr(r.abuse_email),
+      org_address: maybeStr(r.org_address),
+      whois_server: maybeStr(r.whois_server),
+      remarks: maybeStr(r.remarks),
+    };
+    if (Object.values(rdap).every((x) => x == null)) {
+      rdap = null;
+    }
+  }
+  return {
+    ...d,
+    success: bool(d.success, true),
+    error: d.error ?? null,
+    continent: maybeStr(d.continent),
+    continent_code: maybeStr(d.continent_code),
+    postal: maybeStr(d.postal),
+    region_code: maybeStr(d.region_code),
+    connection_domain: maybeStr(d.connection_domain),
+    connection_class: maybeStr(d.connection_class),
+    ip_kind: maybeStr(d.ip_kind),
+    rdap,
+  };
 }
 
 // ── NTP Check ───────────────────────────────────────────────────

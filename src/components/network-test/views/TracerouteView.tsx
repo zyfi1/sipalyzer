@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Network, Globe, Loader2, Play, GitCompareArrows, ChevronDown } from "@/lib/icons";
+import { Network, Globe, Loader2, Play, Square, GitCompareArrows, ChevronDown } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { tooltips } from "@/lib/tooltips";
 
@@ -40,6 +40,8 @@ export function TracerouteView() {
 
   const traceroute = useNetworkTestStore((s) => s.traceroute);
   const runTraceroute = useNetworkTestStore((s) => s.runTraceroute);
+  const requestStopTraceroute = useNetworkTestStore((s) => s.requestStopTraceroute);
+  const stopRouteComparison = useNetworkTestStore((s) => s.stopRouteComparison);
   const lastSource = useNetworkTestStore((s) => s.lastSource);
 
   // Route comparison
@@ -129,6 +131,14 @@ export function TracerouteView() {
             disabled={traceRunning}
             onKeyDown={(e) => e.key === "Enter" && !traceRunning && target.trim() && handleRun()}
           />
+          {traceRunning && (
+            <TooltipWrapper entry={tooltips.netStopTest}>
+              <Button type="button" variant="destructive" className="h-10 gap-2 px-4" onClick={() => void requestStopTraceroute()}>
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper entry={tooltips.netRunTest}>
             <Button
               className="h-10 gap-2 px-5"
@@ -256,6 +266,14 @@ export function TracerouteView() {
                 className="h-9 text-xs flex-1"
                 disabled={routeComparing}
               />
+              {routeComparing && (
+                <TooltipWrapper entry={tooltips.netStopTest}>
+                  <Button type="button" variant="destructive" className="h-9 gap-1.5 px-3 text-xs shrink-0" onClick={stopRouteComparison}>
+                    <Square className="h-3.5 w-3.5" />
+                    Stop
+                  </Button>
+                </TooltipWrapper>
+              )}
               <Button
                 variant="neutral"
                 className="h-9 gap-2 px-4 text-xs shrink-0"

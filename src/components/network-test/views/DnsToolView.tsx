@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { cn } from "@/lib/utils";
 import { ToolSubTabs } from "@/components/ui/tool-sub-tabs";
 import { VoipView } from "@/components/network-test/VoipView";
 import { PortTestPanel } from "../components/PortTestPanel";
@@ -11,9 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TooltipWrapper } from "@/components/ui/tooltip-wrapper";
-import { Globe, Play, Loader2 } from "@/lib/icons";
+import { Globe, Play, Loader2, Square } from "@/lib/icons";
 import type { DnsRecordType } from "@/types/dns";
 import { tooltips } from "@/lib/tooltips";
+import { CoordinateValue } from "../dns/CoordinateValue";
+import { GeoIpLocationMap } from "../dns/GeoIpLocationMap";
+import { GeoIpIntelDetails } from "../dns/GeoIpIntelDetails";
 
 const NatAlgPanel = lazy(() => import("./NatAlgPanel"));
 
@@ -92,6 +96,7 @@ function UnifiedDnsToolbox() {
     setReverseIp, setReverseServer, setReverseFcrdns, runReverse,
     setDigDomain, setDigRecordType, setDigServer, setDigUseTcp, setDigRd, setDigCd, setDigAd, runDig,
     setGeoipIp, runGeoip, runAsnLookup,
+    dismissAllDnsOperations,
   } = useDnsTestStore();
 
   const [target, setTarget] = useState("");
@@ -172,7 +177,7 @@ function UnifiedDnsToolbox() {
     sip: "RFC 3263 SIP chain resolution for a domain/host target.",
     reverse: "PTR and forward-confirmed DNS. Requires IP target.",
     dig: "Raw diagnostics output with query flags.",
-    geoip: "Location and provider metadata. Requires IP target.",
+    geoip: "Location, ISP, ASN, and registry (RDAP) metadata. Requires IP target.",
     asn: "Autonomous system details. Requires IP target.",
   };
 
@@ -194,9 +199,15 @@ function UnifiedDnsToolbox() {
 
   const selectedRecordDescription = RECORD_TYPE_DESCRIPTIONS[recordType];
 
+  const geoipHasMap =
+    activeTool === "geoip" &&
+    geoip.result != null &&
+    geoip.result.lat != null &&
+    geoip.result.lon != null;
+
   return (
-    <div className="space-y-3">
-      <section className="ui-hero-surface app-view-surface-pad space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <section className="ui-hero-surface app-view-surface-pad shrink-0 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/35 pb-3">
           <div>
             <TooltipWrapper
@@ -243,6 +254,14 @@ function UnifiedDnsToolbox() {
             </TooltipWrapper>
           </div>
 
+          {anyRunning && (
+            <TooltipWrapper title="Stop DNS operations" description="Clear running states for all DNS toolbox actions. In-flight requests may still complete in the background.">
+              <Button type="button" size="sm" variant="destructive" className="h-9 gap-1.5 px-3 text-xs" onClick={dismissAllDnsOperations}>
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper
             title={`Run ${activeLabel}`}
             description={`Execute ${activeLabel} against the current target with current options.`}
@@ -362,15 +381,25 @@ function UnifiedDnsToolbox() {
         <p className="text-2xs text-muted-foreground/75">{toolHints[activeTool]}</p>
       </section>
 
-      <section className="ui-hero-surface overflow-hidden">
-        <div className="ui-section-header-sm border-b border-border/35">
+      <section
+        className={cn(
+          "ui-hero-surface flex min-h-0 flex-col overflow-hidden",
+          geoipHasMap && "min-h-0 flex-1",
+        )}
+      >
+        <div className="ui-section-header-sm shrink-0 border-b border-border/35">
           <div className="flex w-full items-center justify-between gap-2">
             <span className="text-xs font-semibold text-foreground">{activeLabel} Results</span>
             <DnsStatusPill label={activeLabel} status={activeStatus} />
           </div>
         </div>
 
-        <div className="app-view-surface-pad">
+        <div
+          className={cn(
+            "app-view-surface-pad",
+            geoipHasMap && "flex min-h-0 flex-1 flex-col overflow-hidden",
+          )}
+        >
           {activeTool === "lookup" && (
             lookup.result ? (
               <div className="space-y-2">
@@ -438,21 +467,98 @@ function UnifiedDnsToolbox() {
 
           {activeTool === "geoip" && (
             geoip.result ? (
-              <div className="space-y-2 text-xs">
-                <div className="text-2xs text-muted-foreground">{geoip.result.source}</div>
-                <div className="ui-hero-surface p-3">
-                  <div className="flex items-center gap-2"><span className="w-20 text-muted-foreground">IP</span><span className="font-mono">{geoip.result.ip}</span></div>
-                  {geoip.result.country && <div className="flex items-center gap-2"><span className="w-20 text-muted-foreground">Country</span><span>{geoip.result.country}</span></div>}
-                  {geoip.result.city && <div className="flex items-center gap-2"><span className="w-20 text-muted-foreground">City</span><span>{geoip.result.city}</span></div>}
-                  {geoip.result.asn && (
-                    <div className="flex items-center gap-2">
-                      <TooltipWrapper
-                        title="ASN (Autonomous System Number)"
-                        description="The internet routing network that announces this IP prefix via BGP, typically mapped to an ISP or organization."
-                      >
-                        <span className="w-20 text-muted-foreground cursor-help">ASN</span>
-                      </TooltipWrapper>
-                      <span>{geoip.result.asn}</span>
+              <div
+                className={cn(
+                  "gap-2 text-xs",
+                  geoipHasMap ? "flex min-h-0 flex-1 flex-col" : "space-y-2",
+                )}
+              >
+                <div className="shrink-0 text-2xs text-muted-foreground">{geoip.result.source}</div>
+                <div
+                  className={cn(
+                    "ui-hero-surface p-2 sm:p-3",
+                    geoipHasMap ? "flex min-h-0 flex-1 flex-col gap-0 overflow-hidden" : "space-y-2",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "space-y-1.5 text-xs",
+                      geoipHasMap &&
+                        "max-h-[min(40vh,300px)] min-h-0 shrink-0 overflow-y-auto overscroll-contain border-b border-border/25 pb-2 pr-0.5",
+                    )}
+                  >
+                    <div className="grid grid-cols-[4.5rem_1fr] items-baseline gap-x-2 gap-y-1 sm:grid-cols-[5.5rem_1fr]">
+                      <span className="text-2xs text-muted-foreground">IP</span>
+                      <span className="min-w-0 font-mono text-2xs text-foreground sm:text-xs">{geoip.result.ip}</span>
+                      {geoip.result.country && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">Country</span>
+                          <span className="min-w-0 text-2xs sm:text-xs">{geoip.result.country}</span>
+                        </>
+                      )}
+                      {geoip.result.region && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">Region</span>
+                          <span className="min-w-0 text-2xs sm:text-xs">{geoip.result.region}</span>
+                        </>
+                      )}
+                      {geoip.result.city && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">City</span>
+                          <span className="min-w-0 text-2xs sm:text-xs">{geoip.result.city}</span>
+                        </>
+                      )}
+                      {geoip.result.lat != null && geoip.result.lon != null && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">Coords</span>
+                          <span className="font-mono text-2xs sm:text-xs">
+                            <CoordinateValue lat={geoip.result.lat} lon={geoip.result.lon} />
+                          </span>
+                        </>
+                      )}
+                      {geoip.result.isp && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">ISP</span>
+                          <span className="min-w-0 break-words text-2xs sm:text-xs">{geoip.result.isp}</span>
+                        </>
+                      )}
+                      {geoip.result.org && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">Org</span>
+                          <span className="min-w-0 break-words text-2xs sm:text-xs">{geoip.result.org}</span>
+                        </>
+                      )}
+                      {geoip.result.asn && (
+                        <>
+                          <TooltipWrapper
+                            title="ASN (Autonomous System Number)"
+                            description="The internet routing network that announces this IP prefix via BGP, typically mapped to an ISP or organization."
+                          >
+                            <span className="cursor-help text-2xs text-muted-foreground">ASN</span>
+                          </TooltipWrapper>
+                          <span className="min-w-0 text-2xs sm:text-xs">{geoip.result.asn}</span>
+                        </>
+                      )}
+                      {geoip.result.timezone && (
+                        <>
+                          <span className="text-2xs text-muted-foreground">TZ</span>
+                          <span className="min-w-0 font-mono text-2xs sm:text-xs">{geoip.result.timezone}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="pt-1.5">
+                      <GeoIpIntelDetails result={geoip.result} />
+                    </div>
+                  </div>
+                  {geoip.result.lat != null && geoip.result.lon != null && (
+                    <div className="flex min-h-0 flex-1 flex-col pt-2">
+                      <GeoIpLocationMap
+                        fillHeight
+                        lat={geoip.result.lat}
+                        lon={geoip.result.lon}
+                        label="Approximate location"
+                        className="min-h-0 flex-1"
+                      />
                     </div>
                   )}
                 </div>
@@ -517,14 +623,23 @@ export function DnsToolView({ toolId, onExecToolIdChange }: { toolId?: string; o
   }, [activeTab]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div
+      className={cn(
+        "flex flex-col gap-3",
+        activeTab === "dns" && "min-h-0 flex-1 overflow-hidden",
+      )}
+    >
       <ToolSubTabs
         tabs={ACCESS_TABS}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         toolId={toolId}
       />
-      {renderActivePanel}
+      {activeTab === "dns" ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{renderActivePanel}</div>
+      ) : (
+        renderActivePanel
+      )}
     </div>
   );
 }

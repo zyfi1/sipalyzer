@@ -229,6 +229,21 @@ export interface EdnsInfo {
 
 // ── GeoIP ───────────────────────────────────────────────────────────────
 
+/** RDAP / registry (WHOIS-style) enrichment returned with GeoIP when available. */
+export interface GeoIpRdapInfo {
+  registry: string | null;
+  net_range: string | null;
+  net_handle: string | null;
+  net_name: string | null;
+  allocation_type: string | null;
+  status: string | null;
+  registrant: string | null;
+  abuse_email: string | null;
+  org_address: string | null;
+  whois_server: string | null;
+  remarks: string | null;
+}
+
 export interface GeoIpResult {
   ip: string;
   success: boolean;
@@ -244,6 +259,14 @@ export interface GeoIpResult {
   timezone: string | null;
   source: string;
   error: string | null;
+  continent?: string | null;
+  continent_code?: string | null;
+  postal?: string | null;
+  region_code?: string | null;
+  connection_domain?: string | null;
+  connection_class?: string | null;
+  ip_kind?: string | null;
+  rdap?: GeoIpRdapInfo | null;
 }
 
 export interface AsnResult {

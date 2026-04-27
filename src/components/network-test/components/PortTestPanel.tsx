@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AppDropdown } from "@/components/ui/app-dropdown";
-import { Plus, Play, Loader2, Shield, Trash, Info } from "@/lib/icons";
+import { Plus, Play, Loader2, Shield, Square, Trash, Info } from "@/lib/icons";
 import { useNetworkTestStore } from "@/stores/networkTestStore";
 import { useExecutionContextStore } from "@/stores/executionContextStore";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ const PORT_PROTOCOL_OPTIONS: { value: PortProtocol; label: string }[] = [
 export function PortTestPanel({ borderless = false }: { borderless?: boolean } = {}) {
   const portScan = useNetworkTestStore((s) => s.portScan);
   const runPortScan = useNetworkTestStore((s) => s.runPortScan);
+  const dismissPortScan = useNetworkTestStore((s) => s.dismissPortScan);
   const customPortEntries = useNetworkTestStore((s) => s.customPortEntries);
   const setCustomPortEntries = useNetworkTestStore((s) => s.setCustomPortEntries);
   const lastSource = useNetworkTestStore((s) => s.lastSource);
@@ -118,6 +119,14 @@ export function PortTestPanel({ borderless = false }: { borderless?: boolean } =
               />
             </TooltipWrapper>
           </div>
+          {isRunning && (
+            <TooltipWrapper title="Stop scan" description="Abandon the port scan UI; in-flight probes may still complete in the background.">
+              <Button type="button" variant="destructive" onClick={dismissPortScan} className="h-10 gap-1.5 px-4">
+                <Square className="h-4 w-4" />
+                Stop
+              </Button>
+            </TooltipWrapper>
+          )}
           <TooltipWrapper title="Scan" description="Run the queued ports against the target host.">
             <Button
               onClick={runTest}

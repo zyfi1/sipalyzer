@@ -715,6 +715,7 @@ func handleMessage(connCtx context.Context, conn *SafeConn, config *AgentConfig,
 			var p FileServeParams
 			p.HTTPPort = 8080
 			p.TFTPPort = 69
+			p.FtpPort = 2121
 			p.Protocols = []string{"http"}
 			json.Unmarshal(msg.Params, &p)
 			ch := make(chan ToolResponse, 32)
