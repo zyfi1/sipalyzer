@@ -31,7 +31,7 @@ Most VoIP incidents are not blocked by a lack of data; they are blocked by fragm
 
 ## Hero Visual
 
-![SIPalyzer Interface](docs/ui/hero-screenshot.svg)
+![SIPalyzer Interface](docs/ui/hero-screenshot.png)
 
 From alert to packet evidence to diagnosis - all within one desktop surface.
 
