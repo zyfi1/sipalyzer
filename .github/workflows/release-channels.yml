@@ -34,6 +34,17 @@ jobs:
       prerelease: ${{ steps.meta.outputs.prerelease }}
       release_name: ${{ steps.meta.outputs.release_name }}
     steps:
+      - name: Validate updater distribution visibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event.repository.private }}" == "true" ]]; then
+            echo "This repository is private."
+            echo "GitHub-hosted in-app updater requires the repository and release assets to be publicly accessible."
+            echo "Set repository visibility to public before running channel releases."
+            exit 1
+          fi
+
       - name: Resolve tag and channel
         id: meta
         shell: bash

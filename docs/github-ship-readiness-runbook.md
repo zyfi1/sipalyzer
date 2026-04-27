@@ -1,81 +1,102 @@
-# GitHub Ship-Readiness Runbook
+# GitHub + Branch Update Runbook
 
-This runbook covers the minimum manual steps required while the automation handles the rest.
+This is the practical update flow for this app, using your current channel model:
 
-## 1) One-time prerequisites
+- `beta` = fast-moving integration branch and updater manifest host
+- `rc` = release-candidate stabilization branch
+- `main` = production/stable channel
 
-- Install and authenticate GitHub CLI:
+## 1) One-time setup
+
+- Authenticate GitHub CLI:
   - `gh auth login`
-- Ensure repository has Actions enabled.
-- Confirm default branch is `main`.
+- Ensure GitHub Actions are enabled.
+- Ensure default branch is `main`.
+- Configure Actions secrets:
+  - `TAURI_PRIVATE_KEY`
+  - `TAURI_KEY_PASSWORD`
+  - `TAURI_UPDATER_PUBKEY`
+- Keep the repository visibility as `public` (required for GitHub-hosted updater assets).
 
-## 2) Recommended repository model
+## 2) App and updater essentials
 
-- Use two repositories:
-  - staging: where release workflows are validated first
-  - production: where validated workflows are promoted
+- Version must stay aligned in:
+  - `package.json`
+  - `src-tauri/Cargo.toml`
+  - `src-tauri/tauri.conf.json`
+- App updater code is in:
+  - `src-tauri/src/commands/updater.rs`
+- Updater manifests are published to:
+  - `updater/beta.json`
+  - `updater/rc.json`
+  - `updater/main.json`
+- Runtime default updater base URL points at:
+  - `https://raw.githubusercontent.com/zyfi1/sipalyzer/beta/updater`
+- Updater release assets are hosted in GitHub Releases and referenced directly in updater manifests.
 
-## 3) Required secrets (full signing now)
+## 3) Tag policy (channel-aware)
 
-Set in GitHub repository settings -> `Secrets and variables` -> `Actions`:
+- Beta tag: `vX.Y.Z-beta.N`
+- RC tag: `vX.Y.Z-rc.N`
+- Production tag (`main`): `vX.Y.Z`
 
-- `TAURI_PRIVATE_KEY`
-- `TAURI_KEY_PASSWORD`
+GitHub workflow that builds/publishes releases:
 
-Optional platform signing secrets can be added later by platform policy.
+- `.github/workflows/release-channels.yml`
 
-## 4) Channel and tag policy
+## 4) Day-to-day branch flow
 
-- Beta: `vX.Y.Z-beta.N`
-- RC: `vX.Y.Z-rc.N`
-- Stable: `vX.Y.Z`
+1. Start from `beta` for feature work.
+2. Open PRs into `main` for protected quality checks (`CI Quality Gates`).
+3. Merge approved work.
+4. Cut channel tags from the commit you want to ship.
+5. Use promotion workflow to move beta -> rc -> main tags.
 
-Release workflow: `.github/workflows/release-channels.yml`
+## 5) Shipping flow (simple)
 
-## 5) Normal release flow
-
-1. Push beta tag, example:
-   - `git tag v1.4.0-beta.1 && git push origin v1.4.0-beta.1`
-2. Validate beta quality and soak.
-3. Promote beta to RC with workflow:
-   - `Promote Release Channel` (`source_tag=v1.4.0-beta.1`, `target_channel=rc`)
-4. Validate RC soak window.
-5. Promote RC to stable:
-   - `Promote Release Channel` (`source_tag=v1.4.0-rc.1`, `target_channel=stable`)
+1. Create beta tag:
+   - `git tag v1.4.0-beta.1`
+   - `git push origin v1.4.0-beta.1`
+2. In GitHub Actions, run `Release Channels` with:
+   - `tag=v1.4.0-beta.1`
+3. Validate beta build and in-app update checks.
+4. Promote to RC using `Promote Release Channel`:
+   - `source_tag=v1.4.0-beta.1`
+   - `target_channel=rc`
+5. Validate RC soak period.
+6. Promote RC to production (`main`) with:
+   - `source_tag=v1.4.0-rc.1`
+   - `target_channel=main`
 
 ## 6) Rollback flow
 
-Use workflow `.github/workflows/rollback-stable.yml`:
+Use `.github/workflows/rollback-stable.yml` with:
 
-- `rollback_to_tag`: known-good tag (stable or RC)
-- `new_stable_tag`: next stable version tag to publish rollback (for example `v1.4.1`)
+- `rollback_to_tag`: known-good tag (`vX.Y.Z` or `vX.Y.Z-rc.N`)
+- `new_stable_tag`: replacement production tag (`vX.Y.Z`)
 
-This creates a new stable tag from known-good commit and triggers standard stable release automation.
+This republishes a known-good release commit under a new production tag.
 
-## 7) Branch protections (recommended required checks)
+## 7) Quality checks to require
 
-Require these checks before merge to `main`:
+Require these before merge to `main`:
 
 - `Quality Gates` from `.github/workflows/build-app.yml`
 
-Enable:
+Recommended branch protection options:
 
-- Require pull request before merging
-- Require status checks to pass before merging
-- Require linear history (optional but recommended)
+- Require pull request before merge
+- Require status checks before merge
+- Require linear history (optional)
 
-## 8) Staging -> production cutover
+## 8) Workflows and what they do
 
-1. Validate at least one full beta -> rc -> stable cycle in staging.
-2. Mirror workflows and scripts to production repository.
-3. Reconfigure production secrets.
-4. Run first beta dry run in production.
-5. Promote to RC and stable only after successful checks.
-
-## 9) Where to operate
-
-- CI gates: `.github/workflows/build-app.yml`
-- Channel releases: `.github/workflows/release-channels.yml`
-- Channel promotions: `.github/workflows/promote-release.yml`
-- Stable rollback: `.github/workflows/rollback-stable.yml`
+- `.github/workflows/build-app.yml`
+  - CI gates (typecheck, tests, build, rust checks, strict lane)
+- `.github/workflows/release-channels.yml`
+  - Creates GitHub release artifacts and publishes updater manifests
+- `.github/workflows/promote-release.yml`
+  - Promotes existing tags between channels by creating new target tags
+- `.github/workflows/rollback-stable.yml`
+  - Reissues a stable release from a known-good commit
 

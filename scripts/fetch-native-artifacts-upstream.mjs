@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cpSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createWriteStream } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -61,9 +61,18 @@ function walkFiles(dir) {
 function copyMatchedFile(searchRoot, patterns, destPath) {
   const files = walkFiles(searchRoot);
   const destResolved = resolve(destPath);
-  const match = files.find(
+  const candidates = files.filter(
     (f) => patterns.some((p) => p.test(f.replaceAll("\\", "/"))) && resolve(f) !== destResolved,
   );
+  candidates.sort((a, b) => {
+    const aSymlink = lstatSync(a).isSymbolicLink();
+    const bSymlink = lstatSync(b).isSymbolicLink();
+    if (aSymlink !== bSymlink) {
+      return aSymlink ? 1 : -1;
+    }
+    return a.localeCompare(b);
+  });
+  const match = candidates[0];
   if (!match) return false;
   try {
     if (realpathSync(match) === realpathSync(destPath)) {
