@@ -238,8 +238,8 @@ impl MmapPcapReader {
 
         let pcap_header = pcap::PacketHeader {
             ts: libc::timeval {
-                tv_sec: header.ts_sec as i64,
-                tv_usec: ts_usec as i64,
+                tv_sec: header.ts_sec as libc::time_t,
+                tv_usec: ts_usec as libc::suseconds_t,
             },
             caplen: header.caplen,
             len: header.len,

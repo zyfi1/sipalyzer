@@ -236,6 +236,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Npcap install skipped (exit $LASTEXITCODE); continuing without bundled Npcap driver."
           }
+          exit 0
 
       - name: Install Linux dependencies (extended lane)
         if: matrix.target != 'local-noop' && runner.os == 'Linux'
