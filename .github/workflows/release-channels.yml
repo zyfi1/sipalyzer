@@ -242,14 +242,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Npcap install skipped (exit $LASTEXITCODE); continuing without bundled Npcap driver."
           }
-          if (Test-Path "C:\vcpkg\installed\x64-windows\include\openssl\ssl.h") {
-            "OPENSSL_DIR=C:\vcpkg\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "OPENSSL_LIB_DIR=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "OPENSSL_INCLUDE_DIR=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          } else {
-            Write-Host "vcpkg OpenSSL not found; relying on crate vendored OpenSSL."
+          if (-not (Test-Path "C:\vcpkg\vcpkg.exe")) {
+            Write-Error "vcpkg executable not found at C:\vcpkg\vcpkg.exe"
+            exit 1
           }
+          & "C:\vcpkg\vcpkg.exe" install openssl:x64-windows
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "vcpkg install openssl:x64-windows failed."
+            exit 1
+          }
+          if (-not (Test-Path "C:\vcpkg\installed\x64-windows\include\openssl\ssl.h")) {
+            Write-Error "OpenSSL headers not found in vcpkg install path."
+            exit 1
+          }
+          "OPENSSL_DIR=C:\vcpkg\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OPENSSL_LIB_DIR=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OPENSSL_INCLUDE_DIR=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           exit 0
 
       - name: Install Linux dependencies (extended lane)
