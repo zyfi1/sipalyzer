@@ -1,15 +1,15 @@
 {
-  "version": "1.0.0-beta.12",
+  "version": "1.0.0-beta.14",
   "notes": "",
-  "pub_date": "2026-04-28T17:25:51Z",
+  "pub_date": "2026-04-28T18:21:01Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "untrusted comment: signature from tauri secret key\nRURYwuHN4rFw+nCkHRi2AB+rAJwRP3fqsrUKiOndEY2sSaxs3/ZDGScx2E/nodB/Ftk4RPwYopY1me7U9fGfz9TBHW+vb+CgJgo=\ntrusted comment: timestamp:1777397567\tfile:SIPalyzer.app.tar.gz\nqUwPQoT0rsD0TOnHLm9+5NoXQdNjbTvaLehwVfGy2Gtj/vV9LrmzT8HekL1ClmYg/hXYRyRn/bCkTgkpY9PjAA==",
-      "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.12/SIPalyzer_aarch64.app.tar.gz"
+      "signature": "RURYwuHN4rFw+msAf8z6Nr3mOSbIOMQ+UlNHIs3TWkxRHd52B0zTb3Nlo2zbQkl+NkHrMdrTJN04aqZIiv8gEzutzJfrQBeFLQA=",
+      "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.14/SIPalyzer_aarch64.app.tar.gz"
     },
     "darwin-x86_64": {
-      "signature": "untrusted comment: signature from tauri secret key\nRURYwuHN4rFw+iozYfZ+o/8vbQnLQz1JH2/WO6RDXsJfymKdcMBEfp8oxBAmS7LbkpxAwD+NmsWUQhYsIhONEG4Qzi9dXj6zdA0=\ntrusted comment: timestamp:1777397316\tfile:SIPalyzer.app.tar.gz\nzIoYmIpLmiCkXW4/rZoW6YcyCtF6s+p8HKVE6kO1QqtifATOBrhQLzKFi9n4drI7S55UdD0HVCdzmH3Z5ro1Cw==",
-      "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.12/SIPalyzer_x64.app.tar.gz"
+      "signature": "RURYwuHN4rFw+tfHAzHzuKyTG9Pl75lj+wYvpPxN6RmK1zL4ou3n4r95xeS7UA8J7OmzkE2aStg6xNDe9U9z7CykeBcAYaE5HA4=",
+      "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.14/SIPalyzer_x64.app.tar.gz"
     }
   }
 }

@@ -81,17 +81,27 @@ async function fetchSignature(url, token) {
     throw new Error(`Failed to download signature (${response.status}): ${body}`);
   }
   const raw = (await response.text()).trim();
+  let minisignText = raw;
   // GitHub release assets may surface updater .sig files as a base64-encoded payload.
-  // The updater expects the decoded minisign text blob.
   try {
     const decoded = Buffer.from(raw, "base64").toString("utf8").trim();
     if (decoded.startsWith("untrusted comment:")) {
-      return decoded;
+      minisignText = decoded;
     }
   } catch {
-    // Not base64-encoded; use raw string as-is.
+    // Not base64-encoded; continue with the raw text payload.
   }
-  return raw;
+
+  // Tauri updater expects the signature field to be a base64 string only.
+  // Minisign signature files are:
+  //   line 1: untrusted comment
+  //   line 2: signature (base64)
+  //   line 3+: trusted comment + global signature
+  const lines = minisignText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines[0]?.startsWith("untrusted comment:") && lines[1]) {
+    return lines[1];
+  }
+  return lines[0] ?? minisignText;
 }
 
 async function main() {
