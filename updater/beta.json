@@ -1,11 +1,11 @@
 {
-  "version": "1.0.0-beta.7",
-  "notes": "Beta 7 signed updater artifact for macOS arm64.",
-  "pub_date": "2026-04-28T14:05:28Z",
+  "version": "1.0.0-beta.8",
+  "notes": "Beta 8 updater test release.",
+  "pub_date": "2026-04-28T14:33:25Z",
   "platforms": {
     "darwin-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSWXd1SE40ckZ3K29maU51d3pPUHRBeUoxbFpNQzhNd0kxWEtsSnN2VFVsaTFtVVBLZnhrSjFZTzFkYjFnNHhVTkgraHZvaEg1NEdlM01qdkhNUlMxT1BZRkpMTW1LZndNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3Mzg1MDIwCWZpbGU6U0lQYWx5emVyLmFwcC50YXIuZ3oKU2EzWTJ1M3NScTl6REw5bi9FSTJRa2pIVitzaEdvdGd0SFdrK3Mwcm5ORG5MTy9QTU9pejJrSTRhNVNTaUV6UzExazBUMDFWVHI1THJWK1JsQ3dsRGc9PQo=",
-      "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.7/SIPalyzer.app.tar.gz"
+      "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.8/SIPalyzer.app.tar.gz"
     }
   }
 }
