@@ -174,7 +174,7 @@ jobs:
     needs: [prepare, strict-preflight, validate-secrets]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64"}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts"}]}') }}
+      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-gnu","label":"linux-x64"},{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64"},{"os":"macos-latest","target":"x86_64-apple-darwin","label":"macOS-x64"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc","label":"windows-x64"}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts"}]}') }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Local strategy skip
@@ -236,6 +236,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Npcap install skipped (exit $LASTEXITCODE); continuing without bundled Npcap driver."
           }
+          choco install openssl -y --no-progress 2>&1 | Out-Host
+          $opensslDir = Get-ChildItem "C:\Program Files" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OpenSSL*" } | Select-Object -First 1
+          if ($null -eq $opensslDir) {
+            Write-Error "OpenSSL installation directory not found."
+            exit 1
+          }
+          "OPENSSL_DIR=$($opensslDir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           exit 0
 
       - name: Install Linux dependencies (extended lane)
@@ -249,6 +257,8 @@ jobs:
             patchelf \
             libpcap-dev \
             libasound2-dev
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "$GITHUB_ENV"
 
       - name: Build and upload channel release
         if: matrix.target != 'local-noop'
