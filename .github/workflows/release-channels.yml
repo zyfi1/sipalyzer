@@ -174,7 +174,7 @@ jobs:
     needs: [prepare, strict-preflight, validate-secrets]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-gnu","label":"linux-x64"},{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64"},{"os":"macos-latest","target":"x86_64-apple-darwin","label":"macOS-x64"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc","label":"windows-x64"}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts"}]}') }}
+      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64"}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts"}]}') }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Local strategy skip
