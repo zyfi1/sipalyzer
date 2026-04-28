@@ -60,7 +60,7 @@ pub struct UpdaterReleaseInfo {
     published_at: Option<String>,
 }
 
-fn updater_pubkey() -> Result<String, String> {
+fn updater_pubkey() -> Option<String> {
     // Runtime env overrides are dev-only; release builds rely on compile-time values.
     let runtime_pubkey = if allow_runtime_updater_env_overrides() {
         std::env::var("SIPALYZER_UPDATER_PUBKEY").ok()
@@ -70,12 +70,9 @@ fn updater_pubkey() -> Result<String, String> {
     let pubkey = runtime_pubkey.unwrap_or_else(|| compiletime_updater_pubkey().to_string());
     let pubkey = pubkey.trim();
     if pubkey.is_empty() {
-        return Err(
-            "Updater is not configured yet. Missing SIPALYZER_UPDATER_PUBKEY (runtime or build-time)."
-                .to_string(),
-        );
+        return None;
     }
-    Ok(pubkey.to_string())
+    Some(pubkey.to_string())
 }
 
 fn updater_endpoint_for_channel(channel: ReleaseChannel) -> String {
@@ -108,13 +105,16 @@ pub async fn updater_check(
 ) -> Result<Option<UpdaterReleaseInfo>, String> {
     let release_channel = parse_channel(channel.trim())?;
     let endpoint = updater_endpoint_url(release_channel)?;
-    let pubkey = updater_pubkey()?;
-
-    let updater = app
+    let builder = app
         .updater_builder()
         .endpoints(vec![endpoint])
-        .map_err(|e| format!("Failed to configure update endpoint: {e}"))?
-        .pubkey(pubkey)
+        .map_err(|e| format!("Failed to configure update endpoint: {e}"))?;
+    let builder = if let Some(pubkey) = updater_pubkey() {
+        builder.pubkey(pubkey)
+    } else {
+        builder
+    };
+    let updater = builder
         .build()
         .map_err(|e| format!("Failed to build updater: {e}"))?;
 
@@ -138,13 +138,16 @@ pub async fn updater_install(
 ) -> Result<Option<UpdaterReleaseInfo>, String> {
     let release_channel = parse_channel(channel.trim())?;
     let endpoint = updater_endpoint_url(release_channel)?;
-    let pubkey = updater_pubkey()?;
-
-    let updater = app
+    let builder = app
         .updater_builder()
         .endpoints(vec![endpoint])
-        .map_err(|e| format!("Failed to configure update endpoint: {e}"))?
-        .pubkey(pubkey)
+        .map_err(|e| format!("Failed to configure update endpoint: {e}"))?;
+    let builder = if let Some(pubkey) = updater_pubkey() {
+        builder.pubkey(pubkey)
+    } else {
+        builder
+    };
+    let updater = builder
         .build()
         .map_err(|e| format!("Failed to build updater: {e}"))?;
 

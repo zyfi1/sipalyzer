@@ -905,7 +905,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                   </div>
                   {isUpdaterNotConfiguredError(updaterLastError) ? (
                     <p className={settingsStyles.textXsMuted}>
-                      Updater is not configured in this build. Set `SIPALYZER_UPDATER_PUBKEY` at build time to enable update checks.
+                      Updater key not detected from override env vars. This build will use the configured app updater key.
                     </p>
                   ) : null}
                 </div>
