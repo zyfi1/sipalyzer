@@ -3,7 +3,7 @@ use tauri_plugin_updater::UpdaterExt;
 use url::Url;
 
 const DEFAULT_UPDATER_BASE_URL: &str =
-    "https://raw.githubusercontent.com/zyfi1/sipalyzer/beta/updater";
+    "https://cdn.jsdelivr.net/gh/zyfi1/sipalyzer@beta/updater";
 #[inline]
 fn allow_runtime_updater_env_overrides() -> bool {
     cfg!(debug_assertions)
