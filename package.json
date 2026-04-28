@@ -1,6 +1,6 @@
 {
   "name": "sipalyzer",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.7",
   "description": "SIPalyzer - Professional VoIP toolset for registration testing and diagnostics",
   "type": "module",
   "scripts": {

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { ChevronDown, Code, ExternalLink, FileSearch, Info, LayoutDashboard, Monitor, Network, Package, PhoneCall, Printer, Satellite, Shield, Sparkles, StickyNote, Toolbox, Wrench, X, Zap } from "@/lib/icons";
 import packageManifest from "../../../package.json";
 import { Button } from "@/components/ui/button";
@@ -111,11 +112,30 @@ interface SettingsAboutPanelProps {
   onClose: () => void;
 }
 
-const APP_VERSION = packageManifest.version ?? "0.0.0";
-const IS_BETA_BUILD = /beta/i.test(APP_VERSION);
+const FALLBACK_APP_VERSION = packageManifest.version ?? "0.0.0";
 
 export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
   const [packetCaptureInfoOpen, setPacketCaptureInfoOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState(FALLBACK_APP_VERSION);
+  const isBetaBuild = /beta/i.test(appVersion);
+
+  useEffect(() => {
+    let cancelled = false;
+    getVersion()
+      .then((runtimeVersion) => {
+        if (!cancelled && runtimeVersion) {
+          setAppVersion(runtimeVersion);
+        }
+      })
+      .catch(() => {
+        // Fallback to package manifest when the API is unavailable (e.g. web preview/tests).
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-card animate-in fade-in duration-[var(--motion-duration-micro)] [transition-timing-function:var(--motion-ease-micro)]">
       <header className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -138,8 +158,8 @@ export function SettingsAboutPanel({ onClose }: SettingsAboutPanelProps) {
           <div className="flex flex-col">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-base font-bold tracking-tight">SIPalyzer</span>
-              <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-accent text-foreground">v{APP_VERSION}</span>
-              {IS_BETA_BUILD ? (
+              <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-accent text-foreground">v{appVersion}</span>
+              {isBetaBuild ? (
                 <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300">
                   Beta
                 </span>
