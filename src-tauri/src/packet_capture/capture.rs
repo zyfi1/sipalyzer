@@ -937,7 +937,7 @@ impl CaptureSession {
                 // ICMP
                 return Some(crate::packet_capture::PacketInfo {
                     timestamp: chrono::DateTime::from_timestamp(
-                        packet.header.ts.tv_sec,
+                        packet.header.ts.tv_sec.into(),
                         (packet.header.ts.tv_usec as u32) * 1000,
                     )
                     .unwrap_or_else(|| chrono::Utc::now()),
@@ -1125,7 +1125,7 @@ impl CaptureSession {
         // Convert pcap timestamp to chrono
         // pcap uses timeval: tv_sec (seconds) and tv_usec (microseconds)
         let timestamp = chrono::DateTime::from_timestamp(
-            packet.header.ts.tv_sec,
+            packet.header.ts.tv_sec.into(),
             (packet.header.ts.tv_usec as u32) * 1000, // Convert microseconds to nanoseconds (multiply by 1000)
         )
         .unwrap_or_else(|| chrono::Utc::now());

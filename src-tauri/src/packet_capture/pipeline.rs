@@ -312,7 +312,7 @@ impl CapturePipeline {
                     stats.packets_captured.fetch_add(1, Ordering::Relaxed);
 
                     let raw_packet = RawPacket {
-                        timestamp_secs: packet.header.ts.tv_sec,
+                        timestamp_secs: packet.header.ts.tv_sec.into(),
                         timestamp_usecs: packet.header.ts.tv_usec as u32,
                         packet_number,
                         data: packet.data.to_vec(),
@@ -492,8 +492,8 @@ impl CapturePipeline {
         // Create pcap-compatible packet header
         let header = pcap::PacketHeader {
             ts: libc::timeval {
-                tv_sec: raw.timestamp_secs as libc::time_t,
-                tv_usec: raw.timestamp_usecs as libc::suseconds_t,
+                tv_sec: raw.timestamp_secs as _,
+                tv_usec: raw.timestamp_usecs as _,
             },
             caplen: raw.data.len() as u32,
             len: raw.data.len() as u32,
