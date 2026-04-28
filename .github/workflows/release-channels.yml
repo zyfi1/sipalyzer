@@ -174,7 +174,7 @@ jobs:
     needs: [prepare, strict-preflight, validate-secrets]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-gnu","label":"linux-x64"},{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64"},{"os":"macos-latest","target":"x86_64-apple-darwin","label":"macOS-x64"},{"os":"windows-latest","target":"x86_64-pc-windows-msvc","label":"windows-x64"}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts"}]}') }}
+      matrix: ${{ fromJSON(inputs.build_strategy == 'github-hosted' && '{"include":[{"os":"ubuntu-latest","target":"x86_64-unknown-linux-gnu","label":"linux-x64","bundle_args":"--bundles deb,rpm"},{"os":"macos-latest","target":"aarch64-apple-darwin","label":"macOS-arm64","bundle_args":""},{"os":"macos-latest","target":"x86_64-apple-darwin","label":"macOS-x64","bundle_args":""},{"os":"windows-latest","target":"x86_64-pc-windows-msvc","label":"windows-x64","bundle_args":""}]}' || '{"include":[{"os":"ubuntu-latest","target":"local-noop","label":"local-artifacts","bundle_args":""}]}') }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Local strategy skip
@@ -198,6 +198,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - name: Cache Rust build artifacts
+        if: matrix.target != 'local-noop'
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
       - name: Install frontend dependencies
         if: matrix.target != 'local-noop'
@@ -236,14 +242,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Npcap install skipped (exit $LASTEXITCODE); continuing without bundled Npcap driver."
           }
-          choco install openssl -y --no-progress 2>&1 | Out-Host
-          $opensslDir = Get-ChildItem "C:\Program Files" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OpenSSL*" } | Select-Object -First 1
-          if ($null -eq $opensslDir) {
-            Write-Error "OpenSSL installation directory not found."
-            exit 1
+          if (Test-Path "C:\vcpkg\installed\x64-windows\include\openssl\ssl.h") {
+            "OPENSSL_DIR=C:\vcpkg\installed\x64-windows" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "OPENSSL_LIB_DIR=C:\vcpkg\installed\x64-windows\lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "OPENSSL_INCLUDE_DIR=C:\vcpkg\installed\x64-windows\include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            Write-Host "vcpkg OpenSSL not found; relying on crate vendored OpenSSL."
           }
-          "OPENSSL_DIR=$($opensslDir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           exit 0
 
       - name: Install Linux dependencies (extended lane)
@@ -272,7 +278,7 @@ jobs:
           releaseName: ${{ needs.prepare.outputs.release_name }}
           releaseDraft: false
           prerelease: ${{ needs.prepare.outputs.prerelease }}
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ matrix.bundle_args }}
 
   publish-updater-manifest:
     name: Publish updater manifest (${{ needs.prepare.outputs.channel }})
