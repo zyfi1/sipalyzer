@@ -10,14 +10,6 @@ fn allow_runtime_updater_env_overrides() -> bool {
 }
 
 #[inline]
-fn compiletime_updater_pubkey() -> &'static str {
-    match option_env!("SIPALYZER_UPDATER_PUBKEY") {
-        Some(value) => value,
-        None => "",
-    }
-}
-
-#[inline]
 fn compiletime_updater_base_url() -> &'static str {
     match option_env!("SIPALYZER_UPDATER_BASE_URL") {
         Some(value) => value,
@@ -61,13 +53,13 @@ pub struct UpdaterReleaseInfo {
 }
 
 fn updater_pubkey() -> Option<String> {
-    // Runtime env overrides are dev-only; release builds rely on compile-time values.
+    // Runtime env overrides are dev-only; release builds rely on tauri.conf updater key.
     let runtime_pubkey = if allow_runtime_updater_env_overrides() {
         std::env::var("SIPALYZER_UPDATER_PUBKEY").ok()
     } else {
         None
     };
-    let pubkey = runtime_pubkey.unwrap_or_else(|| compiletime_updater_pubkey().to_string());
+    let pubkey = runtime_pubkey.unwrap_or_default();
     let pubkey = pubkey.trim();
     if pubkey.is_empty() {
         return None;

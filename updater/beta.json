@@ -4,7 +4,7 @@
   "pub_date": "2026-04-28T14:33:25Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSWXd1SE40ckZ3K29maU51d3pPUHRBeUoxbFpNQzhNd0kxWEtsSnN2VFVsaTFtVVBLZnhrSjFZTzFkYjFnNHhVTkgraHZvaEg1NEdlM01qdkhNUlMxT1BZRkpMTW1LZndNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3Mzg1MDIwCWZpbGU6U0lQYWx5emVyLmFwcC50YXIuZ3oKU2EzWTJ1M3NScTl6REw5bi9FSTJRa2pIVitzaEdvdGd0SFdrK3Mwcm5ORG5MTy9QTU9pejJrSTRhNVNTaUV6UzExazBUMDFWVHI1THJWK1JsQ3dsRGc9PQo=",
+      "signature": "untrusted comment: signature from tauri secret key\nRURYwuHN4rFw+ofiNuwzOPtAyJ1lZMC8MwI1XKlJsvTUli1mUPKfxkJ1YO1db1g4xUNH+hvohH54Ge3MjvHMRS1OPYFJLMmKfwM=\ntrusted comment: timestamp:1777385020\tfile:SIPalyzer.app.tar.gz\nSa3Y2u3sRq9zDL9n/EI2QkjHV+shGotgtHWk+s0rnNDnLO/PMOiz2kI4a5SSiEzS11k0T01VTr5LrV+RlCwlDg==",
       "url": "https://github.com/zyfi1/sipalyzer/releases/download/v1.0.0-beta.8/SIPalyzer.app.tar.gz"
     }
   }

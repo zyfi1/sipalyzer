@@ -94,6 +94,14 @@ function isUpdaterNotConfiguredError(message: string | null | undefined): boolea
   );
 }
 
+function formatPublishedAt(value: string): string {
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleString();
+  }
+  return value;
+}
+
 async function searchLocations(search: string): Promise<LocationSuggestion[]> {
   if (search.length < 2) return [];
   try {
@@ -892,7 +900,7 @@ export function SettingsCenter({ isOpen, onClose }: SettingsCenterProps) {
                       <div className={settingsStyles.stack1}>
                         <p className={settingsStyles.fontMediumForeground}>Update available: {availableUpdate.version}</p>
                         {availableUpdate.publishedAt ? (
-                          <p className={settingsStyles.textXsMuted}>Published: {new Date(availableUpdate.publishedAt).toLocaleString()}</p>
+                          <p className={settingsStyles.textXsMuted}>Published: {formatPublishedAt(availableUpdate.publishedAt)}</p>
                         ) : null}
                       </div>
                     ) : (

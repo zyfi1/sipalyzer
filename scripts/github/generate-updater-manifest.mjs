@@ -36,7 +36,10 @@ function classifyPlatform(assetName) {
     return `linux-${detectArch(assetName)}`;
   }
   if (lower.endsWith(".app.tar.gz")) {
-    return `darwin-${detectArch(assetName)}`;
+    const arch = lower.includes("aarch64") || lower.includes("arm64")
+      ? "aarch64"
+      : (lower.includes("x86_64") || lower.includes("x64") ? "x86_64" : "aarch64");
+    return `darwin-${arch}`;
   }
   if (lower.endsWith(".msi") || lower.endsWith("-setup.exe")) {
     return `windows-${detectArch(assetName)}`;
@@ -77,7 +80,18 @@ async function fetchSignature(url, token) {
     const body = await response.text();
     throw new Error(`Failed to download signature (${response.status}): ${body}`);
   }
-  return (await response.text()).trim();
+  const raw = (await response.text()).trim();
+  // GitHub release assets may surface updater .sig files as a base64-encoded payload.
+  // The updater expects the decoded minisign text blob.
+  try {
+    const decoded = Buffer.from(raw, "base64").toString("utf8").trim();
+    if (decoded.startsWith("untrusted comment:")) {
+      return decoded;
+    }
+  } catch {
+    // Not base64-encoded; use raw string as-is.
+  }
+  return raw;
 }
 
 async function main() {
