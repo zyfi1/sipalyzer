@@ -493,7 +493,7 @@ impl CapturePipeline {
         let header = pcap::PacketHeader {
             ts: libc::timeval {
                 tv_sec: raw.timestamp_secs,
-                tv_usec: raw.timestamp_usecs as i32,
+                tv_usec: raw.timestamp_usecs as i64,
             },
             caplen: raw.data.len() as u32,
             len: raw.data.len() as u32,

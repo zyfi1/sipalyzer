@@ -231,10 +231,10 @@ jobs:
         if: matrix.target != 'local-noop' && runner.os == 'Windows'
         shell: pwsh
         run: |
-          try {
-            choco install npcap --version=1.79 -y --no-progress
-          } catch {
-            Write-Host "Npcap install failed; continuing release build without runtime capture driver."
+          $ErrorActionPreference = "Continue"
+          choco install npcap -y --no-progress 2>&1 | Out-Host
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Npcap install skipped (exit $LASTEXITCODE); continuing without bundled Npcap driver."
           }
 
       - name: Install Linux dependencies (extended lane)

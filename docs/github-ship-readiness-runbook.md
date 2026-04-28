@@ -15,7 +15,7 @@ This is the practical update flow for this app, using your current channel model
 - Configure Actions secrets:
   - `TAURI_PRIVATE_KEY`
   - `TAURI_KEY_PASSWORD`
-  - `TAURI_UPDATER_PUBKEY`
+  - `TAURI_UPDATER_PUBKEY` (minisign public key line only; must match `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`)
 - Keep the repository visibility as `public` (required for GitHub-hosted updater assets).
 
 ## 2) App and updater essentials
