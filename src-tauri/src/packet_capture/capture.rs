@@ -980,7 +980,7 @@ impl CaptureSession {
                 let ip_header_len = ((ip_data[0] & 0x0F) * 4) as usize;
                 return Some(crate::packet_capture::PacketInfo {
                     timestamp: chrono::DateTime::from_timestamp(
-                        packet.header.ts.tv_sec,
+                        packet.header.ts.tv_sec.into(),
                         (packet.header.ts.tv_usec as u32) * 1000,
                     )
                     .unwrap_or_else(|| chrono::Utc::now()),

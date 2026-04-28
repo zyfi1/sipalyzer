@@ -3,7 +3,7 @@ members = ["crates/*"]
 
 [package]
 name = "sipalyzer"
-version = "1.0.0-beta.14"
+version = "1.0.0-beta.15"
 description = "SIPalyzer - Professional VoIP toolset for registration testing and diagnostics"
 authors = ["SIPalyzer"]
 license = ""
